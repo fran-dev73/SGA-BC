@@ -111,6 +111,7 @@ page 51126 "Cambiar Ubicaciones SGA"
 
     var
         rSeleccion: Record "Ubicacion SGA";
+        cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
         Resumen: Text;
         CambiarCapacidad: Boolean;
         Capacidad: Decimal;
@@ -136,59 +137,31 @@ page 51126 "Cambiar Ubicaciones SGA"
     begin
         rSeleccion.Copy(prm_Seleccion);
         Resumen := StrSubstNo(NumUbicacionesLbl, rSeleccion.Count());
-        conContenidoNum := ConContenido(rSeleccion);
+        conContenidoNum := cUbicaciones.ContarConContenido(rSeleccion);
         if conContenidoNum > 0 then
             Resumen += StrSubstNo(ConContenidoLbl, conContenidoNum);
     end;
 
     /// <summary>
-    /// Aplica lo marcado. Primero qué admite y luego la mezcla, porque la mezcla depende de que
-    /// el hueco sea de caja. Devuelve cuántas ubicaciones se han cambiado.
-    /// Las que tienen contenido se saltan: su configuración solo se cambia vacías (TestVacia de
-    /// la tabla). Cuántas y cuáles se saltaron lo dice Omitidas.
+    /// Aplica lo marcado a la selección con Cod. "Gestion Ubicaciones SGA". Devuelve cuántas
+    /// ubicaciones se han cambiado; las que tienen contenido se saltan y lo dice
+    /// UbicacionesOmitidas.
     /// </summary>
     procedure Aplicar(): Integer
     var
-        rUbicacion: Record "Ubicacion SGA";
-        hechas: Integer;
-        NadaQueCambiarErr: Label 'No ha marcado nada que cambiar.';
+        TempPlantilla: Record "Ubicacion SGA" temporary;
     begin
-        if not (CambiarCapacidad or CambiarAdmite or CambiarMezcla or CambiarTipoUbicacion or CambiarZona) then
-            Error(NadaQueCambiarErr);
+        // La plantilla solo lleva los valores: se asignan sin validar, porque las validaciones
+        // de la tabla son para una ubicación de verdad.
+        TempPlantilla."Tipo UM Admitida" := Admite;
+        TempPlantilla."Permite Mezcla Producto" := Mezcla;
+        TempPlantilla."Capacidad Uds." := Capacidad;
+        TempPlantilla."Tipo Ubicacion" := TipoUbicacion;
+        TempPlantilla."Cod. Zona SGA" := Zona;
 
-        Omitidas := 0;
-        OmitidasEjemplo := '';
-        rUbicacion.Copy(rSeleccion);
-        if not rUbicacion.FindSet(true) then
-            exit(0);
-
-        repeat
-            if rUbicacion.EstaVacia() then begin
-                if CambiarAdmite then
-                    rUbicacion.Validate("Tipo UM Admitida", Admite);
-                if CambiarMezcla then
-                    rUbicacion.Validate("Permite Mezcla Producto", Mezcla);
-                if CambiarCapacidad then
-                    rUbicacion.Validate("Capacidad Uds.", Capacidad);
-                if CambiarTipoUbicacion then
-                    rUbicacion.Validate("Tipo Ubicacion", TipoUbicacion);
-                if CambiarZona then
-                    rUbicacion."Cod. Zona SGA" := Zona;
-                // Con capacidad o clase nuevas, el % de ocupación y el estado cambian.
-                rUbicacion.RecalcularOcupacion();
-                rUbicacion.Modify(true);
-                hechas += 1;
-            end else begin
-                Omitidas += 1;
-                if Omitidas <= 5 then begin
-                    if OmitidasEjemplo <> '' then
-                        OmitidasEjemplo += ', ';
-                    OmitidasEjemplo += rUbicacion."Cod. Bin";
-                end;
-            end;
-        until rUbicacion.Next() = 0;
-
-        exit(hechas);
+        exit(cUbicaciones.AplicarCambiosUbicaciones(rSeleccion, TempPlantilla, CambiarCapacidad, CambiarAdmite,
+                                                    CambiarMezcla, CambiarTipoUbicacion, CambiarZona,
+                                                    Omitidas, OmitidasEjemplo));
     end;
 
     /// <summary>
@@ -199,19 +172,5 @@ page 51126 "Cambiar Ubicaciones SGA"
     begin
         prm_Ejemplo := OmitidasEjemplo;
         exit(Omitidas);
-    end;
-
-    local procedure ConContenido(var prm_Seleccion: Record "Ubicacion SGA"): Integer
-    var
-        rUbicacion: Record "Ubicacion SGA";
-        n: Integer;
-    begin
-        rUbicacion.Copy(prm_Seleccion);
-        if rUbicacion.FindSet() then
-            repeat
-                if not rUbicacion.EstaVacia() then
-                    n += 1;
-            until rUbicacion.Next() = 0;
-        exit(n);
     end;
 }

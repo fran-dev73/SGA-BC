@@ -41,7 +41,7 @@ codeunit 51102 "Gestion Mapa SGA"
             exit(0);
 
         repeat
-            if TrocearCodigo(rUbicacionSGA."Cod. Bin", nave, estanteria, columna, altura) then
+            if cUbicaciones.TrocearCodigo(rUbicacionSGA."Cod. Bin", nave, estanteria, columna, altura) then
                 if (prm_Nave = '') or (nave = prm_Nave) then begin
                     if columna > maxColumnasEncontradas then
                         maxColumnasEncontradas := columna;
@@ -68,17 +68,9 @@ codeunit 51102 "Gestion Mapa SGA"
         rContenido: Record "Contenido Ubicacion SGA";
     begin
         rContenido.SetRange("Cod. Almacen", prm_Buffer."Cod. Almacen");
-        rContenido.SetRange("Cod. Bin", CodUbicacionCelda(prm_Buffer."Cod. Nave", prm_Buffer."Cod. Estanteria",
-                                                          prm_Columna, prm_Buffer."Cod. Altura"));
+        rContenido.SetRange("Cod. Bin", cUbicaciones.ComponerCodigoUbicacion(prm_Buffer."Cod. Nave", prm_Buffer."Cod. Estanteria",
+                                                                             prm_Columna, prm_Buffer."Cod. Altura"));
         Page.Run(Page::"Contenido Ubicaciones SGA", rContenido);
-    end;
-
-    /// <summary>
-    /// Reconstruye el código de ubicación de una celda: A-01-15-3.
-    /// </summary>
-    procedure CodUbicacionCelda(prm_Nave: Code[1]; prm_Estanteria: Code[2]; prm_Columna: Integer; prm_Altura: Code[1]): Code[20]
-    begin
-        exit(CopyStr(prm_Nave + '-' + prm_Estanteria + '-' + DosDigitos(prm_Columna) + '-' + prm_Altura, 1, 20));
     end;
 
     /// <summary>
@@ -91,10 +83,6 @@ codeunit 51102 "Gestion Mapa SGA"
         exit(32);
     end;
 
-    /// <summary>
-    /// Trocea un código nave-estantería-columna-altura. Devuelve false si el código no sigue
-    /// el formato, para que el llamante lo descarte en lugar de dibujarlo en una celda falsa.
-    /// </summary>
     /// <summary>
     /// Devuelve las ubicaciones del almacén en JSON, para el mapa 3D.
     /// Cada elemento lleva las coordenadas físicas que el lienzo necesita para colocar el
@@ -127,7 +115,7 @@ codeunit 51102 "Gestion Mapa SGA"
             exit('[]');
 
         repeat
-            if TrocearCodigo(rUbicacionSGA."Cod. Bin", nave, estanteria, columna, altura) then
+            if cUbicaciones.TrocearCodigo(rUbicacionSGA."Cod. Bin", nave, estanteria, columna, altura) then
                 if ((prm_Nave = '') or (nave = prm_Nave)) and
                    ((prm_Estanteria = '') or (estanteria = prm_Estanteria))
                 then
@@ -285,29 +273,6 @@ codeunit 51102 "Gestion Mapa SGA"
     end;
 
     /// <summary>
-    /// Parte un código Nave-Estantería-Columna-Altura (p. ej. A-01-05-2). False si no tiene
-    /// esa forma. Lo usa también el análisis ABC para saber la altura de cada hueco.
-    /// </summary>
-    procedure TrocearCodigo(prm_Codigo: Code[20]; var prm_Nave: Code[1]; var prm_Estanteria: Code[2]; var prm_Columna: Integer; var prm_Altura: Code[1]): Boolean
-    var
-        partes: List of [Text];
-        texto: Text;
-    begin
-        texto := prm_Codigo;
-        partes := texto.Split('-');
-        if partes.Count() <> 4 then
-            exit(false);
-
-        if not Evaluate(prm_Columna, partes.Get(3)) then
-            exit(false);
-
-        prm_Nave := CopyStr(partes.Get(1), 1, MaxStrLen(prm_Nave));
-        prm_Estanteria := CopyStr(partes.Get(2), 1, MaxStrLen(prm_Estanteria));
-        prm_Altura := CopyStr(partes.Get(4), 1, MaxStrLen(prm_Altura));
-        exit(true);
-    end;
-
-    /// <summary>
     /// Deja el buffer posicionado en la fila de esa estantería y altura, creándola si hace falta.
     /// </summary>
     local procedure SituarFila(var prm_Buffer: Record "Buffer Mapa SGA"; prm_Almacen: Code[10]; prm_Nave: Code[1]; prm_Estanteria: Code[2]; prm_Altura: Code[1])
@@ -377,17 +342,6 @@ codeunit 51102 "Gestion Mapa SGA"
         end;
     end;
 
-    /// <summary>
-    /// Formatea un entero a dos dígitos con cero a la izquierda. No se usa PadStr porque
-    /// en AL rellena por la derecha: PadStr('5', 2, '0') devuelve '50', no '05'.
-    /// </summary>
-    local procedure DosDigitos(prm_Valor: Integer): Text
     var
-        texto: Text;
-    begin
-        texto := Format(prm_Valor);
-        if StrLen(texto) < 2 then
-            exit('0' + texto);
-        exit(texto);
-    end;
+        cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
 }

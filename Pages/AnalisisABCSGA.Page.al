@@ -41,8 +41,10 @@ page 51128 "Analisis ABC SGA"
                     TableRelation = Location;
 
                     trigger OnValidate()
+                    var
+                        rCalculo: Record "Calculo ABC SGA";
                     begin
-                        MostrarCalculo(UltimoCalculo(FiltroAlmacen));
+                        MostrarCalculo(rCalculo.UltimoDelAlmacen(FiltroAlmacen));
                     end;
                 }
                 field(Mostrar; Mostrar)
@@ -254,31 +256,15 @@ page 51128 "Analisis ABC SGA"
 
         rConfig.ObtenerConfig();
         FiltroAlmacen := rConfig."Almacen por Defecto";
-        MostrarCalculo(UltimoCalculo(FiltroAlmacen));
+        MostrarCalculo(rCalculo.UltimoDelAlmacen(FiltroAlmacen));
     end;
 
     trigger OnAfterGetRecord()
     begin
-        case Rec.Clase of
-            Rec.Clase::A:
-                EstiloClase := 'Favorable';
-            Rec.Clase::B:
-                EstiloClase := 'Ambiguous';
-            else
-                EstiloClase := 'Subordinate';
-        end;
-
-        EstiloCambio := 'Standard';
-        if Rec."Cambia Clase" then
-            EstiloCambio := 'Unfavorable';
-
-        EstiloUbicacion := 'Standard';
-        if Rec."Mal Ubicado" then
-            EstiloUbicacion := 'Unfavorable';
-
-        EstiloUnidad := 'Standard';
-        if Rec."Sin Unidad Pale" then
-            EstiloUnidad := 'Unfavorable';
+        EstiloClase := Rec.EstiloClaseABC();
+        EstiloCambio := Rec.EstiloClaseAnterior();
+        EstiloUbicacion := Rec.EstiloHuecoSuClase();
+        EstiloUnidad := Rec.EstiloUnidadPale();
     end;
 
     /// <summary>
@@ -289,26 +275,10 @@ page 51128 "Analisis ABC SGA"
         NoCalculo := prm_NoCalculo;
     end;
 
-    local procedure UltimoCalculo(prm_Almacen: Code[10]): Integer
-    var
-        rCalculo: Record "Calculo ABC SGA";
-    begin
-        rCalculo.SetCurrentKey("Cod. Almacen", "No.");
-        rCalculo.SetRange("Cod. Almacen", prm_Almacen);
-        if rCalculo.FindLast() then
-            exit(rCalculo."No.");
-        exit(0);
-    end;
-
     local procedure MostrarCalculo(prm_NoCalculo: Integer)
     var
         rCalculo: Record "Calculo ABC SGA";
-        InfoCalculoLbl: Label 'Nº %1 del %2 (%3). Ventas del %4 al %5. Cortes: A hasta %6 %, B hasta %7 %.', Comment = '%1 = nº, %2 = fecha, %3 = usuario, %4 = desde, %5 = hasta, %6 = corte A, %7 = corte B';
         SinCalculoLbl: Label 'Todavía no hay ningún cálculo de este almacén. Pulse "Calcular ahora".';
-        ResumenConcentracionLbl: Label 'El 20 % de los productos (%1 de %2) hace el %3 % de los palés salidos (%4 palés).', Comment = '%1 = productos top, %2 = productos, %3 = %, %4 = palés salidos';
-        ResumenClasesLbl: Label 'A: %1 productos (%2 palés en almacén) · B: %3 productos · C: %4 productos.', Comment = '%1 = productos A, %2 = palés A, %3 = productos B, %4 = productos C';
-        ResumenHuecosLbl: Label '%1 de %2 palés están en un hueco de su clase (%3 %). De los palés A, el %4 % está en huecos A. Huecos de picking y reserva: %5.', Comment = '%1 = bien ubicados, %2 = palés, %3 = %, %4 = % A en A, %5 = huecos';
-        ProductosSinUMPaleLbl: Label '%1 productos con ventas no tienen unidad de palé: quedan como C. Márquelos en la columna "Unidad de palé".', Comment = '%1 = nº productos';
     begin
         NoCalculo := prm_NoCalculo;
         Clear(ResumenConcentracion);
@@ -319,17 +289,8 @@ page 51128 "Analisis ABC SGA"
         if (NoCalculo = 0) or not rCalculo.Get(NoCalculo) then begin
             NoCalculo := 0;
             InfoCalculo := SinCalculoLbl;
-        end else begin
-            InfoCalculo := StrSubstNo(InfoCalculoLbl, rCalculo."No.", rCalculo."Fecha Calculo", rCalculo.Usuario,
-                                      rCalculo."Fecha Desde", rCalculo."Fecha Hasta", rCalculo."Corte A", rCalculo."Corte B");
-            ResumenConcentracion := StrSubstNo(ResumenConcentracionLbl, rCalculo."Productos Top 20", rCalculo.Productos,
-                                               rCalculo."% Salidas Top 20", rCalculo."Palets Salidos");
-            ResumenClases := StrSubstNo(ResumenClasesLbl, rCalculo."Productos A", rCalculo."Palets A", rCalculo."Productos B", rCalculo."Productos C");
-            ResumenHuecos := StrSubstNo(ResumenHuecosLbl, rCalculo."Palets Hueco Su Clase", rCalculo."Palets en Almacen",
-                                        rCalculo.PorcentajeBienUbicados(), rCalculo.PorcentajeAEnHuecosA(), rCalculo."Huecos Utiles");
-            if rCalculo."Productos Sin UM Pale" > 0 then
-                ResumenAvisos := StrSubstNo(ProductosSinUMPaleLbl, rCalculo."Productos Sin UM Pale");
-        end;
+        end else
+            rCalculo.TextosResumen(InfoCalculo, ResumenConcentracion, ResumenClases, ResumenHuecos, ResumenAvisos);
 
         AplicarFiltros();
     end;

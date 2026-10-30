@@ -75,15 +75,43 @@ codeunit 51100 "Gestion Contenido SGA"
     /// </summary>
     procedure Desubicar(var prm_Contenido: Record "Contenido Ubicacion SGA"): Integer
     var
-        LineaReservadaErr: Label 'La línea de %1 en %2 tiene %3 reservadas por una orden de picking. Cancele antes la orden o la parada.', Comment = '%1 = producto, %2 = ubicación, %3 = cantidad reservada';
         DesubicadoLbl: Label 'Quitado de la ubicación: pendiente de ubicar.';
     begin
-        if prm_Contenido."Cantidad Reservada" > 0 then
-            Error(LineaReservadaErr, prm_Contenido."No. Producto", prm_Contenido."Cod. Bin", prm_Contenido."Cantidad Reservada");
+        ComprobarSinReserva(prm_Contenido);
 
         exit(RegistrarSalida(prm_Contenido."Cod. Almacen", prm_Contenido."Cod. Bin", prm_Contenido."No. Producto",
                              prm_Contenido."Cod. Variante", prm_Contenido."No. Lote", prm_Contenido."Cod. Unidad Medida",
                              prm_Contenido.Cantidad, "Origen Mov. SGA"::Manual, '', 0, DesubicadoLbl));
+    end;
+
+    /// <summary>
+    /// Saca de su ubicación, enteras, las líneas de contenido del conjunto recibido (filtros o
+    /// marcas de la selección) y las deja sin ubicar. Todo o nada: si una línea está reservada
+    /// por una orden de picking, no se saca ninguna. Devuelve cuántas líneas ha sacado.
+    /// </summary>
+    procedure DesubicarLineas(var prm_Contenido: Record "Contenido Ubicacion SGA"): Integer
+    var
+        TempContenidoCopia: Record "Contenido Ubicacion SGA" temporary;
+        lineas: Integer;
+    begin
+        if not prm_Contenido.FindSet() then
+            exit(0);
+
+        // Primero se comprueba todo y se copia a una temporal: cada salida borra su línea al
+        // dejarla a cero, y recorrer la tabla real mientras se borra podría saltarse líneas.
+        repeat
+            ComprobarSinReserva(prm_Contenido);
+            TempContenidoCopia := prm_Contenido;
+            TempContenidoCopia.Insert();
+        until prm_Contenido.Next() = 0;
+
+        TempContenidoCopia.FindSet();
+        repeat
+            Desubicar(TempContenidoCopia);
+            lineas += 1;
+        until TempContenidoCopia.Next() = 0;
+
+        exit(lineas);
     end;
 
     /// <summary>
@@ -93,8 +121,6 @@ codeunit 51100 "Gestion Contenido SGA"
     procedure VaciarUbicacion(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]): Integer
     var
         rContenido: Record "Contenido Ubicacion SGA";
-        TempContenidoCopia: Record "Contenido Ubicacion SGA" temporary;
-        lineas: Integer;
         UbicacionReservadaErr: Label 'La ubicación %1 tiene contenido reservado por órdenes de picking. Cancele antes esas órdenes o paradas.', Comment = '%1 = ubicación';
     begin
         rContenido.SetRange("Cod. Almacen", prm_Almacen);
@@ -104,20 +130,54 @@ codeunit 51100 "Gestion Contenido SGA"
             Error(UbicacionReservadaErr, prm_Ubicacion);
         rContenido.SetRange("Cantidad Reservada");
 
-        // Copia antes de sacar: cada salida borra su línea al dejarla a cero.
-        if rContenido.FindSet() then
-            repeat
-                TempContenidoCopia := rContenido;
-                TempContenidoCopia.Insert();
-            until rContenido.Next() = 0;
+        exit(DesubicarLineas(rContenido));
+    end;
 
-        if TempContenidoCopia.FindSet() then
-            repeat
-                Desubicar(TempContenidoCopia);
-                lineas += 1;
-            until TempContenidoCopia.Next() = 0;
+    /// <summary>
+    /// Bloquea la línea de contenido si está libre y la desbloquea si está bloqueada. Al
+    /// bloquear, el motivo deja trazado quién y cuándo; el detalle se matiza luego en la línea.
+    /// </summary>
+    procedure AlternarBloqueo(var prm_Contenido: Record "Contenido Ubicacion SGA")
+    var
+        motivo: Text[50];
+        BloqueadoPorLbl: Label 'Bloqueado por %1 el %2', Comment = '%1 = usuario, %2 = fecha';
+    begin
+        if prm_Contenido.Bloqueado then begin
+            BloquearContenido(prm_Contenido, false, '');
+            exit;
+        end;
 
-        exit(lineas);
+        motivo := CopyStr(StrSubstNo(BloqueadoPorLbl, UserId(), Format(Today())), 1, MaxStrLen(motivo));
+        BloquearContenido(prm_Contenido, true, motivo);
+    end;
+
+    /// <summary>
+    /// Traslada una línea de contenido con el diálogo "Mover Contenido SGA": el operario
+    /// confirma destino, cantidad y motivo. Con prm_Destino relleno el diálogo sale con ese
+    /// destino propuesto; al confirmar, prm_Destino devuelve el destino elegido de verdad.
+    /// Si el motivo va vacío, el movimiento lleva prm_DescripcionPorDefecto.
+    /// Devuelve el nº de movimiento, o 0 si el operario cancela.
+    /// </summary>
+    procedure TrasladarConDialogo(var prm_Contenido: Record "Contenido Ubicacion SGA"; var prm_Destino: Code[20]; prm_DescripcionPorDefecto: Text): Integer
+    var
+        pMover: Page "Mover Contenido SGA";
+        descripcion: Text;
+    begin
+        pMover.Inicializar(prm_Contenido);
+        if prm_Destino <> '' then
+            pMover.FijarDestino(prm_Destino);
+        if pMover.RunModal() <> Action::OK then
+            exit(0);
+
+        prm_Destino := pMover.ObtenerDestino();
+        descripcion := pMover.ObtenerMotivo();
+        if descripcion = '' then
+            descripcion := prm_DescripcionPorDefecto;
+
+        exit(RegistrarTraslado(prm_Contenido."Cod. Almacen", prm_Contenido."Cod. Bin", prm_Destino,
+                               prm_Contenido."No. Producto", prm_Contenido."Cod. Variante", prm_Contenido."No. Lote",
+                               prm_Contenido."Cod. Unidad Medida", pMover.ObtenerCantidad(),
+                               "Origen Mov. SGA"::Manual, '', 0, descripcion));
     end;
 
     /// <summary>
@@ -212,7 +272,7 @@ codeunit 51100 "Gestion Contenido SGA"
     /// <summary>
     /// Bloquea o desbloquea una línea de contenido.
     /// </summary>
-    procedure BloquearContenido(var rContenido: Record "Contenido Ubicacion SGA"; prm_Bloquear: Boolean; prm_Motivo: Text[50])
+    local procedure BloquearContenido(var rContenido: Record "Contenido Ubicacion SGA"; prm_Bloquear: Boolean; prm_Motivo: Text[50])
     begin
         rContenido.Bloqueado := prm_Bloquear;
         if prm_Bloquear then
@@ -282,6 +342,18 @@ codeunit 51100 "Gestion Contenido SGA"
         LimpiarContenidoVacio(prm_Almacen);
         cPicking.RecalcularReservasAlmacen(prm_Almacen);
         cUbicaciones.RecalcularEstados(prm_Almacen);
+    end;
+
+    /// <summary>
+    /// Una línea con cantidad reservada por una orden de picking no se puede sacar de su
+    /// ubicación: la orden se quedaría sin el stock que tiene que recoger.
+    /// </summary>
+    local procedure ComprobarSinReserva(var prm_Contenido: Record "Contenido Ubicacion SGA")
+    var
+        LineaReservadaErr: Label 'La línea de %1 en %2 tiene %3 reservadas por una orden de picking. Cancele antes la orden o la parada.', Comment = '%1 = producto, %2 = ubicación, %3 = cantidad reservada';
+    begin
+        if prm_Contenido."Cantidad Reservada" > 0 then
+            Error(LineaReservadaErr, prm_Contenido."No. Producto", prm_Contenido."Cod. Bin", prm_Contenido."Cantidad Reservada");
     end;
 
     local procedure AplicarMovimiento(prm_Tipo: Enum "Tipo Mov. Ubicacion SGA"; prm_Origen: Enum "Origen Mov. SGA"; prm_Almacen: Code[10]; prm_UbicacionOrigen: Code[20]; prm_UbicacionDestino: Code[20]; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50]; prm_UM: Code[10]; prm_Cantidad: Decimal; prm_NoDocumento: Code[20]; prm_NoLinea: Integer; prm_Descripcion: Text): Integer

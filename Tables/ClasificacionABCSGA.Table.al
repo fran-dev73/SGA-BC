@@ -137,4 +137,51 @@ table 51113 "Clasificacion ABC SGA"
         {
         }
     }
+
+    /// <summary>
+    /// Estilo de la columna Clase: A en verde, B en ámbar y C apagada.
+    /// </summary>
+    procedure EstiloClaseABC(): Text
+    begin
+        case Clase of
+            Clase::A:
+                exit('Favorable');
+            Clase::B:
+                exit('Ambiguous');
+        end;
+
+        exit('Subordinate');
+    end;
+
+    /// <summary>
+    /// Estilo de la clase anterior: en rojo si el producto cambia de clase.
+    /// </summary>
+    procedure EstiloClaseAnterior(): Text
+    begin
+        exit(EstiloAviso("Cambia Clase"));
+    end;
+
+    /// <summary>
+    /// Estilo de los palés en hueco de su clase: en rojo si tiene palés fuera de su clase.
+    /// </summary>
+    procedure EstiloHuecoSuClase(): Text
+    begin
+        exit(EstiloAviso("Mal Ubicado"));
+    end;
+
+    /// <summary>
+    /// Estilo de la unidad de palé: en rojo si el producto no la tiene.
+    /// </summary>
+    procedure EstiloUnidadPale(): Text
+    begin
+        exit(EstiloAviso("Sin Unidad Pale"));
+    end;
+
+    local procedure EstiloAviso(prm_Aviso: Boolean): Text
+    begin
+        if prm_Aviso then
+            exit('Unfavorable');
+
+        exit('Standard');
+    end;
 }

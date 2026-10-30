@@ -147,10 +147,6 @@ page 51120 "Lineas Orden Picking Subpag"
     trigger OnAfterGetRecord()
     begin
         EstiloFila := Rec.EstiloEstado();
-
-        if Rec.HayDesvio() then
-            EstiloDesvio := 'Attention'
-        else
-            EstiloDesvio := 'Standard';
+        EstiloDesvio := Rec.EstiloUbicacionConfirmada();
     end;
 }

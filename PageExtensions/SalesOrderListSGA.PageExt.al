@@ -113,20 +113,9 @@ pageextension 51108 "Sales Order List SGA" extends "Sales Order List"
     /// </summary>
     local procedure MostrarSoloEstado(prm_Estado: Enum "Estado Preparacion SGA")
     var
-        rCabecera: Record "Sales Header";
         cPicking: Codeunit "Gestion Picking SGA";
     begin
-        Rec.ClearMarks();
-        Rec.MarkedOnly(false);
-        rCabecera.CopyFilters(Rec);
-        if rCabecera.FindSet() then
-            repeat
-                if cPicking.EstadoPreparacionVenta(rCabecera) = prm_Estado then begin
-                    Rec.Get(rCabecera."Document Type", rCabecera."No.");
-                    Rec.Mark(true);
-                end;
-            until rCabecera.Next() = 0;
-        Rec.MarkedOnly(true);
+        cPicking.MarcarVentasPorEstado(Rec, prm_Estado);
         CurrPage.Update(false);
     end;
 }

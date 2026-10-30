@@ -6,6 +6,7 @@ using Microsoft.Inventory.Ledger;
 using Microsoft.Inventory.Tracking;
 using Microsoft.Sales.Document;
 using Microsoft.Sales.History;
+using System.Security.User;
 
 /// <summary>
 /// Codeunit Gestion Picking SGA (ID 51104).
@@ -247,7 +248,8 @@ codeunit 51104 "Gestion Picking SGA"
     /// <summary>
     /// Confirma que el preparador ha recogido una cantidad base de una parada. Es el punto en
     /// el que el stock sale de la ubicación y queda la huella en el diario de movimientos.
-    /// Con prm_Bin en blanco se da por buena la ubicación propuesta.
+    /// Con "Exigir Confirmar Ubicacion" la ubicación de la que se recoge es obligatoria; sin
+    /// ella, prm_Bin en blanco da por buena la ubicación propuesta.
     /// </summary>
     procedure ConfirmarLinea(var prm_Linea: Record "Linea Orden Picking SGA"; prm_Bin: Code[20]; prm_Cantidad: Decimal; prm_DigitoControl: Text)
     var
@@ -261,10 +263,15 @@ codeunit 51104 "Gestion Picking SGA"
         CantidadExcedePendienteErr: Label 'No puede recoger %1: quedan %2 pendientes en esta parada.', Comment = '%1 = cantidad indicada, %2 = cantidad pendiente';
         DesvioNoPermitidoErr: Label 'La configuración no permite recoger de una ubicación distinta de la propuesta (%1).', Comment = '%1 = ubicación propuesta';
         UbicacionNoIndicadaErr: Label 'Indique de qué ubicación ha recogido la mercancía.';
+        UbicacionNoEscaneadaErr: Label 'Escanee o teclee la ubicación de la que ha recogido.';
         DescripcionSalidaLbl: Label 'Picking %1 del documento %2', Comment = '%1 = nº orden, %2 = documento origen';
     begin
         if prm_Cantidad <= 0 then
             Error(CantidadNoPositivaErr);
+
+        rConfig.ObtenerConfig();
+        if rConfig."Exigir Confirmar Ubicacion" and (prm_Bin = '') then
+            Error(UbicacionNoEscaneadaErr);
 
         if prm_Linea.Estado = prm_Linea.Estado::Cancelada then
             Error(LineaCanceladaErr);
@@ -279,7 +286,6 @@ codeunit 51104 "Gestion Picking SGA"
         if binReal = '' then
             Error(UbicacionNoIndicadaErr);
 
-        rConfig.ObtenerConfig();
         if not rConfig.DesvioPermitido(prm_Linea."Cod. Bin Propuesto", binReal) then
             Error(DesvioNoPermitidoErr, prm_Linea."Cod. Bin Propuesto");
 
@@ -347,7 +353,7 @@ codeunit 51104 "Gestion Picking SGA"
         rLinea: Record "Linea Orden Picking SGA";
     begin
         rLinea.SetRange("No. Orden", prm_Orden."No. Orden");
-        rLinea.SetFilter(Estado, '%1|%2', rLinea.Estado::Pendiente, rLinea.Estado::Parcial);
+        rLinea.FiltrarPendientes();
         if rLinea.FindSet() then
             repeat
                 rLinea.Estado := rLinea.Estado::Cancelada;
@@ -432,6 +438,70 @@ codeunit 51104 "Gestion Picking SGA"
     end;
 
     /// <summary>
+    /// Asigna (o desasigna, con prm_Usuario en blanco) todas las órdenes del conjunto recibido
+    /// (filtros o marcas de la selección). Devuelve cuántas ha tocado.
+    /// </summary>
+    procedure AsignarOrdenes(var prm_Orden: Record "Orden Picking SGA"; prm_Usuario: Code[50]): Integer
+    var
+        hechas: Integer;
+    begin
+        // Por la clave primaria: asignar cambia el estado, que encabeza la clave de la página,
+        // y recorrer por ella mientras se modifica saltaría órdenes.
+        prm_Orden.SetCurrentKey("No. Orden");
+        if prm_Orden.FindSet(true) then
+            repeat
+                AsignarOrden(prm_Orden, prm_Usuario);
+                hechas += 1;
+            until prm_Orden.Next() = 0;
+
+        exit(hechas);
+    end;
+
+    /// <summary>
+    /// Suma prm_Delta a la prioridad de las órdenes del conjunto recibido, sin bajar de cero.
+    /// </summary>
+    procedure CambiarPrioridad(var prm_Orden: Record "Orden Picking SGA"; prm_Delta: Integer)
+    begin
+        // Por la clave primaria: la prioridad forma parte de la clave de la página, y recorrer
+        // por ella mientras se modifica podría visitar dos veces la misma orden.
+        prm_Orden.SetCurrentKey("No. Orden");
+        if prm_Orden.FindSet(true) then
+            repeat
+                if prm_Orden.Prioridad + prm_Delta < 0 then
+                    prm_Orden.Validate(Prioridad, 0)
+                else
+                    prm_Orden.Validate(Prioridad, prm_Orden.Prioridad + prm_Delta);
+                prm_Orden.Modify(true);
+            until prm_Orden.Next() = 0;
+    end;
+
+    /// <summary>
+    /// Con "Exigir Asignacion Picking", solo un responsable de picking (marcado en
+    /// Configuración de usuarios) puede repartir órdenes o cambiar su prioridad. Sin ella, el
+    /// reparto es libre, igual que el preparador se asigna solo las que coge.
+    ///
+    /// Se comprueba por código y no solo con el conjunto de permisos porque los conjuntos
+    /// estándar de BC suelen dar ejecución sobre todas las páginas.
+    /// </summary>
+    procedure ComprobarResponsablePicking()
+    var
+        rConfig: Record "Config. SGA";
+        rUserSetup: Record "User Setup";
+        NoResponsablePickingErr: Label 'Solo un responsable de picking puede asignar órdenes o cambiar su prioridad. Pida que le marquen "Responsable picking SGA" en Configuración de usuarios.';
+    begin
+        rConfig.ObtenerConfig();
+        if not rConfig."Exigir Asignacion Picking" then
+            exit;
+
+        rUserSetup.SetLoadFields("Responsable Picking SGA");
+        if rUserSetup.Get(UserId()) then
+            if rUserSetup."Responsable Picking SGA" then
+                exit;
+
+        Error(NoResponsablePickingErr);
+    end;
+
+    /// <summary>
     /// Deja que el usuario actual prepare la orden, o se para. Con asignación exigida solo
     /// puede el asignado. Sin ella, una orden sin preparador pasa a ser suya, y una de otro
     /// se la queda si confirma. Devuelve false si el usuario no confirma.
@@ -453,6 +523,31 @@ codeunit 51104 "Gestion Picking SGA"
 
         AsignarOrden(prm_Orden, usuario);
         exit(true);
+    end;
+
+    /// <summary>
+    /// Abre la pantalla del preparador sobre las paradas pendientes de la orden. Quien abre la
+    /// preparación pasa a ser el preparador, para que otro no la coja a la vez; con asignación
+    /// exigida, solo entra el asignado. Se guarda antes de abrir, porque la pantalla se abre
+    /// sin esperar y el preparador confirma parada a parada.
+    /// </summary>
+    procedure AbrirPreparacion(var prm_Orden: Record "Orden Picking SGA")
+    var
+        rLinea: Record "Linea Orden Picking SGA";
+        SinParadasPendientesErr: Label 'La orden %1 no tiene paradas pendientes.', Comment = '%1 = nº orden';
+    begin
+        rLinea.SetRange("No. Orden", prm_Orden."No. Orden");
+        rLinea.FiltrarPendientes();
+        if rLinea.IsEmpty() then
+            Error(SinParadasPendientesErr, prm_Orden."No. Orden");
+
+        // Se lee la orden de nuevo: la que llega de la página puede no estar al día.
+        prm_Orden.Get(prm_Orden."No. Orden");
+        if not TomarParaPreparar(prm_Orden) then
+            exit;
+        Commit();
+
+        Page.Run(Page::"Preparar Picking SGA", rLinea);
     end;
 
     /// <summary>
@@ -480,9 +575,14 @@ codeunit 51104 "Gestion Picking SGA"
             Error(OrdenAsignadaOtroErr, prm_Orden."No. Orden", prm_Orden."Cod. Usuario Asignado");
     end;
 
-    local procedure UsuarioActual(): Code[50]
+    /// <summary>
+    /// Usuario actual tal como se guarda en "Cod. Usuario Asignado" de la orden.
+    /// </summary>
+    procedure UsuarioActual(): Code[50]
+    var
+        rOrden: Record "Orden Picking SGA";
     begin
-        exit(CopyStr(UserId(), 1, 50));
+        exit(CopyStr(UserId(), 1, MaxStrLen(rOrden."Cod. Usuario Asignado")));
     end;
 
     /// <summary>
@@ -552,6 +652,24 @@ codeunit 51104 "Gestion Picking SGA"
 
         prm_Orden."Fecha Paso a Documento" := CurrentDateTime();
         prm_Orden.Modify();
+    end;
+
+    /// <summary>
+    /// Pasa al pedido de venta lo recogido en sus órdenes de picking. Basta con una orden: el
+    /// paso al pedido suma todas las del pedido.
+    /// </summary>
+    procedure PasarAPedidoDeVenta(prm_NoPedido: Code[20])
+    var
+        rOrden: Record "Orden Picking SGA";
+        PedidoSinOrdenesErr: Label 'El pedido %1 no tiene órdenes de picking.', Comment = '%1 = nº pedido';
+    begin
+        rOrden.SetCurrentKey("No. Documento Origen");
+        rOrden.SetRange("No. Documento Origen", prm_NoPedido);
+        rOrden.SetRange(Origen, rOrden.Origen::Venta);
+        if not rOrden.FindLast() then
+            Error(PedidoSinOrdenesErr, prm_NoPedido);
+
+        PasarAPedido(rOrden);
     end;
 
     /// <summary>
@@ -706,7 +824,7 @@ codeunit 51104 "Gestion Picking SGA"
         rLinea.SetRange("Cod. Variante", prm_Variante);
         rLinea.SetRange("Cod. Almacen", prm_Almacen);
         rLinea.SetRange("Cod. Bin Propuesto", prm_Bin);
-        rLinea.SetFilter(Estado, '%1|%2', rLinea.Estado::Pendiente, rLinea.Estado::Parcial);
+        rLinea.FiltrarPendientes();
         rLinea.CalcSums("Cantidad Pendiente");
         reserva := rLinea."Cantidad Pendiente";
 
@@ -756,7 +874,7 @@ codeunit 51104 "Gestion Picking SGA"
 
         if prm_Almacen <> '' then
             rLinea.SetRange("Cod. Almacen", prm_Almacen);
-        rLinea.SetFilter(Estado, '%1|%2', rLinea.Estado::Pendiente, rLinea.Estado::Parcial);
+        rLinea.FiltrarPendientes();
         if rLinea.FindSet() then
             repeat
                 RecalcularReserva(rLinea."Cod. Almacen", rLinea."Cod. Bin Propuesto", rLinea."No. Producto", rLinea."Cod. Variante", rLinea."No. Lote");
@@ -805,6 +923,29 @@ codeunit 51104 "Gestion Picking SGA"
         if conAlgo > 0 then
             exit("Estado Preparacion SGA"::Parcial);
         exit("Estado Preparacion SGA"::"Sin Preparar");
+    end;
+
+    /// <summary>
+    /// Marca los pedidos del conjunto recibido (sus filtros) que están en ese estado de
+    /// preparación y deja ver solo esos. El estado no es un campo de la tabla y no se puede
+    /// filtrar: se marca. Trabaja sobre las marcas del propio registro, así que la lista pasa
+    /// su Rec.
+    /// </summary>
+    procedure MarcarVentasPorEstado(var prm_Venta: Record "Sales Header"; prm_Estado: Enum "Estado Preparacion SGA")
+    var
+        rCabecera: Record "Sales Header";
+    begin
+        prm_Venta.ClearMarks();
+        prm_Venta.MarkedOnly(false);
+        rCabecera.CopyFilters(prm_Venta);
+        if rCabecera.FindSet() then
+            repeat
+                if EstadoPreparacionVenta(rCabecera) = prm_Estado then begin
+                    prm_Venta.Get(rCabecera."Document Type", rCabecera."No.");
+                    prm_Venta.Mark(true);
+                end;
+            until rCabecera.Next() = 0;
+        prm_Venta.MarkedOnly(true);
     end;
 
     /// <summary>

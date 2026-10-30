@@ -226,9 +226,6 @@ Tabla de **configuración única** del módulo. Se crea automáticamente la prim
 Métodos:
 - `ObtenerConfig()`: lee la configuración y la crea vacía la primera vez.
 - `TestUbicacionConfigurada(Ubicacion, NombreCampo)`: error si una ubicación de flujo no está configurada.
-- `ComprobarResponsablePicking()`: con `Exigir Asignacion Picking`, error si el usuario no es
-  responsable de picking (`Responsable Picking SGA` en Configuración de usuarios). La usan
-  `Orden Picking SGA` (asignar y prioridad) y `Pag51124`; ver *Asignación: el paso intermedio*.
 - `DesvioPermitido(Propuesta, Confirmada): Boolean`: regla de desvío única. Devuelve verdadero si
   la ubicación confirmada es la propuesta o si `Permitir Desvio Ubicacion` está activo. Trabaja sobre
   la configuración ya leída con `ObtenerConfig`. La usan `Cod51101.ConfirmarReparto` (solo en líneas con
@@ -290,7 +287,8 @@ Methods:
 ├─ ActualizarEstado()       — Diferencia y Estado
 ├─ FiltrarUsuarioActual()   — SetRange del usuario actual, sin Reset ni
 │                             FilterGroup (la página lo llama en su FilterGroup 2)
-└─ EstiloConciliacion()
+├─ EstiloConciliacion()
+└─ EstiloEnDocumentos()     — ámbar si hay En Documentos (Pendiente de ubicar)
 ```
 
 Se rellena cuando lanzas el informe *Conciliar con el stock*. Cada usuario ve sus propios resultados (scoped).
@@ -327,8 +325,14 @@ Triggers:
 
 Methods:
 ├─ RecalcularEstado()        — Recalcula el estado desde las líneas
-└─ EstiloEstado() -> Text    — Color para la UI (Favorable si Finalizada, etc.)
+├─ Progreso(var Hechas, var Total) — Paradas recogidas de las no canceladas; solo usa
+│                              No. Orden (la pantalla del preparador no lee la orden)
+├─ EstiloEstado() -> Text    — Color para la UI (Favorable si Finalizada, etc.)
+└─ EstiloFechaEnvio() -> Text — En rojo si la fecha de envío ya ha llegado
 ```
+
+El FlowField `Lineas Pendientes` lleva escrito el filtro `Pendiente|Parcial`, el mismo de
+`Linea Orden Picking SGA.FiltrarPendientes`: una `CalcFormula` no puede llamar a un procedimiento.
 
 Una orden es el **guion del recorrido**: dónde ir, qué coger, cuánto. **No mueve stock**: lo mueve `ConfirmarLinea` al confirmar cada parada.
 
@@ -365,8 +369,14 @@ Triggers:
 
 Methods:
 ├─ ActualizarPendiente()       — Recalcula Cantidad Pendiente y Estado
+├─ FiltrarPendientes()         — Estado Pendiente|Parcial; no toca la clave ni el resto
+│                                de filtros. Es el único sitio con ese filtro en código
+├─ CantidadBaseDesdeDocumento(Cantidad, PendienteDocumento) -> Decimal
+│                              — Lo tecleado en la UM del pedido, en base; si es lo
+│                                pendiente, el pendiente exacto (sin restos de redondeo)
 ├─ EstiloEstado() -> Text      — Color para UI
-└─ HayDesvio() -> Boolean      — ¿Se recogió de otra ubicación?
+├─ HayDesvio() -> Boolean      — ¿Se recogió de otra ubicación?
+└─ EstiloUbicacionConfirmada() -> Text — Resaltada si hay desvío
 ```
 
 Una línea es **una parada**: ir a una ubicación, coger un producto y lote específicos en una cantidad. Si la ubicación tiene 100 cajas del mismo lote, es una parada. Si después hay 50 cajas del mismo producto pero lote diferente en otra ubicación, es otra parada.
@@ -384,8 +394,9 @@ Preparada SGA` − *Quantity Shipped*) con lo pendiente: todas completas → *Pr
 algo → *Parcial*; ninguna → *Sin preparar*; sin nada pendiente → en blanco. Se calcula al momento
 y no se guarda: guardarlo obligaría a recalcularlo al registrar envíos de BC, y SGA no se engancha
 al registro. Por eso en la lista de pedidos (Pag-Ext 51108) no se filtra con los filtros
-estándar: las acciones *Ver preparados* / *Ver preparados en parte* marcan los pedidos
-(`Mark` + `MarkedOnly`). Coste: en la lista se calcula por cada pedido que se pinta.
+estándar: las acciones *Ver preparados* / *Ver preparados en parte* llaman a
+`Cod51104.MarcarVentasPorEstado` con el `Rec` de la lista, que marca los pedidos (`Mark` +
+`MarkedOnly`). Coste: en la lista se calcula por cada pedido que se pinta.
 
 ### Navegación: sin menú propio
 
@@ -442,9 +453,31 @@ PUBLIC PROCEDURES (son los puntos de entrada):
                          Caducidad, UM, CantidadBase, Origen)
 │  └─ Solo en la carga inicial: distribuye el stock que BC tenía.
 │
-├─ BloquearContenido(Almacen, Ubicacion, Producto, Variante, Lote, 
-                     Caducidad, Bloqueado, MotivoBloq)
-│  └─ Marca línea como bloqueada o la desbloquea.
+├─ Desubicar(var Contenido) -> NoMovimiento
+│  └─ Saca una línea entera de su ubicación y la deja sin ubicar. Error si
+│     tiene reserva de picking.
+│
+├─ DesubicarLineas(var Contenido) -> Lineas
+│  └─ Lo mismo para todo el conjunto recibido (filtros o marcas de la
+│     selección). Todo o nada: comprueba las reservas de todas antes de tocar
+│     ninguna. Lo usa "Quitar de la ubicación" de Contenido Ubicaciones SGA.
+│
+├─ VaciarUbicacion(Almacen, Ubicacion) -> Lineas
+│  └─ Error si la ubicación tiene algo reservado; si no, DesubicarLineas con
+│     todo su contenido. Lo usan la ficha de la ubicación y el mapa 3D.
+│
+├─ AlternarBloqueo(var Contenido)
+│  └─ Bloquea la línea (motivo "Bloqueado por usuario el fecha") o la
+│     desbloquea. El bloqueo lo escribe el procedimiento local BloquearContenido.
+│
+├─ TrasladarConDialogo(var Contenido, var Destino, DescripcionPorDefecto)
+│                     -> NoMovimiento
+│  └─ Abre "Mover Contenido SGA" (con el destino propuesto si viene) y
+│     registra con RegistrarTraslado, origen Manual. Motivo vacío: la
+│     descripción por defecto. Devuelve en Destino el elegido; 0 si se cancela.
+│
+├─ FijarModoSilencioso(Silencioso)
+│  └─ Sin diálogos de confirmación (procesos por lotes).
 │
 ├─ FijarReserva(Almacen, Ubicacion, Producto, Variante, Lote, 
                 Caducidad, CantidadReservada)
@@ -505,17 +538,44 @@ PUBLIC:
 │
 ├─ GenerarUbicaciones(Almacen, Nave, RangoE, RangoC, RangoA, 
                       Zona, Tipo, Capacidad)
-│  └─ Crea de golpe N ubicaciones. Idempotente.
+│  └─ Crea de golpe N ubicaciones. Idempotente. El código lo compone
+│     ComponerCodigoUbicacion y la secuencia es estantería×10000 + columna×100
+│     + altura.
 │
-├─ ContarUbicaciones(Almacen, Estado)
-│  └─ SELECT COUNT(*) grouped by Estado.
+├─ ComponerCodigoUbicacion(Nave, Estanteria, Columna, Altura) -> Codigo
+│  └─ Formato A-01-05-2: la estantería llega con sus dos dígitos, la columna se
+│     rellena a dos y la altura va tal cual. Lo usan GenerarUbicaciones y la
+│     celda del mapa (Cod51102.AbrirContenidoCelda).
+│
+├─ TrocearCodigo(Codigo, var Nave, var Estanteria, var Columna, var Altura)
+│                -> Boolean
+│  └─ Lo contrario: false si no tiene cuatro partes o la columna no es un
+│     número. Lo usan el mapa (rejilla y 3D) y el análisis ABC (altura del hueco).
+│
+├─ AplicarCambiosUbicaciones(var Seleccion, var TempPlantilla, CambiarCapacidad,
+│                            CambiarAdmite, CambiarMezcla, CambiarTipo,
+│                            CambiarZona, var Omitidas, var Ejemplos) -> Hechas
+│  └─ "Cambiar en bloque": solo lo marcado, con el valor de la plantilla, y solo
+│     en ubicaciones vacías. Orden: Admite, Mezcla, Capacidad, Tipo (con
+│     Validate); la zona se asigna sin validar; RecalcularOcupacion y
+│     Modify(true). Las que tienen contenido se cuentan en Omitidas y las
+│     cinco primeras van en Ejemplos.
+│
+├─ ContarConContenido(var Seleccion) -> Integer
+│  └─ Cuántas de la selección tienen contenido (las que el cambio se salta).
+│
+├─ RegenerarDigitos(var Seleccion) -> Hechas
+│  └─ Dígito de control nuevo para la selección (Modify sin triggers).
+│
+├─ ContarUbicaciones(Almacen, Estado) -> Integer
+│  └─ Cuántas ubicaciones del almacén están en ese estado.
+│
+├─ ResumenUbicaciones(Almacen) -> Texto
+│  └─ "N ubicaciones: X vacías, Y llenas, Z bloqueadas." (resumen del mapa 3D).
 │
 ├─ UbicacionFijaProducto(Producto) -> Ubicacion
 │  └─ Si el producto tiene Shelf No. en su ficha, retorna eso.
 │     Si no, retorna el campo "Producto Fijo" de la Ubicacion SGA.
-│
-├─ SecuenciaDesdeTopologia(Nave, E, C, A) -> Integer
-│  └─ Convierte nav-00-01-00-01 a un número para ordenar picking.
 │
 ├─ ProponerUbicacionCon(Estrategia, Excluidas, Almacen, Producto, Variante,
 │                       Lote, UM, Cantidad, var Motivo) -> Ubicacion
@@ -560,11 +620,9 @@ PUBLIC:
 │     rellena BufferMapa con resumen por columna,
 │     retorna cuántas columnas había (para saber si caben en 20).
 │
-├─ CodUbicacionCelda(Nave, Estanteria, Columna, Altura) -> Cod
-│  └─ Reconstruye código: ej "A-01-03-02".
-│
 ├─ AbrirContenidoCelda(BufferRec, NumColumna)
-│  └─ Abre la página de Contenido filtrada por esa ubicación.
+│  └─ Abre la página de Contenido filtrada por esa ubicación; el código lo
+│     compone Cod51101.ComponerCodigoUbicacion.
 │
 ├─ PintarCelda(BufferRec, NumColumna) -> ResumenTexto, EstiloColor
 │  └─ Retorna lo que va dentro de la celda (ej: "5 prod (150 ud)")
@@ -599,6 +657,13 @@ PUBLIC:
 │
 ├─ LimpiarBuffer(var rStock: BufferConciliacion)
 │  └─ Borra las filas del usuario actual (FiltrarUsuarioActual) de BufferConciliacion.
+│
+├─ RegularizarConciliacion(var Fila) -> Boolean
+│  └─ "Regularizar en ubicación de ajustes" de la conciliación. Diferencia 0:
+│     avisa de que cuadra. Negativa (sobra en ubicaciones): avisa y no hace
+│     nada. Positiva: error si no hay ubicación de ajustes, Confirm y
+│     Cod51100.RegistrarAjuste; con movimiento, la fila queda con Stock SGA =
+│     Stock BC. True si ha registrado.
 │
 ├─ CargarPendienteUbicar(Almacen, var Pendiente temporal) -> Lineas
 │  └─ Una línea de BufferConciliacion (temporal) por lote con Diferencia > 0,
@@ -774,7 +839,7 @@ Report 51102 "Carga Inicial Contenido SGA"     (solo pide opciones y filtro de p
   han ocupado las anteriores, cosa que una simulación "sin escribir" no podría. El resultado
   sobrevive porque va en una tabla temporal (Tab51114 "Linea Ubicacion SGA"), que no entra en la
   vuelta atrás. Cargado es Estado Ubicado (con su ubicación); no cargado, Estado "Sin Sitio"
-  (con el motivo).
+  (con el motivo). La página pinta en rojo lo no cargado con `EstiloCargaInicial` de la tabla.
 - **Todo o nada.** Si algo falla a mitad, se deshace la carga entera. Los productos bloqueados se
   apartan antes (salen como no cargados) porque `AplicarMovimiento` los rechaza con error.
 - **Cursor de huecos de palé.** Los huecos vacíos sin producto fijo se recorren una sola vez en
@@ -813,12 +878,14 @@ Report "Conciliacion SGA vs Stock"
      (¿cuánto hay realmente en ubicaciones?)
   └─ Llama Cod51103.ClasificarYFiltrar()
      (compara, calcula Estado)
-  └─ Si hay "SinUbicar" (falta):
-     └─ Llama Cod51100.RegistrarAjuste()
-        (los mete en Ubicacion Ajustes automáticamente)
-  └─ Si hay "SobraEnSGA" (exceso):
-     └─ Avisa pero no regulariza (requiere investigación manual).
   └─ Abre página "Conciliacion SGA" con los resultados.
+
+Página "Conciliacion SGA", acción "Regularizar en ubicación de ajustes"
+  └─ Llama Cod51103.RegularizarConciliacion(fila)
+     └─ "SinUbicar" (falta): Confirm y Cod51100.RegistrarAjuste()
+        (lo mete en la ubicación de ajustes; la fila queda cuadrada)
+     └─ "SobraEnSGA" (exceso): avisa pero no regulariza
+        (hay que recontar las ubicaciones).
 ```
 
 ---
@@ -870,9 +937,12 @@ PUBLIC:
 │     Pendiente base). Reserva tras cada línea del pedido.
 │     Si hay stock insuficiente, crea la orden igual y avisa.
 │
-├─ ConfirmarLinea(var Linea, BinConfirmado, CantidadBase)
+├─ ConfirmarLinea(var Linea, BinConfirmado, CantidadBase, DigitoControl)
 │  └─ El preparador confirma haber recogido de una parada:
-│     - Valida ubicación confirmada y desvío según config.
+│     - Cantidad > 0; con "Exigir Confirmar Ubicacion", la ubicación
+│       escaneada es obligatoria (sin ella, en blanco = la propuesta).
+│     - Parada no cancelada y cantidad dentro de lo pendiente.
+│     - Desvío según config y dígito de control del hueco real.
 │     - Actualiza la parada y luego llama a RegistrarSalida.
 │     - Recalcula la reserva del hueco propuesto (y del real).
 │     - Recalcula estado de la orden.
@@ -884,8 +954,43 @@ PUBLIC:
 │  └─ Las del usuario abiertas; si no, la más antigua sin asignar,
 │     que pasa a ser suya.
 │
+├─ TomarParaPreparar(var Orden) -> Boolean / ComprobarPreparador(var Orden)
+│  └─ Ver "Asignación: el paso intermedio".
+│
+├─ AbrirPreparacion(var Orden)
+│  └─ Error si la orden no tiene paradas pendientes; vuelve a leer la
+│     orden y TomarParaPreparar (si no confirma, no abre); Commit y abre
+│     "Preparar Picking SGA" con sus paradas pendientes. Lo usan la lista
+│     y la ficha de órdenes.
+│
+├─ AsignarOrden(var Orden, Usuario) / AsignarOrdenes(var Orden, Usuario)
+│                                     -> Hechas
+│  └─ Validate + Modify(true) de una orden o de toda la selección (por
+│     clave primaria, porque asignar cambia el estado de la clave de la página).
+│
+├─ CambiarPrioridad(var Orden, Delta)
+│  └─ Suma Delta a la prioridad de la selección, sin bajar de cero, por
+│     clave primaria (la prioridad está en la clave de la página).
+│
+├─ ComprobarResponsablePicking()
+│  └─ Con "Exigir Asignacion Picking", error si el usuario no es
+│     responsable de picking (User Setup."Responsable Picking SGA").
+│
+├─ UsuarioActual() -> Code[50]
+│  └─ El usuario tal como se guarda en "Cod. Usuario Asignado".
+│
 ├─ PasarAPedido(var Orden)          (también OnRun, TableNo = Orden)
 │  └─ Escribe en el pedido Qty. to Ship y seguimiento por lote.
+│
+├─ PasarAPedidoDeVenta(NoPedido)
+│  └─ PasarAPedido con la última orden de venta del pedido (basta una:
+│     suma todas las del pedido). Error si no tiene ninguna.
+│
+├─ EstadoPreparacionVenta(Cabecera) / EstiloEstadoPreparacion(Estado)
+│  └─ Ver "Estado de preparación del pedido".
+│
+├─ MarcarVentasPorEstado(var Venta, Estado)
+│  └─ Marca los pedidos de la vista en ese estado y deja MarkedOnly.
 │
 └─ RecalcularReserva / RecalcularReservasOrden / RecalcularReservasAlmacen
    └─ Reserva de un hueco = Σ Cantidad Pendiente de sus paradas
@@ -923,8 +1028,9 @@ PRIVATE:
 4. Tras cada línea del pedido se reserva (`RecalcularReservasOrden`), para que la línea siguiente no vea ese stock.
 5. El preparador pulsa *Siguiente orden* (o *Preparar*) y la orden pasa a ser suya.
 6. Ve cada parada en la UM del pedido: ubicación, producto, lote y cantidad.
-7. Escanea la ubicación y pulsa *Confirmar recogida*. La página pasa la cantidad a base (`EnUMBase`).
-8. `ConfirmarLinea` actualiza la parada, llama a `RegistrarSalida` y recalcula la reserva.
+7. Escanea la ubicación y pulsa *Confirmar recogida*. La página pasa la cantidad a base con
+   `CantidadBaseDesdeDocumento` de la parada.
+8. `ConfirmarLinea` comprueba la ubicación (obligatoria con *Exigir confirmar ubicación*), actualiza la parada, llama a `RegistrarSalida` y recalcula la reserva.
 9. Al acabar la última parada, `Pag51121.TerminarOrden` hace `Commit` y lanza
    `Codeunit.Run(Gestion Picking SGA, Orden)`, que es `PasarAPedido`. Si falla, se avisa, pero lo
    confirmado ya está guardado. Se repite con *Pasar al pedido* desde la orden o desde el pedido.
@@ -961,7 +1067,7 @@ Enviar a picking ──> Pendiente de asignar ──(responsable asigna)──> 
   para no tener que abrirlo al repartir.
 - **Quién reparte**, en dos capas:
   1. **Casilla `User Setup."Responsable Picking SGA"`** (`Tab-Ext51100`, visible en
-     Configuración de usuarios con `Pag-Ext51105`). `Config. SGA.ComprobarResponsablePicking()`
+     Configuración de usuarios con `Pag-Ext51105`). `Cod51104.ComprobarResponsablePicking()`
      la exige al abrir `Pag51124`, al validar `Cod. Usuario Asignado` y al validar `Prioridad`.
      Solo se comprueba con *Exigir asignación* activo: sin ella el reparto es libre, igual que
      el preparador se asigna solo lo que coge. Es la capa que manda.
@@ -1029,7 +1135,8 @@ Enviar a picking ──> Pendiente de asignar ──(responsable asigna)──> 
 
 ```
 SGA/Tables/BufferUbicarEntradaSGA.Table.al   buffer temporal, una fila por cosa a ubicar
-SGA/Codeunits/GestionEntradasSGA.Codeunit.al    carga, propone y confirma
+SGA/Codeunits/GestionEntradasSGA.Codeunit.al    carga, propone y confirma; prepara el palé de tarea,
+                                                saca y anota su etiqueta y lo ubica
 SGA/Pages/UbicarEntradasSGA.Page.al         la pantalla, la misma para los dos orígenes
 SGA/Pages/UbicarPaletsLineaSGA.Page.al      imprimir la etiqueta de un palé de la línea y ubicarlo
 ```
@@ -1075,6 +1182,22 @@ configuración, por defecto Estándar) y `Estrategia Ubic. Ensamblados` (por def
 Copia de `Pag50250` (*Impresión Etiquetas Producción*) en la que imprimir y ubicar son un solo
 paso. `Pag50250` no se toca.
 
+La página solo captura la tarea y la ubicación y enseña la situación del palé (texto y estilo).
+El trabajo es de `Cod51105 Gestion Entradas SGA`, dueño del palé de tarea:
+- `PrepararPaleTarea(Tarea, var Fila, var Aviso)`: el siguiente palé y su hueco.
+- `ImprimirYUbicarPale(var Tarea, var Pale)`: comprueba la etiqueta (`ComprobarEtiqueta`), la
+  saca (`EnviarEtiqueta` a BarTender o `ImprimirEtiquetaA5` en Sandbox), hace `Commit` y llama a
+  `ConfirmarFila`. Hace `Commit`, así que no se llama dentro de un registro ni desde una
+  TryFunction. Antes de llamar, la página comprueba que hay palé, que la ubicación no está en
+  blanco y que existe (`Cod51101.ComprobarUbicacionExiste`), y guarda la ubicación y la cantidad
+  para el texto de *Último palé* (al ubicar, la fila pasa a llevar lo pendiente). Después relee
+  la tarea.
+- `AnotarEtiquetaImpresa` (local): con la etiqueta ya contada, hora de la primera y, con la
+  última, hora y tarea *Finalizado*. BarTender suma la etiqueta y la anota antes de subir el
+  fichero; en A5 la suma el report y solo se anota.
+- `AjustarEtiquetasImpresas(var Tarea)`: la acción *Ajustar impr. etiquetas* (después de su
+  Confirm en la página). Iguala impresas con totales y pone *Finalizado*, sin tocar horas.
+
 - **A qué entrada se apunta el palé.** `PrepararPaleTarea` busca el `Assembly Header` con
   `Linked Tarea` = la tarea y registra con su nº de pedido. Si ya está registrado, usa el
   `Posted Assembly Header` con la misma tarea y su `Order No.`. Sin ensamblado enlazado no se
@@ -1098,7 +1221,7 @@ paso. `Pag50250` no se toca.
   producción. Se lanza `Rep50237` sin request page (directo a la impresora de *Selección de
   impresoras*, Universal Print), con `Commit` antes porque un report no se abre con transacción
   viva. El report suma la impresa solo si no es vista previa. Si el contador no sube, se da error
-  y no se ubica. La página completa lo que el report no hace: horas y estado *Finalizado*. Cada
+  y no se ubica. `AnotarEtiquetaImpresa` completa lo que el report no hace: horas y estado *Finalizado*. Cada
   A5 consume un SSCC de la serie de *Inventory Setup*. Por ahora la A5 es solo para Sandbox:
   pasarla a producción es cambiar la condición de `ImprimirYUbicarPale`.
 
@@ -1179,16 +1302,22 @@ apuntan a un sitio donde ya no hay nada, y el panel sale en blanco en ejecución
 
 **Vaciar desde el mapa**: clic derecho (`contextmenu`) sobre un cubo con `l` > 0 → evento
 `VaciarSolicitado(codBin)` → `Pag51122.Vaciar` enseña el contenido, confirma y llama a
-`Cod51100.VaciarUbicacion`, que comparten la ficha de la ubicación y, línea a línea
-(`Cod51100.Desubicar`), *Quitar de la ubicación* en *Contenido de ubicaciones*. Sin contenido,
-el clic derecho no hace nada (y no abre el menú del navegador).
+`Cod51100.VaciarUbicacion`, que comparten la ficha de la ubicación y el mapa. *Quitar de la
+ubicación* en *Contenido de ubicaciones* usa `Cod51100.DesubicarLineas` con la selección, que es
+lo mismo con todo o nada. Sin contenido, el clic derecho no hace nada (y no abre el menú del
+navegador).
 
 **Traslado arrastrando**: el lienzo no mueve nada, solo avisa con los dos códigos. Solo deja
 empezar desde un cubo con `l` > 0 (líneas de contenido, que manda `DatosMapa3D`; el color no
 basta porque *bloqueada* tapa a *llena*). `Pag51122.Trasladar` pide la línea si hay varias
-(`Contenido Ubicaciones SGA` en modo lookup), abre `Mover Contenido SGA` con `FijarDestino` y
-registra con `Cod51100.RegistrarTraslado`. Después llama a `Actualizar`, no a `Dibujar`, porque
-`Dibujar` reinicia la vista.
+(`Contenido Ubicaciones SGA` en modo lookup) y llama a `Cod51100.TrasladarConDialogo` con el
+destino del arrastre y "Traslado desde el mapa 3D" como descripción si no se pone motivo. El
+diálogo `Mover Contenido SGA` sale con ese destino (`FijarDestino`) y el operario lo puede
+cambiar: el mensaje final lleva el destino que devuelve `TrasladarConDialogo`. Si se cancela no
+se repinta. Después llama a `Actualizar`, no a `Dibujar`, porque `Dibujar` reinicia la vista. El
+resumen de la cabecera sale de `Cod51101.ResumenUbicaciones`. *Trasladar* y *Bloquear /
+desbloquear* de *Contenido de ubicaciones* (lista y subpágina) usan los mismos
+`TrasladarConDialogo` y `AlternarBloqueo`.
 
 Un traslado viaja en UM base (lo que hay en el hueco). Para no chocar con huecos de palé o de
 caja, `TestUMAdmitida` acepta un traslado si el producto **tiene** una unidad de la clase del
@@ -1321,8 +1450,8 @@ if ocupado + entrada > "Capacidad Uds." then ...           // Cod51100 (registro
 ```
 
 `EnUMHueco` no redondea: el registro (`Cod51100`) redondea la entrada a 0,00001 y la propuesta no.
-`RecalcularOcupacion` (% y estado) y `CapacidadDisponible` usan el mismo cálculo, así que el % se
-mide en la clase del hueco y no en unidades base.
+`RecalcularOcupacion` (% y estado) usa el mismo cálculo, así que el % se mide en la clase del
+hueco y no en unidades base.
 
 Que un hueco de palé admita **cualquier** palé, y no solo el de un producto, es lo que permite
 a la carga inicial recorrer los huecos libres con un cursor que solo avanza.
@@ -1352,11 +1481,15 @@ criterio de cálculo. Puntos de diseño:
   cantidades. Si algún día hay huecos de varios palés, hay que contar con la UM de palé.
 - **Clase de hueco sin guardar**: se calcula en cada ejecución ordenando una copia temporal de
   `Ubicacion SGA` (altura del código × 1.000.000 + secuencia picking). La altura sale de
-  `TrocearCodigo` de `Gestion Mapa SGA`, que pasa a ser pública. Un código sin la forma
+  `TrocearCodigo` de `Gestion Ubicaciones SGA`, la misma que usa el mapa. Un código sin la forma
   Nave-Estantería-Columna-Altura cuenta como la peor altura.
 - **Ventas por almacén**: filtra `Location Code` del movimiento. Ventas netas: las devoluciones
   restan.
 - **Productos sin unidad de palé**: no se pueden pasar a palés; quedan C y se avisan en el resumen.
+- **La página solo enseña.** `Calculo ABC SGA` da el último cálculo de un almacén
+  (`UltimoDelAlmacen`) y los textos del resumen (`TextosResumen`); `Clasificacion ABC SGA`, el
+  estilo de cada columna (`EstiloClaseABC`, `EstiloClaseAnterior`, `EstiloHuecoSuClase`,
+  `EstiloUnidadPale`).
 
 ---
 

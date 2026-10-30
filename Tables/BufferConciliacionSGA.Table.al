@@ -174,4 +174,16 @@ table 51107 "Buffer Conciliacion SGA"
 
         exit('Standard');
     end;
+
+    /// <summary>
+    /// Estilo de "En documentos" en Pendiente de ubicar: en ámbar si parte está en documentos
+    /// de entrada que todavía no se han ubicado.
+    /// </summary>
+    procedure EstiloEnDocumentos(): Text
+    begin
+        if "En Documentos" > 0 then
+            exit('Ambiguous');
+
+        exit('Standard');
+    end;
 }

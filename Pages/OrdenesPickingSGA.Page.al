@@ -111,7 +111,7 @@ page 51118 "Ordenes Picking SGA"
 
                     Commit();
                     Rec := rOrden;
-                    AbrirPreparacion();
+                    cPicking.AbrirPreparacion(rOrden);
                     CurrPage.Update(false);
                 end;
             }
@@ -123,8 +123,10 @@ page 51118 "Ordenes Picking SGA"
                 Image = Warehouse;
 
                 trigger OnAction()
+                var
+                    cPicking: Codeunit "Gestion Picking SGA";
                 begin
-                    AbrirPreparacion();
+                    cPicking.AbrirPreparacion(Rec);
                     CurrPage.Update(false);
                 end;
             }
@@ -136,8 +138,10 @@ page 51118 "Ordenes Picking SGA"
                 Image = User;
 
                 trigger OnAction()
+                var
+                    cPicking: Codeunit "Gestion Picking SGA";
                 begin
-                    Rec.SetRange("Cod. Usuario Asignado", CopyStr(UserId(), 1, MaxStrLen(Rec."Cod. Usuario Asignado")));
+                    Rec.SetRange("Cod. Usuario Asignado", cPicking.UsuarioActual());
                     Rec.SetFilter(Estado, '%1|%2', Rec.Estado::Abierta, Rec.Estado::"En Proceso");
                     Rec.SetCurrentKey(Estado, Prioridad, "No. Orden");
                     CurrPage.Update(false);
@@ -172,7 +176,7 @@ page 51118 "Ordenes Picking SGA"
                 var
                     cPicking: Codeunit "Gestion Picking SGA";
                 begin
-                    cPicking.AsignarOrden(Rec, CopyStr(UserId(), 1, MaxStrLen(Rec."Cod. Usuario Asignado")));
+                    cPicking.AsignarOrden(Rec, cPicking.UsuarioActual());
                     CurrPage.Update(false);
                 end;
             }
@@ -266,27 +270,5 @@ page 51118 "Ordenes Picking SGA"
     trigger OnAfterGetRecord()
     begin
         EstiloFila := Rec.EstiloEstado();
-    end;
-
-    local procedure AbrirPreparacion()
-    var
-        rLinea: Record "Linea Orden Picking SGA";
-        rOrden: Record "Orden Picking SGA";
-        cPicking: Codeunit "Gestion Picking SGA";
-        SinParadasPendientesErr: Label 'La orden %1 no tiene paradas pendientes.', Comment = '%1 = nº orden';
-    begin
-        rLinea.SetRange("No. Orden", Rec."No. Orden");
-        rLinea.SetFilter(Estado, '%1|%2', rLinea.Estado::Pendiente, rLinea.Estado::Parcial);
-        if rLinea.IsEmpty() then
-            Error(SinParadasPendientesErr, Rec."No. Orden");
-
-        // Quien abre la preparación pasa a ser el preparador, para que otro no la coja a la vez.
-        // Con asignación exigida, solo entra el asignado.
-        rOrden.Get(Rec."No. Orden");
-        if not cPicking.TomarParaPreparar(rOrden) then
-            exit;
-        Commit();
-
-        Page.Run(Page::"Preparar Picking SGA", rLinea);
     end;
 }

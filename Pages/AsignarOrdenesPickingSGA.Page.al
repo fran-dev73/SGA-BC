@@ -244,20 +244,17 @@ page 51124 "Asignar Ordenes Picking SGA"
 
     trigger OnOpenPage()
     var
-        rConfig: Record "Config. SGA";
+        cPicking: Codeunit "Gestion Picking SGA";
     begin
         // Con asignación exigida, la pantalla es solo para responsables: un preparador no debe
         // poder repartirse el trabajo. La tabla lo vuelve a comprobar al asignar.
-        rConfig.ComprobarResponsablePicking();
+        cPicking.ComprobarResponsablePicking();
     end;
 
     trigger OnAfterGetRecord()
     begin
         EstiloFila := Rec.EstiloEstado();
-
-        EstiloFecha := 'Standard';
-        if (Rec."Fecha Envio" <> 0D) and (Rec."Fecha Envio" <= WorkDate()) then
-            EstiloFecha := 'Unfavorable';
+        EstiloFecha := Rec.EstiloFechaEnvio();
     end;
 
     /// <summary>
@@ -272,15 +269,7 @@ page 51124 "Asignar Ordenes Picking SGA"
         AsignacionQuitadaMsg: Label 'Se ha quitado la asignación de %1 órdenes.', Comment = '%1 = número';
     begin
         CurrPage.SetSelectionFilter(rOrden);
-        // Por la clave primaria: asignar cambia el estado, que encabeza la clave de la página,
-        // y recorrer por ella mientras se modifica saltaría órdenes.
-        rOrden.SetCurrentKey("No. Orden");
-        if rOrden.FindSet(true) then
-            repeat
-                cPicking.AsignarOrden(rOrden, prm_Usuario);
-                hechas += 1;
-            until rOrden.Next() = 0;
-
+        hechas := cPicking.AsignarOrdenes(rOrden, prm_Usuario);
         CurrPage.Update(false);
 
         if prm_Usuario = '' then
@@ -292,17 +281,10 @@ page 51124 "Asignar Ordenes Picking SGA"
     local procedure CambiarPrioridad(prm_Delta: Integer)
     var
         rOrden: Record "Orden Picking SGA";
+        cPicking: Codeunit "Gestion Picking SGA";
     begin
         CurrPage.SetSelectionFilter(rOrden);
-        if rOrden.FindSet(true) then
-            repeat
-                if rOrden.Prioridad + prm_Delta < 0 then
-                    rOrden.Validate(Prioridad, 0)
-                else
-                    rOrden.Validate(Prioridad, rOrden.Prioridad + prm_Delta);
-                rOrden.Modify(true);
-            until rOrden.Next() = 0;
-
+        cPicking.CambiarPrioridad(rOrden, prm_Delta);
         CurrPage.Update(false);
     end;
 }

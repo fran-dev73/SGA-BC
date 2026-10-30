@@ -4,8 +4,11 @@ using AntonioNadal.Produccion;
 using Microsoft.Assembly.Document;
 using Microsoft.Assembly.History;
 using Microsoft.Inventory.Item;
+using Microsoft.Inventory.Item.Catalog;
 using Microsoft.Inventory.Ledger;
+using Microsoft.Inventory.Setup;
 using Microsoft.Purchases.Vendor;
+using System.Environment;
 
 /// <summary>
 /// Codeunit Gestion Entradas SGA (ID 51105).
@@ -22,6 +25,10 @@ using Microsoft.Purchases.Vendor;
 /// sin perder el hilo y sin arrastrar un estado paralelo que se desincronice.
 ///
 /// Quien escribe sigue siendo Cod. "Gestion Contenido SGA": aquí solo se decide.
+///
+/// También es dueño del palé de una tarea de producción ("Imprimir y ubicar palés"): prepara
+/// el siguiente palé con su hueco (PrepararPaleTarea), saca su etiqueta (BarTender o, en
+/// Sandbox, el report A5), anota la etiqueta en la tarea y lo ubica (ImprimirYUbicarPale).
 /// </summary>
 codeunit 51105 "Gestion Entradas SGA"
 {
@@ -545,6 +552,247 @@ codeunit 51105 "Gestion Entradas SGA"
         prm_Fila.FindFirst();
 
         exit(true);
+    end;
+
+    /// <summary>
+    /// Imprime la etiqueta del palé de una tarea y lo ubica (prm_Pale, el que ha preparado
+    /// PrepararPaleTarea, con la ubicación ya comprobada por quien llama). Lo que impide sacar la
+    /// etiqueta se comprueba antes de imprimir, para no dejar etiquetas de palés sin ubicación.
+    ///
+    /// En Sandbox no se toca BarTender (su carpeta FTP es la de producción): la etiqueta sale con
+    /// el report A5, directa a la impresora que tenga asignada en Selección de impresoras.
+    ///
+    /// Hace Commit (antes del report A5 y después de imprimir), así que no se puede llamar
+    /// dentro de una transacción de registro ni desde una TryFunction. La tarea queda modificada:
+    /// quien llama la relee.
+    /// </summary>
+    procedure ImprimirYUbicarPale(var prm_Tarea: Record "Tareas Produccion"; var prm_Pale: Record "Buffer Ubicar Entrada SGA")
+    var
+        EnvironmentInformation: Codeunit "Environment Information";
+    begin
+        ComprobarEtiqueta(prm_Tarea);
+
+        if EnvironmentInformation.IsSandbox() then
+            ImprimirEtiquetaA5(prm_Tarea)
+        else begin
+            ComprobarBarTender();
+            EnviarEtiqueta(prm_Tarea);
+        end;
+        // La etiqueta ya ha salido: que un fallo al ubicar no deshaga el contador de
+        // impresas. El palé quedaría pendiente y se ubica desde "Ubicar entradas".
+        Commit();
+
+        ConfirmarFila(prm_Pale);
+    end;
+
+    /// <summary>
+    /// Da la tarea por terminada igualando las etiquetas impresas con las totales. No toca las
+    /// horas de impresión ni ubica nada.
+    /// </summary>
+    procedure AjustarEtiquetasImpresas(var prm_Tarea: Record "Tareas Produccion")
+    begin
+        prm_Tarea."Etiquetas Impresas" := prm_Tarea."Etiquetas Totales";
+        prm_Tarea.Estado := prm_Tarea.Estado::Finalizado;
+        prm_Tarea.Modify();
+    end;
+
+    /// <summary>
+    /// Lo que impide sacar la etiqueta, salga por donde salga: sin códigos de barras,
+    /// producción sin empezar o todas las etiquetas ya impresas.
+    /// </summary>
+    local procedure ComprobarEtiqueta(var prm_Tarea: Record "Tareas Produccion")
+    var
+        rItemRef: Record "Item Reference";
+        SinCodigosBarrasErr: Label 'Este producto no tiene códigos de barras definidos, revisar y después volver a imprimir.';
+        ProduccionNoIniciadaErr: Label 'No se pueden imprimir etiquetas de una producción no iniciada.';
+        EtiquetasYaImpresasErr: Label 'Ya están impresas las %1 etiquetas planificadas para esta tarea.', Comment = '%1 = etiquetas totales';
+    begin
+        rItemRef.SetRange("Item No.", prm_Tarea."Cod. Producto");
+        rItemRef.SetRange("Reference Type", rItemRef."Reference Type"::"Bar Code");
+        if rItemRef.IsEmpty() then
+            Error(SinCodigosBarrasErr);
+
+        if not prm_Tarea."Todo el dia" then begin
+            // El 3502007 se etiqueta sin esperar a que arranque la línea, igual que en Pag50250.
+            if (prm_Tarea."Cod. Producto" <> '3502007') and (prm_Tarea."Estado Produccion" = prm_Tarea."Estado Produccion"::"0") then
+                Error(ProduccionNoIniciadaErr);
+            // Pag50250 deja sacar una de más (compara con >). Aquí cada etiqueta es un palé que
+            // se ubica, así que no se pasa de las planificadas.
+            if prm_Tarea."Etiquetas Impresas" >= prm_Tarea."Etiquetas Totales" then
+                Error(EtiquetasYaImpresasErr, prm_Tarea."Etiquetas Totales");
+        end;
+    end;
+
+    /// <summary>
+    /// BarTender necesita la ruta y la conexión FTP de la carpeta que vigila la impresora.
+    /// </summary>
+    local procedure ComprobarBarTender()
+    var
+        rConfExistencias: Record "Inventory Setup";
+        FaltaRutaEtiquetasErr: Label 'Falta configuración ruta exportación impresión etiquetas producción.';
+    begin
+        if not rConfExistencias.Get() then
+            Error(FaltaRutaEtiquetasErr);
+        rConfExistencias.TestField("Ruta Fichero Etiquetas");
+        rConfExistencias.TestField("Conexion FTP - Impr. Etiquetas");
+    end;
+
+    /// <summary>
+    /// Genera el fichero de la etiqueta para BarTender, suma una etiqueta impresa a la tarea y
+    /// sube el fichero a la carpeta que vigila la impresora. Mismo contenido que
+    /// CrearFicheroImpresora de Pag50250.
+    /// </summary>
+    local procedure EnviarEtiqueta(var prm_Tarea: Record "Tareas Produccion")
+    var
+        rItem: Record Item;
+        rDatos: Record "Datos Reports Temporales";
+        rConfExistencias: Record "Inventory Setup";
+        TempFileBuffer: Record "DynES HLP File Buffer" temporary;
+        cduDynasoftFTPHelper: Codeunit "DynES HLP Ftp Helper";
+        OutStr: OutStream;
+        dato: Text;
+        tipoPrecinto: Code[20];
+        volumen: Text;
+        caducidadText: Text;
+        dun14: Text;
+        ean13: Text;
+        FicheroTok: Label 'EtiquetasA5.txt', Locked = true;
+        CodigoDatosTok: Label 'BARTENDER', Locked = true;
+    begin
+        rItem.Get(prm_Tarea."Cod. Producto");
+        rItem.CalcFields("EAN-13", "DUN-14");
+        dun14 := CopyStr(rItem."DUN-14", 1, 13);    // Caja: DUN-14 sin dígito de control
+        ean13 := CopyStr(rItem."EAN-13", 1, 12);    // Botella: EAN-13 sin dígito de control
+
+        // Sin precinto se etiqueta como EXPORT.
+        if prm_Tarea."Tipo Precinto" <> '' then
+            tipoPrecinto := prm_Tarea."Tipo Precinto"
+        else
+            tipoPrecinto := 'EXPORT';
+
+        if rItem."Unit Volume" = 1.0 then
+            volumen := '1,00'
+        else
+            volumen := Format(rItem."Unit Volume");
+
+        caducidadText := Format(prm_Tarea.Caducidad, 6, '<Year,2><Month,2><Day,2>');
+
+        dato := prm_Tarea.Descripcion + ';' +
+                'GRADOS: ' + Format(rItem."Grados de Alcohol") + ';' +
+                'VOLUMEN: ' + volumen + ';' +
+                'FAMILIA: ' + rItem."Tipo Alcohol" + ';' +
+                'LOTE: ' + prm_Tarea.Lote + ';' +
+                'NAV: ' + prm_Tarea."Cod. Producto" + ';' +
+                'VARIANTE: ' + tipoPrecinto + ';' +
+                prm_Tarea."Unidad Medida Venta" + ';' +
+                prm_Tarea."Cod. Pale Defecto" + ';' +
+                dun14 + ';' +
+                ean13 + ';' +
+                CodigoPale(prm_Tarea) + ';' +
+                ';' +
+                Format(prm_Tarea."Qty. Und. Medida") + ';' +
+                '01' + ';' +
+                prm_Tarea.Lote + ';' +
+                caducidadText;
+
+        rDatos.SetRange(Code01, CodigoDatosTok);
+        rDatos.DeleteAll();
+
+        rDatos.Init();
+        rDatos.Usuario := CopyStr(UserId(), 1, MaxStrLen(rDatos.Usuario));
+        rDatos.Fecha := Today;
+        rDatos.Hora := Time;
+        rDatos.Code01 := CodigoDatosTok;
+        rDatos.Integer01 := 1;
+        rDatos.Text01 := CopyStr(dato, 1, MaxStrLen(rDatos.Text01));
+        rDatos.Insert();
+
+        prm_Tarea."Etiquetas Impresas" += 1;
+        AnotarEtiquetaImpresa(prm_Tarea);
+
+        rConfExistencias.Get();
+        TempFileBuffer.Init();
+        TempFileBuffer.Id := 2;
+        TempFileBuffer."Full File Path" := StrSubstNo('%1%2', rConfExistencias."Ruta Fichero Etiquetas", FicheroTok);
+        TempFileBuffer."File Name" := FicheroTok;
+        TempFileBuffer."File Content".CreateOutStream(OutStr);
+        Xmlport.Export(Xmlport::"Ficheros Impresora", OutStr, rDatos);
+        TempFileBuffer.Insert();
+        TempFileBuffer.SetRange(Id, 2);
+        cduDynasoftFTPHelper.Upload(CopyStr(rConfExistencias."Conexion FTP - Impr. Etiquetas", 1, 20), TempFileBuffer);
+    end;
+
+    /// <summary>
+    /// Etiqueta A5 (report 50237) sin ventana de opciones: va directa a la impresora que tenga
+    /// el report en Selección de impresoras (Universal Print). Sin impresora asignada, BC la
+    /// descarga en PDF.
+    ///
+    /// El report ya suma la etiqueta impresa, y solo si se imprime de verdad. Si el contador no
+    /// sube, no ha salido etiqueta y se para aquí: no se ubica un palé sin etiqueta. Lo que el
+    /// report no hace (horas y dar la tarea por terminada) lo completa AnotarEtiquetaImpresa.
+    /// </summary>
+    local procedure ImprimirEtiquetaA5(var prm_Tarea: Record "Tareas Produccion")
+    var
+        rTarea: Record "Tareas Produccion";
+        impresasAntes: Decimal;
+        EtiquetaNoImpresaErr: Label 'No ha salido la etiqueta del palé: no se ubica.';
+    begin
+        impresasAntes := prm_Tarea."Etiquetas Impresas";
+
+        // Un report no se puede lanzar con una transacción abierta.
+        Commit();
+        rTarea.Get(prm_Tarea.Linea);
+        rTarea.SetRecFilter();
+        Report.RunModal(Report::"Etiqueta Producto A5", false, false, rTarea);
+
+        prm_Tarea.Get(prm_Tarea.Linea);
+        if prm_Tarea."Etiquetas Impresas" <= impresasAntes then
+            Error(EtiquetaNoImpresaErr);
+
+        AnotarEtiquetaImpresa(prm_Tarea);
+    end;
+
+    /// <summary>
+    /// Completa en la tarea una etiqueta que ya está contada en "Etiquetas Impresas": la hora
+    /// de la primera y, con la última, la hora y la tarea terminada. Es lo mismo salga la
+    /// etiqueta por BarTender o por el report A5.
+    /// </summary>
+    local procedure AnotarEtiquetaImpresa(var prm_Tarea: Record "Tareas Produccion")
+    begin
+        if prm_Tarea."Etiquetas Impresas" = 1 then
+            prm_Tarea."Hora Primera Impresion" := Time;
+        if prm_Tarea."Etiquetas Totales" = prm_Tarea."Etiquetas Impresas" then begin
+            prm_Tarea.Estado := prm_Tarea.Estado::Finalizado;
+            prm_Tarea."Hora Ultima Impresion" := Time;
+        end;
+        prm_Tarea.Modify();
+    end;
+
+    /// <summary>
+    /// Código de unidad de envío del palé (EAN-128), sacado del DUN-14 de la unidad de venta,
+    /// el lote, las cajas por palé y el tipo de precinto. Es lo único de la etiqueta de
+    /// Barras128 de Pag50250 que lleva el fichero de BarTender.
+    /// </summary>
+    local procedure CodigoPale(var prm_Tarea: Record "Tareas Produccion"): Text
+    var
+        rUnidMedProd: Record "Item Unit of Measure";
+        cduCodBarras: Codeunit "Gestion Codigos Barras";
+        codigoDUN14: Code[20];
+        usoPrecinto: Text[1];
+    begin
+        if rUnidMedProd.Get(prm_Tarea."Cod. Producto", prm_Tarea."Unidad Medida Venta") then begin
+            rUnidMedProd.CalcFields("Codigo Barras");
+            codigoDUN14 := CopyStr(rUnidMedProd."Codigo Barras", 1, MaxStrLen(codigoDUN14));
+        end;
+
+        if (StrPos(prm_Tarea."Tipo Precinto", 'B4') > 0) or (StrPos(prm_Tarea."Tipo Precinto", 'E6') > 0) then
+            usoPrecinto := '0';
+        if StrPos(prm_Tarea."Tipo Precinto", 'SP') > 0 then
+            usoPrecinto := '2';
+
+        cduCodBarras.Run();
+        cduCodBarras.GetEAN128PaletsVariante(CopyStr(codigoDUN14, 1, 14), prm_Tarea.Lote, Format(prm_Tarea."Qty. Und. Medida"), usoPrecinto);
+        exit(CopyStr(cduCodBarras.GetEAN128PaletsTxt2(), 5, 17));
     end;
 
     /// <summary>

@@ -10,7 +10,8 @@ using Microsoft.Inventory.Ledger;
 /// la tabla "Buffer Conciliacion SGA". Lo usan la carga inicial, la conciliación y la página
 /// "Pendiente Ubicar SGA" (con la tabla en temporal), para que todas midan exactamente lo mismo.
 /// También da lo ya ubicado y lo pendiente de un producto, la caducidad de un lote y la
-/// consulta de dónde está un producto.
+/// consulta de dónde está un producto, y regulariza una fila de la conciliación en la
+/// ubicación de ajustes (RegularizarConciliacion).
 ///
 /// El stock por lote se obtiene de la cantidad pendiente de los movimientos abiertos, que
 /// es la forma en que BC representa las existencias vivas de cada lote.
@@ -111,6 +112,59 @@ codeunit 51103 "Consulta Stock SGA"
         rStock.FiltrarUsuarioActual();
         rStock.DeleteAll();
         rStock.Reset();
+    end;
+
+    /// <summary>
+    /// Cuadra una fila de la conciliación con stock de BC sin ubicar: coloca la diferencia en
+    /// la ubicación de ajustes, tras confirmarlo el usuario, y deja la fila cuadrada. Solo
+    /// toca la capa de ubicaciones; el stock de BC no cambia. Si en la fila sobra contenido en
+    /// las ubicaciones no regulariza nada, porque no se sabe de qué hueco sale el exceso.
+    /// Devuelve true si ha registrado el ajuste.
+    /// </summary>
+    procedure RegularizarConciliacion(var prm_Fila: Record "Buffer Conciliacion SGA"): Boolean
+    var
+        rConfig: Record "Config. SGA";
+        rBuffer: Record "Buffer Conciliacion SGA";
+        cContenido: Codeunit "Gestion Contenido SGA";
+        LineaYaCuadraMsg: Label 'Esta línea ya cuadra.';
+        UbicAjustesSinConfigurarErr: Label 'Debe configurar la ubicación de ajustes en la configuración de SGA.';
+        ColocarEnAjustesQst: Label 'Se van a colocar %1 unidades de %2 en la ubicación de ajustes %3, para que dejen de estar sin ubicar. El stock de BC no cambia. ¿Desea continuar?', Comment = '%1 = diferencia, %2 = producto, %3 = ubicación de ajustes';
+        RegularizacionConciliacionLbl: Label 'Regularización conciliación';
+        SobraContenidoMsg: Label 'En esta línea sobra contenido en las ubicaciones (%1 unidades de más). No se puede regularizar automáticamente, porque hay que decidir de qué ubicación sale el exceso: recuente las ubicaciones que contienen el producto.', Comment = '%1 = exceso';
+    begin
+        if prm_Fila.Diferencia = 0 then begin
+            Message(LineaYaCuadraMsg);
+            exit(false);
+        end;
+
+        // El exceso en ubicaciones no se puede cuadrar solo: no sabemos de qué hueco sale.
+        if prm_Fila.Diferencia < 0 then begin
+            Message(SobraContenidoMsg, -prm_Fila.Diferencia);
+            exit(false);
+        end;
+
+        rConfig.ObtenerConfig();
+        if rConfig."Ubic. Ajustes" = '' then
+            Error(UbicAjustesSinConfigurarErr);
+
+        if not Confirm(ColocarEnAjustesQst, false, prm_Fila.Diferencia, prm_Fila."No. Producto", rConfig."Ubic. Ajustes") then
+            exit(false);
+
+        // El stock que BC tiene y SGA no aparece en la ubicación de ajustes hasta que
+        // alguien lo coloque físicamente donde le corresponde.
+        if cContenido.RegistrarAjuste(prm_Fila."Cod. Almacen", rConfig."Ubic. Ajustes", prm_Fila."No. Producto",
+                                      prm_Fila."Cod. Variante", prm_Fila."No. Lote", prm_Fila."Unidad Medida Base",
+                                      prm_Fila.Diferencia, RegularizacionConciliacionLbl) = 0
+        then
+            exit(false);
+
+        if rBuffer.Get(prm_Fila."Cod. Usuario", prm_Fila."No. Producto", prm_Fila."Cod. Variante", prm_Fila."Cod. Almacen", prm_Fila."No. Lote") then begin
+            rBuffer."Stock SGA" := rBuffer."Stock BC";
+            rBuffer.ActualizarEstado();
+            rBuffer.Modify();
+        end;
+
+        exit(true);
     end;
 
     local procedure AcumularFila(var rStock: Record "Buffer Conciliacion SGA"; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Almacen: Code[10]; prm_Lote: Code[50]; prm_UMBase: Code[10]; prm_StockBC: Decimal; prm_StockSGA: Decimal)

@@ -72,9 +72,9 @@ table 51108 "Orden Picking SGA"
 
             trigger OnValidate()
             var
-                rConfig: Record "Config. SGA";
+                cPicking: Codeunit "Gestion Picking SGA";
             begin
-                rConfig.ComprobarResponsablePicking();
+                cPicking.ComprobarResponsablePicking();
             end;
         }
         field(60; Descripcion; Text[100])
@@ -133,6 +133,8 @@ table 51108 "Orden Picking SGA"
             Caption = 'Líneas pendientes';
             Editable = false;
             FieldClass = FlowField;
+            // El mismo filtro que "Linea Orden Picking SGA".FiltrarPendientes: una CalcFormula
+            // no puede llamar a un procedimiento.
             CalcFormula = count("Linea Orden Picking SGA" where("No. Orden" = field("No. Orden"),
                                                                 Estado = filter(Pendiente | Parcial)));
         }
@@ -217,7 +219,7 @@ table 51108 "Orden Picking SGA"
             exit;
         end;
 
-        rLinea.SetFilter(Estado, '%1|%2', rLinea.Estado::Pendiente, rLinea.Estado::Parcial);
+        rLinea.FiltrarPendientes();
         pendientes := rLinea.Count();
 
         rLinea.SetRange(Estado, rLinea.Estado::Recogida);
@@ -235,6 +237,22 @@ table 51108 "Orden Picking SGA"
             else
                 Estado := EstadoSinEmpezar();
         end;
+    end;
+
+    /// <summary>
+    /// Avance del recorrido: paradas ya recogidas de las que cuentan, que son todas menos las
+    /// canceladas. Solo usa "No. Orden", así que sirve sin leer la orden.
+    /// </summary>
+    procedure Progreso(var prm_Hechas: Integer; var prm_Total: Integer)
+    var
+        rLinea: Record "Linea Orden Picking SGA";
+    begin
+        rLinea.SetRange("No. Orden", "No. Orden");
+        rLinea.SetFilter(Estado, '<>%1', rLinea.Estado::Cancelada);
+        prm_Total := rLinea.Count();
+
+        rLinea.SetRange(Estado, rLinea.Estado::Recogida);
+        prm_Hechas := rLinea.Count();
     end;
 
     /// <summary>
@@ -268,10 +286,11 @@ table 51108 "Orden Picking SGA"
     local procedure ValidarAsignacion()
     var
         rConfig: Record "Config. SGA";
+        cPicking: Codeunit "Gestion Picking SGA";
         OrdenNoAsignableErr: Label 'La orden %1 está %2 y ya no se puede asignar.', Comment = '%1 = nº orden, %2 = estado';
         OrdenEmpezadaSinAsignarErr: Label 'La orden %1 ya está empezada. Reasígnela a otro preparador en lugar de dejarla sin asignar.', Comment = '%1 = nº orden';
     begin
-        rConfig.ComprobarResponsablePicking();
+        cPicking.ComprobarResponsablePicking();
 
         if not EstaViva() then
             Error(OrdenNoAsignableErr, "No. Orden", Estado);
@@ -284,6 +303,17 @@ table 51108 "Orden Picking SGA"
         end;
 
         Estado := EstadoSinEmpezar();
+    end;
+
+    /// <summary>
+    /// Estilo de la fecha de envío: en rojo si ya ha llegado o ha pasado.
+    /// </summary>
+    procedure EstiloFechaEnvio(): Text
+    begin
+        if ("Fecha Envio" <> 0D) and ("Fecha Envio" <= WorkDate()) then
+            exit('Unfavorable');
+
+        exit('Standard');
     end;
 
     /// <summary>

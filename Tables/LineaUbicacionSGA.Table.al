@@ -141,4 +141,16 @@ table 51114 "Linea Ubicacion SGA"
 
         exit('Standard');
     end;
+
+    /// <summary>
+    /// Estilo de la línea en el resultado de la carga inicial: normal si se ha cargado
+    /// (Ubicado) y en rojo si no.
+    /// </summary>
+    procedure EstiloCargaInicial(): Text
+    begin
+        if Estado = Estado::Ubicado then
+            exit('Standard');
+
+        exit('Unfavorable');
+    end;
 }

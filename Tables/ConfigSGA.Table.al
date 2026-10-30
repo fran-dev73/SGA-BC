@@ -4,7 +4,6 @@ using Microsoft.Foundation.NoSeries;
 using Microsoft.Foundation.UOM;
 using Microsoft.Inventory.Location;
 using Microsoft.Warehouse.Structure;
-using System.Security.User;
 
 /// <summary>
 /// Table Config. SGA (ID 51104).
@@ -220,30 +219,6 @@ table 51104 "Config. SGA"
             Init();
             Insert(true);
         end;
-    end;
-
-    /// <summary>
-    /// Con "Exigir Asignacion Picking", solo un responsable de picking (marcado en
-    /// Configuración de usuarios) puede repartir órdenes o cambiar su prioridad. Sin ella, el
-    /// reparto es libre, igual que el preparador se asigna solo las que coge.
-    ///
-    /// Se comprueba por código y no solo con el conjunto de permisos porque los conjuntos
-    /// estándar de BC suelen dar ejecución sobre todas las páginas.
-    /// </summary>
-    procedure ComprobarResponsablePicking()
-    var
-        rUserSetup: Record "User Setup";
-        NoResponsablePickingErr: Label 'Solo un responsable de picking puede asignar órdenes o cambiar su prioridad. Pida que le marquen "Responsable picking SGA" en Configuración de usuarios.';
-    begin
-        ObtenerConfig();
-        if not "Exigir Asignacion Picking" then
-            exit;
-
-        if rUserSetup.Get(UserId()) then
-            if rUserSetup."Responsable Picking SGA" then
-                exit;
-
-        Error(NoResponsablePickingErr);
     end;
 
     /// <summary>

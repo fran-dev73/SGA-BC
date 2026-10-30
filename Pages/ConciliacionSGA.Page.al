@@ -191,48 +191,9 @@ page 51113 "Conciliacion SGA"
 
     local procedure RegularizarLinea()
     var
-        rConfig: Record "Config. SGA";
-        rBuffer: Record "Buffer Conciliacion SGA";
-        cContenido: Codeunit "Gestion Contenido SGA";
-        noMovimiento: Integer;
-        LineaYaCuadraMsg: Label 'Esta línea ya cuadra.';
-        UbicAjustesSinConfigurarErr: Label 'Debe configurar la ubicación de ajustes en la configuración de SGA.';
-        ColocarEnAjustesQst: Label 'Se van a colocar %1 unidades de %2 en la ubicación de ajustes %3, para que dejen de estar sin ubicar. El stock de BC no cambia. ¿Desea continuar?', Comment = '%1 = diferencia, %2 = producto, %3 = ubicación de ajustes';
-        RegularizacionConciliacionLbl: Label 'Regularización conciliación';
-        SobraContenidoMsg: Label 'En esta línea sobra contenido en las ubicaciones (%1 unidades de más). No se puede regularizar automáticamente, porque hay que decidir de qué ubicación sale el exceso: recuente las ubicaciones que contienen el producto.', Comment = '%1 = exceso';
+        cStock: Codeunit "Consulta Stock SGA";
     begin
-        if Rec.Diferencia = 0 then begin
-            Message(LineaYaCuadraMsg);
-            exit;
-        end;
-
-        // El exceso en ubicaciones no se puede cuadrar solo: no sabemos de qué hueco sale.
-        if Rec.Diferencia < 0 then begin
-            Message(SobraContenidoMsg, -Rec.Diferencia);
-            exit;
-        end;
-
-        rConfig.ObtenerConfig();
-        if rConfig."Ubic. Ajustes" = '' then
-            Error(UbicAjustesSinConfigurarErr);
-
-        if not Confirm(ColocarEnAjustesQst, false, Rec.Diferencia, Rec."No. Producto", rConfig."Ubic. Ajustes") then
-            exit;
-
-        // El stock que BC tiene y SGA no aparece en la ubicación de ajustes hasta que
-        // alguien lo coloque físicamente donde le corresponde.
-        noMovimiento := cContenido.RegistrarAjuste(Rec."Cod. Almacen", rConfig."Ubic. Ajustes", Rec."No. Producto",
-                                                   Rec."Cod. Variante", Rec."No. Lote", Rec."Unidad Medida Base",
-                                                   Rec.Diferencia, RegularizacionConciliacionLbl);
-        if noMovimiento = 0 then
-            exit;
-
-        if rBuffer.Get(Rec."Cod. Usuario", Rec."No. Producto", Rec."Cod. Variante", Rec."Cod. Almacen", Rec."No. Lote") then begin
-            rBuffer."Stock SGA" := rBuffer."Stock BC";
-            rBuffer.ActualizarEstado();
-            rBuffer.Modify();
-        end;
-
-        CurrPage.Update(false);
+        if cStock.RegularizarConciliacion(Rec) then
+            CurrPage.Update(false);
     end;
 }

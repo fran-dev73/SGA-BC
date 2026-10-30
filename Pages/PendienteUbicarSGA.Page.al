@@ -264,9 +264,7 @@ page 51131 "Pendiente Ubicar SGA"
 
     trigger OnAfterGetRecord()
     begin
-        EstiloDocumentos := 'Standard';
-        if Rec."En Documentos" > 0 then
-            EstiloDocumentos := 'Ambiguous';
+        EstiloDocumentos := Rec.EstiloEnDocumentos();
     end;
 
     local procedure Recalcular()

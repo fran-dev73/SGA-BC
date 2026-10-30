@@ -68,20 +68,11 @@ pageextension 51104 "Sales Order SGA" extends "Sales Order"
 
                     trigger OnAction()
                     var
-                        rOrden: Record "Orden Picking SGA";
                         cPicking: Codeunit "Gestion Picking SGA";
-                        PedidoSinOrdenesErr: Label 'El pedido %1 no tiene órdenes de picking.', Comment = '%1 = nº pedido';
                         PickingPasadoMsg: Label 'Lo recogido se ha pasado al pedido.';
                     begin
                         CurrPage.SaveRecord();
-                        rOrden.SetCurrentKey("No. Documento Origen");
-                        rOrden.SetRange("No. Documento Origen", Rec."No.");
-                        rOrden.SetRange(Origen, rOrden.Origen::Venta);
-                        if not rOrden.FindLast() then
-                            Error(PedidoSinOrdenesErr, Rec."No.");
-
-                        // Basta con una: el paso al pedido suma todas las órdenes del pedido.
-                        cPicking.PasarAPedido(rOrden);
+                        cPicking.PasarAPedidoDeVenta(Rec."No.");
                         CurrPage.Update(false);
                         Message(PickingPasadoMsg);
                     end;

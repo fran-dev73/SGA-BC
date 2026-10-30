@@ -144,21 +144,10 @@ page 51119 "Ficha Orden Picking SGA"
 
                 trigger OnAction()
                 var
-                    rLinea: Record "Linea Orden Picking SGA";
                     cPicking: Codeunit "Gestion Picking SGA";
-                    SinParadasPendientesErr: Label 'La orden %1 no tiene paradas pendientes.', Comment = '%1 = nº orden';
                 begin
-                    rLinea.SetRange("No. Orden", Rec."No. Orden");
-                    rLinea.SetFilter(Estado, '%1|%2', rLinea.Estado::Pendiente, rLinea.Estado::Parcial);
-                    if rLinea.IsEmpty() then
-                        Error(SinParadasPendientesErr, Rec."No. Orden");
-
                     CurrPage.SaveRecord();
-                    if not cPicking.TomarParaPreparar(Rec) then
-                        exit;
-                    Commit();
-
-                    Page.Run(Page::"Preparar Picking SGA", rLinea);
+                    cPicking.AbrirPreparacion(Rec);
                     CurrPage.Update(false);
                 end;
             }

@@ -267,6 +267,28 @@ table 51109 "Linea Orden Picking SGA"
     end;
 
     /// <summary>
+    /// Cantidad base que corresponde a lo que el preparador teclea en la UM del pedido. Si
+    /// teclea lo pendiente (prm_PendienteDocumento, lo que se le enseña), se toma el pendiente
+    /// exacto en base para no dejar restos de redondeo.
+    /// </summary>
+    procedure CantidadBaseDesdeDocumento(prm_Cantidad: Decimal; prm_PendienteDocumento: Decimal): Decimal
+    begin
+        if prm_Cantidad = prm_PendienteDocumento then
+            exit("Cantidad Pendiente");
+
+        exit(EnUMBase(prm_Cantidad));
+    end;
+
+    /// <summary>
+    /// Deja solo las paradas que quedan por recoger: pendientes o recogidas en parte. No toca
+    /// la clave ni el resto de filtros, que pone cada llamante.
+    /// </summary>
+    procedure FiltrarPendientes()
+    begin
+        SetFilter(Estado, '%1|%2', Estado::Pendiente, Estado::Parcial);
+    end;
+
+    /// <summary>
     /// UM con la que se enseña la parada: la del pedido, o la base si la parada es anterior
     /// a que se guardara.
     /// </summary>
@@ -284,5 +306,16 @@ table 51109 "Linea Orden Picking SGA"
     procedure HayDesvio(): Boolean
     begin
         exit(("Cod. Bin Confirmado" <> '') and ("Cod. Bin Confirmado" <> "Cod. Bin Propuesto"));
+    end;
+
+    /// <summary>
+    /// Estilo de la ubicación confirmada: resaltada si el preparador se ha desviado.
+    /// </summary>
+    procedure EstiloUbicacionConfirmada(): Text
+    begin
+        if HayDesvio() then
+            exit('Attention');
+
+        exit('Standard');
     end;
 }

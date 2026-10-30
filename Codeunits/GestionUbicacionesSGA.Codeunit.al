@@ -5,20 +5,17 @@ using Microsoft.Warehouse.Structure;
 
 /// <summary>
 /// Codeunit Gestion Ubicaciones SGA (ID 51101).
-/// Ciclo de vida de ubicaciones: creación desde topología, sincronización, recálculo de estados.
-///
-/// NOTA: Fase 1 con Bin estándar. Los métodos GenerarUbicaciones y otros que dependían
-/// de la topología personalizada (UbicacionAlmacen nave-estantería-columna-altura)
-/// están documentados pero no implementados hasta Fase 2.
+/// Se ocupa de los huecos:
+///   - Topología sobre el Bin estándar: creación y sincronización, generación en masa,
+///     recálculo de estados, formato del código nave-estantería-columna-altura (componerlo y
+///     trocearlo), cambios en bloque y recuentos por estado.
+///   - Motor de propuesta: en qué hueco dejar un producto, por qué no hay hueco y la
+///     ubicación guiada de un reparto.
 /// </summary>
 codeunit 51101 "Gestion Ubicaciones SGA"
 {
     Access = Public;
 
-    /// <summary>
-    /// Sincroniza la topología estándar (tabla Bin) con SGA, creando filas en
-    /// "Ubicacion SGA" para los Bins que aún no las tienen.
-    /// </summary>
     /// <summary>
     /// Obtiene o crea una ubicación SGA para un Bin dado.
     /// </summary>
@@ -33,6 +30,10 @@ codeunit 51101 "Gestion Ubicaciones SGA"
         exit(prm_Bin);
     end;
 
+    /// <summary>
+    /// Sincroniza la topología estándar (tabla Bin) con SGA, creando filas en
+    /// "Ubicacion SGA" para los Bins que aún no las tienen.
+    /// </summary>
     procedure SincronizarTopologia(prm_Almacen: Code[10])
     var
         rBin: Record Bin;
@@ -91,6 +92,102 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     end;
 
     /// <summary>
+    /// Cambio en bloque de los datos de gestión de las ubicaciones de la selección (con sus
+    /// filtros y marcas). Solo se toca lo marcado con prm_Cambiar*, con el valor de la plantilla.
+    /// Primero qué admite y luego la mezcla, porque la mezcla depende de que el hueco sea de
+    /// caja; la zona se asigna tal cual, sin validar. Devuelve cuántas ubicaciones ha cambiado.
+    /// Las que tienen contenido se saltan: su configuración solo se cambia vacías (TestVacia de
+    /// la tabla). Cuántas se saltan sale en prm_Omitidas y las primeras (hasta 5) en prm_Ejemplos.
+    /// </summary>
+    procedure AplicarCambiosUbicaciones(var prm_Seleccion: Record "Ubicacion SGA"; var TempPlantilla: Record "Ubicacion SGA" temporary; prm_CambiarCapacidad: Boolean; prm_CambiarAdmite: Boolean; prm_CambiarMezcla: Boolean; prm_CambiarTipo: Boolean; prm_CambiarZona: Boolean; var prm_Omitidas: Integer; var prm_Ejemplos: Text) hechas: Integer
+    var
+        rUbicacionSGA: Record "Ubicacion SGA";
+        NadaQueCambiarErr: Label 'No ha marcado nada que cambiar.';
+    begin
+        if not (prm_CambiarCapacidad or prm_CambiarAdmite or prm_CambiarMezcla or prm_CambiarTipo or prm_CambiarZona) then
+            Error(NadaQueCambiarErr);
+
+        prm_Omitidas := 0;
+        prm_Ejemplos := '';
+        // Copy y no CopyFilters: la selección de la lista viaja en marcas.
+        rUbicacionSGA.Copy(prm_Seleccion);
+        if not rUbicacionSGA.FindSet(true) then
+            exit(0);
+
+        repeat
+            if rUbicacionSGA.EstaVacia() then begin
+                if prm_CambiarAdmite then
+                    rUbicacionSGA.Validate("Tipo UM Admitida", TempPlantilla."Tipo UM Admitida");
+                if prm_CambiarMezcla then
+                    rUbicacionSGA.Validate("Permite Mezcla Producto", TempPlantilla."Permite Mezcla Producto");
+                if prm_CambiarCapacidad then
+                    rUbicacionSGA.Validate("Capacidad Uds.", TempPlantilla."Capacidad Uds.");
+                if prm_CambiarTipo then
+                    rUbicacionSGA.Validate("Tipo Ubicacion", TempPlantilla."Tipo Ubicacion");
+                if prm_CambiarZona then
+                    rUbicacionSGA."Cod. Zona SGA" := TempPlantilla."Cod. Zona SGA";
+                // Con capacidad o clase nuevas, el % de ocupación y el estado cambian.
+                rUbicacionSGA.RecalcularOcupacion();
+                rUbicacionSGA.Modify(true);
+                hechas += 1;
+            end else begin
+                prm_Omitidas += 1;
+                if prm_Omitidas <= 5 then begin
+                    if prm_Ejemplos <> '' then
+                        prm_Ejemplos += ', ';
+                    prm_Ejemplos += rUbicacionSGA."Cod. Bin";
+                end;
+            end;
+        until rUbicacionSGA.Next() = 0;
+    end;
+
+    /// <summary>
+    /// Cuántas ubicaciones de la selección (con sus filtros y marcas) tienen contenido. Son las
+    /// que un cambio en bloque se salta.
+    /// </summary>
+    procedure ContarConContenido(var prm_Seleccion: Record "Ubicacion SGA") conContenido: Integer
+    var
+        rUbicacionSGA: Record "Ubicacion SGA";
+    begin
+        rUbicacionSGA.Copy(prm_Seleccion);
+        if rUbicacionSGA.FindSet() then
+            repeat
+                if not rUbicacionSGA.EstaVacia() then
+                    conContenido += 1;
+            until rUbicacionSGA.Next() = 0;
+    end;
+
+    /// <summary>
+    /// Da un dígito de control nuevo a las ubicaciones de la selección (con sus filtros y
+    /// marcas). Modify sin triggers: solo cambia el dígito. Devuelve cuántas ha cambiado.
+    /// </summary>
+    procedure RegenerarDigitos(var prm_Seleccion: Record "Ubicacion SGA") hechas: Integer
+    begin
+        if prm_Seleccion.FindSet(true) then
+            repeat
+                prm_Seleccion.GenerarDigitoControl();
+                prm_Seleccion.Modify();
+                hechas += 1;
+            until prm_Seleccion.Next() = 0;
+    end;
+
+    /// <summary>
+    /// Resumen de ocupación de un almacén: cuántas ubicaciones tiene y cuántas están vacías,
+    /// llenas o bloqueadas.
+    /// </summary>
+    procedure ResumenUbicaciones(prm_Almacen: Code[10]): Text
+    var
+        rUbicacionSGA: Record "Ubicacion SGA";
+        ResumenLbl: Label '%1 ubicaciones: %2 vacías, %3 llenas, %4 bloqueadas.', Comment = '%1 = total, %2 = vacías, %3 = llenas, %4 = bloqueadas';
+    begin
+        rUbicacionSGA.SetRange("Cod. Almacen", prm_Almacen);
+        exit(StrSubstNo(ResumenLbl, rUbicacionSGA.Count(),
+                        ContarUbicaciones(prm_Almacen, "Estado Ubicacion SGA"::Vacia),
+                        ContarUbicaciones(prm_Almacen, "Estado Ubicacion SGA"::Llena),
+                        ContarUbicaciones(prm_Almacen, "Estado Ubicacion SGA"::Bloqueada)));
+    end;
+
+    /// <summary>
     /// Genera ubicaciones en masa recorriendo los rangos de estantería, columna y altura.
     /// Crea el Bin estándar si no existe y su fila de datos SGA, en ese orden.
     /// Es idempotente: lo que ya existe no se toca, así que se puede reejecutar para ampliar.
@@ -109,7 +206,7 @@ codeunit 51101 "Gestion Ubicaciones SGA"
         for estanteria := prm_EstanteriaDesde to prm_EstanteriaHasta do
             for columna := prm_ColumnaDesde to prm_ColumnaHasta do
                 for altura := prm_AlturaDesde to prm_AlturaHasta do begin
-                    codBin := ComponerCodigoUbicacion(prm_Nave, estanteria, columna, altura);
+                    codBin := ComponerCodigoUbicacion(prm_Nave, DosDigitos(estanteria), columna, Format(altura));
 
                     if not rBin.Get(prm_Almacen, codBin) then begin
                         rBin.Init();
@@ -143,10 +240,39 @@ codeunit 51101 "Gestion Ubicaciones SGA"
 
     /// <summary>
     /// Compone el código de ubicación con el formato nave-estantería-columna-altura (A-01-15-3).
+    /// La estantería y la altura llegan ya como texto (la estantería con sus dos dígitos); la
+    /// columna se rellena aquí a dos dígitos. Es el único sitio que conoce el formato al
+    /// componerlo; TrocearCodigo hace lo contrario.
     /// </summary>
-    local procedure ComponerCodigoUbicacion(prm_Nave: Code[1]; prm_Estanteria: Integer; prm_Columna: Integer; prm_Altura: Integer): Code[20]
+    procedure ComponerCodigoUbicacion(prm_Nave: Code[1]; prm_Estanteria: Text; prm_Columna: Integer; prm_Altura: Text): Code[20]
+    var
+        rUbicacionSGA: Record "Ubicacion SGA";
     begin
-        exit(CopyStr(prm_Nave + '-' + DosDigitos(prm_Estanteria) + '-' + DosDigitos(prm_Columna) + '-' + Format(prm_Altura), 1, 20));
+        exit(CopyStr(prm_Nave + '-' + prm_Estanteria + '-' + DosDigitos(prm_Columna) + '-' + prm_Altura, 1, MaxStrLen(rUbicacionSGA."Cod. Bin")));
+    end;
+
+    /// <summary>
+    /// Parte un código nave-estantería-columna-altura (p. ej. A-01-05-2). Devuelve false si el
+    /// código no sigue el formato (no tiene cuatro partes o la columna no es un número), para
+    /// que el llamante lo descarte en lugar de colocarlo en una posición falsa.
+    /// </summary>
+    procedure TrocearCodigo(prm_Codigo: Code[20]; var prm_Nave: Code[1]; var prm_Estanteria: Code[2]; var prm_Columna: Integer; var prm_Altura: Code[1]): Boolean
+    var
+        partes: List of [Text];
+        texto: Text;
+    begin
+        texto := prm_Codigo;
+        partes := texto.Split('-');
+        if partes.Count() <> 4 then
+            exit(false);
+
+        if not Evaluate(prm_Columna, partes.Get(3)) then
+            exit(false);
+
+        prm_Nave := CopyStr(partes.Get(1), 1, MaxStrLen(prm_Nave));
+        prm_Estanteria := CopyStr(partes.Get(2), 1, MaxStrLen(prm_Estanteria));
+        prm_Altura := CopyStr(partes.Get(4), 1, MaxStrLen(prm_Altura));
+        exit(true);
     end;
 
     /// <summary>
@@ -685,28 +811,7 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     end;
 
     /// <summary>
-    /// Calcula la secuencia (orden de recorrido) a partir de los tramos de la topología.
-    /// Un tramo no numérico cuenta como 0 en lugar de abortar: la secuencia es orden de
-    /// recorrido, no un dato contable, y una nave puede tener códigos no numéricos.
-    /// </summary>
-    procedure SecuenciaDesdeTopologia(prm_Nave: Code[1]; prm_Estanteria: Code[2]; prm_Columna: Code[2]; prm_Altura: Code[1]): Integer
-    var
-        estanteria: Integer;
-        columna: Integer;
-        altura: Integer;
-    begin
-        if not Evaluate(estanteria, prm_Estanteria) then
-            estanteria := 0;
-        if not Evaluate(columna, prm_Columna) then
-            columna := 0;
-        if not Evaluate(altura, prm_Altura) then
-            altura := 0;
-
-        exit(SecuenciaDesde(estanteria, columna, altura));
-    end;
-
-    /// <summary>
-    /// Contadores de ubicaciones por estado.
+    /// Cuántas ubicaciones del almacén están en ese estado.
     /// </summary>
     procedure ContarUbicaciones(prm_Almacen: Code[10]; prm_Estado: Enum "Estado Ubicacion SGA"): Integer
     var

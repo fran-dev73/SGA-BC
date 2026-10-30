@@ -269,14 +269,12 @@ page 51103 "Contenido Ubicaciones SGA"
     local procedure DesubicarSeleccion()
     var
         rContenido: Record "Contenido Ubicacion SGA";
-        TempCopia: Record "Contenido Ubicacion SGA" temporary;
+        rLinea: Record "Contenido Ubicacion SGA";
         cContenido: Codeunit "Gestion Contenido SGA";
         lineas: Integer;
-        hechas: Integer;
         DesubicarLineasQst: Label 'Se van a quitar de su ubicación %1 líneas de contenido. La mercancía queda pendiente de ubicar (el stock de BC no cambia). ¿Continuar?', Comment = '%1 = número de líneas';
         LineaDesubicadaMsg: Label 'Se ha quitado %1 %2 de %3 de la ubicación %4. Queda pendiente de ubicar.', Comment = '%1 = cantidad, %2 = unidad, %3 = producto, %4 = ubicación';
         LineasDesubicadasMsg: Label 'Se han quitado %1 líneas de sus ubicaciones. Quedan pendientes de ubicar.', Comment = '%1 = número de líneas';
-        LineaReservadaErr: Label 'La línea de %1 en %2 tiene %3 reservadas por una orden de picking. Cancele antes la orden o la parada.', Comment = '%1 = producto, %2 = ubicación, %3 = cantidad reservada';
     begin
         CurrPage.SetSelectionFilter(rContenido);
         lineas := rContenido.Count();
@@ -286,30 +284,19 @@ page 51103 "Contenido Ubicaciones SGA"
         if not Confirm(DesubicarLineasQst, false, lineas) then
             exit;
 
-        if rContenido.FindSet() then
-            repeat
-                if rContenido."Cantidad Reservada" > 0 then
-                    Error(LineaReservadaErr, rContenido."No. Producto", rContenido."Cod. Bin", rContenido."Cantidad Reservada");
-            until rContenido.Next() = 0;
+        // El mensaje de una sola línea cuenta lo que se ha quitado: se lee antes, porque al
+        // quitarla la línea desaparece.
+        if lineas = 1 then begin
+            rContenido.FindFirst();
+            rLinea := rContenido;
+        end;
 
-        // Se copian antes a una tabla temporal: la salida borra la línea al dejarla a cero, y
-        // recorrer la tabla real mientras se borra podría saltarse líneas.
-        rContenido.FindSet();
-        repeat
-            TempCopia := rContenido;
-            TempCopia.Insert();
-        until rContenido.Next() = 0;
+        lineas := cContenido.DesubicarLineas(rContenido);
 
-        TempCopia.FindSet();
-        repeat
-            cContenido.Desubicar(TempCopia);
-            hechas += 1;
-        until TempCopia.Next() = 0;
-
-        if hechas = 1 then
-            Message(LineaDesubicadaMsg, TempCopia.Cantidad, TempCopia."Cod. Unidad Medida", TempCopia."No. Producto", TempCopia."Cod. Bin")
+        if lineas = 1 then
+            Message(LineaDesubicadaMsg, rLinea.Cantidad, rLinea."Cod. Unidad Medida", rLinea."No. Producto", rLinea."Cod. Bin")
         else
-            Message(LineasDesubicadasMsg, hechas);
+            Message(LineasDesubicadasMsg, lineas);
 
         CurrPage.Update(false);
     end;
@@ -317,36 +304,17 @@ page 51103 "Contenido Ubicaciones SGA"
     local procedure TrasladarContenido()
     var
         cContenido: Codeunit "Gestion Contenido SGA";
-        pagMover: Page "Mover Contenido SGA";
-        noMovimiento: Integer;
+        destino: Code[20];
     begin
-        pagMover.Inicializar(Rec);
-        if pagMover.RunModal() <> Action::OK then
-            exit;
-
-        noMovimiento := cContenido.RegistrarTraslado(Rec."Cod. Almacen", Rec."Cod. Bin",
-                                                     pagMover.ObtenerDestino(), Rec."No. Producto",
-                                                     Rec."Cod. Variante", Rec."No. Lote",
-                                                     Rec."Cod. Unidad Medida", pagMover.ObtenerCantidad(),
-                                                     "Origen Mov. SGA"::Manual, '', 0, pagMover.ObtenerMotivo());
-        if noMovimiento <> 0 then
+        if cContenido.TrasladarConDialogo(Rec, destino, '') <> 0 then
             CurrPage.Update(false);
     end;
 
     local procedure AlternarBloqueoContenido()
     var
         cContenido: Codeunit "Gestion Contenido SGA";
-        motivo: Text[50];
-        BloqueadoPorLbl: Label 'Bloqueado por %1 el %2', Comment = '%1 = usuario, %2 = fecha';
     begin
-        if Rec.Bloqueado then begin
-            cContenido.BloquearContenido(Rec, false, '');
-            CurrPage.Update(false);
-            exit;
-        end;
-
-        motivo := CopyStr(StrSubstNo(BloqueadoPorLbl, UserId(), Format(Today())), 1, MaxStrLen(motivo));
-        cContenido.BloquearContenido(Rec, true, motivo);
+        cContenido.AlternarBloqueo(Rec);
         CurrPage.Update(false);
     end;
 

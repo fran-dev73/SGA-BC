@@ -272,7 +272,7 @@ page 51121 "Preparar Picking SGA"
     begin
         rConfig.ObtenerConfig();
         ExigeDigito := rConfig."Exigir Digito Control";
-        Rec.SetFilter(Estado, '%1|%2', Rec.Estado::Pendiente, Rec.Estado::Parcial);
+        Rec.FiltrarPendientes();
         if Rec.FindFirst() then;
         Preparar();
     end;
@@ -306,18 +306,14 @@ page 51121 "Preparar Picking SGA"
 
     local procedure CalcularProgreso()
     var
-        rLinea: Record "Linea Orden Picking SGA";
+        rOrden: Record "Orden Picking SGA";
         total: Integer;
         hechas: Integer;
         ProgresoLbl: Label '%1 de %2 paradas', Comment = '%1 = paradas hechas, %2 = total de paradas';
     begin
-        rLinea.SetRange("No. Orden", Rec."No. Orden");
-        rLinea.SetFilter(Estado, '<>%1', rLinea.Estado::Cancelada);
-        total := rLinea.Count();
-
-        rLinea.SetRange(Estado, rLinea.Estado::Recogida);
-        hechas := rLinea.Count();
-
+        // Sin leer la orden: Progreso solo necesita el número, y con la pantalla vacía no lo hay.
+        rOrden."No. Orden" := Rec."No. Orden";
+        rOrden.Progreso(hechas, total);
         Progreso := StrSubstNo(ProgresoLbl, hechas, total);
     end;
 
@@ -350,27 +346,14 @@ page 51121 "Preparar Picking SGA"
 
     local procedure Confirmar()
     var
-        rConfig: Record "Config. SGA";
         cPicking: Codeunit "Gestion Picking SGA";
-        cantidadBase: Decimal;
         CantidadNoIndicadaErr: Label 'Indique la cantidad recogida.';
-        UbicacionNoIndicadaErr: Label 'Escanee o teclee la ubicación de la que ha recogido.';
     begin
         if CantidadRecogida <= 0 then
             Error(CantidadNoIndicadaErr);
 
-        rConfig.ObtenerConfig();
-        if rConfig."Exigir Confirmar Ubicacion" and (UbicacionEscaneada = '') then
-            Error(UbicacionNoIndicadaErr);
-
-        // El preparador habla en la UM del pedido; la parada, en base. Si lo tecleado es lo
-        // pendiente, se toma el pendiente exacto para no dejar restos de redondeo.
-        if CantidadRecogida = PendienteDocumento then
-            cantidadBase := Rec."Cantidad Pendiente"
-        else
-            cantidadBase := Rec.EnUMBase(CantidadRecogida);
-
-        cPicking.ConfirmarLinea(Rec, UbicacionEscaneada, cantidadBase, DigitoControl);
+        // El preparador habla en la UM del pedido; la parada, en base.
+        cPicking.ConfirmarLinea(Rec, UbicacionEscaneada, Rec.CantidadBaseDesdeDocumento(CantidadRecogida, PendienteDocumento), DigitoControl);
 
         // Al quedar recogida sale del filtro de pendientes, así que se recarga la vista.
         if not SiguienteParada() then begin
@@ -445,7 +428,7 @@ page 51121 "Preparar Picking SGA"
         Rec.Reset();
         Rec.SetCurrentKey("No. Orden", Estado, "Secuencia Picking");
         Rec.SetRange("No. Orden", orden);
-        Rec.SetFilter(Estado, '%1|%2', Rec.Estado::Pendiente, Rec.Estado::Parcial);
+        Rec.FiltrarPendientes();
 
         exit(Rec.FindFirst());
     end;

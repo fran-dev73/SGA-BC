@@ -380,14 +380,14 @@ codeunit 51107 "Analisis ABC SGA"
     /// </summary>
     local procedure NivelHueco(prm_Codigo: Code[20]): Integer
     var
-        cMapa: Codeunit "Gestion Mapa SGA";
+        cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
         nave: Code[1];
         estanteria: Code[2];
         columna: Integer;
         altura: Code[1];
         nivel: Integer;
     begin
-        if not cMapa.TrocearCodigo(prm_Codigo, nave, estanteria, columna, altura) then
+        if not cUbicaciones.TrocearCodigo(prm_Codigo, nave, estanteria, columna, altura) then
             exit(999);
         if not Evaluate(nivel, altura) then
             exit(999);

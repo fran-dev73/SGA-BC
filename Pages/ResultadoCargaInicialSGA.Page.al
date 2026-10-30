@@ -108,10 +108,7 @@ page 51125 "Resultado Carga Inicial SGA"
     trigger OnAfterGetRecord()
     begin
         Cargado := Rec.Estado = Rec.Estado::Ubicado;
-        if Cargado then
-            EstiloFila := 'Standard'
-        else
-            EstiloFila := 'Unfavorable';
+        EstiloFila := Rec.EstiloCargaInicial();
     end;
 
     /// <summary>

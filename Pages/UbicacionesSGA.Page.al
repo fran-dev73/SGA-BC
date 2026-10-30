@@ -216,6 +216,7 @@ page 51100 "Ubicaciones SGA"
                 trigger OnAction()
                 var
                     rSeleccion: Record "Ubicacion SGA";
+                    cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
                     hechas: Integer;
                     RegenerarDigitosQst: Label 'Se va a cambiar el dígito de control de %1 ubicaciones. Sus etiquetas actuales dejarán de valer y habrá que reimprimirlas. ¿Continuar?', Comment = '%1 = número';
                     DigitosRegeneradosMsg: Label 'Se han regenerado %1 dígitos de control. Reimprima sus etiquetas.', Comment = '%1 = número';
@@ -224,13 +225,7 @@ page 51100 "Ubicaciones SGA"
                     if not Confirm(RegenerarDigitosQst, false, rSeleccion.Count()) then
                         exit;
 
-                    if rSeleccion.FindSet(true) then
-                        repeat
-                            rSeleccion.GenerarDigitoControl();
-                            rSeleccion.Modify();
-                            hechas += 1;
-                        until rSeleccion.Next() = 0;
-
+                    hechas := cUbicaciones.RegenerarDigitos(rSeleccion);
                     CurrPage.Update(false);
                     Message(DigitosRegeneradosMsg, hechas);
                 end;

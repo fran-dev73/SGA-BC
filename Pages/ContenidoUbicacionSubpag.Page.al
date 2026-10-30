@@ -133,37 +133,17 @@ page 51102 "Contenido Ubicacion Subpag"
     local procedure TrasladarContenido()
     var
         cContenido: Codeunit "Gestion Contenido SGA";
-        pagMover: Page "Mover Contenido SGA";
-        noMovimiento: Integer;
+        destino: Code[20];
     begin
-        pagMover.Inicializar(Rec);
-        if pagMover.RunModal() <> Action::OK then
-            exit;
-
-        noMovimiento := cContenido.RegistrarTraslado(Rec."Cod. Almacen", Rec."Cod. Bin",
-                                                     pagMover.ObtenerDestino(), Rec."No. Producto",
-                                                     Rec."Cod. Variante", Rec."No. Lote",
-                                                     Rec."Cod. Unidad Medida", pagMover.ObtenerCantidad(),
-                                                     "Origen Mov. SGA"::Manual, '', 0, pagMover.ObtenerMotivo());
-        if noMovimiento <> 0 then
+        if cContenido.TrasladarConDialogo(Rec, destino, '') <> 0 then
             CurrPage.Update(false);
     end;
 
     local procedure AlternarBloqueoContenido()
     var
         cContenido: Codeunit "Gestion Contenido SGA";
-        motivo: Text[50];
-        BloqueadoPorLbl: Label 'Bloqueado por %1 el %2', Comment = '%1 = usuario, %2 = fecha';
     begin
-        if Rec.Bloqueado then begin
-            cContenido.BloquearContenido(Rec, false, '');
-            CurrPage.Update(false);
-            exit;
-        end;
-
-        // El motivo queda trazado con quién y cuándo; el detalle se matiza luego en la línea.
-        motivo := CopyStr(StrSubstNo(BloqueadoPorLbl, UserId(), Format(Today())), 1, MaxStrLen(motivo));
-        cContenido.BloquearContenido(Rec, true, motivo);
+        cContenido.AlternarBloqueo(Rec);
         CurrPage.Update(false);
     end;
 }

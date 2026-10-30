@@ -199,7 +199,7 @@ page 51122 "Mapa 3D Almacen SGA"
         cContenido: Codeunit "Gestion Contenido SGA";
         cMapa: Codeunit "Gestion Mapa SGA";
         pContenido: Page "Contenido Ubicaciones SGA";
-        pMover: Page "Mover Contenido SGA";
+        destino: Code[20];
         SinContenidoTrasladarErr: Label 'La ubicación %1 no tiene contenido que trasladar.', Comment = '%1 = ubicación';
         TrasladadoMsg: Label 'Trasladado de %1 a %2.', Comment = '%1 = origen, %2 = destino';
         TrasladoMapa3DLbl: Label 'Traslado desde el mapa 3D';
@@ -218,22 +218,16 @@ page 51122 "Mapa 3D Almacen SGA"
         end else
             rContenido.FindFirst();
 
-        pMover.Inicializar(rContenido);
-        pMover.FijarDestino(prm_Destino);
-        if pMover.RunModal() <> Action::OK then
+        // El operario puede cambiar en el diálogo el destino del arrastre: el mensaje lleva el elegido.
+        destino := prm_Destino;
+        if cContenido.TrasladarConDialogo(rContenido, destino, TrasladoMapa3DLbl) = 0 then
             exit;
-
-        cContenido.RegistrarTraslado(rContenido."Cod. Almacen", rContenido."Cod. Bin", pMover.ObtenerDestino(),
-                                     rContenido."No. Producto", rContenido."Cod. Variante", rContenido."No. Lote",
-                                     rContenido."Cod. Unidad Medida", pMover.ObtenerCantidad(),
-                                     "Origen Mov. SGA"::Manual, '', 0,
-                                     DescripcionTraslado(pMover.ObtenerMotivo(), TrasladoMapa3DLbl));
 
         // Sin perder la vista: el operario sigue en el mismo giro, zoom y pasillo.
         CurrPage.Lienzo.Actualizar(cMapa.DatosMapa3D(FiltroAlmacen, FiltroNave, FiltroEstanteria));
         CalcularResumen();
         CurrPage.Update(false);
-        Message(TrasladadoMsg, prm_Origen, pMover.ObtenerDestino());
+        Message(TrasladadoMsg, prm_Origen, destino);
     end;
 
     /// <summary>
@@ -272,22 +266,9 @@ page 51122 "Mapa 3D Almacen SGA"
         Message(UbicacionVaciadaMsg, prm_CodBin, lineas);
     end;
 
-    local procedure DescripcionTraslado(prm_Motivo: Text; prm_PorDefecto: Text): Text
-    begin
-        if prm_Motivo <> '' then
-            exit(prm_Motivo);
-
-        exit(prm_PorDefecto);
-    end;
-
     local procedure CalcularResumen()
     var
-        rUbicacionSGA: Record "Ubicacion SGA";
-        total: Integer;
-        vacias: Integer;
-        llenas: Integer;
-        bloqueadas: Integer;
-        ResumenLbl: Label '%1 ubicaciones: %2 vacías, %3 llenas, %4 bloqueadas.', Comment = '%1 = total, %2 = vacías, %3 = llenas, %4 = bloqueadas';
+        cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
         IndiqueAlmacenLbl: Label 'Indique un almacén para dibujar el mapa.';
     begin
         if FiltroAlmacen = '' then begin
@@ -295,18 +276,6 @@ page 51122 "Mapa 3D Almacen SGA"
             exit;
         end;
 
-        rUbicacionSGA.SetRange("Cod. Almacen", FiltroAlmacen);
-        total := rUbicacionSGA.Count();
-
-        rUbicacionSGA.SetRange("Estado SGA", rUbicacionSGA."Estado SGA"::Vacia);
-        vacias := rUbicacionSGA.Count();
-
-        rUbicacionSGA.SetRange("Estado SGA", rUbicacionSGA."Estado SGA"::Llena);
-        llenas := rUbicacionSGA.Count();
-
-        rUbicacionSGA.SetRange("Estado SGA", rUbicacionSGA."Estado SGA"::Bloqueada);
-        bloqueadas := rUbicacionSGA.Count();
-
-        Resumen := StrSubstNo(ResumenLbl, total, vacias, llenas, bloqueadas);
+        Resumen := cUbicaciones.ResumenUbicaciones(FiltroAlmacen);
     end;
 }

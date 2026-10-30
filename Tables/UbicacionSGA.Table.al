@@ -609,24 +609,6 @@ table 51101 "Ubicacion SGA"
     end;
 
     /// <summary>
-    /// Capacidad libre en la clase del hueco (palés o cajas). Devuelve 0 si no hay hueco y -1
-    /// si no hay capacidad declarada (hueco indeterminado).
-    /// </summary>
-    procedure CapacidadDisponible(): Decimal
-    var
-        ocupado: Decimal;
-    begin
-        if "Capacidad Uds." <= 0 then
-            exit(-1);
-
-        ocupado := OcupadoEnUMHueco();
-        if ocupado >= "Capacidad Uds." then
-            exit(0);
-
-        exit("Capacidad Uds." - ocupado);
-    end;
-
-    /// <summary>
     /// Indica si la ubicación admite movimientos en este momento.
     /// </summary>
     procedure EsUtilizable(): Boolean
