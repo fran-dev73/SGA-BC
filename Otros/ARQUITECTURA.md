@@ -673,8 +673,10 @@ PUBLIC:
       ficha), dividiendo y sin límite de palés. Vacío si el producto va en
       blanco o la cantidad no es positiva. Lo usan Ubicar producto (Equivale
       a) y Pendiente de ubicar (Desglose).
-   └─ Las funciones de clase: ver "Unidad de medida por ubicación".
 ```
+
+Las funciones de clase (TipoUMProducto, UMAdmitida, TipoHuecoDestino, UMProductoDeTipo) se
+explican en "Unidad de medida por ubicación".
 
 Las conversiones con el factor guardado en el propio documento (línea de venta, ensamblado,
 línea de picking) no pasan por aquí: usan el de su registro, porque la ficha puede haber cambiado

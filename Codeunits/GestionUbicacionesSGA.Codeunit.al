@@ -253,7 +253,8 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     /// (Repartir de "Unidades Producto SGA", con el palé de la ficha) y propone un hueco para
     /// cada trozo, en orden y sin dar el mismo hueco a dos. Las líneas quedan Pendiente con el
     /// hueco propuesto también como confirmado, o "Sin Sitio" con el motivo. Como mucho
-    /// MaxLineasReparto líneas: lo que no entra se vuelve a proponer después.
+    /// MaxLineasReparto líneas, para que una unidad mal configurada no genere miles: lo que
+    /// no entra no se propone y queda en "Pendiente de ubicar".
     /// </summary>
     procedure ProponerReparto(prm_Estrategia: Enum "Estrategia Ubicacion SGA"; prm_Almacen: Code[10]; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50]; prm_CantidadBase: Decimal; var TempLinea: Record "Linea Ubicacion SGA" temporary)
     var

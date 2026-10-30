@@ -45,8 +45,14 @@ hay, marcada como *No se puede ubicar* y el motivo.
 Es el mismo reparto en todas partes: *Ubicar producto*, *Equivale a* y el desglose de *Pendiente de
 ubicar*, la carga inicial por *Huecos libres*, *Ubicar seleccionadas* y el palé de una tarea en
 *Imprimir y ubicar palés*. En este último el palé es el de la tarea y no el de la ficha, y la caja
-es la unidad de venta si es más pequeña que ese palé. Lo que cambia entre ellos es solo cómo se
-busca el hueco de cada parte.
+es la unidad de venta si es más pequeña que ese palé. Lo que cambia entre ellos es qué se hace con
+cada parte:
+
+- *Equivale a* y el desglose de *Pendiente de ubicar* solo muestran el reparto; no buscan hueco.
+- *Ubicar producto*, *Huecos libres* y *Ubicar seleccionadas* buscan un hueco para cada parte.
+- En la carga inicial, un producto sin caja no ubica las sueltas: quedan como no cargadas.
+- *Imprimir y ubicar palés* ubica solo el palé de la tarea; las sueltas que sobran de las cajas
+  quedan pendientes, con aviso.
 
 ### Qué admite cada hueco
 
