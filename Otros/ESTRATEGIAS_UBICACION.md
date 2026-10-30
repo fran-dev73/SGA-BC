@@ -42,6 +42,12 @@ caja**. 690 botellas con palé de 540 y CAJA12 son *1 PALE, 12 CAJA12, 6 BOTELLA
 En *Ubicar producto* el resultado sale en una tabla, una línea por parte, con su hueco o, si no lo
 hay, marcada como *No se puede ubicar* y el motivo.
 
+Es el mismo reparto en todas partes: *Ubicar producto*, *Equivale a* y el desglose de *Pendiente de
+ubicar*, la carga inicial por *Huecos libres*, *Ubicar seleccionadas* y el palé de una tarea en
+*Imprimir y ubicar palés*. En este último el palé es el de la tarea y no el de la ficha, y la caja
+es la unidad de venta si es más pequeña que ese palé. Lo que cambia entre ellos es solo cómo se
+busca el hueco de cada parte.
+
 ### Qué admite cada hueco
 
 Cada ubicación dice qué admite (campo *Admite* de su ficha). Hay **dos reglas distintas**, a

@@ -40,9 +40,9 @@ pageextension 51100 "Item Card SGA" extends "Item Card"
 
                     trigger OnAction()
                     var
-                        cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
+                        cStock: Codeunit "Consulta Stock SGA";
                     begin
-                        cUbicaciones.ConsultarUbicacionesProducto(Rec."No.", '', '', '');
+                        cStock.ConsultarUbicacionesProducto(Rec."No.", '', '', '');
                     end;
                 }
                 action(MovsUbicacionSGA)

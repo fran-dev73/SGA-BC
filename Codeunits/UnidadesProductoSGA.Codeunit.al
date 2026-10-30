@@ -201,4 +201,156 @@ codeunit 51108 "Unidades Producto SGA"
             exit('');
         exit(um);
     end;
+
+    /// <summary>
+    /// Reparte una cantidad en unidad base en los trozos que se ubican por separado: una línea
+    /// por palé completo (Cantidad 1), una con las cajas completas y una con las unidades
+    /// sueltas que no llegan a una caja, en ese orden y con Linea correlativa. No deja líneas
+    /// con cantidad cero; sin caja, todo lo que no llega a un palé va en la línea de sueltas.
+    ///
+    /// prm_UMPale en blanco: el palé y la caja de la ficha (UMProductoDeTipo). Con un palé
+    /// indicado (el de una tarea de embotellado) se usa ese, con su factor, y la caja es la
+    /// unidad de venta si lleva más de una unidad y menos que ese palé.
+    ///
+    /// Solo rellena producto, unidad, cantidades y el texto del trozo (Paso): el almacén, el lote
+    /// y el hueco los pone quien lo usa. Borra antes lo que hubiera en TempLinea.
+    /// </summary>
+    procedure Repartir(prm_Producto: Code[20]; prm_CantidadBase: Decimal; prm_UMPale: Code[10]; var TempLinea: Record "Linea Ubicacion SGA" temporary)
+    var
+        umPale: Code[10];
+        umCaja: Code[10];
+        factorPale: Decimal;
+        factorCaja: Decimal;
+        resto: Decimal;
+        pales: Integer;
+        i: Integer;
+        cajas: Decimal;
+        PaleDeLbl: Label 'Palé %1 de %2', Comment = '%1 = nº de palé, %2 = total';
+        UnidadesVentaLbl: Label 'Unidades de venta';
+        UnidadesSueltasLbl: Label 'Unidades sueltas';
+    begin
+        TempLinea.Reset();
+        TempLinea.DeleteAll();
+        if (prm_Producto = '') or (prm_CantidadBase <= 0) then
+            exit;
+
+        UnidadesReparto(prm_Producto, prm_UMPale, umPale, factorPale, umCaja, factorCaja);
+        resto := prm_CantidadBase;
+
+        if umPale <> '' then begin
+            pales := Round(resto / factorPale, 1, '<');
+            for i := 1 to pales do
+                AnadirTrozo(TempLinea, prm_Producto, StrSubstNo(PaleDeLbl, i, pales), umPale, 1, factorPale);
+            resto := Round(resto - pales * factorPale, 0.00001);
+        end;
+
+        if umCaja <> '' then begin
+            cajas := Round(resto / factorCaja, 1, '<');
+            if cajas > 0 then begin
+                AnadirTrozo(TempLinea, prm_Producto, UnidadesVentaLbl, umCaja, cajas, cajas * factorCaja);
+                resto := Round(resto - cajas * factorCaja, 0.00001);
+            end;
+        end;
+
+        if resto > 0 then
+            AnadirTrozo(TempLinea, prm_Producto, UnidadesSueltasLbl, UMBase(prm_Producto), resto, resto);
+    end;
+
+    /// <summary>
+    /// Una cantidad en unidad base dicha en palés, cajas y unidades sueltas, con las mismas
+    /// unidades que Repartir con el palé de la ficha: 690 botellas con palé de 540 y CAJA12 son
+    /// "1 PALE, 12 CAJA12, 6 BOTELLA". Divide en lugar de recorrer los trozos, así que no tiene
+    /// límite de palés. Vacío si el producto va en blanco o la cantidad no es positiva.
+    /// </summary>
+    procedure Desglose(prm_Producto: Code[20]; prm_CantidadBase: Decimal): Text
+    var
+        umPale: Code[10];
+        umCaja: Code[10];
+        factorPale: Decimal;
+        factorCaja: Decimal;
+        resto: Decimal;
+        texto: Text;
+    begin
+        if (prm_Producto = '') or (prm_CantidadBase <= 0) then
+            exit('');
+
+        UnidadesReparto(prm_Producto, '', umPale, factorPale, umCaja, factorCaja);
+        resto := prm_CantidadBase;
+        AnadirAlDesglose(umPale, factorPale, resto, texto);
+        AnadirAlDesglose(umCaja, factorCaja, resto, texto);
+
+        resto := Round(resto, 0.00001);
+        if resto > 0 then begin
+            if texto <> '' then
+                texto += ', ';
+            texto += Format(resto) + ' ' + UMBase(prm_Producto);
+        end;
+        exit(texto);
+    end;
+
+    /// <summary>
+    /// El palé y la caja con los que se reparte (ver Repartir). Unidad en blanco y factor 0 si el
+    /// producto no la tiene.
+    /// </summary>
+    local procedure UnidadesReparto(prm_Producto: Code[20]; prm_UMPaleIndicada: Code[10]; var prm_UMPale: Code[10]; var prm_FactorPale: Decimal; var prm_UMCaja: Code[10]; var prm_FactorCaja: Decimal)
+    var
+        rItem: Record Item;
+    begin
+        prm_FactorPale := 0;
+        prm_FactorCaja := 0;
+        if prm_UMPaleIndicada = '' then begin
+            prm_UMPale := UMProductoDeTipo(prm_Producto, "Tipo UM SGA"::Pale);
+            prm_UMCaja := UMProductoDeTipo(prm_Producto, "Tipo UM SGA"::Caja);
+        end else begin
+            prm_UMPale := prm_UMPaleIndicada;
+            prm_UMCaja := '';
+            rItem.SetLoadFields("Sales Unit of Measure");
+            if rItem.Get(prm_Producto) then
+                prm_UMCaja := rItem."Sales Unit of Measure";
+        end;
+
+        if prm_UMPale <> '' then
+            prm_FactorPale := FactorUM(prm_Producto, prm_UMPale);
+        if prm_UMCaja = '' then
+            exit;
+
+        prm_FactorCaja := FactorUM(prm_Producto, prm_UMCaja);
+        // Con el palé de la ficha, UMProductoDeTipo ya lo garantiza; con otro palé, se comprueba.
+        if (prm_FactorCaja <= 1) or ((prm_FactorPale > 0) and (prm_FactorCaja >= prm_FactorPale)) then begin
+            prm_UMCaja := '';
+            prm_FactorCaja := 0;
+        end;
+    end;
+
+    local procedure AnadirTrozo(var TempLinea: Record "Linea Ubicacion SGA" temporary; prm_Producto: Code[20]; prm_Paso: Text; prm_UM: Code[10]; prm_Cantidad: Decimal; prm_CantidadBase: Decimal)
+    var
+        siguiente: Integer;
+    begin
+        if TempLinea.FindLast() then
+            siguiente := TempLinea.Linea;
+
+        TempLinea.Init();
+        TempLinea.Linea := siguiente + 1;
+        TempLinea.Paso := CopyStr(prm_Paso, 1, MaxStrLen(TempLinea.Paso));
+        TempLinea."No. Producto" := prm_Producto;
+        TempLinea."Cod. Unidad Medida" := prm_UM;
+        TempLinea.Cantidad := prm_Cantidad;
+        TempLinea."Cantidad Base" := Round(prm_CantidadBase, 0.00001);
+        TempLinea.Insert();
+    end;
+
+    local procedure AnadirAlDesglose(prm_UM: Code[10]; prm_Factor: Decimal; var prm_Resto: Decimal; var prm_Texto: Text)
+    var
+        cuantos: Decimal;
+    begin
+        if (prm_UM = '') or (prm_Factor <= 0) then
+            exit;
+        cuantos := Round(prm_Resto / prm_Factor, 1, '<');
+        if cuantos <= 0 then
+            exit;
+        if prm_Texto <> '' then
+            prm_Texto += ', ';
+        prm_Texto += Format(cuantos) + ' ' + prm_UM;
+        prm_Resto -= cuantos * prm_Factor;
+    end;
 }

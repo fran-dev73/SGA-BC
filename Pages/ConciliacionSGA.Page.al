@@ -180,7 +180,7 @@ page 51113 "Conciliacion SGA"
     trigger OnOpenPage()
     begin
         Rec.FilterGroup(2);
-        Rec.SetRange("Cod. Usuario", CopyStr(UserId(), 1, MaxStrLen(Rec."Cod. Usuario")));
+        Rec.FiltrarUsuarioActual();
         Rec.FilterGroup(0);
     end;
 

@@ -1,7 +1,6 @@
 namespace AntonioNadal.SGA;
 
 using Microsoft.Inventory.Item;
-using Microsoft.Inventory.Ledger;
 
 /// <summary>
 /// Codeunit Gestion Contenido SGA (ID 51100).
@@ -25,6 +24,7 @@ codeunit 51100 "Gestion Contenido SGA"
 
     var
         cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
+        cStock: Codeunit "Consulta Stock SGA";
         cUM: Codeunit "Unidades Producto SGA";
         ModoSilencioso: Boolean;
 
@@ -312,7 +312,7 @@ codeunit 51100 "Gestion Contenido SGA"
             umUsada := umBase;
         factor := cUM.TestUMProducto(prm_Producto, umUsada);
         cantidadBase := Round(prm_Cantidad * factor, 0.00001);
-        caducidad := ObtenerCaducidadLote(prm_Producto, prm_Variante, prm_Lote);
+        caducidad := cStock.CaducidadLote(prm_Producto, prm_Variante, prm_Lote);
 
         // La UM la fija la ubicación de destino: una ubicación de palés no admite cajas y al
         // revés. Se comprueba contra la UM que usa el operario, no contra la base del producto.
@@ -576,25 +576,5 @@ codeunit 51100 "Gestion Contenido SGA"
         rUbicacionSGA.RecalcularOcupacion();
         rUbicacionSGA."Fecha Ultimo Movimiento" := CurrentDateTime();
         rUbicacionSGA.Modify(false);
-    end;
-
-    local procedure ObtenerCaducidadLote(prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50]): Date
-    var
-        rItemLedgEntry: Record "Item Ledger Entry";
-    begin
-        if prm_Lote = '' then
-            exit(0D);
-
-        // La caducidad se toma de los movimientos de producto del lote, que es donde ya
-        // la registran los flujos de compra y de fabricación.
-        rItemLedgEntry.SetRange("Item No.", prm_Producto);
-        rItemLedgEntry.SetRange("Lot No.", prm_Lote);
-        if prm_Variante <> '' then
-            rItemLedgEntry.SetRange("Variant Code", prm_Variante);
-        rItemLedgEntry.SetFilter("Expiration Date", '<>%1', 0D);
-        if rItemLedgEntry.FindLast() then
-            exit(rItemLedgEntry."Expiration Date");
-
-        exit(0D);
     end;
 }

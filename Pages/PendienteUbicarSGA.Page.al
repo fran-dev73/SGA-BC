@@ -18,7 +18,7 @@ page 51131 "Pendiente Ubicar SGA"
     Caption = 'Pendiente de ubicar';
     // Worksheet y no List: hace falta la cabecera con el almacén.
     PageType = Worksheet;
-    SourceTable = "Pendiente Ubicar SGA";
+    SourceTable = "Buffer Conciliacion SGA";
     SourceTableTemporary = true;
     UsageCategory = Tasks;
     ApplicationArea = All;
@@ -64,19 +64,27 @@ page 51131 "Pendiente Ubicar SGA"
                 field("No. Producto"; Rec."No. Producto")
                 {
                     ApplicationArea = All;
+                    Caption = 'Nº producto';
+                    ToolTip = 'Producto con stock sin ubicar.';
                 }
                 field(Descripcion; Rec.Descripcion)
                 {
                     ApplicationArea = All;
+                    Caption = 'Descripción';
+                    ToolTip = 'Descripción del producto.';
                 }
                 field("Cod. Variante"; Rec."Cod. Variante")
                 {
                     ApplicationArea = All;
+                    Caption = 'Variante';
+                    ToolTip = 'Variante del producto.';
                     Visible = false;
                 }
                 field("No. Lote"; Rec."No. Lote")
                 {
                     ApplicationArea = All;
+                    Caption = 'Lote';
+                    ToolTip = 'Lote del stock sin ubicar.';
                 }
                 field("Fecha Caducidad"; Rec."Fecha Caducidad")
                 {
@@ -96,27 +104,37 @@ page 51131 "Pendiente Ubicar SGA"
                     ApplicationArea = All;
                     StyleExpr = EstiloDocumentos;
                 }
-                field(Pendiente; Rec.Pendiente)
+                field(Pendiente; Rec.Diferencia)
                 {
                     ApplicationArea = All;
+                    Caption = 'Sin ubicar';
+                    ToolTip = 'Stock de BC que no está en ninguna ubicación.';
                 }
                 field("Stock BC"; Rec."Stock BC")
                 {
                     ApplicationArea = All;
+                    Caption = 'Stock BC';
+                    ToolTip = 'Existencias del lote en BC, en el almacén.';
                     Visible = false;
                 }
                 field("Stock SGA"; Rec."Stock SGA")
                 {
                     ApplicationArea = All;
+                    Caption = 'Ubicado';
+                    ToolTip = 'Lo que ya está en ubicaciones de SGA.';
                     Visible = false;
                 }
                 field("Unidad Medida Base"; Rec."Unidad Medida Base")
                 {
                     ApplicationArea = All;
+                    Caption = 'Unidad base';
+                    ToolTip = 'Unidad en la que van las cantidades de la línea.';
                 }
                 field("Cod. Almacen"; Rec."Cod. Almacen")
                 {
                     ApplicationArea = All;
+                    Caption = 'Almacén';
+                    ToolTip = 'Almacén del stock.';
                     Visible = false;
                 }
             }
@@ -285,7 +303,7 @@ page 51131 "Pendiente Ubicar SGA"
     /// </summary>
     local procedure UbicarSeleccion()
     var
-        TempSeleccion: Record "Pendiente Ubicar SGA" temporary;
+        TempSeleccion: Record "Buffer Conciliacion SGA" temporary;
         TempResultado: Record "Linea Ubicacion SGA" temporary;
         cCarga: Codeunit "Carga Inicial SGA";
         pResultado: Page "Resultado Carga Inicial SGA";

@@ -413,11 +413,10 @@ codeunit 51105 "Gestion Entradas SGA"
         rCabEnsReg: Record "Posted Assembly Header";
         rItem: Record Item;
         rUMPale: Record "Item Unit of Measure";
-        rUMVenta: Record "Item Unit of Measure";
         rConfig: Record "Config. SGA";
+        TempTrozo: Record "Linea Ubicacion SGA" temporary;
         qtyPorUM: Decimal;
         factorPale: Decimal;
-        factorVenta: Decimal;
         factorDestino: Decimal;
         pendienteBase: Decimal;
         restantePlanBase: Decimal;
@@ -510,22 +509,20 @@ codeunit 51105 "Gestion Entradas SGA"
         if paleBase > pendienteBase then
             paleBase := pendienteBase;
 
-        // Unidad en la que se ubica: palé completo, cajas o, si no llega a una caja, unidades.
-        if paleBase >= factorPale then begin
-            umDestino := rUMPale.Code;
-            cantidadDestino := 1;
-        end else begin
-            if rItem."Sales Unit of Measure" <> '' then
-                if rUMVenta.Get(prm_Fila."No. Producto", rItem."Sales Unit of Measure") then
-                    factorVenta := rUMVenta."Qty. per Unit of Measure";
-            if (factorVenta > 1) and (factorVenta < factorPale) and (paleBase >= factorVenta) then begin
-                umDestino := rUMVenta.Code;
-                cantidadDestino := Round(paleBase / factorVenta, 1, '<');
-                sueltasBase := Round(paleBase - cantidadDestino * factorVenta, 0.00001);
-            end else begin
-                umDestino := rItem."Base Unit of Measure";
-                cantidadDestino := paleBase;
-            end;
+        // Unidad en la que se ubica: palé completo, cajas o, si no llega a una caja, unidades. Es
+        // el primer trozo del reparto con el palé de la tarea; las sueltas que sobren de las
+        // cajas quedan pendientes.
+        cUM.Repartir(prm_Fila."No. Producto", paleBase, rUMPale.Code, TempTrozo);
+        if not TempTrozo.FindFirst() then begin
+            prm_Aviso := StrSubstNo(EnsambladoYaUbicadoLbl, prm_Fila."No. Documento");
+            exit(false);
+        end;
+        umDestino := TempTrozo."Cod. Unidad Medida";
+        cantidadDestino := TempTrozo.Cantidad;
+        if umDestino <> rItem."Base Unit of Measure" then begin
+            TempTrozo.SetRange("Cod. Unidad Medida", rItem."Base Unit of Measure");
+            if TempTrozo.FindFirst() then
+                sueltasBase := TempTrozo."Cantidad Base";
         end;
 
         // La fila pasa entera a esa unidad, para que el pendiente y lo ya ubicado se comparen

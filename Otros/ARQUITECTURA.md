@@ -257,19 +257,35 @@ La rellenan cada vez que se abre el *Mapa de almacén*. Es un buffer transitorio
 
 ### 8. **Buffer Conciliacion SGA** (Tab51107)
 ```
-Tabla temporal, con scope por usuario (CodUsuario es parte de la PK)
+Tabla real, con scope por usuario (CodUsuario es parte de la PK)
 
 PK: Cod. Usuario + Cod. Producto + Cod. Variante + Cod. Almacen + Cod. Lote
 
    Stock BC               (total del Item Ledger Entry por lote)
    Stock SGA              (suma de Contenido por lote)
-   Diferencia             (Stock BC - Stock SGA)
+   Diferencia             (Stock BC - Stock SGA, redondeada; la calcula ActualizarEstado)
    Estado                 (Cuadra / SinUbicar / SobraEnSGA)
-   
    UM Base
+   Descripcion            (FlowField: descripción del producto)
+
+   Solo en temporal (Pendiente de ubicar y carga inicial):
+   90 Fecha Caducidad     (CaducidadLote de Cod51103)
+   91 En Documentos       (pendiente en Ubicar recepciones / ensamblados)
+   92 A Ubicar            (Diferencia - En Documentos)
+   93 Desglose            (A Ubicar en palés, cajas y sueltas)
+
+Methods:
+├─ ActualizarEstado()       — Diferencia y Estado
+├─ FiltrarUsuarioActual()   — SetRange del usuario actual, sin Reset ni
+│                             FilterGroup (la página lo llama en su FilterGroup 2)
+└─ EstiloConciliacion()
 ```
 
 Se rellena cuando lanzas el informe *Conciliar con el stock*. Cada usuario ve sus propios resultados (scoped).
+
+Es también la única tabla de stock por lote en memoria: *Pendiente de ubicar* (Pag51131, con
+`SourceTableTemporary`) y la carga inicial la usan como temporal. `CargarPendienteUbicar` exige que
+el registro sea temporal (`IsTemporary`), porque lo vacía entero sin mirar el usuario.
 
 ### 9. **Orden Picking SGA** (Tab51108) — FASE 2
 
@@ -482,13 +498,6 @@ PUBLIC:
 ├─ ContarUbicaciones(Almacen, Estado)
 │  └─ SELECT COUNT(*) grouped by Estado.
 │
-├─ ConsultarUbicacionesProducto(Producto, Variante, Almacen, Lote)
-│  └─ Llena BufferContenido con dónde está el producto, 
-│     ordenado por FEFO y ruta.
-│
-├─ TotalUbicadoProducto(Producto, Variante, Lote)
-│  └─ SELECT SUM(Cantidad) dónde está este producto.
-│
 ├─ UbicacionFijaProducto(Producto) -> Ubicacion
 │  └─ Si el producto tiene Shelf No. en su ficha, retorna eso.
 │     Si no, retorna el campo "Producto Fijo" de la Ubicacion SGA.
@@ -509,6 +518,20 @@ PUBLIC:
 ├─ AnadirExclusion(Filtro, Codigo) -> Filtro
 │  └─ Suma un hueco al filtro de exclusiones de la propuesta ('<>A&<>B').
 │     Un código en blanco no añade nada.
+│
+├─ ProponerReparto(Estrategia, Almacen, Producto, Variante, Lote,
+│                  CantidadBase, var TempLinea)
+│  └─ Ubicación guiada: Cod51108.Repartir con el palé de la ficha y, línea a
+│     línea en orden, ProponerUbicacionCon con las exclusiones acumuladas.
+│     Pendiente (propuesta = confirmada) o "Sin Sitio" con el motivo.
+│     Como mucho 200 líneas.
+│
+├─ ConfirmarReparto(var TempLinea, Linea, Almacen, Producto, Variante,
+│                   Lote) -> RestoBase
+│  └─ Valida todas (ubicación existe, "Exigir confirmar ubicación",
+│     "Permitir desvío ubicación") y luego registra con Cod51100.
+│     Linea = 0: todas las que tienen ubicación (salta las que no);
+│     una línea sin ubicación da error. Devuelve lo que queda sin ubicar.
 │
 └─ ComprobarUbicacionExiste(Almacen, Ubicacion)
    └─ Error si la ubicación no existe en el almacén. Con el almacén o la
@@ -562,8 +585,28 @@ PUBLIC:
 │     - Si SGA > BC: Estado = "SobraEnSGA" (hay más de lo que dice BC).
 │     Si SoloDiferencias = true, borra las que cuadran.
 │
-└─ LimpiarBuffer(CodUsuario)
-   └─ Borra todas las filas de este usuario de BufferConciliacion.
+├─ LimpiarBuffer(CodUsuario)
+│  └─ Borra todas las filas de este usuario de BufferConciliacion.
+│
+├─ CargarPendienteUbicar(Almacen, var Pendiente temporal) -> Lineas
+│  └─ Una línea de BufferConciliacion (temporal) por lote con Diferencia > 0,
+│     con En Documentos, A Ubicar, Desglose (Cod51108.Desglose) y caducidad.
+│
+├─ TotalUbicadoProducto(Almacen, Producto, Variante, Lote) -> Decimal
+│  └─ CalcSums de "Cantidad Base" del contenido; cada filtro solo si viene.
+│
+├─ PendienteDeUbicar(Almacen, Producto, Variante, Lote, var Stock, var Ubicado)
+│  └─ Item.Inventory con sus filtros menos TotalUbicadoProducto. No descuenta
+│     lo que está en documentos. Lo usa Ubicar producto.
+│
+├─ ConsultarUbicacionesProducto(Producto, Variante, Almacen, Lote)
+│  └─ Abre "Consulta Ubic. Producto SGA" con los filtros que vengan.
+│     La usan las acciones de la ficha y la lista de productos.
+│
+└─ CaducidadLote(Producto, Variante, Lote) -> Date
+   └─ La del último movimiento de producto del lote con fecha, en cualquier
+      almacén; la variante solo filtra si viene. Única regla: la usan el
+      registro de movimientos (Cod51100) y Pendiente de ubicar.
 ```
 
 ### Cod51108: UnidadesProductoSGA — Las unidades del producto
@@ -576,10 +619,9 @@ lecturas directas de "Item Unit of Measure" en estos sitios:
 - `Cod51102 GestionMapaSGA`: cuántas unidades lleva el palé por defecto del producto (`gf` del
   mapa), en la unidad que se muestra; y, en `UnidadParaMostrar`, los factores del palé por
   defecto y de la unidad de venta de la ficha para elegir en qué unidad se enseña cada línea.
-- `Cod51105 GestionEntradasSGA`: los factores del palé de la tarea y de la unidad de venta al
-  repartir un ensamblado en palé completo, cajas y unidades sueltas.
-- `Pag51117 UbicarProductoSGA` (`UnidadesJuego`): las unidades de palé y de caja del producto
-  para repartir lo pendiente.
+- `Cod51105 GestionEntradasSGA` (`PrepararPaleTarea`): que el palé de la tarea existe en el
+  producto y su factor, para saber cuánto lleva la etiqueta. El reparto de ese palé lo hace
+  `Repartir`.
 
 ```
 PUBLIC:
@@ -599,7 +641,25 @@ PUBLIC:
 ├─ TipoUMProducto(Producto, UM) -> Palé / Caja / Unidad / en blanco
 ├─ UMAdmitida(Producto, Tipo, UM) -> Boolean
 ├─ TipoHuecoDestino(Producto, UM, Cantidad) -> Palé / Caja / Unidad / en blanco
-└─ UMProductoDeTipo(Producto, Tipo) -> UM
+├─ UMProductoDeTipo(Producto, Tipo) -> UM
+│
+├─ Repartir(Producto, CantidadBase, UMPale, var TempLinea)
+│  └─ El reparto único, en líneas de Tab51114: una por palé completo
+│     ("Palé n de N", cantidad 1), una con las cajas completas ("Unidades de
+│     venta") y una con las sueltas ("Unidades sueltas", UM base). Sin líneas
+│     a cero; sin caja, todo lo que no llega a un palé va en la de sueltas.
+│     UMPale en blanco: palé y caja de la ficha (UMProductoDeTipo). Con un
+│     palé indicado (el de la tarea): ese palé y la unidad de venta como caja
+│     si su factor es > 1 y menor que el del palé. Borra antes TempLinea y
+│     solo rellena producto, UM, cantidades y Paso. Lo usan ProponerReparto
+│     (Cod51101), la carga inicial por huecos libres (Cod51106) y el palé de
+│     tarea (Cod51105).
+│
+└─ Desglose(Producto, CantidadBase) -> Texto
+   └─ "1 PALE, 12 CAJA12, 6 BOTELLA" con las unidades de Repartir (palé de la
+      ficha), dividiendo y sin límite de palés. Vacío si el producto va en
+      blanco o la cantidad no es positiva. Lo usan Ubicar producto (Equivale
+      a) y Pendiente de ubicar (Desglose).
    └─ Las funciones de clase: ver "Unidad de medida por ubicación".
 ```
 
@@ -682,10 +742,12 @@ Report 51102 "Carga Inicial Contenido SGA"     (solo pide opciones y filtro de p
         └─ Cod51103.AcumularStockPorLote()       (producto + variante + lote, en UM base)
         └─ según Destino:
            ├─ Ubicación fija / indicada: todo el lote a un sitio
-           └─ Huecos libres:
-              ├─ palés completos → BuscarHuecoPale (vacío, uno por palé)
-              ├─ resto en cajas  → Cod51101.ProponerUbicacionCon(Priorizar Consolidacion, UM caja)
-              └─ sueltas / sin hueco → no se carga
+           └─ Huecos libres: Cod51108.Repartir (palé y caja de la ficha)
+              ├─ cada palé       → BuscarHuecoPale (vacío, uno por palé; sin hueco, los
+              │                    que quedan se anotan juntos como no cargados)
+              ├─ cajas           → Cod51101.ProponerUbicacionCon(Priorizar Consolidacion, UM caja)
+              ├─ sueltas         → Cod51101.ProponerUbicacionCon(Priorizar Consolidacion, UM base)
+              └─ sin caja / sin hueco → no se carga, con el motivo
         └─ Cod51100.RegistrarCargaInicial()      (sin validar capacidad ni UM: ya se ha elegido)
   └─ Pag51125 "Resultado Carga Inicial SGA"      (una fila por palé, grupo de cajas o no cargado;
                                                    líneas de Tab51114 con Origen "Carga Inicial")
@@ -714,7 +776,9 @@ Report 51102 "Carga Inicial Contenido SGA"     (solo pide opciones y filtro de p
 
 Lo calcula `CargarPendienteUbicar` (Cod. Consulta Stock SGA) al abrir: por cada producto con
 existencias en el almacén (FlowField `Inventory` con `Location Filter`), stock de BC por lote menos
-lo ubicado, con las mismas funciones que la conciliación. De lo sin ubicar separa lo que está
+lo ubicado, con las mismas funciones y la misma tabla que la conciliación (Tab51107 en temporal;
+lo sin ubicar es su `Diferencia`). La caducidad es la de `CaducidadLote`, la misma que se guarda al
+ubicar: el último movimiento del lote con fecha, en cualquier almacén. De lo sin ubicar separa lo que está
 pendiente en *Ubicar recepciones* / *Ubicar ensamblados* (`CargarEntradas` sin fechas, filtrado por
 producto, sumado por variante y lote en unidad base): eso se ubica desde allí, porque esas
 pantallas cuentan lo ubicado por su documento y lo volverían a pedir. Lo que queda (*A ubicar
@@ -1199,9 +1263,11 @@ Son dos reglas distintas, a propósito. El porqué de cada regla y su historial 
 
 `PrepararPaleTarea` lo decide con la tarea: la etiqueta n (n = impresas + 1) es completa si a
 `NumBotellas` le queda al menos un palé tras las n-1 anteriores; si no, es el último, con lo que
-quede. Nunca más de lo pendiente del ensamblado. El completo se registra en la UM de palé; el
-incompleto en la unidad de venta (las botellas que no llegan a una caja quedan pendientes y se
-avisa) o, si no llega a una caja, en la unidad base. La fila se pasa entera a esa UM.
+quede. Nunca más de lo pendiente del ensamblado. Lo que lleva la etiqueta se reparte con
+`Repartir` de Cod51108 y el palé de la tarea, y se ubica el primer trozo: el completo, en la UM de
+palé; el incompleto, en la unidad de venta si es más pequeña que el palé de la tarea (las botellas
+que no llegan a una caja quedan pendientes y se avisa) o, si no llega a una caja, en la unidad
+base. La fila se pasa entera a esa UM.
 
 Como un ensamblado puede quedar ubicado en varias UM (palé, cajas…), `CantidadYaUbicada` en
 **producción** suma en unidad base todas las UM y lo devuelve en la de la fila; así *Ubicar
@@ -1215,7 +1281,7 @@ porque un albarán puede traer el mismo lote en cajas y en palés en filas disti
 | `TipoUMProducto(producto, UM)` | Clase de una UM para ese producto: Palé, Caja, Unidad o en blanco (sin clase, o UM que el producto no tiene) | las demás |
 | `UMAdmitida(producto, tipo, UM)` | ¿El hueco de esa clase admite esa UM? En blanco = cualquiera menos unidades; UM en blanco = base del producto | `Cod51100.TestUMAdmitida` |
 | `TipoHuecoDestino(producto, UM, cantidad)` | Clase de hueco que se propone: el palé a Palé, las unidades a Unidad, las cajas a Caja o a Palé según *Cajas Minimas Hueco Pale* | `Cod51101.MotivoRechazo`, `Cod51101.ExplicarSinHuecoLote` |
-| `UMProductoDeTipo(producto, tipo)` | La UM del producto de esa clase: palé por defecto, unidad de venta o unidad base, si es de esa clase; si no, en blanco. Es también la UM en la que se mide "1" de capacidad de un hueco de esa clase para ese producto | `Cod51100.TestUMAdmitida`, `Ubicacion SGA.EnUMHueco` (capacidad en `Cod51100`, `Cod51101` y `OcupadoEnUMHueco`), carga inicial, ABC, `DesgloseCantidad` |
+| `UMProductoDeTipo(producto, tipo)` | La UM del producto de esa clase: palé por defecto, unidad de venta o unidad base, si es de esa clase; si no, en blanco. Es también la UM en la que se mide "1" de capacidad de un hueco de esa clase para ese producto | `Cod51100.TestUMAdmitida`, `Ubicacion SGA.EnUMHueco` (capacidad en `Cod51100`, `Cod51101` y `OcupadoEnUMHueco`), carga inicial, ABC, `Repartir` y `Desglose` |
 
 ### Dónde se valida, y por qué ahí
 
@@ -1284,7 +1350,7 @@ criterio de cálculo. Puntos de diseño:
 ```
 EN USO:
 51100-51111: Enums           (51110 clase ABC, 51111 estado de preparación del pedido)
-51100-51115: Tables          (51108-51109 órdenes de picking, 51110 buffer de entradas, 51111 libre, 51112-51113 análisis ABC, 51114 línea de ubicación, 51115 pendiente de ubicar)
+51100-51114: Tables          (51107 stock por lote: conciliación y pendiente de ubicar, 51108-51109 órdenes de picking, 51110 buffer de entradas, 51111 libre, 51112-51113 análisis ABC, 51114 línea de ubicación)
 51100-51108: Codeunits       (51104 picking, 51105 entradas, 51106 carga inicial, 51107 análisis ABC, 51108 unidades del producto)
 51100-51131: Pages           (51116 libre; 51127 imprimir y ubicar palés; 51128-51129 análisis ABC; 51130 reparto de Ubicar producto; 51131 pendiente de ubicar)
 51100-51106: Reports         (51106 etiquetas de ubicación)
@@ -1294,7 +1360,7 @@ EN USO:
 51100:       Control Add-in
 
 LIBRES:
-Tables 51111, 51116+ (51120 también) · Codeunits 51109+ · Pages 51116 y 51132+
+Tables 51111, 51115+ (51120 también) · Codeunits 51109+ · Pages 51116 y 51132+
 Enums 51112+ · Reports 51107+ · Page Extensions 51109+ · Table Extensions 51103+
 Permission Sets 51102+
 

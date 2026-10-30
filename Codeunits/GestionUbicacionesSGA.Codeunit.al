@@ -172,26 +172,6 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     end;
 
     /// <summary>
-    /// Consulta ubicaciones de un producto. Abre la página de búsqueda "Consulta Ubic. Producto SGA".
-    /// </summary>
-    procedure ConsultarUbicacionesProducto(prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Almacen: Code[10]; prm_Lote: Code[50])
-    var
-        rContenido: Record "Contenido Ubicacion SGA";
-    begin
-        // La página recoge estos filtros en su OnOpenPage, así que se le pasan puestos.
-        if prm_Producto <> '' then
-            rContenido.SetRange("No. Producto", prm_Producto);
-        if prm_Variante <> '' then
-            rContenido.SetRange("Cod. Variante", prm_Variante);
-        if prm_Almacen <> '' then
-            rContenido.SetRange("Cod. Almacen", prm_Almacen);
-        if prm_Lote <> '' then
-            rContenido.SetRange("No. Lote", prm_Lote);
-
-        Page.Run(Page::"Consulta Ubic. Producto SGA", rContenido);
-    end;
-
-    /// <summary>
     /// Única puerta para proponer en qué ubicación dejar un producto. La estrategia la elige
     /// quien llama, normalmente la que diga "Config. SGA" para su caso. Devuelve '' si no hay
     /// ninguna que lo admita.
@@ -269,41 +249,111 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     end;
 
     /// <summary>
-    /// Una cantidad en unidad base repartida en palés, cajas y botellas sueltas, las tres
-    /// unidades de la ficha del producto: "2 PALE, 5 CAJA12, 6 BOTELLA". Vacío si es cero.
+    /// Ubicación guiada ("Ubicar producto"): reparte la cantidad en palés, cajas y sueltas
+    /// (Repartir de "Unidades Producto SGA", con el palé de la ficha) y propone un hueco para
+    /// cada trozo, en orden y sin dar el mismo hueco a dos. Las líneas quedan Pendiente con el
+    /// hueco propuesto también como confirmado, o "Sin Sitio" con el motivo. Como mucho
+    /// MaxLineasReparto líneas: lo que no entra se vuelve a proponer después.
     /// </summary>
-    procedure DesgloseCantidad(prm_Producto: Code[20]; prm_CantidadBase: Decimal): Text
+    procedure ProponerReparto(prm_Estrategia: Enum "Estrategia Ubicacion SGA"; prm_Almacen: Code[10]; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50]; prm_CantidadBase: Decimal; var TempLinea: Record "Linea Ubicacion SGA" temporary)
     var
-        resto: Decimal;
-        texto: Text;
+        excluidas: Text;
+        motivo: Text;
+        hueco: Code[20];
+        MaxLineasReparto: Integer;
     begin
-        if prm_CantidadBase <= 0 then
-            exit('');
-        resto := prm_CantidadBase;
-        AnadirAlDesglose(prm_Producto, cUM.UMProductoDeTipo(prm_Producto, "Tipo UM SGA"::Pale), resto, texto);
-        AnadirAlDesglose(prm_Producto, cUM.UMProductoDeTipo(prm_Producto, "Tipo UM SGA"::Caja), resto, texto);
-        AnadirAlDesglose(prm_Producto, cUM.UMProductoDeTipo(prm_Producto, "Tipo UM SGA"::Unidad), resto, texto);
-        exit(texto);
+        MaxLineasReparto := 200;
+        cUM.Repartir(prm_Producto, prm_CantidadBase, '', TempLinea);
+        TempLinea.SetFilter(Linea, '>%1', MaxLineasReparto);
+        TempLinea.DeleteAll();
+        TempLinea.Reset();
+
+        // Por la clave (Linea): las exclusiones se acumulan en el orden del reparto.
+        if TempLinea.FindSet() then
+            repeat
+                hueco := ProponerUbicacionCon(prm_Estrategia, excluidas, prm_Almacen, prm_Producto, prm_Variante, prm_Lote,
+                                              TempLinea."Cod. Unidad Medida", TempLinea.Cantidad, motivo);
+                TempLinea.Origen := TempLinea.Origen::Manual;
+                TempLinea."Cod. Almacen" := prm_Almacen;
+                TempLinea."Cod. Variante" := prm_Variante;
+                TempLinea."No. Lote" := prm_Lote;
+                TempLinea."Ubicacion Propuesta" := hueco;
+                TempLinea."Ubicacion Confirmada" := hueco;
+                // Sin hueco, el motivo ya trae la causa.
+                if hueco = '' then
+                    TempLinea.Estado := TempLinea.Estado::"Sin Sitio"
+                else begin
+                    TempLinea.Estado := TempLinea.Estado::Pendiente;
+                    excluidas := AnadirExclusion(excluidas, hueco);
+                end;
+                TempLinea.Motivo := CopyStr(motivo, 1, MaxStrLen(TempLinea.Motivo));
+                TempLinea.Modify();
+            until TempLinea.Next() = 0;
+        TempLinea.Reset();
     end;
 
-    local procedure AnadirAlDesglose(prm_Producto: Code[20]; prm_UM: Code[10]; var prm_Resto: Decimal; var prm_Texto: Text)
+    /// <summary>
+    /// Registra las líneas de un reparto de ProponerReparto: todas las que tengan ubicación
+    /// confirmada y no estén ya ubicadas (prm_Linea = 0), o solo esa línea. Primero comprueba
+    /// todas y luego registra, para no dejar el reparto a medias por un error en una línea.
+    /// Aplica "Exigir confirmar ubicación" y "Permitir desvío ubicación" de la configuración.
+    /// Devuelve lo que queda sin ubicar del reparto, en unidad base.
+    /// </summary>
+    procedure ConfirmarReparto(var TempLinea: Record "Linea Ubicacion SGA" temporary; prm_Linea: Integer; prm_Almacen: Code[10]; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50]): Decimal
     var
-        factor: Decimal;
-        cuantos: Decimal;
+        rConfig: Record "Config. SGA";
+        cContenido: Codeunit "Gestion Contenido SGA";
+        lineas: List of [Integer];
+        n: Integer;
+        restoBase: Decimal;
+        SinLineasConfirmarErr: Label 'No hay ninguna línea con ubicación que confirmar.';
+        IndiqueUbicacionErr: Label 'Indique la ubicación de la línea "%1".', Comment = '%1 = qué';
+        DesvioNoPermitidoErr: Label 'La configuración no permite desviarse de la ubicación propuesta (%1) en la línea "%2".', Comment = '%1 = ubicación, %2 = qué';
+        SinPropuestaErr: Label 'La línea "%1" no tiene ubicación propuesta y la configuración exige proponer antes de confirmar.', Comment = '%1 = qué';
+        UbicadoGuiadoLbl: Label 'Ubicado desde la pantalla de ubicación guiada.';
     begin
-        if (prm_UM = '') or (prm_Resto <= 0) then
-            exit;
-        factor := cUM.FactorUM(prm_Producto, prm_UM);
-        if factor = 1 then
-            cuantos := prm_Resto
-        else
-            cuantos := Round(prm_Resto / factor, 1, '<');
-        if cuantos <= 0 then
-            exit;
-        if prm_Texto <> '' then
-            prm_Texto += ', ';
-        prm_Texto += Format(cuantos) + ' ' + prm_UM;
-        prm_Resto := Round(prm_Resto - cuantos * factor, 0.00001);
+        rConfig.ObtenerConfig();
+
+        TempLinea.Reset();
+        if prm_Linea <> 0 then
+            TempLinea.SetRange(Linea, prm_Linea);
+        TempLinea.SetFilter(Estado, '<>%1', TempLinea.Estado::Ubicado);
+        if TempLinea.FindSet() then
+            repeat
+                if TempLinea."Ubicacion Confirmada" = '' then begin
+                    // Confirmando todo, lo que no tiene sitio se salta; una línea sola, no.
+                    if prm_Linea <> 0 then
+                        Error(IndiqueUbicacionErr, TempLinea.Paso);
+                end else begin
+                    ComprobarUbicacionExiste(prm_Almacen, TempLinea."Ubicacion Confirmada");
+                    if (TempLinea."Ubicacion Propuesta" = '') and rConfig."Exigir Confirmar Ubicacion" then
+                        Error(SinPropuestaErr, TempLinea.Paso);
+                    if (TempLinea."Ubicacion Propuesta" <> '') and (TempLinea."Ubicacion Confirmada" <> TempLinea."Ubicacion Propuesta") and
+                       not rConfig."Permitir Desvio Ubicacion"
+                    then
+                        Error(DesvioNoPermitidoErr, TempLinea."Ubicacion Propuesta", TempLinea.Paso);
+                    lineas.Add(TempLinea.Linea);
+                end;
+            until TempLinea.Next() = 0;
+
+        if lineas.Count() = 0 then
+            Error(SinLineasConfirmarErr);
+
+        TempLinea.Reset();
+        foreach n in lineas do begin
+            TempLinea.Get(n);
+            cContenido.RegistrarEntrada(prm_Almacen, TempLinea."Ubicacion Confirmada", prm_Producto, prm_Variante, prm_Lote,
+                                        TempLinea."Cod. Unidad Medida", TempLinea.Cantidad, "Origen Mov. SGA"::Manual, '', 0, UbicadoGuiadoLbl);
+            TempLinea.Estado := TempLinea.Estado::Ubicado;
+            TempLinea.Motivo := '';
+            TempLinea.Modify();
+        end;
+
+        TempLinea.SetFilter(Estado, '<>%1', TempLinea.Estado::Ubicado);
+        TempLinea.CalcSums("Cantidad Base");
+        restoBase := TempLinea."Cantidad Base";
+        TempLinea.Reset();
+        exit(restoBase);
     end;
 
     /// <summary>
@@ -609,63 +659,6 @@ codeunit 51101 "Gestion Ubicaciones SGA"
 
         // 5 = otro producto, 6 = otro lote; 0 si nada impide la mezcla.
         exit(prm_Ubicacion.ContenidoQueImpideMezcla(prm_Producto, prm_Lote));
-    end;
-
-    /// <summary>
-    /// Total de unidades de un producto+variante+lote ubicadas.
-    /// </summary>
-    /// <summary>
-    /// Cantidad ya repartida en ubicaciones, en unidad de medida base.
-    /// El almacen, la variante y el lote solo filtran si vienen informados, de modo que con
-    /// solo el producto se obtiene el total de todo el almacen.
-    /// </summary>
-    procedure TotalUbicadoProducto(prm_Almacen: Code[10]; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50]): Decimal
-    var
-        rContenido: Record "Contenido Ubicacion SGA";
-    begin
-        rContenido.SetRange("No. Producto", prm_Producto);
-        if prm_Almacen <> '' then
-            rContenido.SetRange("Cod. Almacen", prm_Almacen);
-        if prm_Variante <> '' then
-            rContenido.SetRange("Cod. Variante", prm_Variante);
-        if prm_Lote <> '' then
-            rContenido.SetRange("No. Lote", prm_Lote);
-        rContenido.CalcSums("Cantidad Base");
-        exit(rContenido."Cantidad Base");
-    end;
-
-    /// <summary>
-    /// Lo que queda por ubicar de un producto: las existencias que BC dice que hay en el
-    /// almacen menos lo que SGA ya tiene repartido en ubicaciones. En unidad de medida base.
-    ///
-    /// Devuelve tambien el stock y lo ya ubicado por referencia, porque un pendiente a cero
-    /// no dice si es que no hay stock o si es que ya esta todo colocado.
-    /// </summary>
-    procedure PendienteDeUbicar(prm_Almacen: Code[10]; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50]; var prm_StockBase: Decimal; var prm_UbicadoBase: Decimal): Decimal
-    var
-        rItem: Record Item;
-    begin
-        prm_StockBase := 0;
-        prm_UbicadoBase := 0;
-
-        if prm_Producto = '' then
-            exit(0);
-
-        if not rItem.Get(prm_Producto) then
-            exit(0);
-
-        if prm_Almacen <> '' then
-            rItem.SetRange("Location Filter", prm_Almacen);
-        if prm_Variante <> '' then
-            rItem.SetRange("Variant Filter", prm_Variante);
-        if prm_Lote <> '' then
-            rItem.SetRange("Lot No. Filter", prm_Lote);
-        rItem.CalcFields(Inventory);
-
-        prm_StockBase := rItem.Inventory;
-        prm_UbicadoBase := TotalUbicadoProducto(prm_Almacen, prm_Producto, prm_Variante, prm_Lote);
-
-        exit(prm_StockBase - prm_UbicadoBase);
     end;
 
     /// <summary>

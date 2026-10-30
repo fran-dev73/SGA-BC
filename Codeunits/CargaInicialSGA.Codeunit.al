@@ -1,6 +1,5 @@
 namespace AntonioNadal.SGA;
 
-using Microsoft.Foundation.UOM;
 using Microsoft.Inventory.Item;
 
 /// <summary>
@@ -36,7 +35,7 @@ codeunit 51106 "Carga Inicial SGA"
         TempResultado: Record "Linea Ubicacion SGA" temporary;
         // Modo "solo pendientes" (página Pendiente Ubicar SGA): en vez de todo el stock, se reparte
         // la cantidad indicada de cada lote.
-        TempPendientes: Record "Pendiente Ubicar SGA" temporary;
+        TempPendientes: Record "Buffer Conciliacion SGA" temporary;
         rHueco: Record "Ubicacion SGA";
         rConfig: Record "Config. SGA";
         cContenido: Codeunit "Gestion Contenido SGA";
@@ -77,7 +76,7 @@ codeunit 51106 "Carga Inicial SGA"
     /// (lo sin ubicar que no tiene documento pendiente), no todo el stock. Se llama después de
     /// Configurar. Es lo que usa "Ubicar seleccionadas" de la página Pendiente Ubicar SGA.
     /// </summary>
-    procedure FijarPendientes(var prm_Pendientes: Record "Pendiente Ubicar SGA" temporary)
+    procedure FijarPendientes(var prm_Pendientes: Record "Buffer Conciliacion SGA" temporary)
     var
         UbicacionPendientesLbl: Label 'Ubicación de stock pendiente SGA';
     begin
@@ -155,8 +154,8 @@ codeunit 51106 "Carga Inicial SGA"
         ultimo: Code[20];
     begin
         ultimo := '';
+        // Por la clave primaria, que agrupa por producto (las líneas son de un usuario y un almacén).
         TempPendientes.Reset();
-        TempPendientes.SetCurrentKey("Cod. Almacen", "No. Producto", "Cod. Variante", "No. Lote");
         TempPendientes.SetFilter("A Ubicar", '>0');
         if TempPendientes.FindSet() then
             repeat
@@ -175,7 +174,7 @@ codeunit 51106 "Carga Inicial SGA"
     /// </summary>
     local procedure CopiarPendientes(prm_Producto: Code[20]; var prm_Stock: Record "Buffer Conciliacion SGA" temporary)
     var
-        TempLineas: Record "Pendiente Ubicar SGA" temporary;
+        TempLineas: Record "Buffer Conciliacion SGA" temporary;
     begin
         TempLineas.Copy(TempPendientes, true);
         TempLineas.Reset();
@@ -184,13 +183,7 @@ codeunit 51106 "Carga Inicial SGA"
         TempLineas.SetFilter("A Ubicar", '>0');
         if TempLineas.FindSet() then
             repeat
-                prm_Stock.Init();
-                prm_Stock."Cod. Usuario" := CopyStr(UserId(), 1, MaxStrLen(prm_Stock."Cod. Usuario"));
-                prm_Stock."No. Producto" := prm_Producto;
-                prm_Stock."Cod. Variante" := TempLineas."Cod. Variante";
-                prm_Stock."Cod. Almacen" := TempLineas."Cod. Almacen";
-                prm_Stock."No. Lote" := TempLineas."No. Lote";
-                prm_Stock."Unidad Medida Base" := TempLineas."Unidad Medida Base";
+                prm_Stock := TempLineas;
                 prm_Stock."Stock BC" := TempLineas."A Ubicar";
                 prm_Stock.Insert();
             until TempLineas.Next() = 0;
@@ -261,14 +254,10 @@ codeunit 51106 "Carga Inicial SGA"
     /// </summary>
     local procedure RepartirPorHuecos(var prm_Producto: Record Item; var prm_Stock: Record "Buffer Conciliacion SGA")
     var
+        TempTrozo: Record "Linea Ubicacion SGA" temporary;
         umPale: Code[10];
         umCaja: Code[10];
-        factorPale: Decimal;
-        factorCaja: Decimal;
         pales: Integer;
-        cajas: Decimal;
-        restoBase: Decimal;
-        sueltasBase: Decimal;
         i: Integer;
         hueco: Code[20];
         motivo: Text;
@@ -289,61 +278,50 @@ codeunit 51106 "Carga Inicial SGA"
                 AnotarNoCargado(prm_Producto, prm_Stock, prm_Stock."Unidad Medida Base", prm_Stock."Stock BC", prm_Stock."Stock BC", SinPaleSinUbicacionLbl);
             exit;
         end;
-        factorPale := cUM.FactorUM(prm_Producto."No.", umPale);
+        // El reparto (cada palé, las cajas y lo que no llega a una caja) es el mismo que en
+        // "Ubicar producto"; aquí solo cambia cómo se busca el hueco de los palés.
+        cUM.Repartir(prm_Producto."No.", prm_Stock."Stock BC", '', TempTrozo);
 
-        // Palés completos: uno por hueco.
-        pales := Round(prm_Stock."Stock BC" / factorPale, 1, '<');
+        // Palés completos: uno por hueco, con el cursor de huecos de palé.
+        TempTrozo.SetRange("Cod. Unidad Medida", umPale);
+        pales := TempTrozo.Count();
         i := 0;
-        while i < pales do begin
-            hueco := BuscarHuecoPale(prm_Producto."No.", motivo);
-            if hueco = '' then begin
-                // Sin hueco para este palé no lo habrá para los siguientes: se anotan juntos.
-                // Agotados los huecos de palé, el motivo es el mismo para todos los productos: se
-                // calcula una vez, porque recorre todos los huecos.
-                if MotivoSinHuecoPale = '' then
-                    MotivoSinHuecoPale := CopyStr(cUbicaciones.ExplicarSinHuecoLote(Almacen, prm_Producto."No.", prm_Stock."No. Lote", umPale, 1), 1, MaxStrLen(MotivoSinHuecoPale));
-                AnotarNoCargado(prm_Producto, prm_Stock, umPale, pales - i, (pales - i) * factorPale, MotivoSinHuecoPale);
-                i := pales;
-            end else begin
-                Cargar(prm_Producto, prm_Stock, hueco, umPale, 1, factorPale, motivo);
-                i += 1;
-            end;
-        end;
+        if TempTrozo.FindSet() then
+            repeat
+                hueco := BuscarHuecoPale(prm_Producto."No.", motivo);
+                if hueco = '' then begin
+                    // Sin hueco para este palé no lo habrá para los siguientes: se anotan juntos.
+                    // Agotados los huecos de palé, el motivo es el mismo para todos los productos: se
+                    // calcula una vez, porque recorre todos los huecos.
+                    if MotivoSinHuecoPale = '' then
+                        MotivoSinHuecoPale := CopyStr(cUbicaciones.ExplicarSinHuecoLote(Almacen, prm_Producto."No.", prm_Stock."No. Lote", umPale, 1), 1, MaxStrLen(MotivoSinHuecoPale));
+                    AnotarNoCargado(prm_Producto, prm_Stock, umPale, pales - i, (pales - i) * TempTrozo."Cantidad Base", MotivoSinHuecoPale);
+                    i := pales;
+                end else begin
+                    Cargar(prm_Producto, prm_Stock, hueco, umPale, 1, TempTrozo."Cantidad Base", motivo);
+                    i += 1;
+                end;
+            until (i >= pales) or (TempTrozo.Next() = 0);
 
-        restoBase := prm_Stock."Stock BC" - pales * factorPale;
-        if restoBase <= 0 then
-            exit;
-
-        // El resto, en cajas, a un hueco mixto.
-        if umCaja = '' then begin
-            AnotarNoCargado(prm_Producto, prm_Stock, prm_Stock."Unidad Medida Base", restoBase, restoBase, SinCajaLbl);
-            exit;
-        end;
-        factorCaja := cUM.FactorUM(prm_Producto."No.", umCaja);
-
-        cajas := Round(restoBase / factorCaja, 1, '<');
-        sueltasBase := restoBase - cajas * factorCaja;
-
-        if cajas > 0 then begin
-            hueco := cUbicaciones.ProponerUbicacionCon("Estrategia Ubicacion SGA"::"Priorizar Consolidacion", '', Almacen,
-                                                       prm_Producto."No.", prm_Stock."Cod. Variante", prm_Stock."No. Lote",
-                                                       umCaja, cajas, motivo);
-            // Sin hueco, el motivo ya trae la causa.
-            if hueco = '' then
-                AnotarNoCargado(prm_Producto, prm_Stock, umCaja, cajas, cajas * factorCaja, motivo)
-            else
-                Cargar(prm_Producto, prm_Stock, hueco, umCaja, cajas, cajas * factorCaja, motivo);
-        end;
-
-        // Lo que no llega a una caja, a una ubicación de unidades sueltas.
-        if sueltasBase > 0 then begin
-            hueco := cUbicaciones.ProponerUbicacionCon("Estrategia Ubicacion SGA"::"Priorizar Consolidacion", '', Almacen, prm_Producto."No.",
-                                                       prm_Stock."Cod. Variante", prm_Stock."No. Lote", prm_Stock."Unidad Medida Base", sueltasBase, motivo);
-            if hueco = '' then
-                AnotarNoCargado(prm_Producto, prm_Stock, prm_Stock."Unidad Medida Base", sueltasBase, sueltasBase, motivo)
-            else
-                Cargar(prm_Producto, prm_Stock, hueco, prm_Stock."Unidad Medida Base", sueltasBase, sueltasBase, motivo);
-        end;
+        // El resto: las cajas a un hueco de caja o de palé y lo que no llega a una caja, a un
+        // hueco de unidades sueltas. Sin caja, todo ese resto va en la línea de sueltas y no se
+        // carga.
+        TempTrozo.SetFilter("Cod. Unidad Medida", '<>%1', umPale);
+        if TempTrozo.FindSet() then
+            repeat
+                if umCaja = '' then
+                    AnotarNoCargado(prm_Producto, prm_Stock, TempTrozo."Cod. Unidad Medida", TempTrozo.Cantidad, TempTrozo."Cantidad Base", SinCajaLbl)
+                else begin
+                    hueco := cUbicaciones.ProponerUbicacionCon("Estrategia Ubicacion SGA"::"Priorizar Consolidacion", '', Almacen,
+                                                               prm_Producto."No.", prm_Stock."Cod. Variante", prm_Stock."No. Lote",
+                                                               TempTrozo."Cod. Unidad Medida", TempTrozo.Cantidad, motivo);
+                    // Sin hueco, el motivo ya trae la causa.
+                    if hueco = '' then
+                        AnotarNoCargado(prm_Producto, prm_Stock, TempTrozo."Cod. Unidad Medida", TempTrozo.Cantidad, TempTrozo."Cantidad Base", motivo)
+                    else
+                        Cargar(prm_Producto, prm_Stock, hueco, TempTrozo."Cod. Unidad Medida", TempTrozo.Cantidad, TempTrozo."Cantidad Base", motivo);
+                end;
+            until TempTrozo.Next() = 0;
     end;
 
     /// <summary>

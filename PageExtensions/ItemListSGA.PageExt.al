@@ -26,9 +26,9 @@ pageextension 51101 "Item List SGA" extends "Item List"
 
                     trigger OnAction()
                     var
-                        cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
+                        cStock: Codeunit "Consulta Stock SGA";
                     begin
-                        cUbicaciones.ConsultarUbicacionesProducto(Rec."No.", '', '', '');
+                        cStock.ConsultarUbicacionesProducto(Rec."No.", '', '', '');
                     end;
                 }
             }

@@ -372,6 +372,7 @@ page 51117 "Ubicar Producto SGA"
     /// </summary>
     local procedure RecalcularPendiente()
     var
+        cStock: Codeunit "Consulta Stock SGA";
         stockBase: Decimal;
         ubicadoBase: Decimal;
         pendienteBase: Decimal;
@@ -384,96 +385,13 @@ page 51117 "Ubicar Producto SGA"
         if (Producto = '') or (Almacen = '') then
             exit;
 
-        pendienteBase := cUbicaciones.PendienteDeUbicar(Almacen, Producto, Variante, Lote, stockBase, ubicadoBase);
+        pendienteBase := cStock.PendienteDeUbicar(Almacen, Producto, Variante, Lote, stockBase, ubicadoBase);
 
         // El cálculo va en unidad base; se pasa a la UM elegida con su factor de conversión.
         PendienteUbicar := Round(pendienteBase / cUM.FactorUM(Producto, UM), 0.00001);
         DetalleDisponible := StrSubstNo(DetallePendienteLbl, stockBase, ubicadoBase, cUM.UMBase(Producto));
-        DesglosePendiente := Desglosar(pendienteBase);
+        DesglosePendiente := cUM.Desglose(Producto, pendienteBase);
         CalcularEquivalencia();
-    end;
-
-    /// <summary>
-    /// Las tres unidades con las que se trabaja: el palé por defecto de la ficha, la unidad de
-    /// venta (la caja) y la unidad base. Ninguna otra unidad del producto entra en el reparto.
-    /// La de venta solo cuenta si es mayor que la base y menor que el palé; el palé, si es
-    /// mayor que la base. Factor 0 = esa unidad no se usa.
-    /// </summary>
-    local procedure UnidadesJuego(var prm_UMPale: Code[10]; var prm_FactorPale: Decimal; var prm_UMVenta: Code[10]; var prm_FactorVenta: Decimal)
-    var
-        rItem: Record Item;
-        rUM: Record "Item Unit of Measure";
-    begin
-        prm_UMPale := '';
-        prm_FactorPale := 0;
-        prm_UMVenta := '';
-        prm_FactorVenta := 0;
-        if not rItem.Get(Producto) then
-            exit;
-
-        if rItem."Cod. Pale por Defecto" <> '' then
-            if rUM.Get(Producto, rItem."Cod. Pale por Defecto") then
-                if rUM."Qty. per Unit of Measure" > 1 then begin
-                    prm_UMPale := rUM.Code;
-                    prm_FactorPale := rUM."Qty. per Unit of Measure";
-                end;
-
-        if rItem."Sales Unit of Measure" <> '' then
-            if rUM.Get(Producto, rItem."Sales Unit of Measure") then
-                if (rUM."Qty. per Unit of Measure" > 1) and
-                   ((prm_FactorPale = 0) or (rUM."Qty. per Unit of Measure" < prm_FactorPale))
-                then begin
-                    prm_UMVenta := rUM.Code;
-                    prm_FactorVenta := rUM."Qty. per Unit of Measure";
-                end;
-    end;
-
-    /// <summary>
-    /// Reparte una cantidad en unidad base entre palé, unidad de venta y unidad base:
-    /// 690 botellas con palé de 540 y CAJA12 son "1 PALE, 12 CAJA12, 6 BOTELLA".
-    /// </summary>
-    local procedure Desglosar(prm_CantidadBase: Decimal): Text
-    var
-        umPale: Code[10];
-        umVenta: Code[10];
-        fp: Decimal;
-        fv: Decimal;
-        resto: Decimal;
-        cuantos: Decimal;
-        texto: Text;
-    begin
-        if (Producto = '') or (prm_CantidadBase <= 0) then
-            exit('');
-
-        UnidadesJuego(umPale, fp, umVenta, fv);
-        resto := prm_CantidadBase;
-
-        if fp > 0 then begin
-            cuantos := Round(resto / fp, 1, '<');
-            if cuantos > 0 then begin
-                texto := Format(cuantos) + ' ' + umPale;
-                resto -= cuantos * fp;
-            end;
-        end;
-
-        if fv > 0 then begin
-            cuantos := Round(resto / fv, 1, '<');
-            if cuantos > 0 then begin
-                if texto <> '' then
-                    texto += ', ';
-                texto += Format(cuantos) + ' ' + umVenta;
-                resto -= cuantos * fv;
-            end;
-        end;
-
-        resto := Round(resto, 0.00001);
-        if resto > 0 then begin
-            if texto <> '' then
-                texto += ', ';
-            texto += Format(resto) + ' ' + cUM.UMBase(Producto);
-        end;
-
-        exit(texto);
     end;
 
     /// <summary>
@@ -481,7 +399,7 @@ page 51117 "Ubicar Producto SGA"
     /// </summary>
     local procedure CalcularEquivalencia()
     var
-        factor: Decimal;
+        cantidadBase: Decimal;
         EquivalenciaLbl: Label '%1 %2 (%3)', Comment = '%1 = cantidad en unidad base, %2 = unidad base, %3 = desglose';
     begin
         EquivaleBase := '';
@@ -489,9 +407,8 @@ page 51117 "Ubicar Producto SGA"
         if (Producto = '') or (Cantidad <= 0) then
             exit;
 
-        factor := cUM.FactorUM(Producto, UM);
-        EquivaleBase := StrSubstNo(EquivalenciaLbl, Round(Cantidad * factor, 0.00001), cUM.UMBase(Producto),
-                                   Desglosar(Round(Cantidad * factor, 0.00001)));
+        cantidadBase := Round(Cantidad * cUM.FactorUM(Producto, UM), 0.00001);
+        EquivaleBase := StrSubstNo(EquivalenciaLbl, cantidadBase, cUM.UMBase(Producto), cUM.Desglose(Producto, cantidadBase));
     end;
 
     local procedure LimpiarPropuesta()
@@ -502,28 +419,13 @@ page 51117 "Ubicar Producto SGA"
     end;
 
     /// <summary>
-    /// Proponer: reparte la cantidad (cada palé por separado, luego las unidades de venta y al
-    /// final lo que no llega a una unidad de venta) y busca hueco para cada parte, sin dar el
-    /// mismo hueco a dos. El resultado va a la tabla; lo que no tiene sitio queda marcado con el
-    /// motivo. Si sale una sola línea con hueco, se pregunta directamente si ubicarla.
+    /// Proponer: el reparto y el hueco de cada parte los decide ProponerReparto de "Gestion
+    /// Ubicaciones SGA"; aquí se enseña el resultado. Si sale una sola línea con hueco, se
+    /// pregunta directamente si ubicarla.
     /// </summary>
     local procedure CalcularPropuesta()
     var
         rConfig: Record "Config. SGA";
-        restoBase: Decimal;
-        cant: Decimal;
-        umPaso: Code[10];
-        texto: Text;
-        motivo: Text;
-        hueco: Code[20];
-        excluidas: Text;
-        palesTotales: Integer;
-        paleActual: Integer;
-        umPale: Code[10];
-        umVenta: Code[10];
-        fp: Decimal;
-        fv: Decimal;
-        vueltas: Integer;
         DatosIncompletosErr: Label 'Indique almacén, producto y cantidad antes de proponer una ubicación.';
         UbicarLineaQst: Label '¿Ubicar %1 %2 de %3 en %4?', Comment = '%1 = cantidad, %2 = unidad, %3 = producto, %4 = ubicación';
     begin
@@ -531,51 +433,8 @@ page 51117 "Ubicar Producto SGA"
             Error(DatosIncompletosErr);
 
         rConfig.ObtenerConfig();
-        TempPlan.Reset();
-        TempPlan.DeleteAll();
-
-        restoBase := Round(Cantidad * cUM.FactorUM(Producto, UM), 0.00001);
-        UnidadesJuego(umPale, fp, umVenta, fv);
-        if fp > 0 then
-            palesTotales := Round(restoBase / fp, 1, '<');
-
-        // Tope de vueltas por si una unidad mal configurada no hiciera bajar el resto.
-        vueltas := 0;
-        while (restoBase > 0) and (vueltas < 200) do begin
-            vueltas += 1;
-            DefinirPaso(restoBase, umPale, fp, umVenta, fv, palesTotales, paleActual, umPaso, cant, texto);
-            if cant <= 0 then
-                break;
-
-            hueco := cUbicaciones.ProponerUbicacionCon(rConfig."Estrategia Ubicacion", excluidas, Almacen, Producto,
-                                                       Variante, Lote, umPaso, cant, motivo);
-
-            TempPlan.Init();
-            TempPlan.Linea := vueltas;
-            TempPlan.Origen := TempPlan.Origen::Manual;
-            TempPlan.Paso := CopyStr(texto, 1, MaxStrLen(TempPlan.Paso));
-            TempPlan."Cod. Almacen" := Almacen;
-            TempPlan."No. Producto" := Producto;
-            TempPlan."Descripcion Producto" := DescripcionProducto;
-            TempPlan."Cod. Variante" := Variante;
-            TempPlan."No. Lote" := Lote;
-            TempPlan."Cod. Unidad Medida" := umPaso;
-            TempPlan.Cantidad := cant;
-            TempPlan."Cantidad Base" := Round(cant * cUM.FactorUM(Producto, umPaso), 0.00001);
-            TempPlan."Ubicacion Propuesta" := hueco;
-            TempPlan."Ubicacion Confirmada" := hueco;
-            // Sin hueco, el motivo ya trae la causa.
-            if hueco = '' then
-                TempPlan.Estado := TempPlan.Estado::"Sin Sitio"
-            else begin
-                TempPlan.Estado := TempPlan.Estado::Pendiente;
-                excluidas := cUbicaciones.AnadirExclusion(excluidas, hueco);
-            end;
-            TempPlan.Motivo := CopyStr(motivo, 1, MaxStrLen(TempPlan.Motivo));
-            TempPlan.Insert();
-
-            restoBase -= TempPlan."Cantidad Base";
-        end;
+        cUbicaciones.ProponerReparto(rConfig."Estrategia Ubicacion", Almacen, Producto, Variante, Lote,
+                                     Round(Cantidad * cUM.FactorUM(Producto, UM), 0.00001), TempPlan);
 
         CurrPage.Plan.Page.Cargar(TempPlan);
         CurrPage.Update(false);
@@ -591,98 +450,15 @@ page 51117 "Ubicar Producto SGA"
     end;
 
     /// <summary>
-    /// Qué parte toca con lo que queda (en UM base): un palé, las unidades de venta completas o,
-    /// si no llega a una unidad de venta, las unidades sueltas.
-    /// </summary>
-    local procedure DefinirPaso(prm_RestoBase: Decimal; prm_UMPale: Code[10]; prm_FactorPale: Decimal; prm_UMVenta: Code[10]; prm_FactorVenta: Decimal; prm_PalesTotales: Integer; var prm_PaleActual: Integer; var prm_UM: Code[10]; var prm_Cantidad: Decimal; var prm_Texto: Text)
-    var
-        PaleDeLbl: Label 'Palé %1 de %2', Comment = '%1 = nº de palé, %2 = total';
-        UnidadesVentaLbl: Label 'Unidades de venta';
-        UnidadesSueltasLbl: Label 'Unidades sueltas';
-    begin
-        case true of
-            (prm_FactorPale > 0) and (prm_RestoBase >= prm_FactorPale):
-                begin
-                    prm_PaleActual += 1;
-                    prm_UM := prm_UMPale;
-                    prm_Cantidad := 1;
-                    prm_Texto := StrSubstNo(PaleDeLbl, prm_PaleActual, prm_PalesTotales);
-                end;
-            (prm_FactorVenta > 0) and (prm_RestoBase >= prm_FactorVenta):
-                begin
-                    prm_UM := prm_UMVenta;
-                    prm_Cantidad := Round(prm_RestoBase / prm_FactorVenta, 1, '<');
-                    prm_Texto := UnidadesVentaLbl;
-                end;
-            else begin
-                prm_UM := cUM.UMBase(Producto);
-                prm_Cantidad := prm_RestoBase;
-                prm_Texto := UnidadesSueltasLbl;
-            end;
-        end;
-    end;
-
-    /// <summary>
-    /// Registra las líneas de la tabla: todas las que tengan ubicación confirmada y no estén ya
-    /// ubicadas (prm_Linea = 0), o solo una. Primero se comprueban todas y luego se registra,
-    /// para no dejar el reparto a medias por un error en una línea.
+    /// Registra las líneas de la tabla (todas con prm_Linea = 0, o solo una) con ConfirmarReparto
+    /// de "Gestion Ubicaciones SGA". Lo que queda sin ubicar pasa a ser la cantidad, en unidad
+    /// base, para volver a proponerlo cuando haya sitio; la tabla se queda a la vista.
     /// </summary>
     local procedure ConfirmarLineas(prm_Linea: Integer)
     var
-        rConfig: Record "Config. SGA";
-        cContenido: Codeunit "Gestion Contenido SGA";
-        lineas: List of [Integer];
-        n: Integer;
         restoBase: Decimal;
-        SinLineasConfirmarErr: Label 'No hay ninguna línea con ubicación que confirmar.';
-        IndiqueUbicacionErr: Label 'Indique la ubicación de la línea "%1".', Comment = '%1 = qué';
-        DesvioNoPermitidoErr: Label 'La configuración no permite desviarse de la ubicación propuesta (%1) en la línea "%2".', Comment = '%1 = ubicación, %2 = qué';
-        SinPropuestaErr: Label 'La línea "%1" no tiene ubicación propuesta y la configuración exige proponer antes de confirmar.', Comment = '%1 = qué';
-        UbicadoGuiadoLbl: Label 'Ubicado desde la pantalla de ubicación guiada.';
     begin
-        rConfig.ObtenerConfig();
-
-        TempPlan.Reset();
-        if prm_Linea <> 0 then
-            TempPlan.SetRange(Linea, prm_Linea);
-        TempPlan.SetFilter(Estado, '<>%1', TempPlan.Estado::Ubicado);
-        if TempPlan.FindSet() then
-            repeat
-                if TempPlan."Ubicacion Confirmada" = '' then begin
-                    // Confirmando todo, lo que no tiene sitio se salta; una línea sola, no.
-                    if prm_Linea <> 0 then
-                        Error(IndiqueUbicacionErr, TempPlan.Paso);
-                end else begin
-                    cUbicaciones.ComprobarUbicacionExiste(Almacen, TempPlan."Ubicacion Confirmada");
-                    if (TempPlan."Ubicacion Propuesta" = '') and rConfig."Exigir Confirmar Ubicacion" then
-                        Error(SinPropuestaErr, TempPlan.Paso);
-                    if (TempPlan."Ubicacion Propuesta" <> '') and (TempPlan."Ubicacion Confirmada" <> TempPlan."Ubicacion Propuesta") and
-                       not rConfig."Permitir Desvio Ubicacion"
-                    then
-                        Error(DesvioNoPermitidoErr, TempPlan."Ubicacion Propuesta", TempPlan.Paso);
-                    lineas.Add(TempPlan.Linea);
-                end;
-            until TempPlan.Next() = 0;
-
-        if lineas.Count() = 0 then
-            Error(SinLineasConfirmarErr);
-
-        TempPlan.Reset();
-        foreach n in lineas do begin
-            TempPlan.Get(n);
-            cContenido.RegistrarEntrada(Almacen, TempPlan."Ubicacion Confirmada", Producto, Variante, Lote,
-                                        TempPlan."Cod. Unidad Medida", TempPlan.Cantidad, "Origen Mov. SGA"::Manual, '', 0, UbicadoGuiadoLbl);
-            TempPlan.Estado := TempPlan.Estado::Ubicado;
-            TempPlan.Motivo := '';
-            TempPlan.Modify();
-        end;
-
-        // Lo que queda sin ubicar pasa a ser la cantidad, en unidad base, para volver a
-        // proponerlo cuando haya sitio. La tabla se queda a la vista con el resultado.
-        TempPlan.SetFilter(Estado, '<>%1', TempPlan.Estado::Ubicado);
-        TempPlan.CalcSums("Cantidad Base");
-        restoBase := TempPlan."Cantidad Base";
-        TempPlan.Reset();
+        restoBase := cUbicaciones.ConfirmarReparto(TempPlan, prm_Linea, Almacen, Producto, Variante, Lote);
 
         UM := cUM.UMBase(Producto);
         Cantidad := restoBase;

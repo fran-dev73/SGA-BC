@@ -11,6 +11,10 @@ using Microsoft.Inventory.Location;
 /// No es temporal a propósito: el informe la rellena y la página "Conciliacion SGA" la
 /// consulta después. Las filas se guardan por usuario, así que dos personas pueden
 /// conciliar a la vez sin pisarse.
+///
+/// Es también la tabla de stock por lote en memoria: "Pendiente Ubicar SGA" y la carga inicial
+/// la usan como temporal, y para eso llevan los campos 90 a 93 (caducidad, lo que está en
+/// documentos, lo que se ubica desde la página y su desglose), que la conciliación no rellena.
 /// </summary>
 table 51107 "Buffer Conciliacion SGA"
 {
@@ -86,6 +90,32 @@ table 51107 "Buffer Conciliacion SGA"
             FieldClass = FlowField;
             CalcFormula = lookup(Item.Description where("No." = field("No. Producto")));
         }
+        field(90; "Fecha Caducidad"; Date)
+        {
+            Caption = 'Fecha caducidad';
+            DataClassification = ToBeClassified;
+            ToolTip = 'Caducidad del lote, la del stock de BC.';
+        }
+        field(91; "En Documentos"; Decimal)
+        {
+            Caption = 'En recepciones o ensamblados';
+            DataClassification = ToBeClassified;
+            DecimalPlaces = 0 : 5;
+            ToolTip = 'Parte de lo sin ubicar que está pendiente en "Ubicar recepciones" o "Ubicar ensamblados". Se ubica desde esas pantallas, no desde aquí: si se ubicara aquí, ellas lo volverían a pedir.';
+        }
+        field(92; "A Ubicar"; Decimal)
+        {
+            Caption = 'A ubicar aquí';
+            DataClassification = ToBeClassified;
+            DecimalPlaces = 0 : 5;
+            ToolTip = 'Lo sin ubicar que no tiene documento pendiente: es lo que se ubica desde esta página.';
+        }
+        field(93; Desglose; Text[100])
+        {
+            Caption = 'Desglose';
+            DataClassification = ToBeClassified;
+            ToolTip = 'Lo que hay que ubicar aquí, en palés, cajas y botellas sueltas.';
+        }
     }
 
     keys
@@ -117,6 +147,15 @@ table 51107 "Buffer Conciliacion SGA"
             else
                 Estado := Estado::"Sobra en SGA";
         end;
+    end;
+
+    /// <summary>
+    /// Deja solo las filas del usuario actual. No quita otros filtros ni cambia de grupo de
+    /// filtros, para que una página pueda llamarlo dentro de su FilterGroup.
+    /// </summary>
+    procedure FiltrarUsuarioActual()
+    begin
+        SetRange("Cod. Usuario", CopyStr(UserId(), 1, MaxStrLen("Cod. Usuario")));
     end;
 
     /// <summary>
