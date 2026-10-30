@@ -1,0 +1,216 @@
+/* Estilos del mapa 3D de SGA.
+   Se apoyan en los colores del cliente de Business Central para no desentonar con el resto. */
+
+/* Sin esto el 100% de la raíz no tiene de dónde colgarse y el mapa se queda corto. */
+html,
+body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
+.sga3d-raiz {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    font-family: "Segoe UI", Tahoma, sans-serif;
+    background: #fafafa;
+    border: 1px solid #e5e7eb;
+    border-radius: 4px;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+.sga3d-barra {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding: 4px 8px;
+    background: #ffffff;
+    border-bottom: 1px solid #e5e7eb;
+    font-size: 12px;
+    min-height: 26px;
+}
+
+.sga3d-btn {
+    padding: 3px 10px;
+    font-size: 12px;
+    font-family: inherit;
+    color: #1f2937;
+    background: #f3f4f6;
+    border: 1px solid #d1d5db;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.sga3d-btn:hover {
+    background: #e5e7eb;
+}
+
+.sga3d-btn:active {
+    background: #d1d5db;
+}
+
+/* Botones que se quedan pulsados: separar pasillos y mostrar el nº de ubicación. */
+.sga3d-btn.sga3d-on {
+    color: #ffffff;
+    background: #2563eb;
+    border-color: #1d4ed8;
+}
+
+.sga3d-btn.sga3d-on:hover {
+    background: #1d4ed8;
+}
+
+.sga3d-ayuda {
+    margin-left: 8px;
+    color: #6b7280;
+    white-space: nowrap;
+}
+
+/* Selector de pasillo: aislar una estantería es la única forma de llegar a las del medio. */
+.sga3d-sel {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    margin-left: 8px;
+    color: #4b5563;
+    white-space: nowrap;
+}
+
+.sga3d-combo {
+    padding: 2px 4px;
+    font-size: 12px;
+    font-family: inherit;
+    color: #1f2937;
+    background: #ffffff;
+    border: 1px solid #d1d5db;
+    border-radius: 3px;
+}
+
+.sga3d-btn.sga3d-mini {
+    padding: 2px 6px;
+    line-height: 1.1;
+}
+
+.sga3d-leyenda {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 8px;
+    color: #4b5563;
+    white-space: nowrap;
+}
+
+.sga3d-m {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    margin-left: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.25);
+    border-radius: 2px;
+}
+
+.sga3d-m0 { background: #d9dde3; }
+.sga3d-m1 { background: #7cc47f; }
+.sga3d-m2 { background: #e8a33d; }
+.sga3d-m3 { background: #d9534f; }
+
+.sga3d-info {
+    margin-left: auto;
+    color: #111827;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sga3d-canvas {
+    flex: 1 1 auto;
+    display: block;
+    cursor: grab;
+    background:
+        radial-gradient(ellipse at 50% 35%, #ffffff 0%, #eef1f5 100%);
+}
+
+.sga3d-canvas:active {
+    cursor: grabbing;
+}
+
+/* Modo traslado: se arrastra mercancía, no se gira la nave. */
+.sga3d-canvas.sga3d-trasladar,
+.sga3d-canvas.sga3d-trasladar:active {
+    cursor: copy;
+}
+
+/* Ficha flotante con el contenido de la ubicación bajo el ratón. */
+.sga3d-tip {
+    display: none;
+    position: absolute;
+    z-index: 10;
+    max-width: 460px;
+    padding: 8px 10px;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.18);
+    font-size: 12px;
+    color: #111827;
+    pointer-events: none;
+}
+
+.sga3d-tip-cab {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    font-weight: 700;
+    font-size: 13px;
+    margin-bottom: 6px;
+}
+
+.sga3d-tip-cab span {
+    font-weight: 400;
+    color: #6b7280;
+}
+
+.sga3d-tip table {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+.sga3d-tip td {
+    padding: 3px 6px 3px 0;
+    border-top: 1px solid #f1f5f9;
+    vertical-align: top;
+}
+
+.sga3d-tip small {
+    color: #6b7280;
+}
+
+.sga3d-tip-cant {
+    text-align: right;
+    white-space: nowrap;
+    font-weight: 600;
+}
+
+.sga3d-tip-bloq td {
+    color: #b91c1c;
+}
+
+.sga3d-tip-vacia,
+.sga3d-tip-mas {
+    color: #6b7280;
+    font-style: italic;
+}
+
+.sga3d-tip-pale {
+    white-space: nowrap;
+    color: #1d4ed8;
+    font-weight: 600;
+    padding-left: 8px;
+}

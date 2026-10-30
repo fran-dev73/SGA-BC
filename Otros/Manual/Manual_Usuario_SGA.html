@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Manual de usuario · SGA</title>
+<style>
+  @page {
+    size: A4;
+    margin: 22mm 18mm 20mm 18mm;
+    @top-left { content: "SGA · Gestión de ubicaciones"; font: 600 8pt "Segoe UI", sans-serif; color: #64748b; }
+    @top-right { content: "Manual de usuario"; font: 8pt "Segoe UI", sans-serif; color: #64748b; }
+    @bottom-right { content: "Página " counter(page) " de " counter(pages); font: 8pt "Segoe UI", sans-serif; color: #64748b; }
+    @bottom-left { content: "Dynamics 365 Business Central"; font: 8pt "Segoe UI", sans-serif; color: #94a3b8; }
+  }
+  @page portada { margin: 0; @top-left { content: none; } @top-right { content: none; } @bottom-left { content: none; } @bottom-right { content: none; } }
+
+  :root {
+    --azul: #1e3a5f;
+    --azul2: #2563eb;
+    --azul-claro: #eff6ff;
+    --gris: #475569;
+    --gris-claro: #f1f5f9;
+    --linea: #e2e8f0;
+    --verde: #15803d;
+    --ambar: #b45309;
+    --rojo: #b91c1c;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif; font-size: 10pt; line-height: 1.5; color: #1f2937; margin: 0; }
+
+  /* ---------- Portada ---------- */
+  .portada { page: portada; height: 297mm; width: 210mm; position: relative; overflow: hidden; break-after: page;
+             background: linear-gradient(160deg, #0f2744 0%, #1e3a5f 55%, #2563eb 130%); color: #fff; }
+  .portada .rejilla { position: absolute; right: -10mm; top: 40mm; width: 120mm; opacity: .16; }
+  .portada .rejilla div { display: inline-block; width: 13mm; height: 9mm; margin: 0 2mm 2mm 0; border: 1.2px solid #fff; border-radius: 1.5mm; }
+  .portada .contenido { position: absolute; left: 22mm; right: 22mm; top: 92mm; }
+  .portada .etiqueta { display: inline-block; font-size: 9pt; letter-spacing: .18em; text-transform: uppercase; border: 1px solid rgba(255,255,255,.5); padding: 1.5mm 4mm; border-radius: 20mm; }
+  .portada h1 { font-size: 44pt; line-height: 1.05; margin: 8mm 0 4mm; font-weight: 700; letter-spacing: -.01em; }
+  .portada .sub { font-size: 15pt; font-weight: 300; max-width: 140mm; color: #dbeafe; }
+  .portada .pie { position: absolute; left: 22mm; right: 22mm; bottom: 22mm; display: flex; justify-content: space-between; font-size: 9.5pt; color: #bfdbfe; border-top: 1px solid rgba(255,255,255,.25); padding-top: 4mm; }
+
+  /* ---------- Índice ---------- */
+  .indice { break-after: page; }
+  .indice h2 { border: none; margin-top: 0; }
+  .indice ol { list-style: none; padding: 0; margin: 0; counter-reset: cap; }
+  .indice > ol > li { counter-increment: cap; padding: 2.4mm 0; border-bottom: 1px solid var(--linea); }
+  .indice > ol > li > a { font-weight: 600; font-size: 11.5pt; color: var(--azul); text-decoration: none; }
+  .indice > ol > li > a::before { content: counter(cap, decimal-leading-zero); display: inline-block; width: 12mm; color: var(--azul2); font-weight: 700; }
+  .indice ul { list-style: none; padding: .6mm 0 0 12mm; margin: 0; }
+  .indice ul li { display: inline; font-size: 8.8pt; color: var(--gris); }
+  .indice ul li + li::before { content: "  ·  "; white-space: pre; color: #cbd5e1; }
+  .indice ul a { color: var(--gris); text-decoration: none; }
+
+  /* ---------- Capítulos ---------- */
+  .capitulo { break-before: page; }
+  .cab-cap { display: flex; align-items: flex-end; gap: 5mm; margin-bottom: 6mm; padding-bottom: 3mm; border-bottom: 3px solid var(--azul); }
+  .cab-cap .num { font-size: 34pt; font-weight: 700; color: var(--azul2); line-height: 1; }
+  .cab-cap h2 { margin: 0; font-size: 21pt; color: var(--azul); border: none; line-height: 1.15; }
+  .cab-cap .intro { font-size: 9.5pt; color: var(--gris); margin: 1mm 0 0; }
+  h2 { font-size: 18pt; color: var(--azul); }
+  h3 { font-size: 13pt; color: var(--azul); margin: 7mm 0 2mm; break-after: avoid; }
+  h4 { font-size: 10.5pt; color: #0f172a; margin: 4mm 0 1mm; break-after: avoid; }
+  p { margin: 1.5mm 0 2.5mm; }
+  ul, ol { margin: 1mm 0 3mm; padding-left: 6mm; }
+  li { margin: .8mm 0; }
+  b, strong { color: #0f172a; }
+  em { color: #334155; }
+  .ui { font-weight: 600; color: var(--azul); }          /* nombres de pantallas y botones */
+
+  /* ---------- Recuadros ---------- */
+  .donde { display: flex; gap: 3mm; align-items: baseline; background: var(--azul-claro); border-left: 3.5px solid var(--azul2);
+           padding: 2mm 4mm; border-radius: 0 2mm 2mm 0; margin: 2mm 0 3mm; font-size: 9.3pt; break-inside: avoid; }
+  .donde .k { font-weight: 700; color: var(--azul2); text-transform: uppercase; font-size: 7.5pt; letter-spacing: .08em; white-space: nowrap; }
+  .nota, .aviso, .consejo { padding: 3mm 4mm; border-radius: 2mm; margin: 3mm 0; font-size: 9.3pt; break-inside: avoid; }
+  .nota { background: var(--gris-claro); border: 1px solid var(--linea); }
+  .aviso { background: #fff7ed; border: 1px solid #fed7aa; }
+  .consejo { background: #f0fdf4; border: 1px solid #bbf7d0; }
+  .nota .t, .aviso .t, .consejo .t { display: block; font-weight: 700; font-size: 7.5pt; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 1mm; }
+  .aviso .t { color: var(--ambar); } .consejo .t { color: var(--verde); } .nota .t { color: var(--gris); }
+
+  /* ---------- Pasos ---------- */
+  ol.pasos { list-style: none; padding: 0; counter-reset: paso; }
+  ol.pasos > li { counter-increment: paso; position: relative; padding: 1mm 0 1.5mm 10mm; margin: 0; }
+  ol.pasos > li::before { content: counter(paso); position: absolute; left: 0; top: 1.2mm; width: 6.5mm; height: 6.5mm; border-radius: 50%;
+                          background: var(--azul2); color: #fff; font-weight: 700; font-size: 8.5pt; text-align: center; line-height: 6.5mm; }
+
+  /* ---------- Tablas ---------- */
+  table { width: 100%; border-collapse: collapse; margin: 2mm 0 4mm; font-size: 9pt; break-inside: avoid; }
+  th { background: var(--azul); color: #fff; text-align: left; font-weight: 600; padding: 2mm 3mm; }
+  th b { color: #bfdbfe; }
+  .capitulo.seguido { break-before: auto; margin-top: 12mm; }
+  td { padding: 1.8mm 3mm; border-bottom: 1px solid var(--linea); vertical-align: top; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  table.ayuda td:first-child { width: 48%; }
+
+  /* ---------- Pantallas simuladas ---------- */
+  .dialogo { font-family: "Cascadia Mono", Consolas, monospace; font-size: 8.6pt; background: #0f172a; color: #e2e8f0; border-radius: 2mm;
+             padding: 4mm 5mm; margin: 3mm 0; white-space: pre; line-height: 1.55; break-inside: avoid; }
+  .dialogo .hl { color: #93c5fd; } .dialogo .ok { color: #86efac; } .dialogo .ko { color: #fca5a5; }
+
+  .etiq { width: 70mm; height: 35mm; border: 1.5px solid #0f172a; border-radius: 1.5mm; position: relative; background: #fff; margin: 3mm 0; font-family: "Segoe UI", sans-serif; }
+  .etiq .cod { position: absolute; left: 2mm; top: 2.5mm; font-size: 11pt; font-weight: 700; white-space: nowrap; }
+  .etiq .ctl { position: absolute; right: 2mm; top: 1.3mm; width: 19mm; text-align: center; font-size: 5.5pt; font-weight: 700; letter-spacing: .1em; }
+  .etiq .dig { position: absolute; right: 2mm; top: 4mm; width: 19mm; height: 12mm; border: 1.5px solid #0f172a; text-align: center; font-size: 22pt; font-weight: 700; line-height: 12mm; }
+  .etiq .bar { position: absolute; left: 2mm; right: 2mm; top: 18mm; height: 10mm; display: flex; align-items: stretch; overflow: hidden; }
+  .etiq .bar i { display: block; background: #0f172a; margin-right: .45mm; }
+  .etiq .bar i.f { width: .3mm; } .etiq .bar i.m { width: .6mm; } .etiq .bar i.g { width: 1mm; }
+  .etiq .pie { position: absolute; left: 2mm; bottom: 1mm; font-size: 6pt; color: #334155; }
+  .fila-etiq { display: flex; gap: 8mm; align-items: center; }
+  .fila-etiq ul { margin: 0; }
+
+  .semaforo { display: inline-block; width: 3mm; height: 3mm; border-radius: 50%; margin-right: 1.5mm; vertical-align: -.2mm; }
+  .s-vacia { background: #94a3b8; } .s-parcial { background: #22c55e; } .s-llena { background: #f59e0b; } .s-bloq { background: #ef4444; }
+
+  .flujo { display: flex; gap: 2mm; margin: 4mm 0; break-inside: avoid; }
+  .flujo div { flex: 1; background: var(--azul-claro); border-radius: 2mm; padding: 3mm; font-size: 8.8pt; position: relative; }
+  .flujo div b { display: block; color: var(--azul); font-size: 9.5pt; margin-bottom: 1mm; }
+  .flujo .n { position: absolute; top: -2.5mm; left: 3mm; background: var(--azul2); color: #fff; border-radius: 3mm; padding: 0 2mm; font-size: 7.5pt; font-weight: 700; }
+
+  .resumen { display: grid; grid-template-columns: 1fr 1fr; gap: 3mm; margin: 4mm 0; }
+  .resumen div { border: 1px solid var(--linea); border-radius: 2mm; padding: 3mm 4mm; break-inside: avoid; }
+  .resumen div b { display: block; color: var(--azul); margin-bottom: 1mm; }
+
+  .evitar { break-inside: avoid; }
+
+  /* ---------- Vista en pantalla ----------
+     Al imprimir, los márgenes los pone @page. En el navegador no hay páginas, así que cada
+     bloque se presenta como una hoja A4 centrada sobre fondo gris. No afecta al PDF. */
+  @media screen {
+    html { background: #e5e7eb; }
+    body { padding: 10mm 0; }
+    .portada, .indice, .capitulo {
+      width: 210mm; margin: 0 auto 10mm;
+      box-shadow: 0 2px 12px rgba(15, 23, 42, .15);
+    }
+    .indice, .capitulo { background: #fff; }
+    .indice, .capitulo { padding: 22mm 18mm 20mm; min-height: 297mm; }
+    .capitulo.seguido { margin-top: 0; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ================= PORTADA ================= -->
+<section class="portada">
+  <div class="rejilla">
+    <div></div><div></div><div></div><div></div><div></div><div></div><div></div>
+    <div></div><div></div><div></div><div></div><div></div><div></div><div></div>
+    <div></div><div></div><div></div><div></div><div></div><div></div><div></div>
+    <div></div><div></div><div></div><div></div><div></div><div></div><div></div>
+    <div></div><div></div><div></div><div></div><div></div><div></div><div></div>
+  </div>
+  <div class="contenido">
+    <span class="etiqueta">Manual de usuario</span>
+    <h1>SGA<br>Gestión de ubicaciones</h1>
+    <div class="sub">Dónde está cada producto, dónde dejar lo que entra y de dónde coger lo que sale, dentro de Business Central.</div>
+  </div>
+  <div class="pie"><span>Dynamics 365 Business Central · Módulo de almacén</span><span>Octubre 2026</span></div>
+</section>
+
+<!-- ================= ÍNDICE ================= -->
+<section class="indice">
+  <h2>Contenido</h2>
+  <ol>
+    <li><a href="#c1">Qué es SGA</a>
+      <ul><li><a href="#c1">Para qué sirve</a></li><li><a href="#c1-capas">SGA y el stock de BC</a></li><li><a href="#c1-entrar">Dónde está en Business Central</a></li></ul></li>
+    <li><a href="#c2">Puesta en marcha</a>
+      <ul><li><a href="#c2-config">Configuración</a></li><li><a href="#c2-um">Palés y cajas</a></li><li><a href="#c2-gen">Generar ubicaciones</a></li><li><a href="#c2-bloque">Ajustar en bloque</a></li><li><a href="#c2-etiq">Etiquetas de ubicación</a></li><li><a href="#c2-carga">Carga inicial del stock</a></li></ul></li>
+    <li><a href="#c3">Ubicar la mercancía que entra</a>
+      <ul><li><a href="#c3-prod">Ubicar producto</a></li><li><a href="#c3-dia">Recepciones y ensamblados del día</a></li><li><a href="#c3-estr">Cómo elige el hueco</a></li></ul></li>
+    <li><a href="#c4">Preparar pedidos (picking)</a>
+      <ul><li><a href="#c4-enviar">Enviar a picking</a></li><li><a href="#c4-asignar">Asignar órdenes</a></li><li><a href="#c4-preparar">Preparar</a></li><li><a href="#c4-pedido">Vuelta al pedido</a></li></ul></li>
+    <li><a href="#c5">Trabajar con el contenido</a>
+      <ul><li><a href="#c5-donde">¿Dónde está el producto?</a></li><li><a href="#c5-trasl">Trasladar</a></li><li><a href="#c5-bloq">Bloquear</a></li><li><a href="#c5-quitar">Quitar y vaciar</a></li><li><a href="#c5-recuento">Recontar</a></li></ul></li>
+    <li><a href="#c6">Ver el almacén</a>
+      <ul><li><a href="#c6-lista">Lista de ubicaciones</a></li><li><a href="#c6-mapa">Mapa de almacén</a></li><li><a href="#c6-3d">Mapa 3D</a></li></ul></li>
+    <li><a href="#c7">Control e informes</a>
+      <ul><li><a href="#c7-conc">Conciliación</a></li><li><a href="#c7-diario">Diario de movimientos</a></li><li><a href="#c7-inf">Informes a Excel</a></li></ul></li>
+    <li><a href="#c8">Conceptos que conviene conocer</a></li>
+    <li><a href="#c9">Un día de trabajo</a></li>
+    <li><a href="#c10">Problemas frecuentes</a></li>
+    <li><a href="#c11">Ayuda rápida</a></li>
+  </ol>
+</section>
+
+<!-- ================= 1 ================= -->
+<section class="capitulo" id="c1">
+  <div class="cab-cap"><span class="num">01</span><div><h2>Qué es SGA</h2><p class="intro">Lo que hace, lo que no hace y cómo se entra.</p></div></div>
+
+  <p><b>SGA</b> es el módulo de gestión de ubicaciones del almacén dentro de Business Central. Responde a tres preguntas:</p>
+  <ol class="pasos">
+    <li><b>¿Qué hay en cada hueco?</b> Producto, lote, caducidad y cantidad, ubicación por ubicación.</li>
+    <li><b>¿Dónde dejo lo que entra?</b> Propone el hueco para cada palé y para las cajas sueltas, y explica por qué.</li>
+    <li><b>¿De dónde cojo lo que sale?</b> Convierte cada pedido de venta en un recorrido de paradas para el preparador.</li>
+  </ol>
+
+  <h3 id="c1-capas">SGA y el stock de Business Central</h3>
+  <p>En Business Central el stock es un número por producto y lote. SGA reparte ese mismo stock <b>entre los huecos del almacén</b>. Sin SGA sabes que tienes 500 cajas; con SGA sabes que 200 están en la nave A, 150 en cuarentena y 150 en un hueco bloqueado porque caducan pronto.</p>
+  <div class="nota"><span class="t">Importante</span>SGA <b>no cambia el stock de Business Central</b>. Son dos capas que van en paralelo: BC dice <i>cuánto</i> hay y SGA dice <i>dónde</i>. Si en algún momento no coinciden, la conciliación lo detecta (capítulo 7).</div>
+
+  <h3 id="c1-entrar">Dónde está en Business Central</h3>
+  <ul>
+    <li><b>Rol <span class="ui">Almacén SGA</span>.</b> Arriba, los indicadores del almacén. En la barra de navegación, lo del día a día: <span class="ui">Ubicar producto</span>, <span class="ui">Ubicar recepciones</span>, <span class="ui">Ubicar ensamblados</span>, <span class="ui">Órdenes de picking</span>, <span class="ui">¿Dónde está el producto?</span>, <span class="ui">Contenido de ubicaciones</span> y <span class="ui">Ubicaciones</span>. A la izquierda, las secciones Almacén, Control, Configuración, Tareas periódicas, Puesta en marcha e Informes.</li>
+    <li><b>Rol de Procesador de pedidos.</b> Las mismas opciones, en los grupos <i>Almacén SGA</i>, <i>Almacén SGA - Consultas</i> y <i>Almacén SGA - Configuración</i>.</li>
+    <li><b>Buscador (Alt+Q).</b> Todo lo importante sale escribiendo su nombre: "Ubicar producto", "Órdenes de picking", "Configuración SGA"…</li>
+  </ul>
+</section>
+
+<!-- ================= 2 ================= -->
+<section class="capitulo" id="c2">
+  <div class="cab-cap"><span class="num">02</span><div><h2>Puesta en marcha</h2><p class="intro">Se hace una vez, normalmente por el responsable de almacén.</p></div></div>
+
+  <div class="flujo">
+    <div><span class="n">1</span><b>Configurar</b>Almacén, controles y estrategias.</div>
+    <div><span class="n">2</span><b>Palés y cajas</b>Marcar las unidades de medida.</div>
+    <div><span class="n">3</span><b>Ubicaciones</b>Generarlas y ajustar capacidades.</div>
+    <div><span class="n">4</span><b>Etiquetas</b>Imprimir y pegar.</div>
+    <div><span class="n">5</span><b>Carga inicial</b>Repartir el stock actual.</div>
+  </div>
+
+  <h3 id="c2-config">Configuración</h3>
+  <div class="donde"><span class="k">Dónde</span><span><span class="ui">Configuración SGA</span> · Almacén SGA › Configuración, o en el buscador.</span></div>
+  <table>
+    <tr><th style="width:32%">Apartado</th><th>Qué se fija</th></tr>
+    <tr><td><b>General</b></td><td>El <b>almacén por defecto</b> de todos los procesos y las <b>columnas del mapa</b> (cuántos huecos dibuja la rejilla, máximo 32).</td></tr>
+    <tr><td><b>Ubicaciones por flujo</b></td><td>Ubicaciones especiales: <i>Expedición</i>, <i>Desbordamiento</i> y <i>Ajustes</i> (a donde van las diferencias de la conciliación).</td></tr>
+    <tr><td><b>Estrategias</b></td><td>Cómo se elige el hueco al ubicar (en general, para compras y para ensamblados) y de dónde se coge al preparar (FEFO, FIFO…). Ver capítulos 3 y 4.</td></tr>
+    <tr><td><b>Controles</b></td><td>Si avisar o bloquear al llenarse un hueco, si permitir desviarse del hueco propuesto, si exigir el <b>dígito de control</b> al recoger y si exigir que un responsable <b>asigne</b> las órdenes de picking.</td></tr>
+    <tr><td><b>Numeración</b></td><td>La serie de números de las órdenes de picking. Es obligatoria para enviar pedidos a picking.</td></tr>
+  </table>
+  <p>Las <b>zonas</b> (<span class="ui">Zonas</span>, en la misma sección) agrupan ubicaciones: "Nave A", "Cuarentena", "Producción"… Crea al menos una antes de generar ubicaciones.</p>
+
+  <h3 id="c2-um">Palés y cajas: marcar las unidades de medida</h3>
+  <div class="donde"><span class="k">Dónde</span><span><span class="ui">Unidades de medida</span> (página estándar de BC) · columna <b>Tipo SGA</b>.</span></div>
+  <p>Para SGA, <b>palé y caja son clases, no códigos</b>. Marca una sola vez cada código:</p>
+  <ul>
+    <li><b>Palé</b>: PALE, PALE200, PALE300, EUROPALE… todos los que uséis.</li>
+    <li><b>Caja</b>: CAJA, CAJA6, CAJA12…</li>
+  </ul>
+  <p>Un hueco de palé admite <b>cualquier</b> unidad marcada como palé, y cuántas botellas lleva lo dice la unidad de cada producto. Al crear un código nuevo, basta con marcarlo.</p>
+  <div class="consejo"><span class="t">Consejo</span>Revisa también el <b>Cód. palé por defecto</b> en la ficha de cada producto: es el palé que SGA usa para ese producto y el que enseña el mapa 3D.</div>
+
+  <h3 id="c2-gen">Generar ubicaciones</h3>
+  <div class="donde"><span class="k">Dónde</span><span><span class="ui">Generar ubicaciones</span> · Almacén SGA › Puesta en marcha. También desde Configuración SGA y desde la lista Ubicaciones.</span></div>
+  <p>Crea de golpe todos los huecos de una nave. Cada hueco recibe un código <b>nave-pasillo-hueco-nivel</b> (por ejemplo <b>A-01-15-3</b>), del que salen el mapa y el orden de recorrido del picking.</p>
+  <table>
+    <tr><th>Campo</th><th>Qué es en el almacén</th><th>Ejemplo</th></tr>
+    <tr><td>Almacén</td><td>El almacén de BC</td><td>PRINCIPAL</td></tr>
+    <tr><td>Nave</td><td>Una letra por nave</td><td>A</td></tr>
+    <tr><td>Estantería desde / hasta</td><td>El <b>pasillo</b></td><td>1 a 10</td></tr>
+    <tr><td>Columna desde / hasta</td><td>El <b>hueco</b> a lo largo del pasillo</td><td>1 a 31</td></tr>
+    <tr><td>Altura desde / hasta</td><td>El <b>nivel</b>, de abajo arriba</td><td>1 a 4</td></tr>
+    <tr><td>Zona, tipo y capacidad</td><td>Lo que reciben las ubicaciones nuevas</td><td>Reserva, Reserva, 1</td></tr>
+  </table>
+  <p>El ejemplo crea 10 × 31 × 4 = <b>1.240 huecos</b>. Si los pasillos tienen distinto número de huecos o de niveles, lánzalo una vez por cada grupo de pasillos iguales. Lo que ya existe no se toca, así que se puede relanzar para ampliar.</p>
+  <div class="aviso"><span class="t">Atención</span>
+    <ul style="margin:0">
+      <li><b>Tipo de ubicación:</b> solo los huecos de tipo <b>Picking</b> o <b>Reserva</b> se proponen al ubicar. Los de muelle, cuarentena o ajustes no.</li>
+      <li><b>Capacidad:</b> pon <b>1</b> en los huecos de palé. Con 0 el hueco no tiene límite y se podrían juntar varios palés en él.</li>
+      <li>El almacén debe tener activado <b>Ubicación obligatoria</b> en su ficha.</li>
+    </ul>
+  </div>
+  <p>Si se han dado de alta ubicaciones por fuera de SGA, <span class="ui">Sincronizar ubicaciones</span> (Tareas periódicas) les crea su ficha de SGA.</p>
+
+  <h3 id="c2-bloque">Ajustar capacidad, tipo y zona en bloque</h3>
+  <div class="donde"><span class="k">Dónde</span><span>Lista <span class="ui">Ubicaciones</span> de SGA · acción <b>Cambiar en bloque</b>. (No en <i>Ubicaciones del almacén</i>: esa es la lista estándar de BC y no tiene estos datos.)</span></div>
+  <ol class="pasos">
+    <li>Filtra lo que quieras cambiar. Por ejemplo, un pasillo: <i>Cód. ubicación</i> = <b>A-03-*</b>.</li>
+    <li>Selecciona todas con <b>Ctrl+A</b>, o marca las que quieras.</li>
+    <li>Pulsa <b>Cambiar en bloque</b> y marca <b>solo</b> lo que quieres cambiar.</li>
+  </ol>
+  <table>
+    <tr><th style="width:30%">Dato</th><th>Valores</th></tr>
+    <tr><td><b>Capacidad</b></td><td>1 = un palé (lleve lo que lleve) · 72 = setenta y dos cajas · 0 = sin límite</td></tr>
+    <tr><td><b>Admite</b></td><td>Palé, Caja o en blanco (cualquiera)</td></tr>
+    <tr><td><b>Acepta múltiples productos</b></td><td>Solo en huecos de caja: son los <b>huecos mixtos</b> para cajas sueltas</td></tr>
+    <tr><td><b>Tipo ubicación</b> y <b>Zona</b></td><td>Picking, Reserva, Muelle… y la zona</td></tr>
+  </table>
+
+  <h3 id="c2-etiq">Etiquetas de ubicación</h3>
+  <div class="donde"><span class="k">Dónde</span><span>Lista <span class="ui">Ubicaciones</span> · selecciona los huecos · <b>Imprimir etiquetas</b>. También <span class="ui">Etiquetas de ubicación</span> en el buscador.</span></div>
+  <div class="fila-etiq evitar">
+    <div class="etiq">
+      <div class="cod">A-01-15-3</div><div class="ctl">CONTROL</div><div class="dig">47</div>
+      <div class="bar"><i class="g"></i><i class="f"></i><i class="m"></i><i class="f"></i><i class="g"></i><i class="f"></i><i class="f"></i><i class="m"></i><i class="g"></i><i class="f"></i><i class="m"></i><i class="m"></i><i class="f"></i><i class="g"></i><i class="f"></i><i class="m"></i><i class="f"></i><i class="g"></i><i class="m"></i><i class="f"></i><i class="f"></i><i class="g"></i><i class="m"></i><i class="f"></i><i class="m"></i><i class="g"></i><i class="f"></i><i class="f"></i><i class="m"></i><i class="g"></i><i class="f"></i><i class="m"></i><i class="f"></i><i class="g"></i><i class="f"></i><i class="m"></i><i class="g"></i><i class="f"></i><i class="m"></i><i class="f"></i><i class="g"></i><i class="f"></i><i class="m"></i><i class="g"></i><i class="f"></i><i class="g"></i></div><div class="pie">PRINCIPAL · Palé</div>
+    </div>
+    <ul>
+      <li>Etiqueta de <b>70 × 35 mm</b>, una por hueco, para impresora de etiquetas.</li>
+      <li>El <b>código de barras</b> es el del hueco: se escanea al ubicar y al recoger.</li>
+      <li>El <b>dígito de control</b> (el número del recuadro) es distinto en cada hueco y se teclea al recoger si la configuración lo exige.</li>
+    </ul>
+  </div>
+  <p><b>Regenerar dígitos de control</b> da números nuevos a los huecos seleccionados (por ejemplo, si una etiqueta se ha fotografiado o copiado). Después hay que reimprimir sus etiquetas: las viejas dejan de valer.</p>
+
+  <h3 id="c2-carga">Carga inicial del stock</h3>
+  <div class="donde"><span class="k">Dónde</span><span><span class="ui">Carga inicial de contenido</span> · Almacén SGA › Puesta en marcha.</span></div>
+  <p>Se lanza <b>una vez, al arrancar</b>: coloca en los huecos el stock que ya tiene Business Central, producto a producto y lote a lote, para que SGA y BC empiecen cuadrados. No cambia el stock de BC.</p>
+  <table>
+    <tr><th style="width:32%">Ubicación de destino</th><th>Qué hace</th></tr>
+    <tr><td><b>Huecos libres</b> (recomendado)</td><td>Cada palé completo a un hueco de palé vacío, siguiendo el recorrido. Lo que sobra, en cajas, a un hueco mixto de caja. Lo que no cabe, no se carga.</td></tr>
+    <tr><td><b>Ubicación fija del producto</b></td><td>Todo el lote a la ubicación fija de su ficha; si no tiene, a la ubicación indicada.</td></tr>
+    <tr><td><b>Ubicación indicada</b></td><td>Todo a una ubicación de paso, para repartirlo después con Trasladar.</td></tr>
+  </table>
+  <div class="consejo"><span class="t">Consejo</span>Lánzala primero con <b>Solo simular</b>: hace el reparto completo, enseña el resultado hueco a hueco y no guarda nada. Al terminar, la vista <b>No cargado</b> dice qué se ha quedado fuera y por qué. Para volver a lanzarla sin duplicar, marca <b>Omitir productos que ya están ubicados</b>.</div>
+</section>
+
+<!-- ================= 3 ================= -->
+<section class="capitulo" id="c3">
+  <div class="cab-cap"><span class="num">03</span><div><h2>Ubicar la mercancía que entra</h2><p class="intro">De una en una o todo lo del día de golpe.</p></div></div>
+
+  <h3 id="c3-prod">Ubicar producto</h3>
+  <div class="donde"><span class="k">Dónde</span><span><span class="ui">Ubicar producto</span> · barra de navegación del rol Almacén SGA.</span></div>
+  <ol class="pasos">
+    <li>Indica <b>producto, lote, caducidad y cantidad</b> en la unidad que quieras, o pulsa <b>Ubicar todo lo pendiente</b> para traer todo lo que falta por ubicar de ese producto.</li>
+    <li>Pulsa <b>Proponer ubicación</b>. SGA reparte la cantidad: cada <b>palé completo, uno a uno</b>, a un hueco de palé; las <b>cajas sobrantes, juntas</b>, a un hueco de caja.</li>
+    <li>Sale un <b>diálogo con la situación</b> y la propuesta completa, trozo a trozo:</li>
+  </ol>
+<div class="dialogo">Pendiente de ubicar en el almacén: 1 PALE45, 11 CAJA
+A ubicar ahora: 56 CAJA (1 PALE45, 11 CAJA)
+
+Propuesta:
+  · palé 1 de 1 (1 PALE45)   → <span class="ok">A-01-03-1</span>
+  · cajas sueltas (11 CAJA)  → <span class="ok">M-01-01-1</span>
+
+<span class="hl">¿Ubicar ahora palé 1 de 1 (1 PALE45) en A-01-03-1?</span>
+Lo demás quedará pendiente para volver a proponer.</div>
+  <ol class="pasos" style="counter-reset: paso 3">
+    <li><b>Sí</b>: se ubica ese palé y lo demás queda pendiente en pantalla. Pulsa otra vez <b>Proponer ubicación</b> para el siguiente trozo.<br>
+        <b>No</b>: la propuesta queda en pantalla. Si dejas la mercancía en otro sitio, escanea la ubicación real en <i>Ubicación confirmada</i> y pulsa <b>Confirmar ubicación</b>.</li>
+  </ol>
+  <div class="aviso"><span class="t">Si no hay sitio</span>El trozo sale como <b>SIN SITIO</b> y SGA explica qué falta: que no existe ninguna ubicación de esa clase (por ejemplo, de caja), que las que hay son de muelle u otro uso, que todas están llenas o bloqueadas, o que la unidad no está marcada como palé o caja.</div>
+
+  <h3 id="c3-dia">Recepciones y ensamblados del día</h3>
+  <div class="donde"><span class="k">Dónde</span><span><span class="ui">Ubicar recepciones</span> y <span class="ui">Ubicar ensamblados</span> · barra de navegación.</span></div>
+  <p>Para colocar de golpe <b>todo lo que ha entrado en un día</b>: las recepciones de compra registradas o los embotellados registrados.</p>
+  <ol class="pasos">
+    <li>Ajusta los <b>filtros de arriba</b>: <b>Registrado desde / hasta</b> (en blanco, sin límite), <b>Clase de artículo</b>, almacén y <i>Solo lo que falta por ubicar</i>. <span class="ui">Ubicar recepciones</span> se abre sin fechas y con <b>Prod. externo</b>: salen todas las recepciones pendientes de ubicar de productos externos.</li>
+    <li>Pulsa <b>Proponer ubicaciones</b>: reparte las líneas entre huecos sin dar el mismo hueco a dos líneas. Si una propuesta no te convence, <b>Otra ubicación</b>.</li>
+    <li>Deja la mercancía, corrige la <i>Ubicación confirmada</i> si la has dejado en otro sitio y pulsa <b>Confirmar esta línea</b> o <b>Confirmar todo</b>.</li>
+  </ol>
+  <p>Se puede ubicar una línea en varias veces bajando la cantidad <i>A ubicar</i>. Puedes cerrar la pantalla y volver: solo saldrá lo que falta.</p>
+  <div class="nota"><span class="t">Por qué no se ubica solo al registrar</span>Registrar una recepción o un ensamblado no coloca la mercancía en un hueco. Es a propósito: si el hueco estuviera lleno o bloqueado, el albarán no se podría registrar en BC. Mientras no se ubica, la conciliación lo muestra como <i>sin ubicar</i>.</div>
+
+  <h3 id="c3-estr">Cómo elige el hueco</h3>
+  <p>Según la <b>Estrategia de ubicación</b> de la configuración:</p>
+  <table>
+    <tr><th style="width:30%">Estrategia</th><th>Qué hace</th></tr>
+    <tr><td><b>Estándar</b></td><td>Primero la ubicación fija del producto; si no, junto a lo que ya hay de ese producto; si no, el primer hueco libre del recorrido.</td></tr>
+    <tr><td><b>Priorizar consolidación</b></td><td>Primero junto a lo que ya hay; si no cabe, hueco libre.</td></tr>
+    <tr><td><b>Solo ubicación fija</b></td><td>Únicamente la ubicación fija del producto.</td></tr>
+    <tr><td><b>Primera libre por ruta</b></td><td>El primer hueco libre del recorrido.</td></tr>
+    <tr><td><b>Solo hueco vacío</b></td><td>Un hueco completamente vacío (la usan los ensamblados por defecto).</td></tr>
+  </table>
+  <p>Siempre descarta los huecos bloqueados, sin capacidad suficiente o que no admiten ese producto. El <b>orden de recorrido</b> es el campo <i>Secuencia picking</i> de cada ubicación: pasillo, luego hueco, luego nivel. Para que unos huecos se llenen antes, baja su secuencia en la ficha.</p>
+</section>
+
+<!-- ================= 4 ================= -->
+<section class="capitulo" id="c4">
+  <div class="cab-cap"><span class="num">04</span><div><h2>Preparar pedidos (picking)</h2><p class="intro">Toda salida de venta pasa por una orden de picking.</p></div></div>
+
+  <div class="flujo">
+    <div><span class="n">1</span><b>Oficina</b>Envía el pedido lanzado a picking.</div>
+    <div><span class="n">2</span><b>Responsable</b>Asigna la orden a un preparador (si se exige).</div>
+    <div><span class="n">3</span><b>Preparador</b>Recoge parada a parada.</div>
+    <div><span class="n">4</span><b>Automático</b>Cantidad y lotes vuelven al pedido.</div>
+  </div>
+
+  <h3 id="c4-enviar">1 · Enviar a picking</h3>
+  <div class="donde"><span class="k">Dónde</span><span><span class="ui">Pedido de venta</span> · Almacén SGA › <b>Enviar a picking</b>.</span></div>
+  <ul>
+    <li>El pedido tiene que estar <b>lanzado</b> y no tener otra orden de picking abierta.</li>
+    <li>Por cada línea, SGA busca dónde está el producto y crea una <b>parada</b> por cada hueco y lote que hay que coger.</li>
+    <li>Lo que va a coger cada parada queda <b>reservado</b>: otro pedido ya no lo ve como disponible.</li>
+    <li>Si el pedido ya se preparó en parte, solo manda a recoger lo que falta. Si no hay stock ubicado suficiente, la orden se crea con lo que hay y avisa de lo que falta.</li>
+  </ul>
+  <table>
+    <tr><th style="width:30%">Estrategia de picking</th><th>De dónde coge primero</th></tr>
+    <tr><td><b>FEFO</b></td><td>El lote que antes caduca</td></tr>
+    <tr><td><b>FIFO</b></td><td>El que lleva más tiempo en la ubicación</td></tr>
+    <tr><td><b>Vaciar ubicación</b></td><td>Agrupa por hueco, para dejar huecos libres</td></tr>
+    <tr><td><b>Lote exacto</b></td><td>Como FEFO, indicando el lote concreto en cada parada</td></tr>
+  </table>
+
+  <h3 id="c4-asignar">2 · Asignar órdenes a los preparadores</h3>
+  <div class="donde"><span class="k">Dónde</span><span><span class="ui">Asignar órdenes de picking</span>.</span></div>
+  <p>Muestra las órdenes pendientes con cliente, fecha de envío (en rojo si ya toca), paradas y unidades. Selecciona una o varias y pulsa <b>Asignar a</b>. La <b>prioridad</b> decide qué le sale antes al preparador (<i>Subir</i> / <i>Bajar prioridad</i>).</p>
+  <table>
+    <tr><th></th><th>Exigir asignación <b>desactivado</b></th><th>Exigir asignación <b>activado</b></th></tr>
+    <tr><td>La orden nace…</td><td>Abierta</td><td>Pendiente de asignar</td></tr>
+    <tr><td><i>Siguiente orden</i> da al preparador…</td><td>las suyas y, si no tiene, la siguiente libre</td><td>solo las suyas</td></tr>
+    <tr><td>Quién reparte</td><td>Cualquiera</td><td>Solo los <b>responsables de picking</b></td></tr>
+  </table>
+  <p class="nota"><span class="t">Responsables de picking</span>Son los usuarios con la casilla <b>Responsable picking SGA</b> marcada en <i>Configuración de usuarios</i>, y con el conjunto de permisos <b>SGA - Responsable de almacén</b>. Los preparadores llevan <b>PermissionSet-SGA</b>.</p>
+
+  <h3 id="c4-preparar">3 · Preparar</h3>
+  <div class="donde"><span class="k">Dónde</span><span><span class="ui">Órdenes de picking</span> · <b>Siguiente orden</b> (el botón del día a día) o <b>Preparar</b> sobre una orden concreta.</span></div>
+  <p>La pantalla guía parada a parada:</p>
+  <ul>
+    <li><b>A qué ubicación ir</b>, en grande.</li>
+    <li><b>Qué producto y qué lote</b>, con su caducidad.</li>
+    <li><b>Cuánta cantidad</b>, en la unidad del pedido (cajas, palés…).</li>
+  </ul>
+  <ol class="pasos">
+    <li>Escanea la etiqueta del hueco del que recoges.</li>
+    <li>Si la configuración lo exige, teclea el <b>dígito de control</b> de la etiqueta.</li>
+    <li>Ajusta la cantidad si has cogido menos y pulsa <b>Confirmar recogida</b>. Pasa sola a la siguiente parada.</li>
+  </ol>
+  <p>También se puede <b>Saltar parada</b> (la deja para el final) o marcar <b>No hay stock aquí</b> (la cancela y queda constancia para revisar el hueco).</p>
+  <div class="nota"><span class="t">El dígito de control</span>Solo está impreso en la etiqueta del hueco, así que teclearlo certifica que el preparador está delante de ese hueco. Si no coincide, no deja confirmar.</div>
+
+  <h3 id="c4-pedido">4 · Vuelta al pedido</h3>
+  <p>Al terminar la última parada, SGA rellena en el pedido de venta la <b>cantidad a enviar</b> y los <b>lotes recogidos</b>. Después, oficina registra el envío como siempre. Las líneas sin recoger quedan con cantidad a enviar cero: lo que no ha pasado por picking no sale.</p>
+  <p>Si el paso al pedido fallara, el preparador no pierde nada: oficina lo repite con <b>Pasar al pedido</b> desde la orden, o <b>Pasar picking al pedido</b> desde el pedido. La vista <i>Terminadas sin pasar al pedido</i> enseña las que faltan.</p>
+</section>
+
+<!-- ================= 5 ================= -->
+<section class="capitulo" id="c5">
+  <div class="cab-cap"><span class="num">05</span><div><h2>Trabajar con el contenido</h2><p class="intro">Consultar, mover, bloquear, sacar y contar.</p></div></div>
+
+  <h3 id="c5-donde">¿Dónde está el producto?</h3>
+  <div class="donde"><span class="k">Dónde</span><span><span class="ui">¿Dónde está el producto?</span> · barra de navegación.</span></div>
+  <p>Buscas un producto y salen todos los huecos donde hay, ordenados por <b>caducidad</b> y después por <b>recorrido</b>. Cada línea indica ubicación, zona, lote, caducidad, cantidad disponible (sin lo reservado) y si está bloqueado. Se puede filtrar por lote, por almacén o solo lo disponible.</p>
+
+  <h3 id="c5-trasl">Trasladar</h3>
+  <div class="donde"><span class="k">Dónde</span><span><span class="ui">Contenido de ubicaciones</span> · <b>Trasladar</b>. O arrastrando en el mapa 3D (capítulo 6).</span></div>
+  <p>Selecciona la línea, indica la cantidad (por defecto, toda) y la ubicación de destino. Queda en el diario y la ocupación se recalcula al momento. Trasladar es solo organización: no cambia el stock de BC.</p>
+
+  <h3 id="c5-bloq">Bloquear y desbloquear</h3>
+  <p>En <span class="ui">Contenido de ubicaciones</span>, <b>Alternar bloqueo</b> bloquea una línea (por ejemplo, un lote en cuarentena o a punto de caducar) con su motivo. Lo bloqueado no se propone para recoger. Para bloquear un hueco entero, usa la acción de la lista <span class="ui">Ubicaciones</span>.</p>
+
+  <h3 id="c5-quitar">Quitar de la ubicación y vaciar un hueco</h3>
+  <table>
+    <tr><th style="width:38%">Para…</th><th>Usa…</th></tr>
+    <tr><td>Sacar unas líneas concretas</td><td><span class="ui">Contenido de ubicaciones</span> · selecciona las líneas · <b>Quitar de la ubicación</b></td></tr>
+    <tr><td>Vaciar un hueco entero</td><td>Ficha de la ubicación · <b>Vaciar ubicación</b>, o <b>clic derecho</b> sobre el bloque en el mapa 3D</td></tr>
+  </table>
+  <p>La mercancía queda <b>sin ubicar</b>: sigue en el stock de BC, pero no está en ningún hueco. Vuelve a salir como pendiente en <span class="ui">Ubicar producto</span> (<i>Ubicar todo lo pendiente</i>) hasta que se recoloca. Sirve, por ejemplo, para deshacer una ubicación equivocada.</p>
+  <div class="aviso"><span class="t">No se puede</span>Sacar lo que está reservado por una orden de picking. Cancela antes la orden o su parada.</div>
+
+  <h3 id="c5-recuento">Recontar</h3>
+  <p>En <span class="ui">Contenido de ubicaciones</span>, <b>Recontar</b>: tecleas lo que has contado y SGA registra la diferencia en el diario. Si hay falta, avisa; si hay exceso, lo registra pero hay que investigar de dónde sale.</p>
+</section>
+
+<!-- ================= 6 ================= -->
+<section class="capitulo" id="c6">
+  <div class="cab-cap"><span class="num">06</span><div><h2>Ver el almacén</h2><p class="intro">Lista, rejilla y mapa 3D, con el mismo código de colores.</p></div></div>
+
+  <p>
+    <span class="semaforo s-vacia"></span>Vacía &nbsp;&nbsp;
+    <span class="semaforo s-parcial"></span>Con hueco &nbsp;&nbsp;
+    <span class="semaforo s-llena"></span>Llena &nbsp;&nbsp;
+    <span class="semaforo s-bloq"></span>Bloqueada
+  </p>
+
+  <h3 id="c6-lista">Lista de ubicaciones</h3>
+  <div class="donde"><span class="k">Dónde</span><span><span class="ui">Ubicaciones</span> · barra de navegación.</span></div>
+  <p>Todas las ubicaciones con su estado, zona, tipo, capacidad, ocupación y número de productos. Tiene vistas rápidas (<i>Vacías</i>, <i>Parciales</i>, <i>Llenas</i>, <i>Bloqueadas</i>) y desde aquí se cambia en bloque, se imprimen etiquetas y se bloquea.</p>
+
+  <h3 id="c6-mapa">Mapa de almacén (rejilla)</h3>
+  <div class="donde"><span class="k">Dónde</span><span><span class="ui">Mapa de almacén</span> · Almacén SGA › Almacén.</span></div>
+  <p>La nave como rejilla: cada celda es un hueco con su color. Filtrando por estantería se ve un pasillo de frente, con los niveles en vertical. Al pulsar una celda se ve lo que contiene. Se reconstruye cada vez que se abre.</p>
+
+  <h3 id="c6-3d">Mapa 3D</h3>
+  <div class="donde"><span class="k">Dónde</span><span><span class="ui">Mapa 3D de almacén</span> · Almacén SGA › Almacén.</span></div>
+  <table>
+    <tr><th style="width:32%">Acción</th><th>Resultado</th></tr>
+    <tr><td>Arrastrar</td><td>Gira el almacén</td></tr>
+    <tr><td>Mayús + arrastrar</td><td>Desplaza la vista</td></tr>
+    <tr><td>Rueda del ratón</td><td>Acerca y aleja hacia donde apunta el ratón</td></tr>
+    <tr><td>Pasar por encima</td><td>Ficha con el contenido: descripción del producto, cantidad, lote, caducidad y tipo de palé</td></tr>
+    <tr><td>Clic</td><td>Abre el contenido de la ubicación</td></tr>
+    <tr><td>Doble clic</td><td>Aísla y encuadra su pasillo</td></tr>
+    <tr><td>Clic derecho</td><td>Vacía la ubicación (con confirmación)</td></tr>
+    <tr><td>Ctrl + arrastrar, o botón <b>Trasladar</b></td><td>Lleva el contenido de un hueco a otro</td></tr>
+  </table>
+  <p><b>Trabajar por pasillo.</b> Al elegir un pasillo (desplegable <i>Pasillo</i>, botones <b>&lt;</b> <b>&gt;</b> o doble clic) el mapa lo agranda hasta llenar la pantalla y escribe sobre cada bloque el producto que contiene. <b>Centrar</b> vuelve a encuadrar.</p>
+  <p><b>Trasladar arrastrando.</b> El origen se pinta en azul y el destino en amarillo. Al soltar se elige qué producto o lote mover y se confirma la cantidad; el mapa se actualiza sin perder la vista.</p>
+</section>
+
+<!-- ================= 7 ================= -->
+<section class="capitulo" id="c7">
+  <div class="cab-cap"><span class="num">07</span><div><h2>Control e informes</h2><p class="intro">Que SGA y Business Central sigan cuadrados.</p></div></div>
+
+  <h3 id="c7-conc">Conciliación con el stock</h3>
+  <div class="donde"><span class="k">Dónde</span><span><span class="ui">Conciliar con el stock</span> · Tareas periódicas. El resultado, en <span class="ui">Conciliación SGA vs stock</span> · Control.</span></div>
+  <p>Compara el stock de BC con lo que hay en los huecos:</p>
+  <table>
+    <tr><th style="width:28%">Resultado</th><th>Qué significa y qué hacer</th></tr>
+    <tr><td><b>Cuadra</b></td><td>Todo bien.</td></tr>
+    <tr><td><b>Sin ubicar</b></td><td>Hay stock en BC que no está en ningún hueco (por ejemplo, una recepción aún sin ubicar). Ubícalo, o regularízalo a la ubicación de ajustes.</td></tr>
+    <tr><td><b>Sobra en SGA</b></td><td>Hay en los huecos más de lo que dice BC. No se corrige solo: hay que recontar e investigar.</td></tr>
+  </table>
+  <div class="consejo"><span class="t">Cuándo lanzarla</span>Al final de cada día, y siempre que alguien diga "no encuentro el producto" o se hayan hecho cambios en BC sin pasar por SGA.</div>
+
+  <h3 id="c7-diario">Diario de movimientos</h3>
+  <div class="donde"><span class="k">Dónde</span><span><span class="ui">Movimientos de ubicación</span> · Control.</span></div>
+  <p>Registro de <b>todo</b> lo que entra, sale o se mueve en SGA: tipo de movimiento, de dónde a dónde, producto, lote, cantidad, quién y cuándo. <b>No se puede editar ni borrar</b>: un error se corrige con un movimiento nuevo que lo compensa.</p>
+
+  <h3 id="c7-inf">Informes a Excel</h3>
+  <ul>
+    <li><span class="ui">Inventario por ubicación</span>: todo el contenido, con producto, lote, caducidad, cantidad y bloqueo.</li>
+    <li><span class="ui">Ocupación de ubicaciones</span>: capacidad y ocupación de cada hueco, para ver si falta o sobra espacio.</li>
+  </ul>
+</section>
+
+<!-- ================= 8 ================= -->
+<section class="capitulo" id="c8">
+  <div class="cab-cap"><span class="num">08</span><div><h2>Conceptos que conviene conocer</h2></div></div>
+
+  <div class="resumen">
+    <div><b>Lote y caducidad</b>Todo se controla por lote y caducidad: es lo que permite separar un mismo producto que entró en dos momentos.</div>
+    <div><b>Palé y caja son clases</b>Cada código de unidad se marca una vez como Palé o Caja. Un hueco de palé admite cualquier palé, lleve lo que lleve.</div>
+    <div><b>Capacidad en la clase del hueco</b>1 en un hueco de palé es un palé del producto que entra. 72 en un hueco de caja son 72 cajas.</div>
+    <div><b>Huecos mixtos</b>Solo los huecos de caja pueden aceptar varios productos. Es donde van las cajas sueltas.</div>
+    <div><b>Disponible y reservado</b>Al enviar a picking, lo que se va a coger queda reservado y deja de estar disponible para otros pedidos. Sale del hueco cuando el preparador confirma la recogida.</div>
+    <div><b>Ubicación fija</b>El campo <i>Estantería</i> de la ficha del producto: si lo rellenas, ese producto va siempre a ese hueco.</div>
+    <div><b>Sin ubicar</b>Stock de BC que no está en ningún hueco. Sale como pendiente al ubicar y en la conciliación.</div>
+    <div><b>Movimientos inmutables</b>El diario no se edita ni se borra. Los errores se compensan con otro movimiento.</div>
+  </div>
+</section>
+
+<!-- ================= 9 ================= -->
+<section class="capitulo seguido" id="c9">
+  <div class="cab-cap"><span class="num">09</span><div><h2>Un día de trabajo</h2></div></div>
+  <ol class="pasos">
+    <li><b>Llega una compra.</b> Se registra la recepción en BC como siempre. En <span class="ui">Ubicar recepciones</span>, <b>Proponer ubicaciones</b>.</li>
+    <li><b>Se coloca la mercancía</b> donde dice SGA (o se corrige el hueco) y se confirma.</li>
+    <li><b>Entra un pedido de venta.</b> Se lanza y se envía con <b>Enviar a picking</b>.</li>
+    <li><b>El responsable</b> reparte las órdenes en <span class="ui">Asignar órdenes de picking</span>, si se exige asignación.</li>
+    <li><b>El preparador</b> pulsa <b>Siguiente orden</b> y recoge parada a parada, escaneando cada hueco.</li>
+    <li><b>Al terminar</b>, el pedido ya tiene la cantidad a enviar y los lotes. Oficina registra el envío.</li>
+    <li><b>Al final del día</b>, <span class="ui">Conciliar con el stock</span>. Si hay diferencias, se ubica lo pendiente o se recuenta.</li>
+  </ol>
+</section>
+
+<!-- ================= 10 ================= -->
+<section class="capitulo" id="c10">
+  <div class="cab-cap"><span class="num">10</span><div><h2>Problemas frecuentes</h2></div></div>
+
+  <h4>"No encuentro el producto que debería estar aquí"</h4>
+  <p>Búscalo en <span class="ui">¿Dónde está el producto?</span>. Si sale con otro lote, es ese. Si no sale, lanza la conciliación para ver si está sin ubicar.</p>
+
+  <h4>"No me propone sitio para las cajas sueltas"</h4>
+  <p>Las cajas sueltas solo van a huecos que admiten Caja. El mensaje dice el motivo: si no hay ninguno, crea uno (ficha de una ubicación de tipo Picking o Reserva: <i>Admite</i> = Caja, <i>Acepta múltiples productos</i> y <i>Capacidad</i> en cajas). Si la unidad no está marcada como Caja, márcala en <span class="ui">Unidades de medida</span>.</p>
+
+  <h4>"Me ha metido varios palés en el mismo hueco"</h4>
+  <p>Ese hueco tiene capacidad 0 (sin límite). Sácalos con <b>Quitar de la ubicación</b>, pon capacidad 1 a los huecos de palé con <b>Cambiar en bloque</b> y vuelve a ubicar.</p>
+
+  <h4>"Un hueco de palé rechaza un palé"</h4>
+  <p>Ese código de palé no está marcado como Palé en <span class="ui">Unidades de medida</span> (columna <i>Tipo SGA</i>).</p>
+
+  <h4>"No me deja enviar el pedido a picking"</h4>
+  <p>El pedido tiene que estar lanzado y no tener otra orden abierta. Si dice que no hay nada pendiente, ya está todo recogido: falta registrar el envío.</p>
+
+  <h4>"El preparador no tiene órdenes"</h4>
+  <p>Con <i>Exigir asignación</i> activado, un responsable tiene que asignárselas en <span class="ui">Asignar órdenes de picking</span>.</p>
+
+  <h4>"La orden terminó pero el pedido no tiene los lotes"</h4>
+  <p>Repite el paso con <b>Pasar al pedido</b> desde la orden. Si la línea del pedido tiene reservas por lote, anúlalas antes.</p>
+
+  <h4>"La ocupación de una ubicación no cuadra"</h4>
+  <p>En su ficha, <b>Recalcular estado</b>.</p>
+</section>
+
+<!-- ================= 11 ================= -->
+<section class="capitulo" id="c11">
+  <div class="cab-cap"><span class="num">11</span><div><h2>Ayuda rápida</h2></div></div>
+  <table class="ayuda">
+    <tr><th>Necesito…</th><th>Voy a…</th></tr>
+    <tr><td>Configurar SGA</td><td>Configuración SGA</td></tr>
+    <tr><td>Marcar un código como palé o caja</td><td>Unidades de medida › Tipo SGA</td></tr>
+    <tr><td>Crear las ubicaciones de una nave</td><td>Generar ubicaciones</td></tr>
+    <tr><td>Cambiar capacidad o tipo de muchos huecos</td><td>Ubicaciones › Cambiar en bloque</td></tr>
+    <tr><td>Imprimir etiquetas de ubicación</td><td>Ubicaciones › Imprimir etiquetas</td></tr>
+    <tr><td>Saber dónde dejar lo que entra</td><td>Ubicar producto</td></tr>
+    <tr><td>Colocar lo recibido o embotellado en el día</td><td>Ubicar recepciones / Ubicar ensamblados</td></tr>
+    <tr><td>Ver dónde está un producto</td><td>¿Dónde está el producto?</td></tr>
+    <tr><td>Preparar un pedido de venta</td><td>Pedido de venta (lanzado) › Enviar a picking</td></tr>
+    <tr><td>Repartir el picking entre preparadores</td><td>Asignar órdenes de picking › Asignar a</td></tr>
+    <tr><td>Coger la siguiente orden a preparar</td><td>Órdenes de picking › Siguiente orden</td></tr>
+    <tr><td>Volver a pasar un picking al pedido</td><td>Orden de picking › Pasar al pedido</td></tr>
+    <tr><td>Mover mercancía de un hueco a otro</td><td>Contenido de ubicaciones › Trasladar, o Mapa 3D › arrastrar</td></tr>
+    <tr><td>Bloquear un lote o un hueco</td><td>Contenido de ubicaciones › Alternar bloqueo</td></tr>
+    <tr><td>Deshacer una ubicación equivocada</td><td>Contenido de ubicaciones › Quitar de la ubicación</td></tr>
+    <tr><td>Vaciar un hueco entero</td><td>Ficha de la ubicación › Vaciar ubicación, o clic derecho en el Mapa 3D</td></tr>
+    <tr><td>Contar un hueco</td><td>Contenido de ubicaciones › Recontar</td></tr>
+    <tr><td>Comprobar que SGA y BC cuadran</td><td>Conciliar con el stock</td></tr>
+    <tr><td>Ver quién movió qué y cuándo</td><td>Movimientos de ubicación</td></tr>
+    <tr><td>Ver el almacén en 3D</td><td>Mapa 3D de almacén</td></tr>
+    <tr><td>Exportar el inventario a Excel</td><td>Inventario por ubicación</td></tr>
+  </table>
+</section>
+
+</body>
+</html>
