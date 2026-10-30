@@ -210,7 +210,7 @@ codeunit 51103 "Consulta Stock SGA"
     var
         rItem: Record Item;
         TempStock: Record "Buffer Conciliacion SGA" temporary;
-        TempEntradas: Record "Buffer Ubicar Entrada SGA" temporary;
+        TempEntradas: Record "Linea Ubicacion SGA" temporary;
         cEntradas: Codeunit "Gestion Entradas SGA";
         cUM: Codeunit "Unidades Producto SGA";
         enDocumentos: Dictionary of [Text, Decimal];
@@ -275,7 +275,7 @@ codeunit 51103 "Consulta Stock SGA"
     /// Suma, por variante y lote y en unidad base, lo que queda por ubicar de un producto en las
     /// pantallas de entradas de ese origen (recepciones o ensamblados), sin límite de fechas.
     /// </summary>
-    local procedure AcumularEnDocumentos(var prm_Entradas: Codeunit "Gestion Entradas SGA"; var prm_Buffer: Record "Buffer Ubicar Entrada SGA" temporary; prm_Origen: Enum "Origen Mov. SGA"; prm_Almacen: Code[10]; prm_Producto: Code[20]; var prm_Acumulado: Dictionary of [Text, Decimal])
+    local procedure AcumularEnDocumentos(var prm_Entradas: Codeunit "Gestion Entradas SGA"; var prm_Buffer: Record "Linea Ubicacion SGA" temporary; prm_Origen: Enum "Origen Mov. SGA"; prm_Almacen: Code[10]; prm_Producto: Code[20]; var prm_Acumulado: Dictionary of [Text, Decimal])
     var
         cUM: Codeunit "Unidades Producto SGA";
         clave: Text;

@@ -9,7 +9,7 @@ Este documento es para quien quiera entender **cómo funciona SGA internamente**
 Los objetos están agrupados por tipo dentro de `SGA/`:
 
 ```
-Tables/           15 tablas: zonas, ubicaciones, contenido, movimientos, órdenes, ABC y buffers
+Tables/           13 tablas: zonas, ubicaciones, contenido, movimientos, órdenes, ABC y buffers
 Pages/            31 páginas: listas, fichas, diálogos, factboxes y rol center
 PageExtensions/    8 extensiones: ficha y lista de producto, almacén, pedido de venta (ficha, líneas y lista), rol y usuarios
 Codeunits/         9 codeunits: la puerta de escritura, los motores, las unidades del producto, la carga inicial y el ABC
@@ -607,8 +607,10 @@ PUBLIC:
 │
 └─ ComprobarUbicacionExiste(Almacen, Ubicacion)
    └─ Error si la ubicación no existe en el almacén. Con el almacén o la
-      ubicación en blanco no comprueba nada. La usan Ubicar producto,
-      Ubicar entradas e Imprimir y ubicar palés.
+      ubicación en blanco no comprueba nada. La usan ConfirmarReparto, el
+      OnValidate de "Ubicacion Confirmada" en la tabla Linea Ubicacion SGA
+      (51114) e ImprimirYUbicarPale de la página Imprimir y ubicar palés,
+      que la vuelve a comprobar antes de imprimir la etiqueta.
 ```
 
 ### Cod51102: GestionMapaSGA — Render del mapa
@@ -1134,16 +1136,39 @@ Enviar a picking ──> Pendiente de asignar ──(responsable asigna)──> 
 ## Entradas: ubicar lo recibido y lo producido
 
 ```
-SGA/Tables/BufferUbicarEntradaSGA.Table.al   buffer temporal, una fila por cosa a ubicar
+SGA/Tables/LineaUbicacionSGA.Table.al        las filas, líneas de Tab51114 con Origen Compra o Produccion
 SGA/Codeunits/GestionEntradasSGA.Codeunit.al    carga, propone y confirma; prepara el palé de tarea,
                                                 saca y anota su etiqueta y lo ubica
 SGA/Pages/UbicarEntradasSGA.Page.al         la pantalla, la misma para los dos orígenes
 SGA/Pages/UbicarPaletsLineaSGA.Page.al      imprimir la etiqueta de un palé de la línea y ubicarlo
 ```
 
-Hasta el 2026-10-27 esto se llamaba *Ubicar ensamblados* (`Buffer Ubicar Ensamblado SGA`,
-`Gestion Ensamblados SGA`, `Ubicar Ensamblados SGA`). Se generalizó para meter las
-recepciones de compra sin duplicar el código; los IDs no cambian.
+### Las filas: Tab51114 con Origen Compra o Produccion
+
+Cada fila es una línea de `Linea Ubicacion SGA` (la misma tabla temporal del reparto y de la carga
+inicial). Usa los campos comunes (producto, variante, lote, unidad, almacén, ubicación propuesta y
+confirmada, `Motivo`) y los propios de las entradas: `No. Documento`, `Documento Relacionado`,
+`Descripcion Origen` (*Procedencia*), `Fecha Registro`, `Cantidad Entrada` y `Cantidad Ya Ubicada`.
+`Cantidad` es lo que se va a ubicar ahora (*A ubicar*, por defecto `Pendiente()`).
+`Estado` es Ubicado cuando ya no queda nada y Pendiente si no; en las entradas no se usa
+"Sin Sitio": sin hueco la fila sigue Pendiente, con el motivo. La casilla *Ubicado* de la
+pantalla es una variable de página calculada con `Estado`. `EstiloEstado` pinta verde lo
+ubicado, rojo lo "Sin Sitio", destacado lo que no tiene hueco propuesto y normal el resto.
+
+- **Clave y orden.** La clave primaria es `Linea`, que numera `Cod51105` al cargar. La clave
+  `Documento` (Origen, documento, producto, variante, lote, UM) da el orden de la pantalla:
+  `CargarEntradas` la fija después de vaciar la tabla, porque el `Reset` quita el
+  `SourceTableView` de la página. `CargarRecepciones` busca la fila del movimiento por esa clave
+  en una copia (`Copy(..., true)`), para no dejar filtros en la lista, y asegura así que no hay dos
+  filas con el mismo documento, producto, variante, lote y UM. `ProponerParaTodos` y
+  `ConfirmarTodas` recorren por ella porque no cambia dentro del bucle.
+- **Ubicación confirmada.** El campo tiene `TableRelation` a `Bin` salvo en las líneas de
+  entradas (`Origen` Compra o Produccion): en *Ubicar producto* da la búsqueda de huecos y la
+  validación estándar de la relación. En *Ubicar entradas* e *Imprimir y ubicar palés* no hay
+  búsqueda: el hueco se escanea o se teclea. El `OnValidate` del campo en la tabla llama a
+  `Cod51101.ComprobarUbicacionExiste`, que no mira nada si la línea no tiene almacén. Su mensaje de
+  SGA solo se ve en *Ubicar entradas* e *Imprimir y ubicar palés*: en *Ubicar producto* BC comprueba
+  antes la relación con `Bin` y, si el hueco no existe, da su error estándar.
 
 ### Por qué no se engancha al registro de BC
 
@@ -1202,7 +1227,7 @@ El trabajo es de `Cod51105 Gestion Entradas SGA`, dueño del palé de tarea:
   `Linked Tarea` = la tarea y registra con su nº de pedido. Si ya está registrado, usa el
   `Posted Assembly Header` con la misma tarea y su `Order No.`. Sin ensamblado enlazado no se
   ubica: no habría con qué cuadrarlo después.
-- **Cómo no se ubica dos veces.** `Buffer Ubicar Entrada SGA` lleva `Documento Relacionado`. En
+- **Cómo no se ubica dos veces.** La fila lleva `Documento Relacionado`. En
   `CargarEnsamblados` es el `Order No.` del registrado, y `CalcularPendiente` suma lo ubicado con
   los dos números. Por eso *Ubicar ensamblados* da por colocados los palés de la línea.
 - **Un palé** es una unidad de `Cod. Pale Defecto`, completa salvo la última de la tarea (ver
@@ -1498,7 +1523,7 @@ criterio de cálculo. Puntos de diseño:
 ```
 EN USO:
 51100-51111: Enums           (51110 clase ABC, 51111 estado de preparación del pedido)
-51100-51114: Tables          (51107 stock por lote: conciliación y pendiente de ubicar, 51108-51109 órdenes de picking, 51110 buffer de entradas, 51111 libre, 51112-51113 análisis ABC, 51114 línea de ubicación)
+51100-51114: Tables          (51107 stock por lote: conciliación y pendiente de ubicar, 51108-51109 órdenes de picking, 51110-51111 libres, 51112-51113 análisis ABC, 51114 línea de ubicación: reparto, carga inicial y entradas)
 51100-51108: Codeunits       (51104 picking, 51105 entradas, 51106 carga inicial, 51107 análisis ABC, 51108 unidades del producto)
 51100-51131: Pages           (51116 libre; 51127 imprimir y ubicar palés; 51128-51129 análisis ABC; 51130 reparto de Ubicar producto; 51131 pendiente de ubicar)
 51100-51106: Reports         (51106 etiquetas de ubicación)

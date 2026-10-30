@@ -4,14 +4,20 @@ using Microsoft.Warehouse.Structure;
 
 /// <summary>
 /// Table Linea Ubicacion SGA (ID 51114).
-/// Un trozo de mercancía a ubicar: cada palé, las cajas o las unidades sueltas, con su unidad,
-/// el hueco propuesto, el que se confirma y si se ha podido ubicar o por qué no. Es la tabla
-/// única de "trozo a ubicar": el reparto de "Ubicar producto" (Origen Manual) y el resultado de
-/// la carga inicial y de "Ubicar seleccionadas" (Origen "Carga Inicial").
+/// Un trozo de mercancía a ubicar, con su unidad, el hueco propuesto, el que se confirma y si se
+/// ha podido ubicar o por qué no. Es la tabla única de "trozo a ubicar"; Origen dice para qué es
+/// cada línea:
+/// - Manual: el reparto de "Ubicar producto" (cada palé, las cajas o las unidades sueltas).
+/// - "Carga Inicial": el resultado de la carga inicial y de "Ubicar seleccionadas".
+/// - Compra y Produccion: lo que ha entrado en "Ubicar entradas" (un ensamblado, o un producto,
+///   variante, lote y unidad de un albarán de compra) y el palé de una tarea en "Imprimir y
+///   ubicar palés". Estas líneas llevan además el documento, la cantidad que entró y la ya
+///   ubicada; Cantidad es lo que se va a ubicar ahora.
 ///
-/// Es temporal: solo vive en memoria mientras se usa. En la simulación de la carga inicial es lo
-/// único que queda, porque los movimientos se deshacen y las tablas temporales no entran en esa
-/// vuelta atrás.
+/// Es temporal: solo vive en memoria mientras se usa. Lo ya ubicado de una entrada no se guarda
+/// aquí: se deduce del diario de movimientos cada vez que se carga. En la simulación de la carga
+/// inicial es lo único que queda, porque los movimientos se deshacen y las tablas temporales no
+/// entran en esa vuelta atrás.
 /// </summary>
 table 51114 "Linea Ubicacion SGA"
 {
@@ -24,13 +30,13 @@ table 51114 "Linea Ubicacion SGA"
         field(1; Linea; Integer)
         {
             Caption = 'Línea';
-            ToolTip = 'Número de la línea, en el orden en que se ha repartido.';
+            ToolTip = 'Número de la línea, en el orden en que se ha repartido o cargado.';
             DataClassification = ToBeClassified;
         }
         field(2; Origen; Enum "Origen Mov. SGA")
         {
             Caption = 'Origen';
-            ToolTip = 'Para qué es la línea: Manual en "Ubicar producto", Carga inicial en la carga inicial y en "Ubicar seleccionadas".';
+            ToolTip = 'Para qué es la línea: Manual en "Ubicar producto", Carga inicial en la carga inicial y en "Ubicar seleccionadas", Compra o Producción en "Ubicar entradas" y en el palé de una tarea.';
             DataClassification = ToBeClassified;
         }
         field(10; Paso; Text[100])
@@ -54,9 +60,10 @@ table 51114 "Linea Ubicacion SGA"
         field(22; Cantidad; Decimal)
         {
             Caption = 'Cantidad';
-            ToolTip = 'Cantidad, en la unidad de la línea.';
+            ToolTip = 'Cantidad, en la unidad de la línea. En las entradas, lo que se va a colocar ahora.';
             DataClassification = ToBeClassified;
             DecimalPlaces = 0 : 5;
+            MinValue = 0;
         }
         field(23; "Cantidad Base"; Decimal)
         {
@@ -100,7 +107,16 @@ table 51114 "Linea Ubicacion SGA"
             Caption = 'Ubicación confirmada';
             ToolTip = 'Hueco en el que se deja. En blanco si no se ha podido ubicar.';
             DataClassification = ToBeClassified;
-            TableRelation = Bin.Code where("Location Code" = field("Cod. Almacen"));
+            // Las entradas (Compra y Produccion) no llevan relación ni búsqueda: el hueco se escanea o
+            // se teclea. El resto conserva la búsqueda y la validación estándar de la relación con Bin.
+            TableRelation = if (Origen = filter(<> Compra & <> Produccion)) Bin.Code where("Location Code" = field("Cod. Almacen"));
+
+            trigger OnValidate()
+            var
+                cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
+            begin
+                cUbicaciones.ComprobarUbicacionExiste("Cod. Almacen", "Ubicacion Confirmada");
+            end;
         }
         field(40; Estado; Option)
         {
@@ -116,6 +132,44 @@ table 51114 "Linea Ubicacion SGA"
             ToolTip = 'Por qué se propone ese hueco, o por qué no se puede ubicar.';
             DataClassification = ToBeClassified;
         }
+        field(50; "No. Documento"; Code[20])
+        {
+            Caption = 'Nº documento';
+            ToolTip = 'Ensamblado o albarán de compra del que viene la mercancía.';
+            DataClassification = ToBeClassified;
+        }
+        field(51; "Documento Relacionado"; Code[20])
+        {
+            Caption = 'Documento relacionado';
+            ToolTip = 'Otro número con el que esta misma entrada puede estar ya ubicada. En los ensamblados, el del pedido sin registrar: los palés que se ubican al imprimir su etiqueta van con ese número.';
+            DataClassification = ToBeClassified;
+        }
+        field(52; "Descripcion Origen"; Text[100])
+        {
+            Caption = 'Procedencia';
+            ToolTip = 'Proveedor de la recepción. En los ensamblados va en blanco.';
+            DataClassification = ToBeClassified;
+        }
+        field(53; "Fecha Registro"; Date)
+        {
+            Caption = 'Fecha registro';
+            ToolTip = 'Fecha de registro del albarán o del ensamblado.';
+            DataClassification = ToBeClassified;
+        }
+        field(60; "Cantidad Entrada"; Decimal)
+        {
+            Caption = 'Cantidad entrada';
+            ToolTip = 'Cantidad que ha entrado: la ensamblada, o la recibida neta de deshacer recepciones.';
+            DataClassification = ToBeClassified;
+            DecimalPlaces = 0 : 5;
+        }
+        field(61; "Cantidad Ya Ubicada"; Decimal)
+        {
+            Caption = 'Ya ubicada';
+            ToolTip = 'Cantidad de esta entrada que SGA ya tiene colocada en ubicaciones.';
+            DataClassification = ToBeClassified;
+            DecimalPlaces = 0 : 5;
+        }
     }
 
     keys
@@ -124,11 +178,38 @@ table 51114 "Linea Ubicacion SGA"
         {
             Clustered = true;
         }
+        // Una entrada por documento, producto, variante, lote y unidad: un albarán de compra
+        // puede traer el mismo producto en varios lotes y unidades, y cada combinación va a su
+        // hueco. La unicidad la asegura quien carga (Cod. "Gestion Entradas SGA").
+        key(Documento; Origen, "No. Documento", "No. Producto", "Cod. Variante", "No. Lote", "Cod. Unidad Medida")
+        {
+        }
+        key(Pendientes; Estado, "Ubicacion Propuesta")
+        {
+        }
+    }
+
+    fieldgroups
+    {
+        fieldgroup(DropDown; "No. Documento", "No. Producto", "No. Lote")
+        {
+        }
     }
 
     /// <summary>
-    /// Expresión de estilo de la línea según su estado: verde si ya está ubicada, rojo si no
-    /// tiene sitio y normal si está pendiente.
+    /// Cantidad de una entrada que todavía falta por colocar.
+    /// </summary>
+    procedure Pendiente(): Decimal
+    begin
+        if "Cantidad Entrada" - "Cantidad Ya Ubicada" < 0 then
+            exit(0);
+
+        exit("Cantidad Entrada" - "Cantidad Ya Ubicada");
+    end;
+
+    /// <summary>
+    /// Expresión de estilo de la línea: verde si ya está ubicada, rojo si no tiene sitio,
+    /// destacada si aún no tiene hueco propuesto y normal si está pendiente con su hueco.
     /// </summary>
     procedure EstiloEstado(): Text
     begin
@@ -138,6 +219,9 @@ table 51114 "Linea Ubicacion SGA"
             Estado::"Sin Sitio":
                 exit('Unfavorable');
         end;
+
+        if "Ubicacion Propuesta" = '' then
+            exit('Attention');
 
         exit('Standard');
     end;

@@ -52,18 +52,17 @@ page 51127 "Ubicar Palets Linea SGA"
 
                     trigger OnValidate()
                     begin
-                        cUbicaciones.ComprobarUbicacionExiste(TempPaleActual."Cod. Almacen", TempPaleActual."Ubicacion Confirmada");
                         TempPaleActual.Modify();
                     end;
                 }
-                field(Motivo; TempPaleActual."Motivo Propuesta")
+                field(Motivo; TempPaleActual.Motivo)
                 {
                     Caption = 'Por qué ahí';
                     ToolTip = 'Por qué se propone ese hueco.';
                     ApplicationArea = All;
                     Editable = false;
                 }
-                field(CantidadPale; TempPaleActual."Cantidad a Ubicar")
+                field(CantidadPale; TempPaleActual.Cantidad)
                 {
                     Caption = 'Cantidad del palé';
                     ToolTip = 'Lo que se ubica con este palé, en la unidad del ensamblado. El último puede ir incompleto.';
@@ -337,7 +336,7 @@ page 51127 "Ubicar Palets Linea SGA"
     }
 
     var
-        TempPaleActual: Record "Buffer Ubicar Entrada SGA";
+        TempPaleActual: Record "Linea Ubicacion SGA" temporary;
         cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
         TareaPale: Integer;
         HayPale: Boolean;
@@ -379,7 +378,7 @@ page 51127 "Ubicar Palets Linea SGA"
             if TempPaleActual."Cod. Unidad Medida" = Rec."Cod. Pale Defecto" then
                 tipoPale := PaleCompletoLbl
             else
-                tipoPale := StrSubstNo(PaleIncompletoLbl, TempPaleActual."Cantidad a Ubicar", TempPaleActual."Cod. Unidad Medida");
+                tipoPale := StrSubstNo(PaleIncompletoLbl, TempPaleActual.Cantidad, TempPaleActual."Cod. Unidad Medida");
             Situacion := StrSubstNo(SituacionPaleLbl, tipoPale, TempPaleActual."Cantidad Ya Ubicada", TempPaleActual."Cantidad Entrada",
                                     TempPaleActual."Cod. Unidad Medida", TempPaleActual."No. Documento");
             EstiloSituacion := 'Standard';
@@ -417,7 +416,7 @@ page 51127 "Ubicar Palets Linea SGA"
 
         // Se guardan antes: al ubicar, la fila pasa a llevar lo que queda pendiente.
         ubicacionPale := TempPaleActual."Ubicacion Confirmada";
-        cantidad := TempPaleActual."Cantidad a Ubicar";
+        cantidad := TempPaleActual.Cantidad;
         cEntradas.ImprimirYUbicarPale(Rec, TempPaleActual);
         Rec.Get(Rec.Linea);
         UltimoPale := StrSubstNo(UltimoPaleLbl, cantidad, TempPaleActual."Cod. Unidad Medida", ubicacionPale, Time);

@@ -10,10 +10,11 @@ using Microsoft.Inventory.Location;
 /// propone una ubicación para cada línea, y él confirma o pide otra.
 ///
 /// El origen lo fija quien abre la página con RunPageView sobre el campo Origen (así lo hacen el
-/// rol center y Pag-Ext51103). Sin filtro se abre en ensamblados, que es como funcionaba antes.
+/// rol center y Pag-Ext51103). Sin filtro se abre en ensamblados.
 ///
-/// La lista se reconstruye cada vez que se cambia la fecha: lo que ya está colocado se sabe
-/// por el diario de movimientos, no por una marca guardada aparte.
+/// Las filas son líneas de "Linea Ubicacion SGA" con Origen Compra o Produccion, ordenadas por
+/// documento. La lista se reconstruye cada vez que se cambia un filtro: lo que ya está colocado
+/// se sabe por el diario de movimientos, no por una marca guardada aparte.
 /// </summary>
 page 51123 "Ubicar Entradas SGA"
 {
@@ -23,7 +24,8 @@ page 51123 "Ubicar Entradas SGA"
     PageType = Worksheet;
     UsageCategory = Tasks;
     ApplicationArea = All;
-    SourceTable = "Buffer Ubicar Entrada SGA";
+    SourceTable = "Linea Ubicacion SGA";
+    SourceTableView = sorting(Origen, "No. Documento", "No. Producto", "Cod. Variante", "No. Lote", "Cod. Unidad Medida");
     SourceTableTemporary = true;
     InsertAllowed = false;
     DeleteAllowed = false;
@@ -179,13 +181,15 @@ page 51123 "Ubicar Entradas SGA"
                     ApplicationArea = All;
                     Editable = false;
                 }
-                field("Cantidad a Ubicar"; Rec."Cantidad a Ubicar")
+                field("Cantidad a Ubicar"; Rec.Cantidad)
                 {
+                    Caption = 'A ubicar';
                     ToolTip = 'Cantidad que se va a colocar ahora. Se puede reducir para ubicar en varias veces.';
                     ApplicationArea = All;
                 }
                 field("Cod. Unidad Medida"; Rec."Cod. Unidad Medida")
                 {
+                    Caption = 'Unidad de medida';
                     ToolTip = 'Unidad de medida en la que ha entrado.';
                     ApplicationArea = All;
                     Editable = false;
@@ -197,8 +201,9 @@ page 51123 "Ubicar Entradas SGA"
                     Editable = false;
                     Style = Strong;
                 }
-                field("Motivo Propuesta"; Rec."Motivo Propuesta")
+                field("Motivo Propuesta"; Rec.Motivo)
                 {
+                    Caption = 'Por qué ahí';
                     ToolTip = 'Por qué se propone ese hueco.';
                     ApplicationArea = All;
                     Editable = false;
@@ -207,22 +212,17 @@ page 51123 "Ubicar Entradas SGA"
                 {
                     ToolTip = 'Hueco en el que se ha dejado realmente. Escanéelo o tecléelo si no es el propuesto.';
                     ApplicationArea = All;
-
-                    trigger OnValidate()
-                    var
-                        cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
-                    begin
-                        cUbicaciones.ComprobarUbicacionExiste(Rec."Cod. Almacen", Rec."Ubicacion Confirmada");
-                    end;
                 }
                 field("Cod. Almacen"; Rec."Cod. Almacen")
                 {
+                    Caption = 'Cód. almacén';
                     ToolTip = 'Almacén en el que se coloca.';
                     ApplicationArea = All;
                     Editable = false;
                 }
-                field(Ubicado; Rec.Ubicado)
+                field(Ubicado; LineaUbicada)
                 {
+                    Caption = 'Ubicado';
                     ToolTip = 'Marcado cuando ya no queda nada pendiente de esta línea.';
                     ApplicationArea = All;
                     Editable = false;
@@ -272,7 +272,7 @@ page 51123 "Ubicar Entradas SGA"
                     cEntradas: Codeunit "Gestion Entradas SGA";
                     LineaYaUbicadaErr: Label 'Esta línea ya está ubicada.';
                 begin
-                    if Rec.Ubicado then
+                    if Rec.Estado = Rec.Estado::Ubicado then
                         Error(LineaYaUbicadaErr);
 
                     cEntradas.ProponerOtra(Rec);
@@ -293,7 +293,7 @@ page 51123 "Ubicar Entradas SGA"
                     cantidad: Decimal;
                     ubicacion: Code[20];
                 begin
-                    cantidad := Rec."Cantidad a Ubicar";
+                    cantidad := Rec.Cantidad;
                     ubicacion := Rec."Ubicacion Confirmada";
 
                     cEntradas.ConfirmarFila(Rec);
@@ -413,6 +413,7 @@ page 51123 "Ubicar Entradas SGA"
         EsCompra: Boolean;
         Resumen: Text;
         EstiloFila: Text;
+        LineaUbicada: Boolean;
 
     trigger OnOpenPage()
     var
@@ -450,7 +451,8 @@ page 51123 "Ubicar Entradas SGA"
 
     trigger OnAfterGetRecord()
     begin
-        EstiloFila := Rec.Estilo();
+        EstiloFila := Rec.EstiloEstado();
+        LineaUbicada := Rec.Estado = Rec.Estado::Ubicado;
     end;
 
     local procedure Recargar()
@@ -476,7 +478,7 @@ page 51123 "Ubicar Entradas SGA"
 
     local procedure ActualizarResumen()
     var
-        TempFila: Record "Buffer Ubicar Entrada SGA";
+        TempFila: Record "Linea Ubicacion SGA" temporary;
         total: Integer;
         pendientes: Integer;
         sinHueco: Integer;
@@ -499,7 +501,7 @@ page 51123 "Ubicar Entradas SGA"
             exit;
         end;
 
-        TempFila.SetRange(Ubicado, false);
+        TempFila.SetFilter(Estado, '<>%1', TempFila.Estado::Ubicado);
         pendientes := TempFila.Count();
 
         TempFila.SetRange("Ubicacion Propuesta", '');

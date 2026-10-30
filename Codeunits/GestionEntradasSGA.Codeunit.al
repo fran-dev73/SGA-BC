@@ -35,14 +35,14 @@ codeunit 51105 "Gestion Entradas SGA"
     Access = Public;
 
     /// <summary>
-    /// Rellena el buffer con lo que ha entrado por el origen indicado (Producción para los
+    /// Rellena las líneas con lo que ha entrado por el origen indicado (Producción para los
     /// ensamblados, Compra para las recepciones) entre dos fechas de registro. Cualquiera de las
     /// dos fechas puede ir en blanco: sin fechas se mira todo.
     /// prm_Clase filtra por la "Clase de articulo" de la ficha del producto (su valor de opción);
     /// -1 = todas. prm_Producto deja solo ese producto; en blanco, todos.
-    /// Devuelve cuántas filas ha cargado.
+    /// Devuelve cuántas filas ha cargado. prm_Buffer queda sin filtros y ordenado por documento.
     /// </summary>
-    procedure CargarEntradas(var prm_Buffer: Record "Buffer Ubicar Entrada SGA"; prm_Origen: Enum "Origen Mov. SGA"; prm_FechaDesde: Date; prm_FechaHasta: Date; prm_Almacen: Code[10]; prm_SoloPendientes: Boolean; prm_Clase: Integer; prm_Producto: Code[20]): Integer
+    procedure CargarEntradas(var prm_Buffer: Record "Linea Ubicacion SGA" temporary; prm_Origen: Enum "Origen Mov. SGA"; prm_FechaDesde: Date; prm_FechaHasta: Date; prm_Almacen: Code[10]; prm_SoloPendientes: Boolean; prm_Clase: Integer; prm_Producto: Code[20]): Integer
     var
         OrigenNoUbicableErr: Label 'Solo se pueden ubicar entradas de compra o de producción.';
     begin
@@ -50,6 +50,12 @@ codeunit 51105 "Gestion Entradas SGA"
         FechaHasta := prm_FechaHasta;
         ClaseFiltro := prm_Clase;
         ProductoFiltro := prm_Producto;
+
+        prm_Buffer.Reset();
+        prm_Buffer.DeleteAll();
+        // El orden de la pantalla, por documento. Se fija aquí porque el Reset quita el que
+        // traiga la página.
+        prm_Buffer.SetCurrentKey(Origen, "No. Documento", "No. Producto", "Cod. Variante", "No. Lote", "Cod. Unidad Medida");
 
         case prm_Origen of
             prm_Origen::Produccion:
@@ -93,7 +99,7 @@ codeunit 51105 "Gestion Entradas SGA"
     /// Ensamblados de tipo Embotellado registrados en una fecha. Una fila por ensamblado. Las
     /// elaboraciones quedan fuera: su salida es granel a depósito, no va a hueco.
     /// </summary>
-    local procedure CargarEnsamblados(var prm_Buffer: Record "Buffer Ubicar Entrada SGA"; prm_Almacen: Code[10]; prm_SoloPendientes: Boolean): Integer
+    local procedure CargarEnsamblados(var prm_Buffer: Record "Linea Ubicacion SGA" temporary; prm_Almacen: Code[10]; prm_SoloPendientes: Boolean): Integer
     var
         rCabEns: Record "Posted Assembly Header";
         rItem: Record Item;
@@ -101,9 +107,6 @@ codeunit 51105 "Gestion Entradas SGA"
         almacenFila: Code[10];
         cargadas: Integer;
     begin
-        prm_Buffer.Reset();
-        prm_Buffer.DeleteAll();
-
         rConfig.ObtenerConfig();
 
         if FiltroFechas(FechaDesde, FechaHasta) <> '' then
@@ -148,10 +151,13 @@ codeunit 51105 "Gestion Entradas SGA"
 
                 // Si la pantalla pide un almacén concreto, el ensamblado registrado en otro no
                 // es de esta lista; los que vienen en blanco ya han heredado el del filtro.
+                // Cada ensamblado es un documento distinto, así que no hay dos filas iguales.
                 if ((prm_Almacen = '') or (almacenFila = prm_Almacen)) and
-                   ((not prm_SoloPendientes) or (not prm_Buffer.Ubicado)) then
-                    if prm_Buffer.Insert() then
-                        cargadas += 1;
+                   ((not prm_SoloPendientes) or (prm_Buffer.Estado <> prm_Buffer.Estado::Ubicado)) then begin
+                    cargadas += 1;
+                    prm_Buffer.Linea := cargadas;
+                    prm_Buffer.Insert();
+                end;
             end;
         until rCabEns.Next() = 0;
 
@@ -167,19 +173,17 @@ codeunit 51105 "Gestion Entradas SGA"
     /// recepción genera un movimiento negativo en el mismo albarán, y al sumar por documento
     /// lo deshecho se descuenta solo.
     /// </summary>
-    local procedure CargarRecepciones(var prm_Buffer: Record "Buffer Ubicar Entrada SGA"; prm_Almacen: Code[10]; prm_SoloPendientes: Boolean): Integer
+    local procedure CargarRecepciones(var prm_Buffer: Record "Linea Ubicacion SGA" temporary; prm_Almacen: Code[10]; prm_SoloPendientes: Boolean): Integer
     var
         rItemLedgEntry: Record "Item Ledger Entry";
         rItem: Record Item;
         rVendor: Record Vendor;
-        TempFila: Record "Buffer Ubicar Entrada SGA";
+        TempFila: Record "Linea Ubicacion SGA" temporary;
         um: Code[10];
         factor: Decimal;
+        siguienteLinea: Integer;
         cargadas: Integer;
     begin
-        prm_Buffer.Reset();
-        prm_Buffer.DeleteAll();
-
         rItemLedgEntry.SetRange("Entry Type", rItemLedgEntry."Entry Type"::Purchase);
         rItemLedgEntry.SetRange("Document Type", rItemLedgEntry."Document Type"::"Purchase Receipt");
         if FiltroFechas(FechaDesde, FechaHasta) <> '' then
@@ -196,8 +200,12 @@ codeunit 51105 "Gestion Entradas SGA"
         if not rItemLedgEntry.FindSet() then
             exit(0);
 
-        // Primera pasada: acumular por fila. Las cantidades se llevan a la UM del albarán, que
-        // es en la que se ha recibido y en la que se deja en el hueco.
+        // Primera pasada: acumular por fila (documento, producto, variante, lote y UM). Se busca
+        // en una copia para no dejar filtros en prm_Buffer, que es la lista de la página. Las
+        // cantidades se llevan a la UM del albarán, que es en la que se ha recibido y en la que
+        // se deja en el hueco.
+        TempFila.Copy(prm_Buffer, true);
+        TempFila.SetCurrentKey(Origen, "No. Documento", "No. Producto", "Cod. Variante", "No. Lote", "Cod. Unidad Medida");
         repeat
             if not rItem.Get(rItemLedgEntry."Item No.") then
                 Clear(rItem);
@@ -209,34 +217,39 @@ codeunit 51105 "Gestion Entradas SGA"
                 if factor <= 0 then
                     factor := 1;
 
-                if prm_Buffer.Get(prm_Buffer.Origen::Compra, rItemLedgEntry."Document No.", rItemLedgEntry."Item No.",
-                                  rItemLedgEntry."Variant Code", rItemLedgEntry."Lot No.", um) then begin
-                    prm_Buffer."Cantidad Entrada" += Round(rItemLedgEntry.Quantity / factor, 0.00001);
-                    prm_Buffer.Modify();
+                TempFila.SetRange("No. Documento", rItemLedgEntry."Document No.");
+                TempFila.SetRange("No. Producto", rItemLedgEntry."Item No.");
+                TempFila.SetRange("Cod. Variante", rItemLedgEntry."Variant Code");
+                TempFila.SetRange("No. Lote", rItemLedgEntry."Lot No.");
+                TempFila.SetRange("Cod. Unidad Medida", um);
+                if TempFila.FindFirst() then begin
+                    TempFila."Cantidad Entrada" += Round(rItemLedgEntry.Quantity / factor, 0.00001);
+                    TempFila.Modify();
                 end else begin
-                    prm_Buffer.Init();
-                    prm_Buffer.Origen := prm_Buffer.Origen::Compra;
-                    prm_Buffer."No. Documento" := rItemLedgEntry."Document No.";
-                    prm_Buffer."Fecha Registro" := rItemLedgEntry."Posting Date";
-                    prm_Buffer."Cod. Almacen" := rItemLedgEntry."Location Code";
-                    prm_Buffer."No. Producto" := rItemLedgEntry."Item No.";
-                    prm_Buffer."Cod. Variante" := rItemLedgEntry."Variant Code";
-                    prm_Buffer."No. Lote" := rItemLedgEntry."Lot No.";
-                    prm_Buffer."Cod. Unidad Medida" := um;
-                    prm_Buffer."Cantidad Entrada" := Round(rItemLedgEntry.Quantity / factor, 0.00001);
-                    prm_Buffer."Descripcion Producto" := CopyStr(rItem.Description, 1, MaxStrLen(prm_Buffer."Descripcion Producto"));
+                    TempFila.Init();
+                    siguienteLinea += 1;
+                    TempFila.Linea := siguienteLinea;
+                    TempFila.Origen := TempFila.Origen::Compra;
+                    TempFila."No. Documento" := rItemLedgEntry."Document No.";
+                    TempFila."Fecha Registro" := rItemLedgEntry."Posting Date";
+                    TempFila."Cod. Almacen" := rItemLedgEntry."Location Code";
+                    TempFila."No. Producto" := rItemLedgEntry."Item No.";
+                    TempFila."Cod. Variante" := rItemLedgEntry."Variant Code";
+                    TempFila."No. Lote" := rItemLedgEntry."Lot No.";
+                    TempFila."Cod. Unidad Medida" := um;
+                    TempFila."Cantidad Entrada" := Round(rItemLedgEntry.Quantity / factor, 0.00001);
+                    TempFila."Descripcion Producto" := CopyStr(rItem.Description, 1, MaxStrLen(TempFila."Descripcion Producto"));
                     if (rItemLedgEntry."Source Type" = rItemLedgEntry."Source Type"::Vendor) and
                        rVendor.Get(rItemLedgEntry."Source No.")
                     then
-                        prm_Buffer."Descripcion Origen" := CopyStr(rVendor.Name, 1, MaxStrLen(prm_Buffer."Descripcion Origen"));
-                    prm_Buffer.Insert();
+                        TempFila."Descripcion Origen" := CopyStr(rVendor.Name, 1, MaxStrLen(TempFila."Descripcion Origen"));
+                    TempFila.Insert();
                 end;
             end;
         until rItemLedgEntry.Next() = 0;
 
         // Segunda pasada: con la cantidad neta ya sumada, ver cuánto falta y quitar lo que no
         // se tiene que enseñar (recepciones deshechas del todo, o ya ubicadas si se pide).
-        TempFila.Copy(prm_Buffer, true);
         TempFila.Reset();
         if TempFila.FindSet() then
             repeat
@@ -244,7 +257,7 @@ codeunit 51105 "Gestion Entradas SGA"
                     TempFila.Delete()
                 else begin
                     CalcularPendiente(TempFila);
-                    if prm_SoloPendientes and TempFila.Ubicado then
+                    if prm_SoloPendientes and (TempFila.Estado = TempFila.Estado::Ubicado) then
                         TempFila.Delete()
                     else begin
                         TempFila.Modify();
@@ -260,9 +273,9 @@ codeunit 51105 "Gestion Entradas SGA"
     /// Propone hueco para todas las filas que aún no lo tienen. Va reservando lo que asigna,
     /// para no mandar dos entradas distintas al mismo hueco vacío.
     /// </summary>
-    procedure ProponerParaTodos(var prm_Buffer: Record "Buffer Ubicar Entrada SGA"): Integer
+    procedure ProponerParaTodos(var prm_Buffer: Record "Linea Ubicacion SGA" temporary): Integer
     var
-        TempFila: Record "Buffer Ubicar Entrada SGA";
+        TempFila: Record "Linea Ubicacion SGA" temporary;
         asignadas: Text;
         motivo: Text;
         codigo: Code[20];
@@ -270,18 +283,19 @@ codeunit 51105 "Gestion Entradas SGA"
     begin
         TempFila.Copy(prm_Buffer, true);
         TempFila.Reset();
-        // Se recorre por la clave primaria a propósito: dentro del bucle se modifica
+        // Se recorre por la clave Documento a propósito: dentro del bucle se modifica
         // "Ubicacion Propuesta", y si el orden viniera de esa columna (porque el operario
         // haya ordenado por ella) el recorrido se saltaría filas o las repetiría.
         TempFila.SetCurrentKey(Origen, "No. Documento", "No. Producto", "Cod. Variante", "No. Lote", "Cod. Unidad Medida");
         if not TempFila.FindSet() then
             exit(0);
 
+        // Sin hueco la fila sigue Pendiente, con el motivo: en las entradas no se usa "Sin Sitio".
         repeat
-            if (not TempFila.Ubicado) and (TempFila."Ubicacion Propuesta" = '') then begin
+            if (TempFila.Estado <> TempFila.Estado::Ubicado) and (TempFila."Ubicacion Propuesta" = '') then begin
                 codigo := ProponerParaFila(TempFila, asignadas, motivo);
                 TempFila."Ubicacion Propuesta" := codigo;
-                TempFila."Motivo Propuesta" := CopyStr(motivo, 1, MaxStrLen(TempFila."Motivo Propuesta"));
+                TempFila.Motivo := CopyStr(motivo, 1, MaxStrLen(TempFila.Motivo));
                 TempFila."Ubicacion Confirmada" := codigo;
                 TempFila.Modify();
 
@@ -301,7 +315,7 @@ codeunit 51105 "Gestion Entradas SGA"
     /// Busca una alternativa para una fila, descartando la que ya se le había ofrecido y las
     /// que están reservadas por las demás filas.
     /// </summary>
-    procedure ProponerOtra(var prm_Fila: Record "Buffer Ubicar Entrada SGA")
+    procedure ProponerOtra(var prm_Fila: Record "Linea Ubicacion SGA" temporary)
     var
         excluidas: Text;
         motivo: Text;
@@ -320,7 +334,7 @@ codeunit 51105 "Gestion Entradas SGA"
         end;
 
         prm_Fila."Ubicacion Propuesta" := codigo;
-        prm_Fila."Motivo Propuesta" := CopyStr(motivo, 1, MaxStrLen(prm_Fila."Motivo Propuesta"));
+        prm_Fila.Motivo := CopyStr(motivo, 1, MaxStrLen(prm_Fila.Motivo));
         prm_Fila."Ubicacion Confirmada" := codigo;
         prm_Fila.Modify();
     end;
@@ -328,7 +342,7 @@ codeunit 51105 "Gestion Entradas SGA"
     /// <summary>
     /// Registra la entrada de una fila en la ubicación confirmada.
     /// </summary>
-    procedure ConfirmarFila(var prm_Fila: Record "Buffer Ubicar Entrada SGA")
+    procedure ConfirmarFila(var prm_Fila: Record "Linea Ubicacion SGA" temporary)
     var
         cContenido: Codeunit "Gestion Contenido SGA";
         descripcion: Text;
@@ -338,16 +352,16 @@ codeunit 51105 "Gestion Entradas SGA"
         EnsambladoLbl: Label 'Ensamblado %1', Comment = '%1 = nº ensamblado';
         RecepcionLbl: Label 'Recepción %1', Comment = '%1 = nº albarán de compra';
     begin
-        if prm_Fila.Ubicado then
+        if prm_Fila.Estado = prm_Fila.Estado::Ubicado then
             exit;
 
         if prm_Fila."Ubicacion Confirmada" = '' then
             Error(UbicacionNoIndicadaErr, prm_Fila."No. Producto");
 
-        if prm_Fila."Cantidad a Ubicar" <= 0 then
+        if prm_Fila.Cantidad <= 0 then
             Error(CantidadNoPositivaErr, prm_Fila."No. Producto");
 
-        if prm_Fila."Cantidad a Ubicar" > prm_Fila.Pendiente() then
+        if prm_Fila.Cantidad > prm_Fila.Pendiente() then
             Error(CantidadExcedePendienteErr, prm_Fila.Pendiente(), prm_Fila."No. Producto");
 
         if prm_Fila.Origen = prm_Fila.Origen::Compra then
@@ -357,7 +371,7 @@ codeunit 51105 "Gestion Entradas SGA"
 
         cContenido.RegistrarEntrada(prm_Fila."Cod. Almacen", prm_Fila."Ubicacion Confirmada",
                                     prm_Fila."No. Producto", prm_Fila."Cod. Variante", prm_Fila."No. Lote",
-                                    prm_Fila."Cod. Unidad Medida", prm_Fila."Cantidad a Ubicar",
+                                    prm_Fila."Cod. Unidad Medida", prm_Fila.Cantidad,
                                     prm_Fila.Origen, prm_Fila."No. Documento", 0, descripcion);
 
         CalcularPendiente(prm_Fila);
@@ -368,21 +382,21 @@ codeunit 51105 "Gestion Entradas SGA"
     /// Registra todas las filas pendientes que ya tengan ubicación confirmada.
     /// Devuelve cuántas se han ubicado.
     /// </summary>
-    procedure ConfirmarTodas(var prm_Buffer: Record "Buffer Ubicar Entrada SGA"): Integer
+    procedure ConfirmarTodas(var prm_Buffer: Record "Linea Ubicacion SGA" temporary): Integer
     var
-        TempFila: Record "Buffer Ubicar Entrada SGA";
+        TempFila: Record "Linea Ubicacion SGA" temporary;
         hechas: Integer;
     begin
         TempFila.Copy(prm_Buffer, true);
         TempFila.Reset();
-        // Por la clave primaria: dentro del bucle se marca "Ubicado", que forma parte de la
-        // clave secundaria, y recorrer por ella mientras se modifica rompería el barrido.
+        // Por la clave Documento: dentro del bucle cambia Estado, que forma parte de la clave
+        // Pendientes, y recorrer por ella mientras se modifica rompería el barrido.
         TempFila.SetCurrentKey(Origen, "No. Documento", "No. Producto", "Cod. Variante", "No. Lote", "Cod. Unidad Medida");
         if not TempFila.FindSet() then
             exit(0);
 
         repeat
-            if (not TempFila.Ubicado) and (TempFila."Ubicacion Confirmada" <> '') and (TempFila."Cantidad a Ubicar" > 0) then begin
+            if (TempFila.Estado <> TempFila.Estado::Ubicado) and (TempFila."Ubicacion Confirmada" <> '') and (TempFila.Cantidad > 0) then begin
                 ConfirmarFila(TempFila);
                 hechas += 1;
             end;
@@ -414,7 +428,7 @@ codeunit 51105 "Gestion Entradas SGA"
     /// Devuelve false, con el porqué en prm_Aviso, si no hay palé que ubicar. Con true, en
     /// prm_Aviso puede venir un aviso que no impide ubicar.
     /// </summary>
-    procedure PrepararPaleTarea(prm_Tarea: Record "Tareas Produccion"; var prm_Fila: Record "Buffer Ubicar Entrada SGA"; var prm_Aviso: Text): Boolean
+    procedure PrepararPaleTarea(prm_Tarea: Record "Tareas Produccion"; var prm_Fila: Record "Linea Ubicacion SGA" temporary; var prm_Aviso: Text): Boolean
     var
         rCabEns: Record "Assembly Header";
         rCabEnsReg: Record "Posted Assembly Header";
@@ -445,6 +459,7 @@ codeunit 51105 "Gestion Entradas SGA"
         prm_Aviso := '';
 
         prm_Fila.Init();
+        prm_Fila.Linea := 1;
         prm_Fila.Origen := prm_Fila.Origen::Produccion;
 
         rCabEns.SetRange("Document Type", rCabEns."Document Type"::Order);
@@ -500,7 +515,7 @@ codeunit 51105 "Gestion Entradas SGA"
         factorPale := rUMPale."Qty. per Unit of Measure";
 
         CalcularPendiente(prm_Fila);
-        if prm_Fila.Ubicado then begin
+        if prm_Fila.Estado = prm_Fila.Estado::Ubicado then begin
             prm_Aviso := StrSubstNo(EnsambladoYaUbicadoLbl, prm_Fila."No. Documento");
             exit(false);
         end;
@@ -540,7 +555,7 @@ codeunit 51105 "Gestion Entradas SGA"
         prm_Fila."Cod. Unidad Medida" := umDestino;
         prm_Fila."Cantidad Entrada" := Round(entradaBase / factorDestino, 0.00001);
         prm_Fila."Cantidad Ya Ubicada" := Round(yaUbicadoBase / factorDestino, 0.00001);
-        prm_Fila."Cantidad a Ubicar" := cantidadDestino;
+        prm_Fila.Cantidad := cantidadDestino;
         prm_Fila.Insert();
 
         if ProponerParaTodos(prm_Fila) = 0 then
@@ -566,7 +581,7 @@ codeunit 51105 "Gestion Entradas SGA"
     /// dentro de una transacción de registro ni desde una TryFunction. La tarea queda modificada:
     /// quien llama la relee.
     /// </summary>
-    procedure ImprimirYUbicarPale(var prm_Tarea: Record "Tareas Produccion"; var prm_Pale: Record "Buffer Ubicar Entrada SGA")
+    procedure ImprimirYUbicarPale(var prm_Tarea: Record "Tareas Produccion"; var prm_Pale: Record "Linea Ubicacion SGA" temporary)
     var
         EnvironmentInformation: Codeunit "Environment Information";
     begin
@@ -799,7 +814,7 @@ codeunit 51105 "Gestion Entradas SGA"
     /// Propuesta para una fila concreta, con la estrategia que diga la configuración para
     /// su origen.
     /// </summary>
-    local procedure ProponerParaFila(var prm_Fila: Record "Buffer Ubicar Entrada SGA"; prm_Excluidas: Text; var prm_Motivo: Text): Code[20]
+    local procedure ProponerParaFila(var prm_Fila: Record "Linea Ubicacion SGA" temporary; prm_Excluidas: Text; var prm_Motivo: Text): Code[20]
     var
         rConfig: Record "Config. SGA";
         estrategia: Enum "Estrategia Ubicacion SGA";
@@ -812,7 +827,7 @@ codeunit 51105 "Gestion Entradas SGA"
         else
             estrategia := rConfig."Estrategia Ubic. Ensamblados";
 
-        cantidad := prm_Fila."Cantidad a Ubicar";
+        cantidad := prm_Fila.Cantidad;
         if cantidad <= 0 then
             cantidad := prm_Fila.Pendiente();
 
@@ -824,9 +839,10 @@ codeunit 51105 "Gestion Entradas SGA"
     end;
 
     /// <summary>
-    /// Rellena lo ya ubicado, lo que queda y la marca de terminado de una fila.
+    /// Rellena lo ya ubicado, lo que queda (Cantidad) y el estado de una fila: Ubicado cuando ya
+    /// no queda nada y Pendiente si no.
     /// </summary>
-    local procedure CalcularPendiente(var prm_Fila: Record "Buffer Ubicar Entrada SGA")
+    local procedure CalcularPendiente(var prm_Fila: Record "Linea Ubicacion SGA" temporary)
     begin
         prm_Fila."Cantidad Ya Ubicada" := CantidadYaUbicada(prm_Fila.Origen, prm_Fila."No. Documento", prm_Fila."No. Producto",
                                                             prm_Fila."Cod. Variante", prm_Fila."No. Lote", prm_Fila."Cod. Unidad Medida");
@@ -835,8 +851,11 @@ codeunit 51105 "Gestion Entradas SGA"
         if (prm_Fila."Documento Relacionado" <> '') and (prm_Fila."Documento Relacionado" <> prm_Fila."No. Documento") then
             prm_Fila."Cantidad Ya Ubicada" += CantidadYaUbicada(prm_Fila.Origen, prm_Fila."Documento Relacionado", prm_Fila."No. Producto",
                                                                 prm_Fila."Cod. Variante", prm_Fila."No. Lote", prm_Fila."Cod. Unidad Medida");
-        prm_Fila."Cantidad a Ubicar" := prm_Fila.Pendiente();
-        prm_Fila.Ubicado := prm_Fila.Pendiente() <= 0;
+        prm_Fila.Cantidad := prm_Fila.Pendiente();
+        if prm_Fila.Cantidad <= 0 then
+            prm_Fila.Estado := prm_Fila.Estado::Ubicado
+        else
+            prm_Fila.Estado := prm_Fila.Estado::Pendiente;
     end;
 
     /// <summary>
@@ -887,9 +906,9 @@ codeunit 51105 "Gestion Entradas SGA"
     /// <summary>
     /// Filtro de exclusión con los huecos que ya tienen reservadas las demás filas.
     /// </summary>
-    local procedure ExclusionesDeOtrasFilas(var prm_Fila: Record "Buffer Ubicar Entrada SGA"): Text
+    local procedure ExclusionesDeOtrasFilas(var prm_Fila: Record "Linea Ubicacion SGA" temporary): Text
     var
-        TempOtra: Record "Buffer Ubicar Entrada SGA";
+        TempOtra: Record "Linea Ubicacion SGA" temporary;
         excluidas: Text;
     begin
         // Copia del conjunto temporal completo: recorrerla no mueve el cursor de la fila
