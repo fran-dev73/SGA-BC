@@ -261,7 +261,7 @@ No hay forma de imprimir sin ubicar: cada etiqueta es un palé ubicado.
 
 **Cuánto es un palé**: lo dice la tarea. Cada etiqueta es un palé de su *Palé* por defecto, completo, salvo el **último**, que lleva lo que queda de lo planificado. El palé completo se ubica como palé. El incompleto se ubica **en cajas**: a un hueco de caja si son menos de 10 y a uno de palé si son 10 o más. Si sobran botellas que no llegan a una caja, la pantalla avisa y quedan para *Ubicar producto*. La pantalla dice en *Situación* si el palé es completo o incompleto.
 
-**No te deja imprimir** si el producto no tiene códigos de barras, si la producción no ha empezado o si ya están impresas todas las etiquetas planificadas (la pantalla antigua dejaba sacar una de más).
+**No te deja imprimir** si el producto no tiene códigos de barras, si la producción no ha empezado o si ya están impresas todas las etiquetas planificadas.
 
 **En Sandbox** no se manda nada a BarTender: la etiqueta sale en formato **A5**, directa a la impresora que tenga asignada el report *Etiqueta Producto A5* en **Selección de impresoras** (Universal Print). Si no tiene impresora asignada, BC descarga la etiqueta en PDF. Si la etiqueta no llega a salir, el palé no se ubica.
 

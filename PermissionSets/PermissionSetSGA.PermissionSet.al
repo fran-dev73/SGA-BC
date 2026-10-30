@@ -32,6 +32,8 @@ permissionset 51100 "PermissionSet-SGA"
         tabledata "Buffer Mapa SGA" = RIMD,
         table "Buffer Conciliacion SGA" = X,
         tabledata "Buffer Conciliacion SGA" = RIMD,
+        table "Linea Ubicacion SGA" = X,
+        tabledata "Linea Ubicacion SGA" = RIMD,
         codeunit "Carga Inicial SGA" = X,
         page "Resultado Carga Inicial SGA" = X,
         table "Orden Picking SGA" = X,

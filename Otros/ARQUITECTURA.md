@@ -1527,13 +1527,13 @@ EN USO:
 51100-51108: Codeunits       (51104 picking, 51105 entradas, 51106 carga inicial, 51107 análisis ABC, 51108 unidades del producto)
 51100-51131: Pages           (51116 libre; 51127 imprimir y ubicar palés; 51128-51129 análisis ABC; 51130 reparto de Ubicar producto; 51131 pendiente de ubicar)
 51100-51106: Reports         (51106 etiquetas de ubicación)
-51100-51108: Page Extensions (51105 Configuración de usuarios, 51106 libre: era Unidades de medida, 51107 líneas del pedido de venta, 51108 lista de pedidos de venta)
-51100-51102: Table Extensions (51100 User Setup, 51101 libre: era Unit of Measure, 51102 Sales Line)
+51100-51108: Page Extensions (51105 Configuración de usuarios, 51106 libre, 51107 líneas del pedido de venta, 51108 lista de pedidos de venta)
+51100-51102: Table Extensions (51100 User Setup, 51101 libre, 51102 Sales Line)
 51100-51101: Permission Sets (general y responsable)
 51100:       Control Add-in
 
 LIBRES:
-Tables 51111, 51115+ (51120 también) · Codeunits 51109+ · Pages 51116 y 51132+
+Tables 51110-51111, 51115+ · Codeunits 51109+ · Pages 51116 y 51132+
 Enums 51112+ · Reports 51107+ · Page Extensions 51109+ · Table Extensions 51103+
 Permission Sets 51102+
 
