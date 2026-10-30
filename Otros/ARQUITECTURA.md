@@ -226,6 +226,9 @@ Tabla de **configuración única** del módulo. Se crea automáticamente la prim
 Métodos:
 - `ObtenerConfig()`: lee la configuración y la crea vacía la primera vez.
 - `TestUbicacionConfigurada(Ubicacion, NombreCampo)`: error si una ubicación de flujo no está configurada.
+- `ComprobarResponsablePicking()`: con `Exigir Asignacion Picking`, error si el usuario no es
+  responsable de picking (`Responsable Picking SGA` en Configuración de usuarios). La usan
+  `Orden Picking SGA` (asignar y prioridad) y `Pag51124`; ver *Asignación: el paso intermedio*.
 - `DesvioPermitido(Propuesta, Confirmada): Boolean`: regla de desvío única. Devuelve verdadero si
   la ubicación confirmada es la propuesta o si `Permitir Desvio Ubicacion` está activo. Trabaja sobre
   la configuración ya leída con `ObtenerConfig`. La usan `Cod51101.ConfirmarReparto` (solo en líneas con
@@ -533,7 +536,7 @@ PUBLIC:
 │  └─ Ubicación guiada: Cod51108.Repartir con el palé de la ficha y, línea a
 │     línea en orden, ProponerUbicacionCon con las exclusiones acumuladas.
 │     Pendiente (propuesta = confirmada) o "Sin Sitio" con el motivo.
-│     Como mucho 200 líneas.
+│     Como mucho 200 líneas: el tope se pasa a Repartir, que no crea más.
 │
 ├─ ConfirmarReparto(var TempLinea, Linea, Almacen, Producto, Variante,
 │                   Lote) -> RestoBase
@@ -652,17 +655,18 @@ PUBLIC:
 ├─ TipoHuecoDestino(Producto, UM, Cantidad) -> Palé / Caja / Unidad / en blanco
 ├─ UMProductoDeTipo(Producto, Tipo) -> UM
 │
-├─ Repartir(Producto, CantidadBase, UMPale, var TempLinea)
+├─ Repartir(Producto, CantidadBase, UMPale, MaxLineas, var TempLinea)
 │  └─ El reparto único, en líneas de Tab51114: una por palé completo
 │     ("Palé n de N", cantidad 1), una con las cajas completas ("Unidades de
 │     venta") y una con las sueltas ("Unidades sueltas", UM base). Sin líneas
 │     a cero; sin caja, todo lo que no llega a un palé va en la de sueltas.
 │     UMPale en blanco: palé y caja de la ficha (UMProductoDeTipo). Con un
 │     palé indicado (el de la tarea): ese palé y la unidad de venta como caja
-│     si su factor es > 1 y menor que el del palé. Borra antes TempLinea y
-│     solo rellena producto, UM, cantidades y Paso. Lo usan ProponerReparto
-│     (Cod51101), la carga inicial por huecos libres (Cod51106) y el palé de
-│     tarea (Cod51105).
+│     si su factor es > 1 y menor que el del palé. MaxLineas > 0: no crea
+│     más líneas que esas (las primeras del reparto); 0 reparte entero.
+│     Borra antes TempLinea y solo rellena producto, UM, cantidades y Paso.
+│     Lo usan ProponerReparto (Cod51101, con tope de 200), la carga inicial
+│     por huecos libres (Cod51106) y el palé de tarea (Cod51105), sin tope.
 │
 └─ Desglose(Producto, CantidadBase) -> Texto
    └─ "1 PALE, 12 CAJA12, 6 BOTELLA" con las unidades de Repartir (palé de la

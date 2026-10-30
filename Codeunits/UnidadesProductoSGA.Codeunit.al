@@ -214,8 +214,11 @@ codeunit 51108 "Unidades Producto SGA"
     ///
     /// Solo rellena producto, unidad, cantidades y el texto del trozo (Paso): el almacén, el lote
     /// y el hueco los pone quien lo usa. Borra antes lo que hubiera en TempLinea.
+    ///
+    /// prm_MaxLineas mayor que cero: no crea más líneas que esas (las primeras del reparto, en
+    /// el mismo orden); 0 reparte entero.
     /// </summary>
-    procedure Repartir(prm_Producto: Code[20]; prm_CantidadBase: Decimal; prm_UMPale: Code[10]; var TempLinea: Record "Linea Ubicacion SGA" temporary)
+    procedure Repartir(prm_Producto: Code[20]; prm_CantidadBase: Decimal; prm_UMPale: Code[10]; prm_MaxLineas: Integer; var TempLinea: Record "Linea Ubicacion SGA" temporary)
     var
         umPale: Code[10];
         umCaja: Code[10];
@@ -223,7 +226,9 @@ codeunit 51108 "Unidades Producto SGA"
         factorCaja: Decimal;
         resto: Decimal;
         pales: Integer;
+        palesACrear: Integer;
         i: Integer;
+        linea: Integer;
         cajas: Decimal;
         PaleDeLbl: Label 'Palé %1 de %2', Comment = '%1 = nº de palé, %2 = total';
         UnidadesVentaLbl: Label 'Unidades de venta';
@@ -239,21 +244,24 @@ codeunit 51108 "Unidades Producto SGA"
 
         if umPale <> '' then begin
             pales := Round(resto / factorPale, 1, '<');
-            for i := 1 to pales do
-                AnadirTrozo(TempLinea, prm_Producto, StrSubstNo(PaleDeLbl, i, pales), umPale, 1, factorPale);
+            palesACrear := pales;
+            if (prm_MaxLineas > 0) and (palesACrear > prm_MaxLineas) then
+                palesACrear := prm_MaxLineas;
+            for i := 1 to palesACrear do
+                AnadirTrozo(TempLinea, linea, prm_MaxLineas, prm_Producto, StrSubstNo(PaleDeLbl, i, pales), umPale, 1, factorPale);
             resto := Round(resto - pales * factorPale, 0.00001);
         end;
 
         if umCaja <> '' then begin
             cajas := Round(resto / factorCaja, 1, '<');
             if cajas > 0 then begin
-                AnadirTrozo(TempLinea, prm_Producto, UnidadesVentaLbl, umCaja, cajas, cajas * factorCaja);
+                AnadirTrozo(TempLinea, linea, prm_MaxLineas, prm_Producto, UnidadesVentaLbl, umCaja, cajas, cajas * factorCaja);
                 resto := Round(resto - cajas * factorCaja, 0.00001);
             end;
         end;
 
         if resto > 0 then
-            AnadirTrozo(TempLinea, prm_Producto, UnidadesSueltasLbl, UMBase(prm_Producto), resto, resto);
+            AnadirTrozo(TempLinea, linea, prm_MaxLineas, prm_Producto, UnidadesSueltasLbl, UMBase(prm_Producto), resto, resto);
     end;
 
     /// <summary>
@@ -322,15 +330,18 @@ codeunit 51108 "Unidades Producto SGA"
         end;
     end;
 
-    local procedure AnadirTrozo(var TempLinea: Record "Linea Ubicacion SGA" temporary; prm_Producto: Code[20]; prm_Paso: Text; prm_UM: Code[10]; prm_Cantidad: Decimal; prm_CantidadBase: Decimal)
-    var
-        siguiente: Integer;
+    /// <summary>
+    /// Añade un trozo con la Linea siguiente a prm_Linea (la última creada), salvo que ya se
+    /// haya llegado a prm_MaxLineas (0 = sin tope).
+    /// </summary>
+    local procedure AnadirTrozo(var TempLinea: Record "Linea Ubicacion SGA" temporary; var prm_Linea: Integer; prm_MaxLineas: Integer; prm_Producto: Code[20]; prm_Paso: Text; prm_UM: Code[10]; prm_Cantidad: Decimal; prm_CantidadBase: Decimal)
     begin
-        if TempLinea.FindLast() then
-            siguiente := TempLinea.Linea;
+        if (prm_MaxLineas > 0) and (prm_Linea >= prm_MaxLineas) then
+            exit;
 
+        prm_Linea += 1;
         TempLinea.Init();
-        TempLinea.Linea := siguiente + 1;
+        TempLinea.Linea := prm_Linea;
         TempLinea.Paso := CopyStr(prm_Paso, 1, MaxStrLen(TempLinea.Paso));
         TempLinea."No. Producto" := prm_Producto;
         TempLinea."Cod. Unidad Medida" := prm_UM;

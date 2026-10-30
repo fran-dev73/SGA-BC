@@ -280,7 +280,7 @@ codeunit 51106 "Carga Inicial SGA"
         end;
         // El reparto (cada palé, las cajas y lo que no llega a una caja) es el mismo que en
         // "Ubicar producto"; aquí solo cambia cómo se busca el hueco de los palés.
-        cUM.Repartir(prm_Producto."No.", prm_Stock."Stock BC", '', TempTrozo);
+        cUM.Repartir(prm_Producto."No.", prm_Stock."Stock BC", '', 0, TempTrozo);
 
         // Palés completos: uno por hueco, con el cursor de huecos de palé.
         TempTrozo.SetRange("Cod. Unidad Medida", umPale);

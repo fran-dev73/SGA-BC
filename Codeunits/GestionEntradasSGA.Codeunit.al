@@ -512,7 +512,7 @@ codeunit 51105 "Gestion Entradas SGA"
         // Unidad en la que se ubica: palé completo, cajas o, si no llega a una caja, unidades. Es
         // el primer trozo del reparto con el palé de la tarea; las sueltas que sobren de las
         // cajas quedan pendientes.
-        cUM.Repartir(prm_Fila."No. Producto", paleBase, rUMPale.Code, TempTrozo);
+        cUM.Repartir(prm_Fila."No. Producto", paleBase, rUMPale.Code, 0, TempTrozo);
         if not TempTrozo.FindFirst() then begin
             prm_Aviso := StrSubstNo(EnsambladoYaUbicadoLbl, prm_Fila."No. Documento");
             exit(false);

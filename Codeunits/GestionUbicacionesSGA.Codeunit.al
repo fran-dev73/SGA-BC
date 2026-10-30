@@ -266,10 +266,9 @@ codeunit 51101 "Gestion Ubicaciones SGA"
         MaxLineasReparto := 200;
         rItem.SetLoadFields(Description);
         if rItem.Get(prm_Producto) then;
-        cUM.Repartir(prm_Producto, prm_CantidadBase, '', TempLinea);
-        TempLinea.SetFilter(Linea, '>%1', MaxLineasReparto);
-        TempLinea.DeleteAll();
-        TempLinea.Reset();
+        // El tope corta el reparto al crearlo, por si una cantidad desorbitada o una unidad mal
+        // configurada diera miles de palés.
+        cUM.Repartir(prm_Producto, prm_CantidadBase, '', MaxLineasReparto, TempLinea);
 
         // Por la clave (Linea): las exclusiones se acumulan en el orden del reparto.
         if TempLinea.FindSet() then
