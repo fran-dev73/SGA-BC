@@ -247,6 +247,17 @@ table 51104 "Config. SGA"
     end;
 
     /// <summary>
+    /// Regla de desvío: dejar o coger en una ubicación distinta de la propuesta solo se admite
+    /// con "Permitir Desvio Ubicacion". Ir a la propuesta siempre está permitido. Cada llamador
+    /// decide qué hace si no se permite (error o aviso). Trabaja sobre la configuración ya
+    /// leída con ObtenerConfig, para no volver a leerla en cada línea de un bucle.
+    /// </summary>
+    procedure DesvioPermitido(prm_Propuesta: Code[20]; prm_Confirmada: Code[20]): Boolean
+    begin
+        exit("Permitir Desvio Ubicacion" or (prm_Confirmada = prm_Propuesta));
+    end;
+
+    /// <summary>
     /// Comprueba que la ubicación indicada está configurada; si no, lanza error indicando el campo.
     /// </summary>
     procedure TestUbicacionConfigurada(prm_Ubicacion: Code[20]; prm_NombreCampo: Text)

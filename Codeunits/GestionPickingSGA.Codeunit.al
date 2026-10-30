@@ -280,7 +280,7 @@ codeunit 51104 "Gestion Picking SGA"
             Error(UbicacionNoIndicadaErr);
 
         rConfig.ObtenerConfig();
-        if (binReal <> prm_Linea."Cod. Bin Propuesto") and (not rConfig."Permitir Desvio Ubicacion") then
+        if not rConfig.DesvioPermitido(prm_Linea."Cod. Bin Propuesto", binReal) then
             Error(DesvioNoPermitidoErr, prm_Linea."Cod. Bin Propuesto");
 
         // Certifica que el preparador está delante del hueco del que recoge: el dígito solo

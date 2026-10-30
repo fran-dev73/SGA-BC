@@ -257,12 +257,15 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     /// </summary>
     procedure ProponerReparto(prm_Estrategia: Enum "Estrategia Ubicacion SGA"; prm_Almacen: Code[10]; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50]; prm_CantidadBase: Decimal; var TempLinea: Record "Linea Ubicacion SGA" temporary)
     var
+        rItem: Record Item;
         excluidas: Text;
         motivo: Text;
         hueco: Code[20];
         MaxLineasReparto: Integer;
     begin
         MaxLineasReparto := 200;
+        rItem.SetLoadFields(Description);
+        if rItem.Get(prm_Producto) then;
         cUM.Repartir(prm_Producto, prm_CantidadBase, '', TempLinea);
         TempLinea.SetFilter(Linea, '>%1', MaxLineasReparto);
         TempLinea.DeleteAll();
@@ -274,6 +277,7 @@ codeunit 51101 "Gestion Ubicaciones SGA"
                 hueco := ProponerUbicacionCon(prm_Estrategia, excluidas, prm_Almacen, prm_Producto, prm_Variante, prm_Lote,
                                               TempLinea."Cod. Unidad Medida", TempLinea.Cantidad, motivo);
                 TempLinea.Origen := TempLinea.Origen::Manual;
+                TempLinea."Descripcion Producto" := CopyStr(rItem.Description, 1, MaxStrLen(TempLinea."Descripcion Producto"));
                 TempLinea."Cod. Almacen" := prm_Almacen;
                 TempLinea."Cod. Variante" := prm_Variante;
                 TempLinea."No. Lote" := prm_Lote;
@@ -328,10 +332,9 @@ codeunit 51101 "Gestion Ubicaciones SGA"
                     ComprobarUbicacionExiste(prm_Almacen, TempLinea."Ubicacion Confirmada");
                     if (TempLinea."Ubicacion Propuesta" = '') and rConfig."Exigir Confirmar Ubicacion" then
                         Error(SinPropuestaErr, TempLinea.Paso);
-                    if (TempLinea."Ubicacion Propuesta" <> '') and (TempLinea."Ubicacion Confirmada" <> TempLinea."Ubicacion Propuesta") and
-                       not rConfig."Permitir Desvio Ubicacion"
-                    then
-                        Error(DesvioNoPermitidoErr, TempLinea."Ubicacion Propuesta", TempLinea.Paso);
+                    if TempLinea."Ubicacion Propuesta" <> '' then
+                        if not rConfig.DesvioPermitido(TempLinea."Ubicacion Propuesta", TempLinea."Ubicacion Confirmada") then
+                            Error(DesvioNoPermitidoErr, TempLinea."Ubicacion Propuesta", TempLinea.Paso);
                     lineas.Add(TempLinea.Linea);
                 end;
             until TempLinea.Next() = 0;

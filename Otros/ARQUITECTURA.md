@@ -223,6 +223,15 @@ OTROS:
 
 Tabla de **configuración única** del módulo. Se crea automáticamente la primera vez que se abre `Config. SGA`.
 
+Métodos:
+- `ObtenerConfig()`: lee la configuración y la crea vacía la primera vez.
+- `TestUbicacionConfigurada(Ubicacion, NombreCampo)`: error si una ubicación de flujo no está configurada.
+- `DesvioPermitido(Propuesta, Confirmada): Boolean`: regla de desvío única. Devuelve verdadero si
+  la ubicación confirmada es la propuesta o si `Permitir Desvio Ubicacion` está activo. Trabaja sobre
+  la configuración ya leída con `ObtenerConfig`. La usan `Cod51101.ConfirmarReparto` (solo en líneas con
+  propuesta), `Cod51104.ConfirmarLinea` (error) y `Pag51121.ComprobarUbicacion` (aviso en pantalla);
+  cada uno con su propio mensaje.
+
 ### 6. **Cue SGA** (Tab51105)
 ```
 PK: Cod. Almacen
@@ -585,8 +594,8 @@ PUBLIC:
 │     - Si SGA > BC: Estado = "SobraEnSGA" (hay más de lo que dice BC).
 │     Si SoloDiferencias = true, borra las que cuadran.
 │
-├─ LimpiarBuffer(CodUsuario)
-│  └─ Borra todas las filas de este usuario de BufferConciliacion.
+├─ LimpiarBuffer(var rStock: BufferConciliacion)
+│  └─ Borra las filas del usuario actual (FiltrarUsuarioActual) de BufferConciliacion.
 │
 ├─ CargarPendienteUbicar(Almacen, var Pendiente temporal) -> Lineas
 │  └─ Una línea de BufferConciliacion (temporal) por lote con Diferencia > 0,

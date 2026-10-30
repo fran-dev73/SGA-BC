@@ -342,7 +342,7 @@ page 51121 "Preparar Picking SGA"
 
         rConfig.ObtenerConfig();
         HayAviso := true;
-        if rConfig."Permitir Desvio Ubicacion" then
+        if rConfig.DesvioPermitido(Rec."Cod. Bin Propuesto", UbicacionEscaneada) then
             Aviso := StrSubstNo(DesvioUbicacionLbl, Rec."Cod. Bin Propuesto")
         else
             Aviso := StrSubstNo(DesvioNoPermitidoLbl, Rec."Cod. Bin Propuesto");
