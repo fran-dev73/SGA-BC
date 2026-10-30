@@ -114,7 +114,7 @@ report 51102 "Carga Inicial Contenido SGA"
 
     local procedure Ejecutar()
     var
-        TempResultado: Record "Resultado Carga Inicial SGA" temporary;
+        TempResultado: Record "Linea Ubicacion SGA" temporary;
         cCarga: Codeunit "Carga Inicial SGA";
         pResultado: Page "Resultado Carga Inicial SGA";
         productos: Integer;
@@ -177,7 +177,7 @@ report 51102 "Carga Inicial Contenido SGA"
     /// líneas por causa, de la más repetida a la menos, hasta 6. El detalle de cada línea, con
     /// qué hacer, está en la página de resultado.
     /// </summary>
-    local procedure ResumenNoCargado(var prm_Resultado: Record "Resultado Carga Inicial SGA" temporary): Text
+    local procedure ResumenNoCargado(var prm_Resultado: Record "Linea Ubicacion SGA" temporary): Text
     var
         lineas: Dictionary of [Text, Integer];
         causas: List of [Text];
@@ -192,7 +192,7 @@ report 51102 "Carga Inicial Contenido SGA"
         MasLbl: Label '\- … y %1 motivos más (ver el detalle).', Comment = '%1 = número de motivos';
     begin
         prm_Resultado.Reset();
-        prm_Resultado.SetRange(Cargado, false);
+        prm_Resultado.SetRange(Estado, prm_Resultado.Estado::"Sin Sitio");
         if not prm_Resultado.FindSet() then begin
             prm_Resultado.Reset();
             exit('');

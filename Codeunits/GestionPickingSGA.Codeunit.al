@@ -253,6 +253,7 @@ codeunit 51104 "Gestion Picking SGA"
     var
         rOrden: Record "Orden Picking SGA";
         rConfig: Record "Config. SGA";
+        rUbicacion: Record "Ubicacion SGA";
         cContenido: Codeunit "Gestion Contenido SGA";
         binReal: Code[20];
         CantidadNoPositivaErr: Label 'La cantidad recogida debe ser mayor que cero.';
@@ -285,7 +286,7 @@ codeunit 51104 "Gestion Picking SGA"
         // Certifica que el preparador está delante del hueco del que recoge: el dígito solo
         // está en la etiqueta. Se comprueba aquí y no en la pantalla para que no se pueda saltar.
         if rConfig."Exigir Digito Control" then
-            ComprobarDigitoControl(prm_Linea."Cod. Almacen", binReal, prm_DigitoControl);
+            rUbicacion.TestDigitoControl(prm_Linea."Cod. Almacen", binReal, prm_DigitoControl);
 
         rOrden.Get(prm_Linea."No. Orden");
         ComprobarPreparador(rOrden);
@@ -313,29 +314,6 @@ codeunit 51104 "Gestion Picking SGA"
 
         rOrden.RecalcularEstado();
         rOrden.Modify();
-    end;
-
-    /// <summary>
-    /// Comprueba el dígito de control de la etiqueta del hueco.
-    /// </summary>
-    procedure ComprobarDigitoControl(prm_Almacen: Code[10]; prm_Bin: Code[20]; prm_Digito: Text)
-    var
-        rUbicacion: Record "Ubicacion SGA";
-        DigitoNoIndicadoErr: Label 'Teclee el dígito de control de la etiqueta de la ubicación %1.', Comment = '%1 = ubicación';
-        DigitoIncorrectoErr: Label 'El dígito de control no corresponde a la ubicación %1. Compruebe que está recogiendo del hueco correcto.', Comment = '%1 = ubicación';
-        UbicacionSinDigitoErr: Label 'La ubicación %1 no tiene dígito de control. Genérelo e imprima su etiqueta desde la lista de ubicaciones.', Comment = '%1 = ubicación';
-    begin
-        if DelChr(prm_Digito, '<>', ' ') = '' then
-            Error(DigitoNoIndicadoErr, prm_Bin);
-
-        if not rUbicacion.Get(prm_Almacen, prm_Bin) then
-            Error(DigitoIncorrectoErr, prm_Bin);
-
-        if rUbicacion."Digito Control" = '' then
-            Error(UbicacionSinDigitoErr, prm_Bin);
-
-        if not rUbicacion.DigitoControlCorrecto(prm_Digito) then
-            Error(DigitoIncorrectoErr, prm_Bin);
     end;
 
     /// <summary>
@@ -711,17 +689,15 @@ codeunit 51104 "Gestion Picking SGA"
     var
         rLinea: Record "Linea Orden Picking SGA";
         rContenido: Record "Contenido Ubicacion SGA";
-        rItem: Record Item;
         cContenido: Codeunit "Gestion Contenido SGA";
+        cUM: Codeunit "Unidades Producto SGA";
         reserva: Decimal;
     begin
         if (prm_Bin = '') or (prm_Producto = '') then
             exit;
 
-        if not rItem.Get(prm_Producto) then
-            exit;
-
-        if not rContenido.Get(prm_Almacen, prm_Bin, prm_Producto, prm_Variante, prm_Lote, rItem."Base Unit of Measure") then
+        // El contenido va siempre en la unidad base; sin producto, UMBase da '' y no se encuentra.
+        if not rContenido.Get(prm_Almacen, prm_Bin, prm_Producto, prm_Variante, prm_Lote, cUM.UMBase(prm_Producto)) then
             exit;
 
         rLinea.SetCurrentKey("No. Producto", "No. Lote");

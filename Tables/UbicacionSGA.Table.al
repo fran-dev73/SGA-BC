@@ -393,6 +393,31 @@ table 51101 "Ubicacion SGA"
         exit(DelChr(prm_Digito, '<>', ' ') = "Digito Control");
     end;
 
+    /// <summary>
+    /// Error si el dígito de control tecleado no es el de la ubicación prm_Bin del almacén
+    /// prm_Almacen, que lee en Rec. Certifica que quien confirma está delante del hueco: el
+    /// dígito solo está en su etiqueta. Una ubicación sin datos SGA da el mismo error que un
+    /// dígito incorrecto, para que la comprobación no se pueda saltar.
+    /// </summary>
+    procedure TestDigitoControl(prm_Almacen: Code[10]; prm_Bin: Code[20]; prm_Digito: Text)
+    var
+        DigitoNoIndicadoErr: Label 'Teclee el dígito de control de la etiqueta de la ubicación %1.', Comment = '%1 = ubicación';
+        DigitoIncorrectoErr: Label 'El dígito de control no corresponde a la ubicación %1. Compruebe que está recogiendo del hueco correcto.', Comment = '%1 = ubicación';
+        UbicacionSinDigitoErr: Label 'La ubicación %1 no tiene dígito de control. Genérelo e imprima su etiqueta desde la lista de ubicaciones.', Comment = '%1 = ubicación';
+    begin
+        if DelChr(prm_Digito, '<>', ' ') = '' then
+            Error(DigitoNoIndicadoErr, prm_Bin);
+
+        if not Get(prm_Almacen, prm_Bin) then
+            Error(DigitoIncorrectoErr, prm_Bin);
+
+        if "Digito Control" = '' then
+            Error(UbicacionSinDigitoErr, prm_Bin);
+
+        if not DigitoControlCorrecto(prm_Digito) then
+            Error(DigitoIncorrectoErr, prm_Bin);
+    end;
+
     trigger OnDelete()
     var
         rContenido: Record "Contenido Ubicacion SGA";
@@ -446,25 +471,106 @@ table 51101 "Ubicacion SGA"
     procedure OcupadoEnUMHueco(): Decimal
     var
         rContenido: Record "Contenido Ubicacion SGA";
-        rItemUM: Record "Item Unit of Measure";
-        rConfig: Record "Config. SGA";
-        um: Code[10];
         total: Decimal;
     begin
         rContenido.SetRange("Cod. Almacen", "Cod. Almacen");
         rContenido.SetRange("Cod. Bin", "Cod. Bin");
+        rContenido.SetLoadFields("No. Producto", "Cantidad Base");
         if not rContenido.FindSet() then
             exit(0);
 
         repeat
-            um := rConfig.UMCapacidadProducto(rContenido."No. Producto", "Tipo UM Admitida");
-            if (um <> '') and rItemUM.Get(rContenido."No. Producto", um) and (rItemUM."Qty. per Unit of Measure" > 0) then
-                total += rContenido."Cantidad Base" / rItemUM."Qty. per Unit of Measure"
-            else
-                total += rContenido."Cantidad Base";
+            total += EnUMHueco(rContenido."No. Producto", rContenido."Cantidad Base");
         until rContenido.Next() = 0;
 
         exit(Round(total, 0.00001));
+    end;
+
+    /// <summary>
+    /// Una cantidad base de un producto, contada en la clase que admite el hueco: palés en uno
+    /// de palé, cajas en uno de caja, cada producto con su palé o su caja. Sin tipo, o si el
+    /// producto no tiene unidad de esa clase, en unidades base. Sin redondear: redondea quien la
+    /// usa, si le hace falta.
+    /// </summary>
+    procedure EnUMHueco(prm_Producto: Code[20]; prm_CantidadBase: Decimal): Decimal
+    var
+        cUM: Codeunit "Unidades Producto SGA";
+    begin
+        // FactorUM nunca devuelve cero: con la unidad en blanco o desconocida, uno.
+        exit(prm_CantidadBase / cUM.FactorUM(prm_Producto, cUM.UMProductoDeTipo(prm_Producto, "Tipo UM Admitida")));
+    end;
+
+    /// <summary>
+    /// Qué contenido del hueco impide dejar en él prm_Producto con lote prm_Lote: 0 si nada,
+    /// 5 si hay otro producto y el hueco no acepta mezcla de productos, 6 si hay otro lote y no
+    /// acepta mezcla de lotes (los mismos códigos que el motivo de rechazo de la propuesta).
+    /// Solo mira si existe una línea que choca, sin leerla: es la que usa la propuesta.
+    /// </summary>
+    procedure ContenidoQueImpideMezcla(prm_Producto: Code[20]; prm_Lote: Code[50]): Integer
+    var
+        rContenido: Record "Contenido Ubicacion SGA";
+    begin
+        exit(ComprobarMezcla(prm_Producto, prm_Lote, false, rContenido));
+    end;
+
+    /// <summary>
+    /// Igual que ContenidoQueImpideMezcla sin contenido, pero deja en prm_Contenido la línea
+    /// que choca, para poder nombrarla en el mensaje.
+    /// </summary>
+    procedure ContenidoQueImpideMezcla(prm_Producto: Code[20]; prm_Lote: Code[50]; var prm_Contenido: Record "Contenido Ubicacion SGA"): Integer
+    begin
+        exit(ComprobarMezcla(prm_Producto, prm_Lote, true, prm_Contenido));
+    end;
+
+    local procedure ComprobarMezcla(prm_Producto: Code[20]; prm_Lote: Code[50]; prm_LeerLinea: Boolean; var prm_Contenido: Record "Contenido Ubicacion SGA"): Integer
+    begin
+        prm_Contenido.Reset();
+        prm_Contenido.SetRange("Cod. Almacen", "Cod. Almacen");
+        prm_Contenido.SetRange("Cod. Bin", "Cod. Bin");
+        // Si hay que nombrar la línea que choca, solo hacen falta su producto y su lote.
+        if prm_LeerLinea then
+            prm_Contenido.SetLoadFields("No. Producto", "No. Lote");
+
+        if not "Permite Mezcla Producto" then begin
+            prm_Contenido.SetFilter("No. Producto", '<>%1', prm_Producto);
+            if HayLineaQueChoca(prm_Contenido, prm_LeerLinea) then
+                exit(5);
+            prm_Contenido.SetRange("No. Producto");
+        end;
+
+        // El lote se mira en todo el hueco, sea del producto que sea.
+        if not "Permite Mezcla Lote" then begin
+            prm_Contenido.SetFilter("No. Lote", '<>%1', prm_Lote);
+            if HayLineaQueChoca(prm_Contenido, prm_LeerLinea) then
+                exit(6);
+            prm_Contenido.SetRange("No. Lote");
+        end;
+
+        exit(0);
+    end;
+
+    local procedure HayLineaQueChoca(var prm_Contenido: Record "Contenido Ubicacion SGA"; prm_LeerLinea: Boolean): Boolean
+    begin
+        if prm_LeerLinea then
+            exit(prm_Contenido.FindFirst());
+        exit(not prm_Contenido.IsEmpty());
+    end;
+
+    /// <summary>
+    /// Deja en Rec solo las ubicaciones de almacenaje: Picking y Reserva. Son las únicas que se
+    /// proponen y se clasifican; muelles, cuarentena, ajustes y producción quedan fuera.
+    /// </summary>
+    procedure FiltrarDeAlmacenaje()
+    begin
+        SetFilter("Tipo Ubicacion", '%1|%2', "Tipo Ubicacion"::Picking, "Tipo Ubicacion"::Reserva);
+    end;
+
+    /// <summary>
+    /// Si la ubicación es de almacenaje (Picking o Reserva). Ver FiltrarDeAlmacenaje.
+    /// </summary>
+    procedure EsDeAlmacenaje(): Boolean
+    begin
+        exit("Tipo Ubicacion" in ["Tipo Ubicacion"::Picking, "Tipo Ubicacion"::Reserva]);
     end;
 
     /// <summary>

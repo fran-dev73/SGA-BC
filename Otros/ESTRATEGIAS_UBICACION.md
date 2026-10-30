@@ -161,8 +161,11 @@ lo primero que mejoraría *Junto al mismo producto* si llega a hacer falta.
 
 ### Estrategias que existen hoy
 
-Están en `ProponerUbicacionCon` de [GestionUbicacionesSGA.Codeunit.al](../Codeunits/GestionUbicacionesSGA.Codeunit.al).
-Todas recorren los huecos de tipo *Picking* o *Reserva*, no bloqueados, por **Secuencia picking**.
+Están en `ProponerUbicacionCon` de [GestionUbicacionesSGA.Codeunit.al](../Codeunits/GestionUbicacionesSGA.Codeunit.al),
+que es la única puerta para proponer: cuando no encuentra hueco, devuelve también el motivo
+(`ExplicarSinHuecoLote`, con el lote de la mercancía).
+Todas recorren los huecos de tipo *Picking* o *Reserva* (`Ubicacion SGA.FiltrarDeAlmacenaje`), no
+bloqueados, por **Secuencia picking**.
 
 | Estrategia | Qué hace | Con huecos de un palé |
 |---|---|---|

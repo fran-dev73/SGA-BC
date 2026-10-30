@@ -2,7 +2,6 @@ namespace AntonioNadal.SGA;
 
 using Microsoft.Inventory.Item;
 using Microsoft.Inventory.Location;
-using Microsoft.Warehouse.Structure;
 
 /// <summary>
 /// Page Ubicar Entradas SGA (ID 51123).
@@ -211,12 +210,9 @@ page 51123 "Ubicar Entradas SGA"
 
                     trigger OnValidate()
                     var
-                        rBin: Record Bin;
-                        UbicacionNoExisteErr: Label 'La ubicación %1 no existe en el almacén %2.', Comment = '%1 = ubicación, %2 = almacén';
+                        cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
                     begin
-                        if (Rec."Ubicacion Confirmada" <> '') and (Rec."Cod. Almacen" <> '') then
-                            if not rBin.Get(Rec."Cod. Almacen", Rec."Ubicacion Confirmada") then
-                                Error(UbicacionNoExisteErr, Rec."Ubicacion Confirmada", Rec."Cod. Almacen");
+                        cUbicaciones.ComprobarUbicacionExiste(Rec."Cod. Almacen", Rec."Ubicacion Confirmada");
                     end;
                 }
                 field("Cod. Almacen"; Rec."Cod. Almacen")

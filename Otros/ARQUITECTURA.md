@@ -9,10 +9,10 @@ Este documento es para quien quiera entender **cómo funciona SGA internamente**
 Los objetos están agrupados por tipo dentro de `SGA/`:
 
 ```
-Tables/           16 tablas: zonas, ubicaciones, contenido, movimientos, órdenes, ABC y buffers
+Tables/           15 tablas: zonas, ubicaciones, contenido, movimientos, órdenes, ABC y buffers
 Pages/            31 páginas: listas, fichas, diálogos, factboxes y rol center
 PageExtensions/    8 extensiones: ficha y lista de producto, almacén, pedido de venta (ficha, líneas y lista), rol y usuarios
-Codeunits/         8 codeunits: la puerta de escritura, los motores, la carga inicial y el ABC
+Codeunits/         9 codeunits: la puerta de escritura, los motores, las unidades del producto, la carga inicial y el ABC
 Reports/           7 informes: generación, carga inicial, conciliación, etiquetas y exportaciones
 Enums/            12 enums: tipos, estados, orígenes, estrategias, clase de unidad, clase ABC y preparación del pedido
 ControlAddIns/     1 control: el lienzo del mapa 3D
@@ -112,6 +112,26 @@ PK: Cod. Almacen + Cod. Ubicacion
 ```
 
 Es el "perfil de gestión" de cada ubicación. Se crea una vez en la sincronización topológica y se mantiene.
+
+Las reglas del propio hueco son métodos de la tabla, para que la propuesta (`Cod51101`), el
+registro (`Cod51100`), la carga inicial y el ABC lean lo mismo:
+
+```
+Methods:
+├─ EsUtilizable() -> Boolean             — ni ella ni su zona están bloqueadas
+├─ OcupadoEnUMHueco() -> Decimal         — lo que hay, contado en la clase del hueco (redondeado a 0,00001)
+├─ EnUMHueco(Producto, CantidadBase)     — una cantidad base de un producto, en la clase del hueco (sin redondear)
+├─ ContenidoQueImpideMezcla(Producto, Lote) -> 0 / 5 otro producto / 6 otro lote  — solo mira si existe (IsEmpty)
+├─ ContenidoQueImpideMezcla(Producto, Lote, var Contenido) -> igual, y deja en Contenido la línea que choca
+├─ FiltrarDeAlmacenaje()                 — filtra Tipo Ubicacion = Picking|Reserva
+├─ EsDeAlmacenaje() -> Boolean           — Tipo Ubicacion es Picking o Reserva
+├─ DigitoControlCorrecto(Digito) -> Boolean
+├─ TestDigitoControl(Almacen, Bin, Digito) — error si el dígito no es el del hueco (lo llama el picking)
+└─ EstiloEstado() -> Text                — color según Estado SGA
+```
+
+Cada llamante decide el orden de sus comprobaciones y qué hace con cada resultado: el registro
+lanza el error de cada caso y la propuesta lo convierte en un motivo de rechazo.
 
 **Importante**: también tiene FlowFields que leen desde la tabla topológica `Ubicacion Almacen` (Nave, Estantería, Columna, Altura).
 
@@ -473,8 +493,27 @@ PUBLIC:
 │  └─ Si el producto tiene Shelf No. en su ficha, retorna eso.
 │     Si no, retorna el campo "Producto Fijo" de la Ubicacion SGA.
 │
-└─ SecuenciaDesdeTopologia(Nave, E, C, A) -> Integer
-   └─ Convierte nav-00-01-00-01 a un número para ordenar picking.
+├─ SecuenciaDesdeTopologia(Nave, E, C, A) -> Integer
+│  └─ Convierte nav-00-01-00-01 a un número para ordenar picking.
+│
+├─ ProponerUbicacionCon(Estrategia, Excluidas, Almacen, Producto, Variante,
+│                       Lote, UM, Cantidad, var Motivo) -> Ubicacion
+│  └─ Única puerta para proponer hueco. Con hueco, Motivo dice por qué ese
+│     (fija, consolidación, primer hueco libre o vacío); sin hueco, la causa
+│     y qué hacer (ExplicarSinHuecoLote, con el lote).
+│
+├─ ExplicarSinHuecoLote(Almacen, Producto, Lote, UM, Cantidad) -> Texto
+│  └─ Por qué no hay hueco, contando los de la clase destino por motivo.
+│     La carga inicial la usa directamente para el motivo de palé.
+│
+├─ AnadirExclusion(Filtro, Codigo) -> Filtro
+│  └─ Suma un hueco al filtro de exclusiones de la propuesta ('<>A&<>B').
+│     Un código en blanco no añade nada.
+│
+└─ ComprobarUbicacionExiste(Almacen, Ubicacion)
+   └─ Error si la ubicación no existe en el almacén. Con el almacén o la
+      ubicación en blanco no comprueba nada. La usan Ubicar producto,
+      Ubicar entradas e Imprimir y ubicar palés.
 ```
 
 ### Cod51102: GestionMapaSGA — Render del mapa
@@ -526,6 +565,47 @@ PUBLIC:
 └─ LimpiarBuffer(CodUsuario)
    └─ Borra todas las filas de este usuario de BufferConciliacion.
 ```
+
+### Cod51108: UnidadesProductoSGA — Las unidades del producto
+
+Reúne lo que SGA sabe de las unidades de medida del producto: factor, unidad base, validación
+y clase (palé, caja o unidad). El registro de movimientos (Cod51100), el motor de propuestas y la
+tabla de ubicaciones (Cod51101, Tab Ubicacion SGA) sacan de aquí el factor de la ficha. Quedan
+lecturas directas de "Item Unit of Measure" en estos sitios:
+
+- `Cod51102 GestionMapaSGA`: cuántas unidades lleva el palé por defecto del producto (`gf` del
+  mapa), en la unidad que se muestra; y, en `UnidadParaMostrar`, los factores del palé por
+  defecto y de la unidad de venta de la ficha para elegir en qué unidad se enseña cada línea.
+- `Cod51105 GestionEntradasSGA`: los factores del palé de la tarea y de la unidad de venta al
+  repartir un ensamblado en palé completo, cajas y unidades sueltas.
+- `Pag51117 UbicarProductoSGA` (`UnidadesJuego`): las unidades de palé y de caja del producto
+  para repartir lo pendiente.
+
+```
+PUBLIC:
+├─ FactorUM(Producto, UM) -> Decimal
+│  └─ Unidades base de la UM. 1 si el producto o la UM van en blanco, si el
+│     producto no tiene esa UM o si su factor no es positivo.
+│
+├─ UMBase(Producto) -> UM
+│  └─ Unidad base del producto; en blanco si el producto no existe.
+│
+├─ TestUMProducto(Producto, UM) -> Decimal
+│  └─ Error "La unidad de medida %1 no está definida para el producto %2"
+│     si la UM no es la base ni una de sus unidades. Error estándar si el
+│     producto no existe. Si la UM vale, devuelve su factor (1 la base o un
+│     factor no positivo), y así el registro de movimientos la lee una vez.
+│
+├─ TipoUMProducto(Producto, UM) -> Palé / Caja / Unidad / en blanco
+├─ UMAdmitida(Producto, Tipo, UM) -> Boolean
+├─ TipoHuecoDestino(Producto, UM, Cantidad) -> Palé / Caja / Unidad / en blanco
+└─ UMProductoDeTipo(Producto, Tipo) -> UM
+   └─ Las funciones de clase: ver "Unidad de medida por ubicación".
+```
+
+Las conversiones con el factor guardado en el propio documento (línea de venta, ensamblado,
+línea de picking) no pasan por aquí: usan el de su registro, porque la ficha puede haber cambiado
+después.
 
 ---
 
@@ -607,14 +687,17 @@ Report 51102 "Carga Inicial Contenido SGA"     (solo pide opciones y filtro de p
               ├─ resto en cajas  → Cod51101.ProponerUbicacionCon(Priorizar Consolidacion, UM caja)
               └─ sueltas / sin hueco → no se carga
         └─ Cod51100.RegistrarCargaInicial()      (sin validar capacidad ni UM: ya se ha elegido)
-  └─ Pag51125 "Resultado Carga Inicial SGA"      (una fila por palé, grupo de cajas o no cargado)
+  └─ Pag51125 "Resultado Carga Inicial SGA"      (una fila por palé, grupo de cajas o no cargado;
+                                                   líneas de Tab51114 con Origen "Carga Inicial")
 ```
 
 **Decisiones de la carga inicial**:
 - **La simulación es la carga real deshecha.** `OnRun` termina con `Error(MarcaSimulacionTxt)`
   y el informe distingue esa marca con `EsFinSimulacion`. Así cada propuesta ve los huecos que
   han ocupado las anteriores, cosa que una simulación "sin escribir" no podría. El resultado
-  sobrevive porque va en una tabla temporal (Tab51111), que no entra en la vuelta atrás.
+  sobrevive porque va en una tabla temporal (Tab51114 "Linea Ubicacion SGA"), que no entra en la
+  vuelta atrás. Cargado es Estado Ubicado (con su ubicación); no cargado, Estado "Sin Sitio"
+  (con el motivo).
 - **Todo o nada.** Si algo falla a mitad, se deshace la carga entera. Los productos bloqueados se
   apartan antes (salen como no cargados) porque `AplicarMovimiento` los rechaza con error.
 - **Cursor de huecos de palé.** Los huecos vacíos sin producto fijo se recorren una sola vez en
@@ -818,7 +901,8 @@ Enviar a picking ──> Pendiente de asignar ──(responsable asigna)──> 
 - **Va fuera del código de barras a propósito.** Si estuviera dentro, bastaría con escanear un
   listado impreso; así solo se sabe estando delante de la etiqueta.
 - **`Config. SGA."Exigir Digito Control"`** (campo 46). La comprobación está en el motor,
-  `Cod51104.ConfirmarLinea` → `ComprobarDigitoControl`, no en la página: no se puede saltar.
+  `Cod51104.ConfirmarLinea` → `Ubicacion SGA.TestDigitoControl`, no en la página: no se puede
+  saltar. Una ubicación sin datos SGA da el mismo error que un dígito incorrecto.
   Se comprueba contra el hueco **real** (el escaneado), así un desvío permitido exige el dígito
   del hueco al que se ha ido.
 - **Etiqueta**: `Rep51106 "Etiquetas Ubicaciones SGA"`, layout propio
@@ -1085,8 +1169,8 @@ Así un hueco de palé admite PALE, PALE200, EUROPALE… sin listarlos en ningú
 
 ### De dónde sale la clase
 
-`TipoUMProducto(producto, UM)` es la que usan todos los procesos (propuesta, `UMAdmitida`,
-`UMProductoDeTipo`, `ExplicarSinHueco`). Mira solo la ficha y las `Item Unit of Measure` del
+`TipoUMProducto(producto, UM)`, de `Cod51108 "Unidades Producto SGA"`, es la que usan todos los
+procesos (propuesta, `UMAdmitida`, `UMProductoDeTipo`, `ExplicarSinHuecoLote`). Mira solo la ficha y las `Item Unit of Measure` del
 producto: factor ≤ 1 → Unidad; el `Cod. Pale por Defecto`, o cualquier UM con factor ≥ el suyo →
 Palé; la `Sales Unit of Measure` → Caja; cualquier otra → sin clase (no se propone hueco).
 `UMProductoDeTipo` devuelve la UM de cada clase con la misma regla: palé por defecto, unidad de
@@ -1099,15 +1183,16 @@ No hay ninguna configuración por código de unidad: la ficha del producto es la
 Son dos reglas distintas, a propósito. El porqué de cada regla y su historial están en
 [ESTRATEGIAS_UBICACION.md](ESTRATEGIAS_UBICACION.md); aquí solo dónde vive en el código:
 
-- **Propuesta** (`UbicacionAdmite` → `TipoHuecoDestino` de `Config. SGA`): un solo tipo de hueco
-  por cantidad. Palé → Palé; Unidad → Unidad; Caja → Caja si son menos de *Cajas Minimas Hueco
-  Pale* (10), Palé si son esas o más (palé incompleto de una referencia). Los huecos con *Admite*
-  en blanco no se proponen nunca, tampoco en la carga inicial (`FiltrarHuecosPale`).
+- **Propuesta** (`UbicacionAdmite` → `TipoHuecoDestino` de `Unidades Producto SGA`): un solo tipo
+  de hueco por cantidad. Palé → Palé; Unidad → Unidad; Caja → Caja si son menos de *Cajas Minimas
+  Hueco Pale* (10), Palé si son esas o más (palé incompleto de una referencia). Los huecos con
+  *Admite* en blanco no se proponen nunca, tampoco en la carga inicial (`FiltrarHuecosPale`). Solo
+  se proponen huecos de Picking o Reserva (`Ubicacion SGA.FiltrarDeAlmacenaje`).
 - **Validación al registrar** (`UMAdmitida`, desde `TestUMAdmitida`): más amplia, para que el
   operario pueda dejarlo en otro hueco que también sirva. Palé acepta palés y cajas (una sola
   referencia, porque los de palé no aceptan mezcla); Caja solo cajas; Unidad solo unidades; en
   blanco todo menos unidades. Las unidades sueltas solo entran en huecos de Unidad.
-- **Una sola regla para proponer y para explicar**: `MotivoRechazo` devuelve por qué un hueco no sirve (bloqueado, reservado a otro producto, otra clase o sin configurar, sin sitio, otro producto, otro lote). `UbicacionAdmite` es "motivo = 0", y `ExplicarSinHuecoLote` cuenta los huecos de la clase destino por motivo y lo dice en el mensaje ("No queda espacio en ubicaciones de Palé…: 40 de 42 sin sitio…"). La primera frase del motivo es siempre la causa, para agruparla en el resumen de la carga inicial. Lo usan *Ubicar producto*, *Ubicar entradas*, *Imprimir y ubicar palés* y la carga inicial.
+- **Una sola regla para proponer y para explicar**: `MotivoRechazo` devuelve por qué un hueco no sirve (bloqueado, reservado a otro producto, otra clase o sin configurar, sin sitio, otro producto, otro lote). La capacidad la cuenta con `Ubicacion SGA.EnUMHueco` y la mezcla con `Ubicacion SGA.ContenidoQueImpideMezcla` (la variante sin contenido, que solo mira si existe una línea que choca), los mismos datos que valida el registro. `UbicacionAdmite` es "motivo = 0", y `ExplicarSinHuecoLote` cuenta los huecos de la clase destino por motivo y lo dice en el mensaje ("No queda espacio en ubicaciones de Palé…: 40 de 42 sin sitio…"). `ProponerUbicacionCon` devuelve ya ese motivo cuando no hay hueco, calculado con el lote. La primera frase del motivo es siempre la causa, para agruparla en el resumen de la carga inicial. Lo usan *Ubicar producto*, *Ubicar entradas*, *Imprimir y ubicar palés* y la carga inicial.
 - **Solo con la ubicación vacía**: los campos de configuración de `Ubicacion SGA` (40, 50, 60, 70-73, 90, 91, 100, 110, 111, 113) llaman a `TestVacia` en su `OnValidate`. La ficha los pone `Editable = EsVacia` y `Cambiar ubicaciones en bloque` se salta las que tienen contenido (`UbicacionesOmitidas`). *Bloqueada*, *Motivo bloqueo* y *Descripción* quedan libres. *Generar* y *Sincronizar* solo rellenan ubicaciones nuevas, que están vacías.
 
 ### Palé completo o incompleto en las etiquetas
@@ -1123,14 +1208,14 @@ Como un ensamblado puede quedar ubicado en varias UM (palé, cajas…), `Cantida
 ensamblados* no vuelve a pedir lo ubicado con las etiquetas. En **compras** sigue filtrando por UM,
 porque un albarán puede traer el mismo lote en cajas y en palés en filas distintas.
 
-### Las funciones de clase (`Config. SGA`)
+### Las funciones de clase (`Unidades Producto SGA`)
 
 | Función | Qué hace | Quién la usa |
 |---|---|---|
-| `TipoUM(UM)` | Clase de un código de unidad | las demás |
-| `UMAdmitida(producto, tipo, UM)` | ¿El hueco de esa clase admite esa UM? En blanco = cualquiera; UM en blanco = base del producto | `Cod51100.TestUMAdmitida`, `Cod51101.UbicacionAdmite`, `Pag51117` |
-| `UMProductoDeTipo(producto, tipo)` | La unidad del producto de esa clase: para palé, primero `Item."Cod. Pale por Defecto"` si es de la clase; luego su *Put-away UoM* si es de la clase; si no, la de más cantidad | carga inicial, `Pag51117`, `UMCapacidadProducto` |
-| `UMCapacidadProducto(producto, tipo)` | La UM en la que se mide "1" de capacidad para ese producto | capacidad en `Cod51100`, `Cod51101` y `Ubicacion SGA.OcupadoEnUMHueco` |
+| `TipoUMProducto(producto, UM)` | Clase de una UM para ese producto: Palé, Caja, Unidad o en blanco (sin clase, o UM que el producto no tiene) | las demás |
+| `UMAdmitida(producto, tipo, UM)` | ¿El hueco de esa clase admite esa UM? En blanco = cualquiera menos unidades; UM en blanco = base del producto | `Cod51100.TestUMAdmitida` |
+| `TipoHuecoDestino(producto, UM, cantidad)` | Clase de hueco que se propone: el palé a Palé, las unidades a Unidad, las cajas a Caja o a Palé según *Cajas Minimas Hueco Pale* | `Cod51101.MotivoRechazo`, `Cod51101.ExplicarSinHuecoLote` |
+| `UMProductoDeTipo(producto, tipo)` | La UM del producto de esa clase: palé por defecto, unidad de venta o unidad base, si es de esa clase; si no, en blanco. Es también la UM en la que se mide "1" de capacidad de un hueco de esa clase para ese producto | `Cod51100.TestUMAdmitida`, `Ubicacion SGA.EnUMHueco` (capacidad en `Cod51100`, `Cod51101` y `OcupadoEnUMHueco`), carga inicial, ABC, `DesgloseCantidad` |
 
 ### Dónde se valida, y por qué ahí
 
@@ -1149,14 +1234,14 @@ producto (`Ubicacion SGA.OcupadoEnUMHueco`). Lo que entra se convierte igual con
 producto:
 
 ```al
-ocupado := rUbicacion.OcupadoEnUMHueco();                  // Σ cantidadBase / factor(palé de cada producto)
-entrada := cantidadBase / factor(UMCapacidadProducto(producto, tipo));
+ocupado := rUbicacion.OcupadoEnUMHueco();                  // Σ EnUMHueco(producto de cada línea, su cantidad base)
+entrada := rUbicacion.EnUMHueco(producto, cantidadBase);   // cantidadBase / FactorUM(UMProductoDeTipo(producto, tipo))
 if ocupado + entrada > "Capacidad Uds." then ...           // Cod51100 (registro) y Cod51101 (propuesta)
 ```
 
-`RecalcularOcupacion` (% y estado) y `CapacidadDisponible` usan el mismo cálculo. Antes el %
-comparaba unidades base contra capacidad en palés (1.200 botellas en un hueco de 1 palé daban
-120.000 %); con esto queda corregido.
+`EnUMHueco` no redondea: el registro (`Cod51100`) redondea la entrada a 0,00001 y la propuesta no.
+`RecalcularOcupacion` (% y estado) y `CapacidadDisponible` usan el mismo cálculo, así que el % se
+mide en la clase del hueco y no en unidades base.
 
 Que un hueco de palé admita **cualquier** palé, y no solo el de un producto, es lo que permite
 a la carga inicial recorrer los huecos libres con un cursor que solo avanza.
@@ -1199,8 +1284,8 @@ criterio de cálculo. Puntos de diseño:
 ```
 EN USO:
 51100-51111: Enums           (51110 clase ABC, 51111 estado de preparación del pedido)
-51100-51115: Tables          (51108-51109 órdenes de picking, 51110 buffer de entradas, 51111 resultado carga inicial, 51112-51113 análisis ABC, 51114 plan de ubicación, 51115 pendiente de ubicar)
-51100-51107: Codeunits       (51104 picking, 51105 entradas, 51106 carga inicial, 51107 análisis ABC)
+51100-51115: Tables          (51108-51109 órdenes de picking, 51110 buffer de entradas, 51111 libre, 51112-51113 análisis ABC, 51114 línea de ubicación, 51115 pendiente de ubicar)
+51100-51108: Codeunits       (51104 picking, 51105 entradas, 51106 carga inicial, 51107 análisis ABC, 51108 unidades del producto)
 51100-51131: Pages           (51116 libre; 51127 imprimir y ubicar palés; 51128-51129 análisis ABC; 51130 reparto de Ubicar producto; 51131 pendiente de ubicar)
 51100-51106: Reports         (51106 etiquetas de ubicación)
 51100-51108: Page Extensions (51105 Configuración de usuarios, 51106 libre: era Unidades de medida, 51107 líneas del pedido de venta, 51108 lista de pedidos de venta)
@@ -1209,7 +1294,7 @@ EN USO:
 51100:       Control Add-in
 
 LIBRES:
-Tables 51116+ (51120 también) · Codeunits 51108+ · Pages 51116 y 51132+
+Tables 51111, 51116+ (51120 también) · Codeunits 51109+ · Pages 51116 y 51132+
 Enums 51112+ · Reports 51107+ · Page Extensions 51109+ · Table Extensions 51103+
 Permission Sets 51102+
 

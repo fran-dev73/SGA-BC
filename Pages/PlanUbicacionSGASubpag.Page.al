@@ -10,7 +10,7 @@ page 51130 "Plan Ubicacion SGA Subpag"
 {
     Caption = 'Reparto';
     PageType = ListPart;
-    SourceTable = "Linea Plan Ubicacion SGA";
+    SourceTable = "Linea Ubicacion SGA";
     InsertAllowed = false;
     DeleteAllowed = false;
 
@@ -55,14 +55,14 @@ page 51130 "Plan Ubicacion SGA Subpag"
                 {
                     ApplicationArea = All;
                     Editable = false;
-                    StyleExpr = EstiloEstado;
+                    StyleExpr = EstiloLinea;
                     ToolTip = 'Pendiente de confirmar, ya ubicado o sin sitio.';
                 }
                 field(Motivo; Rec.Motivo)
                 {
                     ApplicationArea = All;
                     Editable = false;
-                    StyleExpr = EstiloEstado;
+                    StyleExpr = EstiloLinea;
                     ToolTip = 'Por qué se propone ese hueco o por qué no se puede ubicar.';
                 }
             }
@@ -70,24 +70,17 @@ page 51130 "Plan Ubicacion SGA Subpag"
     }
 
     var
-        EstiloEstado: Text;
+        EstiloLinea: Text;
 
     trigger OnAfterGetRecord()
     begin
-        case Rec.Estado of
-            Rec.Estado::Ubicado:
-                EstiloEstado := 'Favorable';
-            Rec.Estado::"Sin Sitio":
-                EstiloEstado := 'Unfavorable';
-            else
-                EstiloEstado := 'Standard';
-        end;
+        EstiloLinea := Rec.EstiloEstado();
     end;
 
     /// <summary>
     /// Enseña las líneas de la madre compartiendo su tabla temporal.
     /// </summary>
-    procedure Cargar(var prm_Lineas: Record "Linea Plan Ubicacion SGA")
+    procedure Cargar(var prm_Lineas: Record "Linea Ubicacion SGA")
     begin
         Rec.Copy(prm_Lineas, true);
         Rec.Reset();

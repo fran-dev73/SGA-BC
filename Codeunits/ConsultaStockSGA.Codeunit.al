@@ -224,23 +224,18 @@ codeunit 51103 "Consulta Stock SGA"
     /// </summary>
     local procedure AcumularEnDocumentos(var prm_Entradas: Codeunit "Gestion Entradas SGA"; var prm_Buffer: Record "Buffer Ubicar Entrada SGA" temporary; prm_Origen: Enum "Origen Mov. SGA"; prm_Almacen: Code[10]; prm_Producto: Code[20]; var prm_Acumulado: Dictionary of [Text, Decimal])
     var
-        rItemUM: Record "Item Unit of Measure";
+        cUM: Codeunit "Unidades Producto SGA";
         clave: Text;
         actual: Decimal;
-        factor: Decimal;
     begin
         prm_Entradas.CargarEntradas(prm_Buffer, prm_Origen, 0D, 0D, prm_Almacen, true, -1, prm_Producto);
         prm_Buffer.Reset();
         if prm_Buffer.FindSet() then
             repeat
-                factor := 1;
-                if rItemUM.Get(prm_Buffer."No. Producto", prm_Buffer."Cod. Unidad Medida") then
-                    if rItemUM."Qty. per Unit of Measure" > 0 then
-                        factor := rItemUM."Qty. per Unit of Measure";
                 clave := prm_Buffer."Cod. Variante" + '|' + prm_Buffer."No. Lote";
                 actual := 0;
                 if prm_Acumulado.Get(clave, actual) then;
-                prm_Acumulado.Set(clave, actual + prm_Buffer.Pendiente() * factor);
+                prm_Acumulado.Set(clave, actual + prm_Buffer.Pendiente() * cUM.FactorUM(prm_Buffer."No. Producto", prm_Buffer."Cod. Unidad Medida"));
             until prm_Buffer.Next() = 0;
     end;
 

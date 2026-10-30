@@ -121,19 +121,17 @@ codeunit 51107 "Analisis ABC SGA"
     local procedure AnotarVentas(var prm_Calculo: Record "Calculo ABC SGA"; prm_Producto: Code[20]; prm_CantidadBase: Decimal)
     var
         rLinea: Record "Clasificacion ABC SGA";
-        rConfig: Record "Config. SGA";
-        rItemUM: Record "Item Unit of Measure";
+        cUM: Codeunit "Unidades Producto SGA";
     begin
         if prm_CantidadBase <= 0 then
             exit;
 
         NuevaLinea(prm_Calculo, prm_Producto, rLinea);
         rLinea."Cantidad Salida Base" := prm_CantidadBase;
-        rLinea."Unidad Pale" := rConfig.UMProductoDeTipo(prm_Producto, "Tipo UM SGA"::Pale);
-        if (rLinea."Unidad Pale" <> '') and rItemUM.Get(prm_Producto, rLinea."Unidad Pale") and
-           (rItemUM."Qty. per Unit of Measure" > 0)
-        then
-            rLinea."Palets Salidos" := Round(prm_CantidadBase / rItemUM."Qty. per Unit of Measure", 0.1)
+        // Solo sale un palé que el producto tiene y que lleva más de una unidad base.
+        rLinea."Unidad Pale" := cUM.UMProductoDeTipo(prm_Producto, "Tipo UM SGA"::Pale);
+        if rLinea."Unidad Pale" <> '' then
+            rLinea."Palets Salidos" := Round(prm_CantidadBase / cUM.FactorUM(prm_Producto, rLinea."Unidad Pale"), 0.1)
         else
             rLinea."Sin Unidad Pale" := true;
         rLinea.Insert();
@@ -372,9 +370,8 @@ codeunit 51107 "Analisis ABC SGA"
     /// </summary>
     local procedure EsHuecoUtil(prm_Ubicacion: Record "Ubicacion SGA"): Boolean
     begin
-        if prm_Ubicacion.Bloqueada then
-            exit(false);
-        exit(prm_Ubicacion."Tipo Ubicacion" in [prm_Ubicacion."Tipo Ubicacion"::Picking, prm_Ubicacion."Tipo Ubicacion"::Reserva]);
+        // Solo cuenta el bloqueo del propio hueco, no el de su zona.
+        exit((not prm_Ubicacion.Bloqueada) and prm_Ubicacion.EsDeAlmacenaje());
     end;
 
     /// <summary>

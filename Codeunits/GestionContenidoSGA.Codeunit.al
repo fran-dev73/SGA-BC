@@ -25,6 +25,7 @@ codeunit 51100 "Gestion Contenido SGA"
 
     var
         cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
+        cUM: Codeunit "Unidades Producto SGA";
         ModoSilencioso: Boolean;
 
     /// <summary>
@@ -189,7 +190,7 @@ codeunit 51100 "Gestion Contenido SGA"
         cantidadActual: Decimal;
         diferencia: Decimal;
     begin
-        umBase := UnidadMedidaBase(prm_Producto);
+        umBase := cUM.UMBase(prm_Producto);
 
         if rContenido.Get(prm_Almacen, prm_Ubicacion, prm_Producto, prm_Variante, prm_Lote, umBase) then
             cantidadActual := rContenido."Cantidad Base";
@@ -304,9 +305,12 @@ codeunit 51100 "Gestion Contenido SGA"
         if rItem.Blocked then
             Error(ProductoBloqueadoErr, prm_Producto);
 
-        umUsada := prm_UM;
-        factor := ObtenerFactorUM(prm_Producto, umUsada);
+        // La UM en blanco es la base del producto; cualquier otra tiene que ser suya.
         umBase := rItem."Base Unit of Measure";
+        umUsada := prm_UM;
+        if umUsada = '' then
+            umUsada := umBase;
+        factor := cUM.TestUMProducto(prm_Producto, umUsada);
         cantidadBase := Round(prm_Cantidad * factor, 0.00001);
         caducidad := ObtenerCaducidadLote(prm_Producto, prm_Variante, prm_Lote);
 
@@ -402,7 +406,7 @@ codeunit 51100 "Gestion Contenido SGA"
         umBase: Code[10];
         existe: Boolean;
     begin
-        umBase := UnidadMedidaBase(rMovimiento."No. Producto");
+        umBase := cUM.UMBase(rMovimiento."No. Producto");
 
         existe := rContenido.Get(rMovimiento."Cod. Almacen", prm_Ubicacion, rMovimiento."No. Producto",
                                  rMovimiento."Cod. Variante", rMovimiento."No. Lote", umBase);
@@ -452,8 +456,6 @@ codeunit 51100 "Gestion Contenido SGA"
     var
         rContenido: Record "Contenido Ubicacion SGA";
         rConfig: Record "Config. SGA";
-        umHueco: Code[10];
-        factorHueco: Decimal;
         ocupado: Decimal;
         entrada: Decimal;
         UbicacionBloqueadaErr: Label 'La ubicación %1 está bloqueada: %2', Comment = '%1 = ubicación, %2 = motivo de bloqueo';
@@ -469,21 +471,11 @@ codeunit 51100 "Gestion Contenido SGA"
         if (rUbicacionSGA."Producto Fijo" <> '') and (rUbicacionSGA."Producto Fijo" <> prm_Producto) then
             Error(UbicacionProductoFijoErr, rUbicacionSGA."Cod. Bin", rUbicacionSGA."Producto Fijo");
 
-        rContenido.SetRange("Cod. Almacen", rUbicacionSGA."Cod. Almacen");
-        rContenido.SetRange("Cod. Bin", rUbicacionSGA."Cod. Bin");
-
-        if not rUbicacionSGA."Permite Mezcla Producto" then begin
-            rContenido.SetFilter("No. Producto", '<>%1', prm_Producto);
-            if rContenido.FindFirst() then
+        case rUbicacionSGA.ContenidoQueImpideMezcla(prm_Producto, prm_Lote, rContenido) of
+            5:
                 Error(MezclaProductoErr, rUbicacionSGA."Cod. Bin", rContenido."No. Producto");
-            rContenido.SetRange("No. Producto");
-        end;
-
-        if not rUbicacionSGA."Permite Mezcla Lote" then begin
-            rContenido.SetFilter("No. Lote", '<>%1', prm_Lote);
-            if rContenido.FindFirst() then
+            6:
                 Error(MezclaLoteErr, rUbicacionSGA."Cod. Bin", rContenido."No. Lote");
-            rContenido.SetRange("No. Lote");
         end;
 
         if rUbicacionSGA."Capacidad Uds." <= 0 then
@@ -498,12 +490,7 @@ codeunit 51100 "Gestion Contenido SGA"
         // de su producto, y lo que entra, con el de este producto. Así caben juntos palés de
         // 200 y de 300, o cajas de 6 y de 12.
         ocupado := rUbicacionSGA.OcupadoEnUMHueco();
-        factorHueco := 1;
-        umHueco := rConfig.UMCapacidadProducto(prm_Producto, rUbicacionSGA."Tipo UM Admitida");
-        if umHueco <> '' then
-            // Copia local: ObtenerFactorUM recibe la UM por referencia y puede cambiarla.
-            factorHueco := ObtenerFactorUM(prm_Producto, umHueco);
-        entrada := Round(prm_CantidadBase / factorHueco, 0.00001);
+        entrada := Round(rUbicacionSGA.EnUMHueco(prm_Producto, prm_CantidadBase), 0.00001);
 
         if ocupado + entrada <= rUbicacionSGA."Capacidad Uds." then
             exit;
@@ -532,18 +519,17 @@ codeunit 51100 "Gestion Contenido SGA"
     local procedure TestUMAdmitida(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]; prm_Producto: Code[20]; prm_UM: Code[10]; prm_EsTraslado: Boolean)
     var
         rUbicacionSGA: Record "Ubicacion SGA";
-        rConfig: Record "Config. SGA";
         UMNoAdmitidaErr: Label 'La ubicación %1 admite %2 y no se puede dejar mercancía en %3 en ella. Las unidades sueltas solo van a ubicaciones de Unidad, y las cajas a ubicaciones de Caja o de Palé.', Comment = '%1 = ubicación, %2 = qué admite (Palé/Caja/Unidad), %3 = UM usada';
         ProductoSinUMAdmitidaErr: Label 'La ubicación %1 admite %2 y el producto %3 no tiene ninguna unidad de esa clase.', Comment = '%1 = ubicación, %2 = qué admite (Palé/Caja/Unidad), %3 = producto';
     begin
         if not rUbicacionSGA.Get(prm_Almacen, prm_Ubicacion) then
             exit;
 
-        if rConfig.UMAdmitida(prm_Producto, rUbicacionSGA."Tipo UM Admitida", prm_UM) then
+        if cUM.UMAdmitida(prm_Producto, rUbicacionSGA."Tipo UM Admitida", prm_UM) then
             exit;
 
         if prm_EsTraslado then begin
-            if rConfig.UMProductoDeTipo(prm_Producto, rUbicacionSGA."Tipo UM Admitida") <> '' then
+            if cUM.UMProductoDeTipo(prm_Producto, rUbicacionSGA."Tipo UM Admitida") <> '' then
                 exit;
             Error(ProductoSinUMAdmitidaErr, prm_Ubicacion, rUbicacionSGA."Tipo UM Admitida", prm_Producto);
         end;
@@ -590,39 +576,6 @@ codeunit 51100 "Gestion Contenido SGA"
         rUbicacionSGA.RecalcularOcupacion();
         rUbicacionSGA."Fecha Ultimo Movimiento" := CurrentDateTime();
         rUbicacionSGA.Modify(false);
-    end;
-
-    local procedure ObtenerFactorUM(prm_Producto: Code[20]; var prm_UM: Code[10]): Decimal
-    var
-        rItem: Record Item;
-        rItemUM: Record "Item Unit of Measure";
-        UMNoDefinidaErr: Label 'La unidad de medida %1 no está definida para el producto %2.', Comment = '%1 = unidad de medida, %2 = producto';
-    begin
-        rItem.Get(prm_Producto);
-
-        if prm_UM = '' then
-            prm_UM := rItem."Base Unit of Measure";
-
-        if prm_UM = rItem."Base Unit of Measure" then
-            exit(1);
-
-        if not rItemUM.Get(prm_Producto, prm_UM) then
-            Error(UMNoDefinidaErr, prm_UM, prm_Producto);
-
-        if rItemUM."Qty. per Unit of Measure" <= 0 then
-            exit(1);
-
-        exit(rItemUM."Qty. per Unit of Measure");
-    end;
-
-    local procedure UnidadMedidaBase(prm_Producto: Code[20]): Code[10]
-    var
-        rItem: Record Item;
-    begin
-        if not rItem.Get(prm_Producto) then
-            exit('');
-
-        exit(rItem."Base Unit of Measure");
     end;
 
     local procedure ObtenerCaducidadLote(prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50]): Date

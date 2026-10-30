@@ -206,7 +206,7 @@ Si el reparto da **una sola línea** con hueco, la pantalla te pregunta directam
 **Si no encuentra sitio**, el motivo dice qué falta configurar:
 - **No existe ninguna ubicación de esa clase** (por ejemplo, de caja): te explica cómo crear una (ficha de la ubicación → *Admite* = Caja, *Acepta múltiples productos*, *Capacidad* en cajas).
 - **Existen, pero son de muelle, cuarentena u otro uso**: solo se proponen las de tipo *Picking* o *Reserva*.
-- **Existen, pero ninguna tiene sitio**: llenas, bloqueadas o con otro producto.
+- **Existen, pero ninguna tiene sitio**: llenas, bloqueadas, con otro producto o con otro lote (el motivo tiene en cuenta el lote que estás ubicando).
 
 **El orden de recorrido** ("ruta de picking") es el campo **Secuencia picking** de cada ubicación. Se calcula solo al generarlas a partir del código: primero el pasillo, luego el hueco y luego el nivel (A-01-01-1, A-01-01-2… A-01-02-1…). Si quieres que unos huecos se llenen antes que otros, cambia su *Secuencia picking* en la ficha: cuanto menor, antes.
 

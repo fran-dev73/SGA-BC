@@ -279,12 +279,12 @@ codeunit 51105 "Gestion Entradas SGA"
                 TempFila.Modify();
 
                 if codigo <> '' then begin
-                    asignadas := AnadirExclusion(asignadas, codigo);
+                    asignadas := cUbicaciones.AnadirExclusion(asignadas, codigo);
                     propuestas += 1;
                 end;
             end else
                 if TempFila."Ubicacion Propuesta" <> '' then
-                    asignadas := AnadirExclusion(asignadas, TempFila."Ubicacion Propuesta");
+                    asignadas := cUbicaciones.AnadirExclusion(asignadas, TempFila."Ubicacion Propuesta");
         until TempFila.Next() = 0;
 
         exit(propuestas);
@@ -303,7 +303,7 @@ codeunit 51105 "Gestion Entradas SGA"
     begin
         excluidas := ExclusionesDeOtrasFilas(prm_Fila);
         if prm_Fila."Ubicacion Propuesta" <> '' then
-            excluidas := AnadirExclusion(excluidas, prm_Fila."Ubicacion Propuesta");
+            excluidas := cUbicaciones.AnadirExclusion(excluidas, prm_Fila."Ubicacion Propuesta");
 
         codigo := ProponerParaFila(prm_Fila, excluidas, motivo);
 
@@ -401,7 +401,7 @@ codeunit 51105 "Gestion Entradas SGA"
     ///
     /// El palé completo se ubica en la unidad de palé. El incompleto, en cajas (la unidad de
     /// venta), que van a un hueco de caja o de palé según cuántas sean (ver TipoHuecoDestino en
-    /// "Config. SGA"); las botellas que no lleguen a una caja quedan pendientes y se avisa. Si
+    /// "Unidades Producto SGA"); las botellas que no lleguen a una caja quedan pendientes y se avisa. Si
     /// no llega a una caja, se ubica en unidades sueltas.
     ///
     /// Devuelve false, con el porqué en prm_Aviso, si no hay palé que ubicar. Con true, en
@@ -530,7 +530,7 @@ codeunit 51105 "Gestion Entradas SGA"
 
         // La fila pasa entera a esa unidad, para que el pendiente y lo ya ubicado se comparen
         // en la misma unidad que se va a registrar.
-        factorDestino := FactorProducto(prm_Fila."No. Producto", umDestino);
+        factorDestino := cUM.FactorUM(prm_Fila."No. Producto", umDestino);
         entradaBase := prm_Fila."Cantidad Entrada" * qtyPorUM;
         yaUbicadoBase := prm_Fila."Cantidad Ya Ubicada" * qtyPorUM;
         prm_Fila."Cod. Unidad Medida" := umDestino;
@@ -557,9 +557,7 @@ codeunit 51105 "Gestion Entradas SGA"
     local procedure ProponerParaFila(var prm_Fila: Record "Buffer Ubicar Entrada SGA"; prm_Excluidas: Text; var prm_Motivo: Text): Code[20]
     var
         rConfig: Record "Config. SGA";
-        cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
         estrategia: Enum "Estrategia Ubicacion SGA";
-        codigo: Code[20];
         cantidad: Decimal;
     begin
         rConfig.ObtenerConfig();
@@ -573,15 +571,11 @@ codeunit 51105 "Gestion Entradas SGA"
         if cantidad <= 0 then
             cantidad := prm_Fila.Pendiente();
 
-        codigo := cUbicaciones.ProponerUbicacionCon(estrategia, prm_Excluidas,
-                                                   prm_Fila."Cod. Almacen", prm_Fila."No. Producto",
-                                                   prm_Fila."Cod. Variante", prm_Fila."No. Lote",
-                                                   prm_Fila."Cod. Unidad Medida", cantidad, prm_Motivo);
         // Sin hueco, el motivo dice por qué: sin ubicaciones de esa clase, sin espacio, etc.
-        if codigo = '' then
-            prm_Motivo := cUbicaciones.ExplicarSinHuecoLote(prm_Fila."Cod. Almacen", prm_Fila."No. Producto", prm_Fila."No. Lote",
-                                                           prm_Fila."Cod. Unidad Medida", cantidad);
-        exit(codigo);
+        exit(cUbicaciones.ProponerUbicacionCon(estrategia, prm_Excluidas,
+                                               prm_Fila."Cod. Almacen", prm_Fila."No. Producto",
+                                               prm_Fila."Cod. Variante", prm_Fila."No. Lote",
+                                               prm_Fila."Cod. Unidad Medida", cantidad, prm_Motivo));
     end;
 
     /// <summary>
@@ -641,21 +635,8 @@ codeunit 51105 "Gestion Entradas SGA"
         until rMov.Next() = 0;
 
         if todasLasUM then
-            exit(Round(totalBase / FactorProducto(prm_Producto, prm_UM), 0.00001));
+            exit(Round(totalBase / cUM.FactorUM(prm_Producto, prm_UM), 0.00001));
         exit(total);
-    end;
-
-    /// <summary>
-    /// Unidades base de una UM del producto. Uno si no se reconoce.
-    /// </summary>
-    local procedure FactorProducto(prm_Producto: Code[20]; prm_UM: Code[10]): Decimal
-    var
-        rItemUM: Record "Item Unit of Measure";
-    begin
-        if rItemUM.Get(prm_Producto, prm_UM) then
-            if rItemUM."Qty. per Unit of Measure" > 0 then
-                exit(rItemUM."Qty. per Unit of Measure");
-        exit(1);
     end;
 
     /// <summary>
@@ -678,27 +659,15 @@ codeunit 51105 "Gestion Entradas SGA"
         repeat
             if TempOtra.GetPosition() <> prm_Fila.GetPosition() then
                 if TempOtra."Ubicacion Propuesta" <> '' then
-                    excluidas := AnadirExclusion(excluidas, TempOtra."Ubicacion Propuesta");
+                    excluidas := cUbicaciones.AnadirExclusion(excluidas, TempOtra."Ubicacion Propuesta");
         until TempOtra.Next() = 0;
 
         exit(excluidas);
     end;
 
-    /// <summary>
-    /// Suma un hueco al filtro de exclusión, en el formato que entiende SetFilter.
-    /// </summary>
-    local procedure AnadirExclusion(prm_Filtro: Text; prm_Codigo: Code[20]): Text
-    begin
-        if prm_Codigo = '' then
-            exit(prm_Filtro);
-
-        if prm_Filtro = '' then
-            exit('<>' + prm_Codigo);
-
-        exit(prm_Filtro + '&<>' + prm_Codigo);
-    end;
-
     var
+        cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
+        cUM: Codeunit "Unidades Producto SGA";
         FechaDesde: Date;
         FechaHasta: Date;
         ClaseFiltro: Integer;

@@ -2,7 +2,6 @@ namespace AntonioNadal.SGA;
 
 using Microsoft.Inventory.Item;
 using Microsoft.Inventory.Location;
-using Microsoft.Warehouse.Structure;
 
 /// <summary>
 /// Page Ubicar Producto SGA (ID 51117).
@@ -133,13 +132,9 @@ page 51117 "Ubicar Producto SGA"
                     end;
 
                     trigger OnValidate()
-                    var
-                        rUM: Record "Item Unit of Measure";
-                        UMNoDefinidaErr: Label 'La unidad de medida %1 no está definida para el producto %2.', Comment = '%1 = unidad, %2 = producto';
                     begin
                         if (UM <> '') and (Producto <> '') then
-                            if not rUM.Get(Producto, UM) then
-                                Error(UMNoDefinidaErr, UM, Producto);
+                            cUM.TestUMProducto(Producto, UM);
                         RecalcularPendiente();
                     end;
                 }
@@ -304,7 +299,9 @@ page 51117 "Ubicar Producto SGA"
     }
 
     var
-        TempPlan: Record "Linea Plan Ubicacion SGA";
+        TempPlan: Record "Linea Ubicacion SGA";
+        cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
+        cUM: Codeunit "Unidades Producto SGA";
         Almacen: Code[10];
         Producto: Code[20];
         DescripcionProducto: Text[100];
@@ -327,7 +324,7 @@ page 51117 "Ubicar Producto SGA"
         if Preparada then begin
             // Viene con los datos puestos (desde "Pendiente de ubicar"): se respetan.
             CargarProducto();
-            UM := UmBaseProducto();
+            UM := cUM.UMBase(Producto);
             Cantidad := CantidadPreparada;
             RecalcularPendiente();
         end else begin
@@ -375,7 +372,6 @@ page 51117 "Ubicar Producto SGA"
     /// </summary>
     local procedure RecalcularPendiente()
     var
-        cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
         stockBase: Decimal;
         ubicadoBase: Decimal;
         pendienteBase: Decimal;
@@ -391,8 +387,8 @@ page 51117 "Ubicar Producto SGA"
         pendienteBase := cUbicaciones.PendienteDeUbicar(Almacen, Producto, Variante, Lote, stockBase, ubicadoBase);
 
         // El cálculo va en unidad base; se pasa a la UM elegida con su factor de conversión.
-        PendienteUbicar := Round(pendienteBase / FactorDe(UM), 0.00001);
-        DetalleDisponible := StrSubstNo(DetallePendienteLbl, stockBase, ubicadoBase, UmBaseProducto());
+        PendienteUbicar := Round(pendienteBase / cUM.FactorUM(Producto, UM), 0.00001);
+        DetalleDisponible := StrSubstNo(DetallePendienteLbl, stockBase, ubicadoBase, cUM.UMBase(Producto));
         DesglosePendiente := Desglosar(pendienteBase);
         CalcularEquivalencia();
     end;
@@ -474,7 +470,7 @@ page 51117 "Ubicar Producto SGA"
         if resto > 0 then begin
             if texto <> '' then
                 texto += ', ';
-            texto += Format(resto) + ' ' + UmBaseProducto();
+            texto += Format(resto) + ' ' + cUM.UMBase(Producto);
         end;
 
         exit(texto);
@@ -493,18 +489,9 @@ page 51117 "Ubicar Producto SGA"
         if (Producto = '') or (Cantidad <= 0) then
             exit;
 
-        factor := FactorDe(UM);
-        EquivaleBase := StrSubstNo(EquivalenciaLbl, Round(Cantidad * factor, 0.00001), UmBaseProducto(),
+        factor := cUM.FactorUM(Producto, UM);
+        EquivaleBase := StrSubstNo(EquivalenciaLbl, Round(Cantidad * factor, 0.00001), cUM.UMBase(Producto),
                                    Desglosar(Round(Cantidad * factor, 0.00001)));
-    end;
-
-    local procedure UmBaseProducto(): Code[10]
-    var
-        rItem: Record Item;
-    begin
-        if rItem.Get(Producto) then
-            exit(rItem."Base Unit of Measure");
-        exit('');
     end;
 
     local procedure LimpiarPropuesta()
@@ -523,7 +510,6 @@ page 51117 "Ubicar Producto SGA"
     local procedure CalcularPropuesta()
     var
         rConfig: Record "Config. SGA";
-        cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
         restoBase: Decimal;
         cant: Decimal;
         umPaso: Code[10];
@@ -548,7 +534,7 @@ page 51117 "Ubicar Producto SGA"
         TempPlan.Reset();
         TempPlan.DeleteAll();
 
-        restoBase := Round(Cantidad * FactorDe(UM), 0.00001);
+        restoBase := Round(Cantidad * cUM.FactorUM(Producto, UM), 0.00001);
         UnidadesJuego(umPale, fp, umVenta, fv);
         if fp > 0 then
             palesTotales := Round(restoBase / fp, 1, '<');
@@ -566,22 +552,24 @@ page 51117 "Ubicar Producto SGA"
 
             TempPlan.Init();
             TempPlan.Linea := vueltas;
+            TempPlan.Origen := TempPlan.Origen::Manual;
             TempPlan.Paso := CopyStr(texto, 1, MaxStrLen(TempPlan.Paso));
             TempPlan."Cod. Almacen" := Almacen;
+            TempPlan."No. Producto" := Producto;
+            TempPlan."Descripcion Producto" := DescripcionProducto;
+            TempPlan."Cod. Variante" := Variante;
+            TempPlan."No. Lote" := Lote;
             TempPlan."Cod. Unidad Medida" := umPaso;
             TempPlan.Cantidad := cant;
-            TempPlan."Cantidad Base" := Round(cant * FactorDe(umPaso), 0.00001);
+            TempPlan."Cantidad Base" := Round(cant * cUM.FactorUM(Producto, umPaso), 0.00001);
             TempPlan."Ubicacion Propuesta" := hueco;
             TempPlan."Ubicacion Confirmada" := hueco;
-            if hueco = '' then begin
-                TempPlan.Estado := TempPlan.Estado::"Sin Sitio";
-                motivo := cUbicaciones.ExplicarSinHueco(Almacen, Producto, umPaso, cant);
-            end else begin
+            // Sin hueco, el motivo ya trae la causa.
+            if hueco = '' then
+                TempPlan.Estado := TempPlan.Estado::"Sin Sitio"
+            else begin
                 TempPlan.Estado := TempPlan.Estado::Pendiente;
-                if excluidas = '' then
-                    excluidas := '<>' + hueco
-                else
-                    excluidas += '&<>' + hueco;
+                excluidas := cUbicaciones.AnadirExclusion(excluidas, hueco);
             end;
             TempPlan.Motivo := CopyStr(motivo, 1, MaxStrLen(TempPlan.Motivo));
             TempPlan.Insert();
@@ -627,7 +615,7 @@ page 51117 "Ubicar Producto SGA"
                     prm_Texto := UnidadesVentaLbl;
                 end;
             else begin
-                prm_UM := UmBaseProducto();
+                prm_UM := cUM.UMBase(Producto);
                 prm_Cantidad := prm_RestoBase;
                 prm_Texto := UnidadesSueltasLbl;
             end;
@@ -642,7 +630,6 @@ page 51117 "Ubicar Producto SGA"
     local procedure ConfirmarLineas(prm_Linea: Integer)
     var
         rConfig: Record "Config. SGA";
-        rBin: Record Bin;
         cContenido: Codeunit "Gestion Contenido SGA";
         lineas: List of [Integer];
         n: Integer;
@@ -651,7 +638,6 @@ page 51117 "Ubicar Producto SGA"
         IndiqueUbicacionErr: Label 'Indique la ubicación de la línea "%1".', Comment = '%1 = qué';
         DesvioNoPermitidoErr: Label 'La configuración no permite desviarse de la ubicación propuesta (%1) en la línea "%2".', Comment = '%1 = ubicación, %2 = qué';
         SinPropuestaErr: Label 'La línea "%1" no tiene ubicación propuesta y la configuración exige proponer antes de confirmar.', Comment = '%1 = qué';
-        UbicacionNoExisteErr: Label 'La ubicación %1 no existe en el almacén %2.', Comment = '%1 = ubicación, %2 = almacén';
         UbicadoGuiadoLbl: Label 'Ubicado desde la pantalla de ubicación guiada.';
     begin
         rConfig.ObtenerConfig();
@@ -667,8 +653,7 @@ page 51117 "Ubicar Producto SGA"
                     if prm_Linea <> 0 then
                         Error(IndiqueUbicacionErr, TempPlan.Paso);
                 end else begin
-                    if not rBin.Get(Almacen, TempPlan."Ubicacion Confirmada") then
-                        Error(UbicacionNoExisteErr, TempPlan."Ubicacion Confirmada", Almacen);
+                    cUbicaciones.ComprobarUbicacionExiste(Almacen, TempPlan."Ubicacion Confirmada");
                     if (TempPlan."Ubicacion Propuesta" = '') and rConfig."Exigir Confirmar Ubicacion" then
                         Error(SinPropuestaErr, TempPlan.Paso);
                     if (TempPlan."Ubicacion Propuesta" <> '') and (TempPlan."Ubicacion Confirmada" <> TempPlan."Ubicacion Propuesta") and
@@ -699,22 +684,10 @@ page 51117 "Ubicar Producto SGA"
         restoBase := TempPlan."Cantidad Base";
         TempPlan.Reset();
 
-        UM := UmBaseProducto();
+        UM := cUM.UMBase(Producto);
         Cantidad := restoBase;
         RecalcularPendiente();
         CurrPage.Plan.Page.Cargar(TempPlan);
         CurrPage.Update(false);
-    end;
-
-    local procedure FactorDe(prm_UM: Code[10]): Decimal
-    var
-        rUM: Record "Item Unit of Measure";
-    begin
-        if (prm_UM <> '') and (Producto <> '') then
-            if rUM.Get(Producto, prm_UM) then
-                if rUM."Qty. per Unit of Measure" > 0 then
-                    exit(rUM."Qty. per Unit of Measure");
-
-        exit(1);
     end;
 }

@@ -4,7 +4,6 @@ using AntonioNadal.Produccion;
 using Microsoft.Inventory.Item;
 using Microsoft.Inventory.Item.Catalog;
 using Microsoft.Inventory.Setup;
-using Microsoft.Warehouse.Structure;
 using System.Environment;
 
 /// <summary>
@@ -55,7 +54,7 @@ page 51127 "Ubicar Palets Linea SGA"
 
                     trigger OnValidate()
                     begin
-                        ComprobarUbicacion(TempPaleActual."Ubicacion Confirmada");
+                        cUbicaciones.ComprobarUbicacionExiste(TempPaleActual."Cod. Almacen", TempPaleActual."Ubicacion Confirmada");
                         TempPaleActual.Modify();
                     end;
                 }
@@ -342,6 +341,7 @@ page 51127 "Ubicar Palets Linea SGA"
 
     var
         TempPaleActual: Record "Buffer Ubicar Entrada SGA";
+        cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
         TareaPale: Integer;
         HayPale: Boolean;
         Situacion: Text;
@@ -415,7 +415,7 @@ page 51127 "Ubicar Palets Linea SGA"
             Error(Situacion);
         if TempPaleActual."Ubicacion Confirmada" = '' then
             Error(UbicacionNoIndicadaErr);
-        ComprobarUbicacion(TempPaleActual."Ubicacion Confirmada");
+        cUbicaciones.ComprobarUbicacionExiste(TempPaleActual."Cod. Almacen", TempPaleActual."Ubicacion Confirmada");
         ComprobarEtiqueta();
 
         // En Sandbox no se toca BarTender (su carpeta FTP es la de producción): la etiqueta sale
@@ -437,19 +437,6 @@ page 51127 "Ubicar Palets Linea SGA"
 
         CargarPale();
         CurrPage.Update(false);
-    end;
-
-    /// <summary>
-    /// La ubicación tiene que existir en el almacén del palé.
-    /// </summary>
-    local procedure ComprobarUbicacion(prm_Ubicacion: Code[20])
-    var
-        rBin: Record Bin;
-        UbicacionNoExisteErr: Label 'La ubicación %1 no existe en el almacén %2.', Comment = '%1 = ubicación, %2 = almacén';
-    begin
-        if (prm_Ubicacion <> '') and (TempPaleActual."Cod. Almacen" <> '') then
-            if not rBin.Get(TempPaleActual."Cod. Almacen", prm_Ubicacion) then
-                Error(UbicacionNoExisteErr, prm_Ubicacion, TempPaleActual."Cod. Almacen");
     end;
 
     /// <summary>

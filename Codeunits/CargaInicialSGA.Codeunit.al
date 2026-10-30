@@ -33,7 +33,7 @@ codeunit 51106 "Carga Inicial SGA"
     end;
 
     var
-        TempResultado: Record "Resultado Carga Inicial SGA" temporary;
+        TempResultado: Record "Linea Ubicacion SGA" temporary;
         // Modo "solo pendientes" (página Pendiente Ubicar SGA): en vez de todo el stock, se reparte
         // la cantidad indicada de cada lote.
         TempPendientes: Record "Pendiente Ubicar SGA" temporary;
@@ -42,6 +42,7 @@ codeunit 51106 "Carga Inicial SGA"
         cContenido: Codeunit "Gestion Contenido SGA";
         cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
         cStock: Codeunit "Consulta Stock SGA";
+        cUM: Codeunit "Unidades Producto SGA";
         Almacen: Code[10];
         UbicacionIndicada: Code[20];
         VistaProductos: Text;
@@ -95,7 +96,11 @@ codeunit 51106 "Carga Inicial SGA"
         exit(prm_TextoError = MarcaSimulacionTxt);
     end;
 
-    procedure ObtenerResultado(var prm_Resultado: Record "Resultado Carga Inicial SGA")
+    /// <summary>
+    /// Lo que ha hecho la carga: una línea por palé, grupo de cajas o resto, con Estado Ubicado
+    /// (y su ubicación) o "Sin Sitio" (y el motivo).
+    /// </summary>
+    procedure ObtenerResultado(var prm_Resultado: Record "Linea Ubicacion SGA" temporary)
     begin
         prm_Resultado.Copy(TempResultado, true);
     end;
@@ -273,17 +278,18 @@ codeunit 51106 "Carga Inicial SGA"
     begin
         // El palé y la caja de cada producto salen de su ficha: el palé por defecto y la unidad
         // de venta, se llamen como se llamen (PALE200, EUROPALE, CAJA6…).
-        umPale := rConfig.UMProductoDeTipo(prm_Producto."No.", "Tipo UM SGA"::Pale);
-        umCaja := rConfig.UMProductoDeTipo(prm_Producto."No.", "Tipo UM SGA"::Caja);
+        // Solo salen unidades que el producto tiene y que llevan más de una unidad base.
+        umPale := cUM.UMProductoDeTipo(prm_Producto."No.", "Tipo UM SGA"::Pale);
+        umCaja := cUM.UMProductoDeTipo(prm_Producto."No.", "Tipo UM SGA"::Caja);
 
-        factorPale := FactorUM(prm_Producto."No.", umPale);
-        if factorPale <= 0 then begin
+        if umPale = '' then begin
             if UbicacionIndicada <> '' then
                 Cargar(prm_Producto, prm_Stock, UbicacionIndicada, prm_Stock."Unidad Medida Base", prm_Stock."Stock BC", prm_Stock."Stock BC", SinPaleUbicacionIndicadaLbl)
             else
                 AnotarNoCargado(prm_Producto, prm_Stock, prm_Stock."Unidad Medida Base", prm_Stock."Stock BC", prm_Stock."Stock BC", SinPaleSinUbicacionLbl);
             exit;
         end;
+        factorPale := cUM.FactorUM(prm_Producto."No.", umPale);
 
         // Palés completos: uno por hueco.
         pales := Round(prm_Stock."Stock BC" / factorPale, 1, '<');
@@ -309,11 +315,11 @@ codeunit 51106 "Carga Inicial SGA"
             exit;
 
         // El resto, en cajas, a un hueco mixto.
-        factorCaja := FactorUM(prm_Producto."No.", umCaja);
-        if (umCaja = '') or (factorCaja <= 0) then begin
+        if umCaja = '' then begin
             AnotarNoCargado(prm_Producto, prm_Stock, prm_Stock."Unidad Medida Base", restoBase, restoBase, SinCajaLbl);
             exit;
         end;
+        factorCaja := cUM.FactorUM(prm_Producto."No.", umCaja);
 
         cajas := Round(restoBase / factorCaja, 1, '<');
         sueltasBase := restoBase - cajas * factorCaja;
@@ -322,9 +328,9 @@ codeunit 51106 "Carga Inicial SGA"
             hueco := cUbicaciones.ProponerUbicacionCon("Estrategia Ubicacion SGA"::"Priorizar Consolidacion", '', Almacen,
                                                        prm_Producto."No.", prm_Stock."Cod. Variante", prm_Stock."No. Lote",
                                                        umCaja, cajas, motivo);
+            // Sin hueco, el motivo ya trae la causa.
             if hueco = '' then
-                AnotarNoCargado(prm_Producto, prm_Stock, umCaja, cajas, cajas * factorCaja,
-                                cUbicaciones.ExplicarSinHuecoLote(Almacen, prm_Producto."No.", prm_Stock."No. Lote", umCaja, cajas))
+                AnotarNoCargado(prm_Producto, prm_Stock, umCaja, cajas, cajas * factorCaja, motivo)
             else
                 Cargar(prm_Producto, prm_Stock, hueco, umCaja, cajas, cajas * factorCaja, motivo);
         end;
@@ -334,8 +340,7 @@ codeunit 51106 "Carga Inicial SGA"
             hueco := cUbicaciones.ProponerUbicacionCon("Estrategia Ubicacion SGA"::"Priorizar Consolidacion", '', Almacen, prm_Producto."No.",
                                                        prm_Stock."Cod. Variante", prm_Stock."No. Lote", prm_Stock."Unidad Medida Base", sueltasBase, motivo);
             if hueco = '' then
-                AnotarNoCargado(prm_Producto, prm_Stock, prm_Stock."Unidad Medida Base", sueltasBase, sueltasBase,
-                                cUbicaciones.ExplicarSinHuecoLote(Almacen, prm_Producto."No.", prm_Stock."No. Lote", prm_Stock."Unidad Medida Base", sueltasBase))
+                AnotarNoCargado(prm_Producto, prm_Stock, prm_Stock."Unidad Medida Base", sueltasBase, sueltasBase, motivo)
             else
                 Cargar(prm_Producto, prm_Stock, hueco, prm_Stock."Unidad Medida Base", sueltasBase, sueltasBase, motivo);
         end;
@@ -396,7 +401,7 @@ codeunit 51106 "Carga Inicial SGA"
     begin
         prm_Hueco.SetRange("Cod. Almacen", Almacen);
         prm_Hueco.SetRange(Bloqueada, false);
-        prm_Hueco.SetFilter("Tipo Ubicacion", '%1|%2', prm_Hueco."Tipo Ubicacion"::Picking, prm_Hueco."Tipo Ubicacion"::Reserva);
+        prm_Hueco.FiltrarDeAlmacenaje();
         // Solo huecos de palé: los que no tienen "Admite" configurado no se proponen. No depende
         // del producto: un hueco de palé admite cualquier palé, y eso es lo que permite que el
         // cursor de huecos libres solo avance.
@@ -445,37 +450,27 @@ codeunit 51106 "Carga Inicial SGA"
     begin
         TempResultado.Reset();
         if TempResultado.FindLast() then
-            siguiente := TempResultado."No. Entrada";
+            siguiente := TempResultado.Linea;
 
         TempResultado.Init();
-        TempResultado."No. Entrada" := siguiente + 1;
+        TempResultado.Linea := siguiente + 1;
+        TempResultado.Origen := TempResultado.Origen::"Carga Inicial";
+        TempResultado."Cod. Almacen" := Almacen;
         TempResultado."No. Producto" := prm_Producto."No.";
         TempResultado."Descripcion Producto" := CopyStr(prm_Producto.Description, 1, MaxStrLen(TempResultado."Descripcion Producto"));
         TempResultado."Cod. Variante" := prm_Stock."Cod. Variante";
         TempResultado."No. Lote" := prm_Stock."No. Lote";
-        TempResultado."Cod. Bin" := prm_Bin;
+        TempResultado."Ubicacion Propuesta" := prm_Bin;
+        TempResultado."Ubicacion Confirmada" := prm_Bin;
         TempResultado."Cod. Unidad Medida" := prm_UM;
         TempResultado.Cantidad := prm_Cantidad;
         TempResultado."Cantidad Base" := prm_CantidadBase;
-        TempResultado.Cargado := prm_Cargado;
+        if prm_Cargado then
+            TempResultado.Estado := TempResultado.Estado::Ubicado
+        else
+            TempResultado.Estado := TempResultado.Estado::"Sin Sitio";
         TempResultado.Motivo := CopyStr(prm_Motivo, 1, MaxStrLen(TempResultado.Motivo));
         TempResultado.Insert();
-    end;
-
-    /// <summary>
-    /// Unidades base de una UM del producto. 0 si el producto no tiene esa unidad.
-    /// </summary>
-    local procedure FactorUM(prm_Producto: Code[20]; prm_UM: Code[10]): Decimal
-    var
-        rItemUM: Record "Item Unit of Measure";
-    begin
-        if prm_UM = '' then
-            exit(0);
-
-        if not rItemUM.Get(prm_Producto, prm_UM) then
-            exit(0);
-
-        exit(rItemUM."Qty. per Unit of Measure");
     end;
 
     local procedure YaTieneContenido(prm_Producto: Code[20]): Boolean

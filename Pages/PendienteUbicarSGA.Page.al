@@ -286,7 +286,7 @@ page 51131 "Pendiente Ubicar SGA"
     local procedure UbicarSeleccion()
     var
         TempSeleccion: Record "Pendiente Ubicar SGA" temporary;
-        TempResultado: Record "Resultado Carga Inicial SGA" temporary;
+        TempResultado: Record "Linea Ubicacion SGA" temporary;
         cCarga: Codeunit "Carga Inicial SGA";
         pResultado: Page "Resultado Carga Inicial SGA";
         opcion: Integer;
