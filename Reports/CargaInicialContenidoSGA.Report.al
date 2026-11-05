@@ -117,13 +117,9 @@ report 51102 "Carga Inicial Contenido SGA"
         TempResultado: Record "Linea Ubicacion SGA" temporary;
         cCarga: Codeunit "Carga Inicial SGA";
         pResultado: Page "Resultado Carga Inicial SGA";
-        productos: Integer;
-        cargadas: Decimal;
-        noCargadas: Decimal;
         textoError: Text;
         ConfirmarCargaQst: Label 'Se va a crear el contenido inicial de las ubicaciones del almacén %1 a partir del stock actual. ¿Desea continuar?', Comment = '%1 = almacén';
-        SimulacionTerminadaMsg: Label 'Simulación terminada (no se ha guardado nada).\Productos con stock: %1.\Unidades que se cargarían: %2.\Unidades que se quedarían sin cargar: %3.%4', Comment = '%1 = productos, %2 = unidades cargadas, %3 = unidades sin cargar, %4 = resumen por motivo';
-        CargaTerminadaMsg: Label 'Carga inicial terminada.\Productos con stock: %1.\Unidades cargadas: %2.\Unidades sin cargar: %3.%4', Comment = '%1 = productos, %2 = unidades cargadas, %3 = unidades sin cargar, %4 = resumen por motivo';
+        ProcesoFinalizadoMsg: Label 'Proceso finalizado.';
     begin
         if (not blnSimular) and GuiAllowed() then
             if not Confirm(ConfirmarCargaQst, false, codAlmacen) then
@@ -139,17 +135,14 @@ report 51102 "Carga Inicial Contenido SGA"
                 Error(textoError);
         end;
 
-        cCarga.ObtenerTotales(productos, cargadas, noCargadas);
-        cCarga.ObtenerResultado(TempResultado);
-
         if not GuiAllowed() then
             exit;
 
-        if blnSimular then
-            Message(SimulacionTerminadaMsg, productos, cargadas, noCargadas, ResumenNoCargado(TempResultado))
-        else
-            Message(CargaTerminadaMsg, productos, cargadas, noCargadas, ResumenNoCargado(TempResultado));
+        // Solo el aviso de fin: el detalle, línea a línea y con su motivo, está en la página
+        // de resultado.
+        Message(ProcesoFinalizadoMsg);
 
+        cCarga.ObtenerResultado(TempResultado);
         if not TempResultado.IsEmpty() then begin
             pResultado.Rellenar(TempResultado);
             pResultado.Run();
@@ -170,78 +163,5 @@ report 51102 "Carga Inicial Contenido SGA"
         if optDestino = optDestino::"Huecos Libres" then
             exit('');
         exit(codUbicacionIndicada);
-    end;
-
-    /// <summary>
-    /// Lo que no se ha cargado, agrupado por la causa (la primera frase del motivo): cuántas
-    /// líneas por causa, de la más repetida a la menos, hasta 6. El detalle de cada línea, con
-    /// qué hacer, está en la página de resultado.
-    /// </summary>
-    local procedure ResumenNoCargado(var prm_Resultado: Record "Linea Ubicacion SGA" temporary): Text
-    var
-        lineas: Dictionary of [Text, Integer];
-        causas: List of [Text];
-        causa: Text;
-        elegida: Text;
-        texto: Text;
-        n: Integer;
-        mayor: Integer;
-        vuelta: Integer;
-        CabeceraLbl: Label '\\Sin cargar, por motivo:';
-        LineaLbl: Label '\- %1 (%2 líneas)', Comment = '%1 = causa, %2 = número de líneas';
-        MasLbl: Label '\- … y %1 motivos más (ver el detalle).', Comment = '%1 = número de motivos';
-    begin
-        prm_Resultado.Reset();
-        prm_Resultado.SetRange(Estado, prm_Resultado.Estado::"Sin Sitio");
-        if not prm_Resultado.FindSet() then begin
-            prm_Resultado.Reset();
-            exit('');
-        end;
-        repeat
-            causa := PrimeraFrase(prm_Resultado.Motivo);
-            if lineas.Get(causa, n) then
-                lineas.Set(causa, n + 1)
-            else begin
-                lineas.Add(causa, 1);
-                causas.Add(causa);
-            end;
-        until prm_Resultado.Next() = 0;
-        prm_Resultado.Reset();
-
-        texto := CabeceraLbl;
-        for vuelta := 1 to 6 do begin
-            mayor := 0;
-            elegida := '';
-            foreach causa in causas do
-                if lineas.Get(causa) > mayor then begin
-                    mayor := lineas.Get(causa);
-                    elegida := causa;
-                end;
-            if mayor = 0 then
-                exit(texto);
-            texto += StrSubstNo(LineaLbl, elegida, mayor);
-            lineas.Set(elegida, 0);
-        end;
-
-        n := 0;
-        foreach causa in causas do
-            if lineas.Get(causa) > 0 then
-                n += 1;
-        if n > 0 then
-            texto += StrSubstNo(MasLbl, n);
-        exit(texto);
-    end;
-
-    /// <summary>
-    /// La causa de un motivo: hasta el primer punto. Los motivos empiezan siempre por ella.
-    /// </summary>
-    local procedure PrimeraFrase(prm_Texto: Text): Text
-    var
-        p: Integer;
-    begin
-        p := StrPos(prm_Texto, '. ');
-        if p > 0 then
-            exit(CopyStr(prm_Texto, 1, p));
-        exit(prm_Texto);
     end;
 }

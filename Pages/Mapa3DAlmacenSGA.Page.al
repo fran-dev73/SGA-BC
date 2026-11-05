@@ -4,8 +4,9 @@ using Microsoft.Inventory.Location;
 
 /// <summary>
 /// Page Mapa 3D Almacen SGA (ID 51122).
-/// Vista en tres dimensiones del almacén: cada ubicación es un bloque colocado según su
-/// estantería, columna y altura, y coloreado según lo ocupada que esté.
+/// Mapa del almacén en tres vistas: 3D (cada ubicación es un bloque colocado según su
+/// pasillo, estantería y altura), planta (desde arriba) y frente de un pasillo. Se colorea
+/// por estado, rotación ABC o caducidad, y se busca un producto o una ubicación.
 ///
 /// El dibujo lo hace el control add-in "Mapa 3D SGA"; esta página se limita a decidir qué
 /// ubicaciones entran y a atender el clic sobre un bloque.
@@ -24,7 +25,7 @@ page 51122 "Mapa 3D Almacen SGA"
     ModifyAllowed = false;
     SaveValues = false;
     AboutTitle = 'Mapa 3D de almacén';
-    AboutText = 'Dibuja el almacén en volumen: cada bloque es una ubicación y su color dice si está vacía, con hueco, llena o bloqueada. Arrastre para girar, use la rueda para acercar y pulse un bloque para ver qué contiene. Con "Trasladar" (o Ctrl+arrastrar) lleve una ubicación hasta otra para mover su mercancía.';
+    AboutText = 'Dibuja el almacén en tres vistas: 3D, planta (desde arriba) y frente de un pasillo, que es la de trabajo. Colorea por estado, rotación ABC o caducidad, y busca un producto o una ubicación. Arrastre una ubicación con contenido y suéltela sobre otra para trasladar su mercancía; pulse una ubicación para ver qué contiene.';
 
     layout
     {
@@ -43,25 +44,45 @@ page 51122 "Mapa 3D Almacen SGA"
 
                     trigger OnValidate()
                     begin
+                        // Las zonas son de cada almacén.
+                        FiltroZona := '';
                         Refrescar();
                     end;
                 }
-                field(FiltroNave; FiltroNave)
+                field(FiltroZona; FiltroZona)
                 {
-                    Caption = 'Nave';
-                    ToolTip = 'Nave que se quiere ver. En blanco dibuja todas las del almacén.';
+                    Caption = 'Zona';
+                    ToolTip = 'Zona que se quiere ver por separado. En blanco dibuja todas las del almacén. Los traslados arrastrando solo se hacen dentro de una misma zona.';
                     ApplicationArea = All;
 
-                    trigger OnValidate()
+                    trigger OnLookup(var Text: Text): Boolean
+                    var
+                        rZona: Record "Zona SGA";
                     begin
+                        rZona.SetRange("Cod. Almacen", FiltroAlmacen);
+                        if Page.RunModal(0, rZona) <> Action::LookupOK then
+                            exit(false);
+                        Text := rZona.Code;
+                        exit(true);
+                    end;
+
+                    trigger OnValidate()
+                    var
+                        rZona: Record "Zona SGA";
+                    begin
+                        if FiltroZona <> '' then
+                            rZona.Get(FiltroAlmacen, FiltroZona);
                         Refrescar();
                     end;
                 }
-                field(FiltroEstanteria; FiltroEstanteria)
+                field(FiltroPasillo; FiltroPasillo)
                 {
-                    Caption = 'Estantería';
-                    ToolTip = 'Estantería concreta. En blanco dibuja todas las de la nave.';
+                    Caption = 'Pasillo';
+                    ToolTip = 'Pasillo concreto. En blanco (0) dibuja todos los del almacén.';
                     ApplicationArea = All;
+                    BlankZero = true;
+                    MinValue = 0;
+                    MaxValue = 999;
 
                     trigger OnValidate()
                     begin
@@ -107,12 +128,13 @@ page 51122 "Mapa 3D Almacen SGA"
                     Vaciar(CopyStr(prm_CodBin, 1, 20));
                 end;
 
-                trigger PasilloSeleccionado(prm_Estanteria: Text)
+                trigger PasilloSeleccionado(prm_Pasillo: Text)
                 begin
                     // El lienzo ya ha aislado el pasillo por su cuenta, así que aquí solo se
                     // acompaña el filtro de la página: no se vuelve a dibujar, que tiraría
-                    // el giro y el zoom que el operario tenga puestos.
-                    FiltroEstanteria := CopyStr(prm_Estanteria, 1, MaxStrLen(FiltroEstanteria));
+                    // el giro y el zoom que el operario tenga puestos. En blanco, todos.
+                    if not Evaluate(FiltroPasillo, prm_Pasillo) then
+                        FiltroPasillo := 0;
                     CalcularResumen();
                     CurrPage.Update(false);
                 end;
@@ -160,8 +182,8 @@ page 51122 "Mapa 3D Almacen SGA"
 
     var
         FiltroAlmacen: Code[10];
-        FiltroNave: Code[1];
-        FiltroEstanteria: Code[2];
+        FiltroZona: Code[10];
+        FiltroPasillo: Integer;
         Resumen: Text;
         ControlPreparado: Boolean;
 
@@ -171,6 +193,7 @@ page 51122 "Mapa 3D Almacen SGA"
     begin
         rConfig.ObtenerConfig();
         FiltroAlmacen := rConfig."Almacen por Defecto";
+        FiltroZona := rConfig."Zona por Defecto";
         // No se dibuja aquí: hay que esperar a que el lienzo avise de que está montado.
     end;
 
@@ -182,7 +205,7 @@ page 51122 "Mapa 3D Almacen SGA"
         if not ControlPreparado then
             exit;
 
-        datos := cMapa.DatosMapa3D(FiltroAlmacen, FiltroNave, FiltroEstanteria);
+        datos := cMapa.DatosMapa3D(FiltroAlmacen, FiltroZona, FiltroPasillo);
         CurrPage.Lienzo.Dibujar(datos);
         CalcularResumen();
         CurrPage.Update(false);
@@ -192,18 +215,22 @@ page 51122 "Mapa 3D Almacen SGA"
     /// Traslado pedido arrastrando en el mapa. Si el origen tiene varias líneas (productos o
     /// lotes), se pregunta cuál; luego el diálogo de traslado sale con origen y destino puestos
     /// y el operario confirma la cantidad. Registra Cod. "Gestion Contenido SGA", como siempre.
+    /// Solo dentro de una misma zona: entre zonas se traslada desde Contenido de ubicaciones.
     /// </summary>
     local procedure Trasladar(prm_Origen: Code[20]; prm_Destino: Code[20])
     var
         rContenido: Record "Contenido Ubicacion SGA";
         cContenido: Codeunit "Gestion Contenido SGA";
         cMapa: Codeunit "Gestion Mapa SGA";
+        cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
         pContenido: Page "Contenido Ubicaciones SGA";
         destino: Code[20];
         SinContenidoTrasladarErr: Label 'La ubicación %1 no tiene contenido que trasladar.', Comment = '%1 = ubicación';
         TrasladadoMsg: Label 'Trasladado de %1 a %2.', Comment = '%1 = origen, %2 = destino';
         TrasladoMapa3DLbl: Label 'Traslado desde el mapa 3D';
     begin
+        cUbicaciones.TestMismaZona(FiltroAlmacen, prm_Origen, prm_Destino);
+
         rContenido.SetRange("Cod. Almacen", FiltroAlmacen);
         rContenido.SetRange("Cod. Bin", prm_Origen);
         if rContenido.IsEmpty() then
@@ -220,11 +247,11 @@ page 51122 "Mapa 3D Almacen SGA"
 
         // El operario puede cambiar en el diálogo el destino del arrastre: el mensaje lleva el elegido.
         destino := prm_Destino;
-        if cContenido.TrasladarConDialogo(rContenido, destino, TrasladoMapa3DLbl) = 0 then
+        if cContenido.TrasladarConDialogo(rContenido, destino, TrasladoMapa3DLbl, true) = 0 then
             exit;
 
         // Sin perder la vista: el operario sigue en el mismo giro, zoom y pasillo.
-        CurrPage.Lienzo.Actualizar(cMapa.DatosMapa3D(FiltroAlmacen, FiltroNave, FiltroEstanteria));
+        CurrPage.Lienzo.Actualizar(cMapa.DatosMapa3D(FiltroAlmacen, FiltroZona, FiltroPasillo));
         CalcularResumen();
         CurrPage.Update(false);
         Message(TrasladadoMsg, prm_Origen, destino);
@@ -260,7 +287,7 @@ page 51122 "Mapa 3D Almacen SGA"
 
         lineas := cContenido.VaciarUbicacion(FiltroAlmacen, prm_CodBin);
 
-        CurrPage.Lienzo.Actualizar(cMapa.DatosMapa3D(FiltroAlmacen, FiltroNave, FiltroEstanteria));
+        CurrPage.Lienzo.Actualizar(cMapa.DatosMapa3D(FiltroAlmacen, FiltroZona, FiltroPasillo));
         CalcularResumen();
         CurrPage.Update(false);
         Message(UbicacionVaciadaMsg, prm_CodBin, lineas);
@@ -276,6 +303,6 @@ page 51122 "Mapa 3D Almacen SGA"
             exit;
         end;
 
-        Resumen := cUbicaciones.ResumenUbicaciones(FiltroAlmacen);
+        Resumen := cUbicaciones.ResumenUbicaciones(FiltroAlmacen, FiltroZona);
     end;
 }

@@ -24,7 +24,7 @@ page 51100 "Ubicaciones SGA"
             {
                 field("Cod. Bin"; Rec."Cod. Bin")
                 {
-                    ToolTip = 'Código de la ubicación en la topología nave-estantería-columna-altura.';
+                    ToolTip = 'Código de la ubicación en la topología pasillo-estantería-altura (101-15-03).';
                     ApplicationArea = All;
                     StyleExpr = EstiloFila;
                 }
@@ -80,6 +80,11 @@ page 51100 "Ubicaciones SGA"
                 {
                     ToolTip = 'Cuánto cabe, en la clase que admite el hueco: 1 = un palé (lleve lo que lleve), 72 = setenta y dos cajas. 0 = sin límite. Para cambiar muchas a la vez, use "Cambiar en bloque".';
                     ApplicationArea = All;
+                }
+                field("Control Capacidad"; Rec."Control Capacidad")
+                {
+                    ApplicationArea = All;
+                    Visible = false;
                 }
                 field(Bloqueada; Rec.Bloqueada)
                 {
@@ -316,25 +321,6 @@ page 51100 "Ubicaciones SGA"
                 ApplicationArea = All;
                 Image = Balance;
                 RunObject = report "Conciliacion SGA vs Stock";
-            }
-        }
-        area(Reporting)
-        {
-            action(InformeInventario)
-            {
-                Caption = 'Inventario por ubicación';
-                ToolTip = 'Exporta a Excel el contenido de las ubicaciones.';
-                ApplicationArea = All;
-                Image = "Report";
-                RunObject = report "Inventario por Ubicacion SGA";
-            }
-            action(InformeOcupacion)
-            {
-                Caption = 'Ocupación de ubicaciones';
-                ToolTip = 'Exporta a Excel el estado y la ocupación de cada ubicación.';
-                ApplicationArea = All;
-                Image = "Report";
-                RunObject = report "Ocupacion Ubicaciones SGA";
             }
         }
         area(Promoted)

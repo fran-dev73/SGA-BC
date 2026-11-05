@@ -4,8 +4,8 @@ using Microsoft.Inventory.Location;
 
 /// <summary>
 /// Page Mapa Almacen SGA (ID 51107).
-/// Rejilla de la nave: una fila por altura de cada estantería y una columna por columna
-/// física. Cada celda muestra qué hay en ese hueco y se colorea según su estado, de modo
+/// Rejilla del almacén: una fila por altura de cada pasillo y una columna por estantería.
+/// Cada celda muestra qué hay en ese hueco y se colorea según su estado, de modo
 /// que se ve de un golpe de vista qué está vacío, qué está lleno y qué está bloqueado.
 ///
 /// Al pulsar una celda se abre el contenido de esa ubicación.
@@ -23,7 +23,7 @@ page 51107 "Mapa Almacen SGA"
     DeleteAllowed = false;
     ModifyAllowed = false;
     AboutTitle = 'Mapa de almacén';
-    AboutText = 'Dibuja las ubicaciones como una rejilla: cada columna es un hueco del pasillo y cada fila una altura, con el color según lo ocupada que esté. Filtre por estantería para verla de frente, como un alzado. Pulse una celda para ver qué contiene. Se reconstruye cada vez que se abre, así que refleja siempre las estanterías que hay ahora.';
+    AboutText = 'Dibuja las ubicaciones como una rejilla: cada columna es una estantería del pasillo y cada fila una altura, con el color según lo ocupada que esté. Filtre por pasillo para verlo de frente, como un alzado. Pulse una celda para ver qué contiene. Se reconstruye cada vez que se abre, así que refleja siempre las ubicaciones que hay ahora.';
 
     layout
     {
@@ -36,7 +36,7 @@ page 51107 "Mapa Almacen SGA"
                 field(FiltroAlmacen; FiltroAlmacen)
                 {
                     Caption = 'Almacén';
-                    ToolTip = 'Almacén cuya nave se quiere ver.';
+                    ToolTip = 'Almacén que se quiere ver.';
                     ApplicationArea = All;
                     TableRelation = Location;
 
@@ -45,22 +45,14 @@ page 51107 "Mapa Almacen SGA"
                         Construir();
                     end;
                 }
-                field(FiltroNave; FiltroNave)
+                field(FiltroPasillo; FiltroPasillo)
                 {
-                    Caption = 'Nave';
-                    ToolTip = 'Nave que se quiere dibujar. En blanco dibuja todas las naves del almacén.';
+                    Caption = 'Pasillo';
+                    ToolTip = 'Pasillo que se quiere ver de frente, como un alzado: las estanterías en horizontal y las alturas en vertical. En blanco (0) muestra todos.';
                     ApplicationArea = All;
-
-                    trigger OnValidate()
-                    begin
-                        Construir();
-                    end;
-                }
-                field(FiltroEstanteria; FiltroEstanteria)
-                {
-                    Caption = 'Estantería';
-                    ToolTip = 'Estantería que se quiere ver de frente, como un alzado: los huecos en horizontal y las alturas en vertical. En blanco muestra todas.';
-                    ApplicationArea = All;
+                    BlankZero = true;
+                    MinValue = 0;
+                    MaxValue = 999;
 
                     trigger OnValidate()
                     begin
@@ -78,7 +70,7 @@ page 51107 "Mapa Almacen SGA"
                 field(Aviso; Aviso)
                 {
                     Caption = 'Aviso';
-                    ToolTip = 'Avisos sobre el dibujo, por ejemplo si la estantería tiene más columnas de las que caben en la rejilla.';
+                    ToolTip = 'Avisos sobre el dibujo, por ejemplo si hay más estanterías de las que caben en la rejilla.';
                     ApplicationArea = All;
                     Editable = false;
                     Style = Unfavorable;
@@ -87,13 +79,13 @@ page 51107 "Mapa Almacen SGA"
             }
             repeater(Rejilla)
             {
-                field("Cod. Estanteria"; Rec."Cod. Estanteria")
+                field(Pasillo; Rec.Pasillo)
                 {
-                    ToolTip = 'Estantería que representa la fila.';
+                    ToolTip = 'Pasillo que representa la fila.';
                     ApplicationArea = All;
                     Style = Strong;
                 }
-                field("Cod. Altura"; Rec."Cod. Altura")
+                field(Altura; Rec.Altura)
                 {
                     ToolTip = 'Altura que representa la fila. Las alturas se dibujan de arriba abajo.';
                     ApplicationArea = All;
@@ -101,7 +93,7 @@ page 51107 "Mapa Almacen SGA"
                 }
                 field("Columna 01"; Rec."Columna 01")
                 {
-                    ToolTip = 'Hueco de la columna 01: producto y cantidad que contiene.';
+                    ToolTip = 'Hueco de la estantería 01: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 01";
                     Visible = MostrarCol01;
@@ -113,7 +105,7 @@ page 51107 "Mapa Almacen SGA"
                 }
                 field("Columna 02"; Rec."Columna 02")
                 {
-                    ToolTip = 'Hueco de la columna 02: producto y cantidad que contiene.';
+                    ToolTip = 'Hueco de la estantería 02: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 02";
                     Visible = MostrarCol02;
@@ -125,7 +117,7 @@ page 51107 "Mapa Almacen SGA"
                 }
                 field("Columna 03"; Rec."Columna 03")
                 {
-                    ToolTip = 'Hueco de la columna 03: producto y cantidad que contiene.';
+                    ToolTip = 'Hueco de la estantería 03: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 03";
                     Visible = MostrarCol03;
@@ -137,7 +129,7 @@ page 51107 "Mapa Almacen SGA"
                 }
                 field("Columna 04"; Rec."Columna 04")
                 {
-                    ToolTip = 'Hueco de la columna 04: producto y cantidad que contiene.';
+                    ToolTip = 'Hueco de la estantería 04: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 04";
                     Visible = MostrarCol04;
@@ -149,7 +141,7 @@ page 51107 "Mapa Almacen SGA"
                 }
                 field("Columna 05"; Rec."Columna 05")
                 {
-                    ToolTip = 'Hueco de la columna 05: producto y cantidad que contiene.';
+                    ToolTip = 'Hueco de la estantería 05: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 05";
                     Visible = MostrarCol05;
@@ -161,7 +153,7 @@ page 51107 "Mapa Almacen SGA"
                 }
                 field("Columna 06"; Rec."Columna 06")
                 {
-                    ToolTip = 'Hueco de la columna 06: producto y cantidad que contiene.';
+                    ToolTip = 'Hueco de la estantería 06: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 06";
                     Visible = MostrarCol06;
@@ -173,7 +165,7 @@ page 51107 "Mapa Almacen SGA"
                 }
                 field("Columna 07"; Rec."Columna 07")
                 {
-                    ToolTip = 'Hueco de la columna 07: producto y cantidad que contiene.';
+                    ToolTip = 'Hueco de la estantería 07: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 07";
                     Visible = MostrarCol07;
@@ -185,7 +177,7 @@ page 51107 "Mapa Almacen SGA"
                 }
                 field("Columna 08"; Rec."Columna 08")
                 {
-                    ToolTip = 'Hueco de la columna 08: producto y cantidad que contiene.';
+                    ToolTip = 'Hueco de la estantería 08: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 08";
                     Visible = MostrarCol08;
@@ -197,7 +189,7 @@ page 51107 "Mapa Almacen SGA"
                 }
                 field("Columna 09"; Rec."Columna 09")
                 {
-                    ToolTip = 'Hueco de la columna 09: producto y cantidad que contiene.';
+                    ToolTip = 'Hueco de la estantería 09: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 09";
                     Visible = MostrarCol09;
@@ -209,7 +201,7 @@ page 51107 "Mapa Almacen SGA"
                 }
                 field("Columna 10"; Rec."Columna 10")
                 {
-                    ToolTip = 'Hueco de la columna 10: producto y cantidad que contiene.';
+                    ToolTip = 'Hueco de la estantería 10: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 10";
                     Visible = MostrarCol10;
@@ -221,7 +213,7 @@ page 51107 "Mapa Almacen SGA"
                 }
                 field("Columna 11"; Rec."Columna 11")
                 {
-                    ToolTip = 'Hueco de la columna 11: producto y cantidad que contiene.';
+                    ToolTip = 'Hueco de la estantería 11: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 11";
                     Visible = MostrarCol11;
@@ -233,7 +225,7 @@ page 51107 "Mapa Almacen SGA"
                 }
                 field("Columna 12"; Rec."Columna 12")
                 {
-                    ToolTip = 'Hueco de la columna 12: producto y cantidad que contiene.';
+                    ToolTip = 'Hueco de la estantería 12: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 12";
                     Visible = MostrarCol12;
@@ -245,7 +237,7 @@ page 51107 "Mapa Almacen SGA"
                 }
                 field("Columna 13"; Rec."Columna 13")
                 {
-                    ToolTip = 'Hueco de la columna 13: producto y cantidad que contiene.';
+                    ToolTip = 'Hueco de la estantería 13: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 13";
                     Visible = MostrarCol13;
@@ -257,7 +249,7 @@ page 51107 "Mapa Almacen SGA"
                 }
                 field("Columna 14"; Rec."Columna 14")
                 {
-                    ToolTip = 'Hueco de la columna 14: producto y cantidad que contiene.';
+                    ToolTip = 'Hueco de la estantería 14: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 14";
                     Visible = MostrarCol14;
@@ -269,7 +261,7 @@ page 51107 "Mapa Almacen SGA"
                 }
                 field("Columna 15"; Rec."Columna 15")
                 {
-                    ToolTip = 'Hueco de la columna 15: producto y cantidad que contiene.';
+                    ToolTip = 'Hueco de la estantería 15: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 15";
                     Visible = MostrarCol15;
@@ -281,7 +273,7 @@ page 51107 "Mapa Almacen SGA"
                 }
                 field("Columna 16"; Rec."Columna 16")
                 {
-                    ToolTip = 'Hueco de la columna 16: producto y cantidad que contiene.';
+                    ToolTip = 'Hueco de la estantería 16: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 16";
                     Visible = MostrarCol16;
@@ -293,7 +285,7 @@ page 51107 "Mapa Almacen SGA"
                 }
                 field("Columna 17"; Rec."Columna 17")
                 {
-                    ToolTip = 'Hueco de la columna 17: producto y cantidad que contiene.';
+                    ToolTip = 'Hueco de la estantería 17: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 17";
                     Visible = MostrarCol17;
@@ -305,7 +297,7 @@ page 51107 "Mapa Almacen SGA"
                 }
                 field("Columna 18"; Rec."Columna 18")
                 {
-                    ToolTip = 'Hueco de la columna 18: producto y cantidad que contiene.';
+                    ToolTip = 'Hueco de la estantería 18: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 18";
                     Visible = MostrarCol18;
@@ -317,7 +309,7 @@ page 51107 "Mapa Almacen SGA"
                 }
                 field("Columna 19"; Rec."Columna 19")
                 {
-                    ToolTip = 'Hueco de la columna 19: producto y cantidad que contiene.';
+                    ToolTip = 'Hueco de la estantería 19: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 19";
                     Visible = MostrarCol19;
@@ -329,7 +321,7 @@ page 51107 "Mapa Almacen SGA"
                 }
                 field("Columna 20"; Rec."Columna 20")
                 {
-                    ToolTip = 'Hueco de la columna 20: producto y cantidad que contiene.';
+                    ToolTip = 'Hueco de la estantería 20: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 20";
                     Visible = MostrarCol20;
@@ -341,7 +333,7 @@ page 51107 "Mapa Almacen SGA"
                 }
                 field("Columna 21"; Rec."Columna 21")
                 {
-                    ToolTip = 'Hueco de la columna 21: producto y cantidad que contiene.';
+                    ToolTip = 'Hueco de la estantería 21: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 21";
                     Visible = MostrarCol21;
@@ -353,7 +345,7 @@ page 51107 "Mapa Almacen SGA"
                 }
                 field("Columna 22"; Rec."Columna 22")
                 {
-                    ToolTip = 'Hueco de la columna 22: producto y cantidad que contiene.';
+                    ToolTip = 'Hueco de la estantería 22: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 22";
                     Visible = MostrarCol22;
@@ -365,7 +357,7 @@ page 51107 "Mapa Almacen SGA"
                 }
                 field("Columna 23"; Rec."Columna 23")
                 {
-                    ToolTip = 'Hueco de la columna 23: producto y cantidad que contiene.';
+                    ToolTip = 'Hueco de la estantería 23: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 23";
                     Visible = MostrarCol23;
@@ -377,7 +369,7 @@ page 51107 "Mapa Almacen SGA"
                 }
                 field("Columna 24"; Rec."Columna 24")
                 {
-                    ToolTip = 'Hueco de la columna 24: producto y cantidad que contiene.';
+                    ToolTip = 'Hueco de la estantería 24: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 24";
                     Visible = MostrarCol24;
@@ -389,7 +381,7 @@ page 51107 "Mapa Almacen SGA"
                 }
                 field("Columna 25"; Rec."Columna 25")
                 {
-                    ToolTip = 'Hueco de la columna 25: producto y cantidad que contiene.';
+                    ToolTip = 'Hueco de la estantería 25: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 25";
                     Visible = MostrarCol25;
@@ -401,7 +393,7 @@ page 51107 "Mapa Almacen SGA"
                 }
                 field("Columna 26"; Rec."Columna 26")
                 {
-                    ToolTip = 'Hueco de la columna 26: producto y cantidad que contiene.';
+                    ToolTip = 'Hueco de la estantería 26: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 26";
                     Visible = MostrarCol26;
@@ -413,7 +405,7 @@ page 51107 "Mapa Almacen SGA"
                 }
                 field("Columna 27"; Rec."Columna 27")
                 {
-                    ToolTip = 'Hueco de la columna 27: producto y cantidad que contiene.';
+                    ToolTip = 'Hueco de la estantería 27: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 27";
                     Visible = MostrarCol27;
@@ -425,7 +417,7 @@ page 51107 "Mapa Almacen SGA"
                 }
                 field("Columna 28"; Rec."Columna 28")
                 {
-                    ToolTip = 'Hueco de la columna 28: producto y cantidad que contiene.';
+                    ToolTip = 'Hueco de la estantería 28: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 28";
                     Visible = MostrarCol28;
@@ -437,7 +429,7 @@ page 51107 "Mapa Almacen SGA"
                 }
                 field("Columna 29"; Rec."Columna 29")
                 {
-                    ToolTip = 'Hueco de la columna 29: producto y cantidad que contiene.';
+                    ToolTip = 'Hueco de la estantería 29: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 29";
                     Visible = MostrarCol29;
@@ -449,7 +441,7 @@ page 51107 "Mapa Almacen SGA"
                 }
                 field("Columna 30"; Rec."Columna 30")
                 {
-                    ToolTip = 'Hueco de la columna 30: producto y cantidad que contiene.';
+                    ToolTip = 'Hueco de la estantería 30: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 30";
                     Visible = MostrarCol30;
@@ -461,7 +453,7 @@ page 51107 "Mapa Almacen SGA"
                 }
                 field("Columna 31"; Rec."Columna 31")
                 {
-                    ToolTip = 'Hueco de la columna 31: producto y cantidad que contiene.';
+                    ToolTip = 'Hueco de la estantería 31: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 31";
                     Visible = MostrarCol31;
@@ -473,7 +465,7 @@ page 51107 "Mapa Almacen SGA"
                 }
                 field("Columna 32"; Rec."Columna 32")
                 {
-                    ToolTip = 'Hueco de la columna 32: producto y cantidad que contiene.';
+                    ToolTip = 'Hueco de la estantería 32: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 32";
                     Visible = MostrarCol32;
@@ -531,8 +523,7 @@ page 51107 "Mapa Almacen SGA"
     var
         cMapa: Codeunit "Gestion Mapa SGA";
         FiltroAlmacen: Code[10];
-        FiltroNave: Code[1];
-        FiltroEstanteria: Code[2];
+        FiltroPasillo: Integer;
         Leyenda: Text;
         Aviso: Text;
         HayAviso: Boolean;
@@ -583,28 +574,24 @@ page 51107 "Mapa Almacen SGA"
 
     local procedure Construir()
     var
-        rConfig: Record "Config. SGA";
         columnaMaxima: Integer;
         limiteRejilla: Integer;
-        RejillaInsuficienteLbl: Label 'La nave tiene columnas hasta la %1 y la rejilla muestra %2. Suba "Columnas mapa" en la configuración de SGA o filtre por nave.', Comment = '%1 = última columna encontrada, %2 = columnas mostradas';
+        RejillaInsuficienteLbl: Label 'Hay estanterías hasta la %1 y la rejilla solo dibuja %2. Las de más allá no se ven aquí: use el mapa 3D.', Comment = '%1 = última estantería encontrada, %2 = columnas mostradas';
     begin
-        rConfig.ObtenerConfig();
-        limiteRejilla := rConfig."Columnas Mapa";
-        if limiteRejilla <= 0 then
-            limiteRejilla := cMapa.MaximoColumnasRejilla();
+        limiteRejilla := cMapa.MaximoColumnasRejilla();
 
-        columnaMaxima := cMapa.ConstruirMapa(Rec, FiltroAlmacen, FiltroNave);
+        columnaMaxima := cMapa.ConstruirMapa(Rec, FiltroAlmacen);
 
         // El alzado se consigue filtrando la vista: el buffer ya está construido, así que
-        // quedarse con una estantería es solo acotar las filas que se pintan.
+        // quedarse con un pasillo es solo acotar las filas que se pintan.
         Rec.FilterGroup(2);
-        if FiltroEstanteria <> '' then
-            Rec.SetRange("Cod. Estanteria", FiltroEstanteria)
+        if FiltroPasillo <> 0 then
+            Rec.SetRange(Pasillo, FiltroPasillo)
         else
-            Rec.SetRange("Cod. Estanteria");
+            Rec.SetRange(Pasillo);
         Rec.FilterGroup(0);
 
-        // El aviso se decide contra el límite configurado, antes de recortar por lo que hay.
+        // El aviso se decide contra el tope de la rejilla, antes de recortar por lo que hay.
         HayAviso := columnaMaxima > limiteRejilla;
         if HayAviso then
             Aviso := StrSubstNo(RejillaInsuficienteLbl, columnaMaxima, limiteRejilla)

@@ -587,7 +587,8 @@ codeunit 51104 "Gestion Picking SGA"
 
     /// <summary>
     /// Pasa al pedido de venta lo recogido: por cada línea de producto, la cantidad a enviar
-    /// y el seguimiento por lote con los lotes que han salido de las ubicaciones.
+    /// y, si el producto lleva lotes estándar, el seguimiento por lote con los lotes que han
+    /// salido de las ubicaciones.
     ///
     /// Se calcula sobre todas las órdenes del pedido, no solo esta, descontando lo ya enviado.
     /// Así se puede repetir sin duplicar nada, y una línea sin recoger queda con cantidad a
@@ -674,6 +675,8 @@ codeunit 51104 "Gestion Picking SGA"
 
     /// <summary>
     /// Sustituye el seguimiento por lote de una línea de venta por los lotes recogidos.
+    /// Solo si el producto lleva lotes estándar (LoteEstandar): sin código de seguimiento por
+    /// lote, BC no espera lotes en la línea y el lote del hueco es solo de SGA.
     /// Solo toca el seguimiento sin reserva (excedente): si la línea tiene reservas contra
     /// lotes concretos, se para, porque deshacerlas es una decisión de oficina.
     /// </summary>
@@ -682,12 +685,16 @@ codeunit 51104 "Gestion Picking SGA"
         rReserva: Record "Reservation Entry";
         rSeguimiento: Record "Reservation Entry";
         cCrearReserva: Codeunit "Create Reserv. Entry";
+        cStock: Codeunit "Consulta Stock SGA";
         lote: Code[50];
         cantidadBase: Decimal;
         caducidad: Date;
         hayLotes: Boolean;
         LineaConReservasErr: Label 'La línea %1 del pedido %2 tiene reservas por lote. Anúlelas antes de pasar el picking al pedido.', Comment = '%1 = nº línea, %2 = nº pedido';
     begin
+        if not cStock.LoteEstandar(prm_LinVenta."No.") then
+            exit;
+
         foreach lote in prm_Lotes.Keys() do
             if lote <> '' then
                 hayLotes := true;
@@ -879,6 +886,46 @@ codeunit 51104 "Gestion Picking SGA"
             repeat
                 RecalcularReserva(rLinea."Cod. Almacen", rLinea."Cod. Bin Propuesto", rLinea."No. Producto", rLinea."Cod. Variante", rLinea."No. Lote");
             until rLinea.Next() = 0;
+    end;
+
+    /// <summary>
+    /// Borra las órdenes sin terminar de un almacén (abiertas, en proceso o pendientes de
+    /// asignar) con sus paradas, aunque lleven algo recogido: es para dejar el almacén a cero
+    /// (Inicializar de Cod. "Gestion Contenido SGA"). Con prm_Producto, solo las que llevan ese
+    /// producto en alguna parada. Las finalizadas y canceladas se quedan como historial.
+    /// No recalcula las reservas: lo hace quien llama, al terminar.
+    /// </summary>
+    procedure EliminarOrdenesSinTerminar(prm_Almacen: Code[10]; prm_Producto: Code[20])
+    var
+        rOrden: Record "Orden Picking SGA";
+        rLinea: Record "Linea Orden Picking SGA";
+        ordenes: List of [Code[20]];
+        noOrden: Code[20];
+    begin
+        rOrden.SetCurrentKey("Cod. Almacen", Estado);
+        rOrden.SetRange("Cod. Almacen", prm_Almacen);
+        rOrden.SetFilter(Estado, '%1|%2|%3', rOrden.Estado::Abierta, rOrden.Estado::"En Proceso", rOrden.Estado::"Pendiente Asignar");
+        rOrden.SetLoadFields("No. Orden");
+        if not rOrden.FindSet() then
+            exit;
+
+        // Primero se eligen y luego se borran, para no borrar sobre el recorrido.
+        repeat
+            rLinea.SetRange("No. Orden", rOrden."No. Orden");
+            if prm_Producto <> '' then
+                rLinea.SetRange("No. Producto", prm_Producto);
+            if (prm_Producto = '') or not rLinea.IsEmpty() then
+                ordenes.Add(rOrden."No. Orden");
+        until rOrden.Next() = 0;
+
+        rLinea.Reset();
+        foreach noOrden in ordenes do begin
+            rLinea.SetRange("No. Orden", noOrden);
+            rLinea.DeleteAll(false);
+            // Sin triggers a propósito: el de la orden no deja borrar con algo recogido.
+            if rOrden.Get(noOrden) then
+                rOrden.Delete(false);
+        end;
     end;
 
     /// <summary>

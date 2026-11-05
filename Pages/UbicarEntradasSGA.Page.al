@@ -9,8 +9,9 @@ using Microsoft.Inventory.Location;
 /// los ensamblados y para las recepciones de compra: el operario ve la lista, el sistema le
 /// propone una ubicación para cada línea, y él confirma o pide otra.
 ///
-/// El origen lo fija quien abre la página con RunPageView sobre el campo Origen (así lo hacen el
-/// rol center y Pag-Ext51103). Sin filtro se abre en ensamblados.
+/// El origen lo fija quien abre la página con FijarOrigen (los menús, a través de Cod51109
+/// "Abrir Ubicar Recepciones SGA" y Cod51110 "Abrir Ubicar Ensamblados SGA") o Preparar. Sin
+/// nada, se abre en ensamblados.
 ///
 /// Las filas son líneas de "Linea Ubicacion SGA" con Origen Compra o Produccion, ordenadas por
 /// documento. La lista se reconstruye cada vez que se cambia un filtro: lo que ya está colocado
@@ -213,6 +214,22 @@ page 51123 "Ubicar Entradas SGA"
                     ToolTip = 'Hueco en el que se ha dejado realmente. Escanéelo o tecléelo si no es el propuesto.';
                     ApplicationArea = All;
                 }
+                field("Traslado Origen"; Rec."Traslado Origen")
+                {
+                    ApplicationArea = All;
+                    Visible = ReubicarABC;
+                }
+                field("Traslado Destino"; Rec."Traslado Destino")
+                {
+                    ApplicationArea = All;
+                    Visible = ReubicarABC;
+                }
+                field("Aceptar Traslado"; Rec."Aceptar Traslado")
+                {
+                    ApplicationArea = All;
+                    Visible = ReubicarABC;
+                    Editable = Rec."Traslado Origen" <> '';
+                }
                 field("Cod. Almacen"; Rec."Cod. Almacen")
                 {
                     Caption = 'Cód. almacén';
@@ -414,6 +431,10 @@ page 51123 "Ubicar Entradas SGA"
         Resumen: Text;
         EstiloFila: Text;
         LineaUbicada: Boolean;
+        Preparada: Boolean;
+        OrigenFijado: Boolean;
+        // Con la reubicación por ABC apagada en la configuración, el traslado no se enseña.
+        ReubicarABC: Boolean;
 
     trigger OnOpenPage()
     var
@@ -421,11 +442,12 @@ page 51123 "Ubicar Entradas SGA"
         CaptionEnsambladosLbl: Label 'Ubicar ensamblados';
         CaptionRecepcionesLbl: Label 'Ubicar recepciones de compra';
     begin
-        // El origen llega como filtro desde RunPageView. Sin filtro, ensamblados.
-        if Rec.GetFilter(Origen) <> '' then
-            OrigenPagina := Rec.GetRangeMin(Origen)
-        else
+        // El origen llega de FijarOrigen o Preparar; si no, ensamblados.
+        if not (Preparada or OrigenFijado) then
             OrigenPagina := OrigenPagina::Produccion;
+
+        rConfig.ObtenerConfig();
+        ReubicarABC := rConfig."Reubicar Pale A por ABC";
 
         EsCompra := OrigenPagina = OrigenPagina::Compra;
         if EsCompra then
@@ -433,20 +455,52 @@ page 51123 "Ubicar Entradas SGA"
         else
             CurrPage.Caption := CaptionEnsambladosLbl;
 
-        rConfig.ObtenerConfig();
-        FiltroAlmacen := rConfig."Almacen por Defecto";
-        // Recepciones: todo lo pendiente de productos externos, sin límite de fecha. Ensamblados:
-        // lo del día, de cualquier clase, como hasta ahora.
-        if EsCompra then begin
+        // Preparada: todo lo pendiente del producto, sin fechas ni clase.
+        if Preparada then begin
             FiltroFechaDesde := 0D;
-            FiltroClase := FiltroClase::"Prod. Externo";
-        end else begin
-            FiltroFechaDesde := WorkDate();
-            FiltroFechaHasta := WorkDate();
+            FiltroFechaHasta := 0D;
             FiltroClase := FiltroClase::Todas;
+        end else begin
+            rConfig.ObtenerConfig();
+            FiltroAlmacen := rConfig."Almacen por Defecto";
+            // Recepciones: todo lo pendiente de productos externos, sin límite de fecha.
+            // Ensamblados: lo del día, de cualquier clase.
+            if EsCompra then begin
+                FiltroFechaDesde := 0D;
+                FiltroClase := FiltroClase::"Prod. Externo";
+            end else begin
+                FiltroFechaDesde := WorkDate();
+                FiltroFechaHasta := WorkDate();
+                FiltroClase := FiltroClase::Todas;
+            end;
         end;
         SoloPendientes := true;
         Recargar();
+    end;
+
+    /// <summary>
+    /// Abre la página en un origen (Compra o Produccion), con los filtros de partida de ese
+    /// origen. Se llama antes de abrirla; es lo que usan los menús (Cod. "Gestion Entradas
+    /// SGA".AbrirUbicarEntradas), porque un filtro de RunPageView no llega a esta página, que es
+    /// temporal.
+    /// </summary>
+    procedure FijarOrigen(prm_Origen: Enum "Origen Mov. SGA")
+    begin
+        OrigenFijado := true;
+        OrigenPagina := prm_Origen;
+    end;
+
+    /// <summary>
+    /// Como FijarOrigen, pero con lo pendiente de un producto en un almacén, sin fechas ni
+    /// clase. Es como la usa "Pendiente de ubicar" para enseñar de qué documentos sale lo que
+    /// tiene en "En documentos". Se llama antes de abrirla.
+    /// </summary>
+    procedure Preparar(prm_Origen: Enum "Origen Mov. SGA"; prm_Almacen: Code[10]; prm_Producto: Code[20])
+    begin
+        Preparada := true;
+        OrigenPagina := prm_Origen;
+        FiltroAlmacen := prm_Almacen;
+        FiltroProducto := prm_Producto;
     end;
 
     trigger OnAfterGetRecord()

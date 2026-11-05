@@ -139,6 +139,17 @@ table 51101 "Ubicacion SGA"
                 TestVacia();
             end;
         }
+        field(74; "Control Capacidad"; Enum "Control Capacidad Ubic. SGA")
+        {
+            Caption = 'Control capacidad';
+            DataClassification = ToBeClassified;
+            ToolTip = 'Qué hacer cuando una entrada no cabe en esta ubicación: lo que diga la configuración de SGA, avisar (y dejar seguir si se confirma) o bloquear. Como el resto de su configuración, solo se cambia con la ubicación vacía.';
+
+            trigger OnValidate()
+            begin
+                TestVacia();
+            end;
+        }
         field(80; Bloqueada; Boolean)
         {
             Caption = 'Bloqueada';
@@ -471,6 +482,9 @@ table 51101 "Ubicacion SGA"
     procedure OcupadoEnUMHueco(): Decimal
     var
         rContenido: Record "Contenido Ubicacion SGA";
+        cUM: Codeunit "Unidades Producto SGA";
+        factores: Dictionary of [Code[20], Decimal];
+        factor: Decimal;
         total: Decimal;
     begin
         rContenido.SetRange("Cod. Almacen", "Cod. Almacen");
@@ -479,11 +493,66 @@ table 51101 "Ubicacion SGA"
         if not rContenido.FindSet() then
             exit(0);
 
+        // Lo mismo que EnUMHueco de cada línea, con el factor de cada producto leído una vez:
+        // un hueco suele tener varias líneas (lotes) del mismo producto.
         repeat
-            total += EnUMHueco(rContenido."No. Producto", rContenido."Cantidad Base");
+            if not factores.Get(rContenido."No. Producto", factor) then begin
+                factor := cUM.FactorClase(rContenido."No. Producto", "Tipo UM Admitida");
+                factores.Add(rContenido."No. Producto", factor);
+            end;
+            total += rContenido."Cantidad Base" / factor;
         until rContenido.Next() = 0;
 
         exit(Round(total, 0.00001));
+    end;
+
+    /// <summary>
+    /// Si, al no caber una entrada, se avisa (y se deja seguir confirmando) en vez de bloquear.
+    /// Manda el control propio de la ubicación; con "Según configuración", el de "Config. SGA".
+    /// Cualquier otro valor bloquea: la capacidad se controla siempre.
+    /// </summary>
+    procedure SoloAvisaCapacidad(): Boolean
+    var
+        rConfig: Record "Config. SGA";
+    begin
+        case "Control Capacidad" of
+            "Control Capacidad"::Avisar:
+                exit(true);
+            "Control Capacidad"::Bloquear:
+                exit(false);
+        end;
+        rConfig.ObtenerConfig();
+        exit(rConfig."Control Capacidad" = rConfig."Control Capacidad"::Avisar);
+    end;
+
+    /// <summary>
+    /// Si caben prm_Entrada más, contadas en la clase del hueco (EnUMHueco), sin pasar de la
+    /// capacidad. Sin capacidad declarada, siempre. Es la comprobación de la propuesta, que mira
+    /// muchos huecos seguidos: parte del estado y del "% Ocupacion" guardados, que deja al día
+    /// cada movimiento (RecalcularOcupacion), y solo suma el contenido línea a línea cuando el
+    /// resultado cae tan cerca de la capacidad que el redondeo del % podría cambiarlo.
+    /// </summary>
+    procedure CabeEntrada(prm_Entrada: Decimal): Boolean
+    var
+        estimado: Decimal;
+        margen: Decimal;
+    begin
+        if "Capacidad Uds." <= 0 then
+            exit(true);
+        // Llena: lo que hay ya llega a la capacidad.
+        if "Estado SGA" = "Estado SGA"::Llena then
+            exit(false);
+
+        // El % va redondeado a 0,01: lo ocupado que da se aleja como mucho un 0,005 % de la
+        // capacidad. El margen dobla eso.
+        estimado := "% Ocupacion" * "Capacidad Uds." / 100;
+        margen := "Capacidad Uds." * 0.0001;
+        if estimado + prm_Entrada <= "Capacidad Uds." - margen then
+            exit(true);
+        if estimado + prm_Entrada > "Capacidad Uds." + margen then
+            exit(false);
+
+        exit(OcupadoEnUMHueco() + prm_Entrada <= "Capacidad Uds.");
     end;
 
     /// <summary>
@@ -496,8 +565,7 @@ table 51101 "Ubicacion SGA"
     var
         cUM: Codeunit "Unidades Producto SGA";
     begin
-        // FactorUM nunca devuelve cero: con la unidad en blanco o desconocida, uno.
-        exit(prm_CantidadBase / cUM.FactorUM(prm_Producto, cUM.UMProductoDeTipo(prm_Producto, "Tipo UM Admitida")));
+        exit(cUM.CantidadEnClase(prm_Producto, "Tipo UM Admitida", prm_CantidadBase));
     end;
 
     /// <summary>

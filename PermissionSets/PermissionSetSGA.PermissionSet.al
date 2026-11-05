@@ -51,7 +51,11 @@ permissionset 51100 "PermissionSet-SGA"
         codeunit "Consulta Stock SGA" = X,
         codeunit "Gestion Picking SGA" = X,
         codeunit "Gestion Entradas SGA" = X,
+        codeunit "Abrir Ubicar Recepciones SGA" = X,
+        codeunit "Abrir Ubicar Ensamblados SGA" = X,
         codeunit "Unidades Producto SGA" = X,
+        codeunit "Ventana Progreso SGA" = X,
+        codeunit "Eliminar Ubicacion SGA" = X,
         table "Calculo ABC SGA" = X,
         tabledata "Calculo ABC SGA" = RIMD,
         table "Clasificacion ABC SGA" = X,
@@ -92,7 +96,5 @@ permissionset 51100 "PermissionSet-SGA"
         report "Sincronizar Ubicaciones SGA" = X,
         report "Carga Inicial Contenido SGA" = X,
         report "Conciliacion SGA vs Stock" = X,
-        report "Inventario por Ubicacion SGA" = X,
-        report "Ocupacion Ubicaciones SGA" = X,
         report "Etiquetas Ubicaciones SGA" = X;
 }

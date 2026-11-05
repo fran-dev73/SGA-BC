@@ -45,7 +45,7 @@ codeunit 51107 "Analisis ABC SGA"
         PalesProductoHueco: Dictionary of [Text, Boolean];
         ClaseHueco: Dictionary of [Code[20], Integer];
         AlmacenObligatorioErr: Label 'Indique el almacén que se quiere analizar.';
-        CorteBMenorQueAErr: Label 'El corte de la clase B (%1 %) tiene que ser mayor o igual que el de la clase A (%2 %).', Comment = '%1 = corte B, %2 = corte A';
+        CorteBMenorQueAErr: Label 'El corte de la clase B (%1 %) tiene que ser mayor o igual que el de la clase A (%2 %): los cortes son acumulados y la B empieza donde acaba la A.', Comment = '%1 = corte B, %2 = corte A';
     begin
         if prm_Almacen = '' then
             Error(AlmacenObligatorioErr);
@@ -71,6 +71,30 @@ codeunit 51107 "Analisis ABC SGA"
 
         rCalculo.Modify();
         exit(rCalculo."No.");
+    end;
+
+    /// <summary>
+    /// Clase (A, B o C, como entero de "Clase ABC SGA") de cada producto en el último cálculo
+    /// del almacén. Vacío si no hay ningún cálculo. Lo usa el mapa para colorear por rotación.
+    /// </summary>
+    procedure ClasesUltimoCalculo(prm_Almacen: Code[10]; var prm_Clases: Dictionary of [Code[20], Integer])
+    var
+        rCalculo: Record "Calculo ABC SGA";
+        rLinea: Record "Clasificacion ABC SGA";
+    begin
+        Clear(prm_Clases);
+        rCalculo.SetCurrentKey("Cod. Almacen", "No.");
+        rCalculo.SetRange("Cod. Almacen", prm_Almacen);
+        if not rCalculo.FindLast() then
+            exit;
+
+        rLinea.SetRange("No. Calculo", rCalculo."No.");
+        rLinea.SetLoadFields("No. Producto", Clase);
+        if rLinea.FindSet() then
+            repeat
+                if not prm_Clases.ContainsKey(rLinea."No. Producto") then
+                    prm_Clases.Add(rLinea."No. Producto", rLinea.Clase.AsInteger());
+            until rLinea.Next() = 0;
     end;
 
     local procedure CrearCabecera(var prm_Calculo: Record "Calculo ABC SGA"; prm_Almacen: Code[10]; prm_Config: Record "Config. SGA")
@@ -271,7 +295,9 @@ codeunit 51107 "Analisis ABC SGA"
             repeat
                 if EsHuecoUtil(rUbicacion) then begin
                     TempOrden := rUbicacion;
-                    TempOrden."Secuencia Picking" := NivelHueco(rUbicacion."Cod. Bin") * 1000000 + Minimo(rUbicacion."Secuencia Picking", 999999);
+                    // La secuencia de un código generado llega a 9.999.999 (pasillo 999): cabe
+                    // entera detrás de la altura, que no pasa de 100.
+                    TempOrden."Secuencia Picking" := NivelHueco(rUbicacion."Cod. Bin") * 10000000 + Minimo(rUbicacion."Secuencia Picking", 9999999);
                     TempOrden.Insert();
                 end;
             until rUbicacion.Next() = 0;
@@ -375,23 +401,19 @@ codeunit 51107 "Analisis ABC SGA"
     end;
 
     /// <summary>
-    /// Altura del hueco sacada de su código (Nave-Estantería-Columna-Altura). Si el código no
-    /// tiene esa forma o la altura no es un número, cuenta como la peor.
+    /// Altura del hueco sacada de su código (pasillo-estantería-altura), de 1 a 99. Si el código
+    /// no tiene esa forma, 100: cuenta como la peor.
     /// </summary>
     local procedure NivelHueco(prm_Codigo: Code[20]): Integer
     var
         cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
-        nave: Code[1];
-        estanteria: Code[2];
-        columna: Integer;
-        altura: Code[1];
-        nivel: Integer;
+        pasillo: Integer;
+        estanteria: Integer;
+        altura: Integer;
     begin
-        if not cUbicaciones.TrocearCodigo(prm_Codigo, nave, estanteria, columna, altura) then
-            exit(999);
-        if not Evaluate(nivel, altura) then
-            exit(999);
-        exit(Minimo(nivel, 999));
+        if not cUbicaciones.TrocearCodigo(prm_Codigo, pasillo, estanteria, altura) then
+            exit(100);
+        exit(altura);
     end;
 
     local procedure Minimo(prm_A: Integer; prm_B: Integer): Integer

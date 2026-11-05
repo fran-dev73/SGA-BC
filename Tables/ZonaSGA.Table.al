@@ -4,7 +4,7 @@ using Microsoft.Inventory.Location;
 
 /// <summary>
 /// Table Zona SGA (ID 51100).
-/// Agrupación lógica de ubicaciones dentro de un almacén (nave, cámara, zona de picking...).
+/// Agrupación lógica de ubicaciones dentro de un almacén (cámara, reserva, zona de picking...).
 /// La zona fija las prioridades por defecto que heredan sus ubicaciones.
 /// </summary>
 table 51100 "Zona SGA"
@@ -33,12 +33,6 @@ table 51100 "Zona SGA"
         {
             Caption = 'Descripción';
             DataClassification = ToBeClassified;
-        }
-        field(40; "Cod. Nave"; Code[1])
-        {
-            Caption = 'Cód. nave';
-            DataClassification = ToBeClassified;
-            ToolTip = 'Nave de la topología de ubicaciones a la que corresponde la zona. Informativo.';
         }
         field(50; "Tipo Ubicacion"; Enum "Tipo Ubicacion SGA")
         {

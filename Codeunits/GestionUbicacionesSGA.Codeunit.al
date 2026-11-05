@@ -7,7 +7,7 @@ using Microsoft.Warehouse.Structure;
 /// Codeunit Gestion Ubicaciones SGA (ID 51101).
 /// Se ocupa de los huecos:
 ///   - Topología sobre el Bin estándar: creación y sincronización, generación en masa,
-///     recálculo de estados, formato del código nave-estantería-columna-altura (componerlo y
+///     recálculo de estados, formato del código pasillo-estantería-altura (componerlo y
 ///     trocearlo), cambios en bloque y recuentos por estado.
 ///   - Motor de propuesta: en qué hueco dejar un producto, por qué no hay hueco y la
 ///     ubicación guiada de un reparto.
@@ -99,12 +99,12 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     /// Las que tienen contenido se saltan: su configuración solo se cambia vacías (TestVacia de
     /// la tabla). Cuántas se saltan sale en prm_Omitidas y las primeras (hasta 5) en prm_Ejemplos.
     /// </summary>
-    procedure AplicarCambiosUbicaciones(var prm_Seleccion: Record "Ubicacion SGA"; var TempPlantilla: Record "Ubicacion SGA" temporary; prm_CambiarCapacidad: Boolean; prm_CambiarAdmite: Boolean; prm_CambiarMezcla: Boolean; prm_CambiarTipo: Boolean; prm_CambiarZona: Boolean; var prm_Omitidas: Integer; var prm_Ejemplos: Text) hechas: Integer
+    procedure AplicarCambiosUbicaciones(var prm_Seleccion: Record "Ubicacion SGA"; var TempPlantilla: Record "Ubicacion SGA" temporary; prm_CambiarCapacidad: Boolean; prm_CambiarControlCapacidad: Boolean; prm_CambiarAdmite: Boolean; prm_CambiarMezcla: Boolean; prm_CambiarTipo: Boolean; prm_CambiarZona: Boolean; var prm_Omitidas: Integer; var prm_Ejemplos: Text) hechas: Integer
     var
         rUbicacionSGA: Record "Ubicacion SGA";
         NadaQueCambiarErr: Label 'No ha marcado nada que cambiar.';
     begin
-        if not (prm_CambiarCapacidad or prm_CambiarAdmite or prm_CambiarMezcla or prm_CambiarTipo or prm_CambiarZona) then
+        if not (prm_CambiarCapacidad or prm_CambiarControlCapacidad or prm_CambiarAdmite or prm_CambiarMezcla or prm_CambiarTipo or prm_CambiarZona) then
             Error(NadaQueCambiarErr);
 
         prm_Omitidas := 0;
@@ -122,6 +122,8 @@ codeunit 51101 "Gestion Ubicaciones SGA"
                     rUbicacionSGA.Validate("Permite Mezcla Producto", TempPlantilla."Permite Mezcla Producto");
                 if prm_CambiarCapacidad then
                     rUbicacionSGA.Validate("Capacidad Uds.", TempPlantilla."Capacidad Uds.");
+                if prm_CambiarControlCapacidad then
+                    rUbicacionSGA.Validate("Control Capacidad", TempPlantilla."Control Capacidad");
                 if prm_CambiarTipo then
                     rUbicacionSGA.Validate("Tipo Ubicacion", TempPlantilla."Tipo Ubicacion");
                 if prm_CambiarZona then
@@ -172,41 +174,145 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     end;
 
     /// <summary>
-    /// Resumen de ocupación de un almacén: cuántas ubicaciones tiene y cuántas están vacías,
-    /// llenas o bloqueadas.
+    /// Resumen de ocupación de un almacén, o de una de sus zonas si prm_Zona no va en blanco:
+    /// cuántas ubicaciones tiene y cuántas están vacías, llenas o bloqueadas.
     /// </summary>
-    procedure ResumenUbicaciones(prm_Almacen: Code[10]): Text
+    procedure ResumenUbicaciones(prm_Almacen: Code[10]; prm_Zona: Code[10]): Text
     var
         rUbicacionSGA: Record "Ubicacion SGA";
         ResumenLbl: Label '%1 ubicaciones: %2 vacías, %3 llenas, %4 bloqueadas.', Comment = '%1 = total, %2 = vacías, %3 = llenas, %4 = bloqueadas';
     begin
         rUbicacionSGA.SetRange("Cod. Almacen", prm_Almacen);
+        if prm_Zona <> '' then
+            rUbicacionSGA.SetRange("Cod. Zona SGA", prm_Zona);
         exit(StrSubstNo(ResumenLbl, rUbicacionSGA.Count(),
-                        ContarUbicaciones(prm_Almacen, "Estado Ubicacion SGA"::Vacia),
-                        ContarUbicaciones(prm_Almacen, "Estado Ubicacion SGA"::Llena),
-                        ContarUbicaciones(prm_Almacen, "Estado Ubicacion SGA"::Bloqueada)));
+                        ContarUbicaciones(prm_Almacen, prm_Zona, "Estado Ubicacion SGA"::Vacia),
+                        ContarUbicaciones(prm_Almacen, prm_Zona, "Estado Ubicacion SGA"::Llena),
+                        ContarUbicaciones(prm_Almacen, prm_Zona, "Estado Ubicacion SGA"::Bloqueada)));
     end;
 
     /// <summary>
-    /// Genera ubicaciones en masa recorriendo los rangos de estantería, columna y altura.
+    /// Los traslados entre zonas no se hacen arrastrando en el mapa: error si el origen y el
+    /// destino son de zonas distintas. Una ubicación sin zona solo casa con otra sin zona.
+    /// </summary>
+    procedure TestMismaZona(prm_Almacen: Code[10]; prm_Origen: Code[20]; prm_Destino: Code[20])
+    var
+        rUbicacionSGA: Record "Ubicacion SGA";
+        zonaOrigen: Code[10];
+        OtraZonaErr: Label 'La ubicación %1 es de la zona "%2" y la %3 de la zona "%4". Los traslados entre zonas no se hacen desde el mapa: use Trasladar en Contenido de ubicaciones.', Comment = '%1 = origen, %2 = zona origen, %3 = destino, %4 = zona destino';
+    begin
+        rUbicacionSGA.SetLoadFields("Cod. Zona SGA");
+        if rUbicacionSGA.Get(prm_Almacen, prm_Origen) then
+            zonaOrigen := rUbicacionSGA."Cod. Zona SGA";
+        Clear(rUbicacionSGA);
+        if rUbicacionSGA.Get(prm_Almacen, prm_Destino) then;
+        if rUbicacionSGA."Cod. Zona SGA" <> zonaOrigen then
+            Error(OtraZonaErr, prm_Origen, zonaOrigen, prm_Destino, rUbicacionSGA."Cod. Zona SGA");
+    end;
+
+    /// <summary>
+    /// Borra todas las ubicaciones del almacén, ficha SGA y Bin, para montarlo de nuevo con
+    /// GenerarUbicaciones. Se llama con el almacén ya vacío en SGA (Inicializar de Cod.
+    /// "Gestion Contenido SGA"): una ficha con contenido no se deja borrar.
+    ///
+    /// Cada hueco se borra en su propia transacción (Cod. "Eliminar Ubicacion SGA"), así que
+    /// empieza confirmando con Commit lo que lleve hecho el llamante. El que BC no deja borrar
+    /// (stock en almacén o documentos pendientes) se queda entero: cuántos en prm_NoEliminadas,
+    /// los primeros (hasta 5) en prm_Ejemplos y el primer motivo en prm_Motivo.
+    ///
+    /// Al final quita de la configuración las ubicaciones por defecto que ya no existen y borra
+    /// las fichas SGA que se hubieran quedado sin Bin. Devuelve cuántas ubicaciones ha borrado.
+    /// </summary>
+    procedure EliminarUbicaciones(prm_Almacen: Code[10]; var prm_NoEliminadas: Integer; var prm_Ejemplos: Text; var prm_Motivo: Text) eliminadas: Integer
+    var
+        rBin: Record Bin;
+        rUbicacionSGA: Record "Ubicacion SGA";
+        rConfig: Record "Config. SGA";
+        cVentana: Codeunit "Ventana Progreso SGA";
+        codigos: List of [Code[20]];
+        codBin: Code[20];
+        AlmacenObligatorioErr: Label 'Indique el almacén.';
+        EliminandoLbl: Label 'Eliminando ubicaciones';
+    begin
+        if prm_Almacen = '' then
+            Error(AlmacenObligatorioErr);
+
+        prm_NoEliminadas := 0;
+        prm_Ejemplos := '';
+        prm_Motivo := '';
+        Commit();
+
+        // Primero los códigos y luego el borrado: cada Codeunit.Run confirma su transacción y
+        // no se borra sobre el mismo recorrido que se está leyendo.
+        rBin.SetRange("Location Code", prm_Almacen);
+        rBin.SetLoadFields(Code);
+        if rBin.FindSet() then
+            repeat
+                codigos.Add(rBin.Code);
+            until rBin.Next() = 0;
+
+        cVentana.Abrir(EliminandoLbl, codigos.Count());
+        foreach codBin in codigos do begin
+            cVentana.Avanzar(codBin);
+            rBin.Get(prm_Almacen, codBin);
+            ClearLastError();
+            if Codeunit.Run(Codeunit::"Eliminar Ubicacion SGA", rBin) then
+                eliminadas += 1
+            else begin
+                prm_NoEliminadas += 1;
+                if prm_Motivo = '' then
+                    prm_Motivo := GetLastErrorText();
+                if prm_NoEliminadas <= 5 then begin
+                    if prm_Ejemplos <> '' then
+                        prm_Ejemplos += ', ';
+                    prm_Ejemplos += codBin;
+                end;
+            end;
+        end;
+        cVentana.Cerrar();
+
+        rUbicacionSGA.SetRange("Cod. Almacen", prm_Almacen);
+        if rUbicacionSGA.FindSet() then
+            repeat
+                if not UbicacionExiste(prm_Almacen, rUbicacionSGA."Cod. Bin") then
+                    rUbicacionSGA.Delete(true);
+            until rUbicacionSGA.Next() = 0;
+
+        if rConfig.Get() and (rConfig."Almacen por Defecto" = prm_Almacen) then begin
+            if not UbicacionExiste(prm_Almacen, rConfig."Ubic. Recepcion Compras") then
+                rConfig."Ubic. Recepcion Compras" := '';
+            if not UbicacionExiste(prm_Almacen, rConfig."Ubic. Entrada Produccion") then
+                rConfig."Ubic. Entrada Produccion" := '';
+            if not UbicacionExiste(prm_Almacen, rConfig."Ubic. Expedicion") then
+                rConfig."Ubic. Expedicion" := '';
+            if not UbicacionExiste(prm_Almacen, rConfig."Ubic. Desbordamiento") then
+                rConfig."Ubic. Desbordamiento" := '';
+            if not UbicacionExiste(prm_Almacen, rConfig."Ubic. Ajustes") then
+                rConfig."Ubic. Ajustes" := '';
+            rConfig.Modify();
+        end;
+    end;
+
+    /// <summary>
+    /// Genera ubicaciones en masa recorriendo los rangos de pasillo, estantería y altura.
     /// Crea el Bin estándar si no existe y su fila de datos SGA, en ese orden.
     /// Es idempotente: lo que ya existe no se toca, así que se puede reejecutar para ampliar.
     /// </summary>
-    procedure GenerarUbicaciones(prm_Almacen: Code[10]; prm_Nave: Code[1]; prm_EstanteriaDesde: Integer; prm_EstanteriaHasta: Integer; prm_ColumnaDesde: Integer; prm_ColumnaHasta: Integer; prm_AlturaDesde: Integer; prm_AlturaHasta: Integer; prm_Zona: Code[10]; prm_Tipo: Enum "Tipo Ubicacion SGA"; prm_Capacidad: Decimal) creadas: Integer
+    procedure GenerarUbicaciones(prm_Almacen: Code[10]; prm_PasilloDesde: Integer; prm_PasilloHasta: Integer; prm_EstanteriaDesde: Integer; prm_EstanteriaHasta: Integer; prm_AlturaDesde: Integer; prm_AlturaHasta: Integer; prm_Zona: Code[10]; prm_Tipo: Enum "Tipo Ubicacion SGA"; prm_Capacidad: Decimal) creadas: Integer
     var
         rBin: Record Bin;
         rUbicacionSGA: Record "Ubicacion SGA";
         rConfigGen: Record "Config. SGA";
+        pasillo: Integer;
         estanteria: Integer;
-        columna: Integer;
         altura: Integer;
         codBin: Code[20];
     begin
         rConfigGen.ObtenerConfig();
-        for estanteria := prm_EstanteriaDesde to prm_EstanteriaHasta do
-            for columna := prm_ColumnaDesde to prm_ColumnaHasta do
+        for pasillo := prm_PasilloDesde to prm_PasilloHasta do
+            for estanteria := prm_EstanteriaDesde to prm_EstanteriaHasta do
                 for altura := prm_AlturaDesde to prm_AlturaHasta do begin
-                    codBin := ComponerCodigoUbicacion(prm_Nave, DosDigitos(estanteria), columna, Format(altura));
+                    codBin := ComponerCodigoUbicacion(pasillo, estanteria, altura);
 
                     if not rBin.Get(prm_Almacen, codBin) then begin
                         rBin.Init();
@@ -224,7 +330,7 @@ codeunit 51101 "Gestion Ubicaciones SGA"
                         rUbicacionSGA."Cod. Zona SGA" := prm_Zona;
                         rUbicacionSGA."Tipo Ubicacion" := prm_Tipo;
                         rUbicacionSGA."Capacidad Uds." := prm_Capacidad;
-                        rUbicacionSGA."Secuencia Picking" := SecuenciaDesde(estanteria, columna, altura);
+                        rUbicacionSGA."Secuencia Picking" := SecuenciaDesde(pasillo, estanteria, altura);
                         // Las ubicaciones nacen con el tipo de la configuración (el palé) y, si
                         // no son de caja, dedicadas a un solo producto. Las mixtas de caja se
                         // marcan después, ubicación a ubicación.
@@ -239,62 +345,70 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     end;
 
     /// <summary>
-    /// Compone el código de ubicación con el formato nave-estantería-columna-altura (A-01-15-3).
-    /// La estantería y la altura llegan ya como texto (la estantería con sus dos dígitos); la
-    /// columna se rellena aquí a dos dígitos. Es el único sitio que conoce el formato al
-    /// componerlo; TrocearCodigo hace lo contrario.
+    /// Compone el código de ubicación con el formato pasillo-estantería-altura (101-15-03): el
+    /// pasillo a tres dígitos y la estantería y la altura a dos, con ceros a la izquierda. Es el
+    /// único sitio que conoce el formato al componerlo; TrocearCodigo hace lo contrario.
     /// </summary>
-    procedure ComponerCodigoUbicacion(prm_Nave: Code[1]; prm_Estanteria: Text; prm_Columna: Integer; prm_Altura: Text): Code[20]
+    procedure ComponerCodigoUbicacion(prm_Pasillo: Integer; prm_Estanteria: Integer; prm_Altura: Integer): Code[20]
     var
         rUbicacionSGA: Record "Ubicacion SGA";
     begin
-        exit(CopyStr(prm_Nave + '-' + prm_Estanteria + '-' + DosDigitos(prm_Columna) + '-' + prm_Altura, 1, MaxStrLen(rUbicacionSGA."Cod. Bin")));
+        exit(CopyStr(ConCeros(prm_Pasillo, 3) + '-' + ConCeros(prm_Estanteria, 2) + '-' + ConCeros(prm_Altura, 2),
+                     1, MaxStrLen(rUbicacionSGA."Cod. Bin")));
     end;
 
     /// <summary>
-    /// Parte un código nave-estantería-columna-altura (p. ej. A-01-05-2). Devuelve false si el
-    /// código no sigue el formato (no tiene cuatro partes o la columna no es un número), para
-    /// que el llamante lo descarte en lugar de colocarlo en una posición falsa.
+    /// Parte un código pasillo-estantería-altura (p. ej. 101-05-02). Devuelve false si el código
+    /// no sigue el formato (tres partes numéricas de tres, dos y dos dígitos), para que el
+    /// llamante lo descarte en lugar de colocarlo en una posición falsa.
     /// </summary>
-    procedure TrocearCodigo(prm_Codigo: Code[20]; var prm_Nave: Code[1]; var prm_Estanteria: Code[2]; var prm_Columna: Integer; var prm_Altura: Code[1]): Boolean
+    procedure TrocearCodigo(prm_Codigo: Code[20]; var prm_Pasillo: Integer; var prm_Estanteria: Integer; var prm_Altura: Integer): Boolean
     var
         partes: List of [Text];
         texto: Text;
     begin
         texto := prm_Codigo;
         partes := texto.Split('-');
-        if partes.Count() <> 4 then
+        if partes.Count() <> 3 then
             exit(false);
 
-        if not Evaluate(prm_Columna, partes.Get(3)) then
-            exit(false);
-
-        prm_Nave := CopyStr(partes.Get(1), 1, MaxStrLen(prm_Nave));
-        prm_Estanteria := CopyStr(partes.Get(2), 1, MaxStrLen(prm_Estanteria));
-        prm_Altura := CopyStr(partes.Get(4), 1, MaxStrLen(prm_Altura));
-        exit(true);
+        exit(LeerParte(partes.Get(1), 3, prm_Pasillo) and
+             LeerParte(partes.Get(2), 2, prm_Estanteria) and
+             LeerParte(partes.Get(3), 2, prm_Altura));
     end;
 
     /// <summary>
-    /// Formatea un entero a dos dígitos con cero a la izquierda. No se usa PadStr porque
+    /// Una parte del código: exactamente prm_Digitos cifras.
+    /// </summary>
+    local procedure LeerParte(prm_Parte: Text; prm_Digitos: Integer; var prm_Valor: Integer): Boolean
+    begin
+        if StrLen(prm_Parte) <> prm_Digitos then
+            exit(false);
+        if DelChr(prm_Parte, '=', '0123456789') <> '' then
+            exit(false);
+        exit(Evaluate(prm_Valor, prm_Parte));
+    end;
+
+    /// <summary>
+    /// Formatea un entero a prm_Digitos cifras con ceros a la izquierda. No se usa PadStr porque
     /// en AL rellena por la derecha: PadStr('5', 2, '0') devuelve '50', no '05'.
     /// </summary>
-    local procedure DosDigitos(prm_Valor: Integer): Text
+    local procedure ConCeros(prm_Valor: Integer; prm_Digitos: Integer): Text
     var
         texto: Text;
     begin
         texto := Format(prm_Valor);
-        if StrLen(texto) < 2 then
-            exit('0' + texto);
+        if StrLen(texto) < prm_Digitos then
+            exit(PadStr('', prm_Digitos - StrLen(texto), '0') + texto);
         exit(texto);
     end;
 
     /// <summary>
-    /// Orden de recorrido físico: primero la estantería, luego la columna y luego la altura.
+    /// Orden de recorrido físico: primero el pasillo, luego la estantería y luego la altura.
     /// </summary>
-    local procedure SecuenciaDesde(prm_Estanteria: Integer; prm_Columna: Integer; prm_Altura: Integer): Integer
+    local procedure SecuenciaDesde(prm_Pasillo: Integer; prm_Estanteria: Integer; prm_Altura: Integer): Integer
     begin
-        exit(prm_Estanteria * 10000 + prm_Columna * 100 + prm_Altura);
+        exit(prm_Pasillo * 10000 + prm_Estanteria * 100 + prm_Altura);
     end;
 
     /// <summary>
@@ -306,13 +420,15 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     /// consolidar o a un hueco libre; sin hueco, la causa y qué hacer (ExplicarSinHuecoLote).
     ///
     /// prm_Excluidas es un filtro de AL ya montado sobre "Cod. Bin" (por ejemplo
-    /// '&lt;&gt;A-01-01-1&amp;&lt;&gt;A-01-02-1', ver AnadirExclusion). Sirve para dos cosas: que el
+    /// '&lt;&gt;101-01-01&amp;&lt;&gt;101-02-01', ver AnadirExclusion). Sirve para dos cosas: que el
     /// operario pueda pedir "otra ubicación" descartando la que se le acaba de ofrecer, y que al
     /// proponer en bloque no se asigne el mismo hueco vacío a dos cosas distintas.
     /// </summary>
     procedure ProponerUbicacionCon(prm_Estrategia: Enum "Estrategia Ubicacion SGA"; prm_Excluidas: Text; prm_Almacen: Code[10]; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50]; prm_UM: Code[10]; prm_Cantidad: Decimal; var prm_Motivo: Text): Code[20]
     var
+        tipo: Enum "Tipo UM SGA";
         codigo: Code[20];
+        entrada: Decimal;
         MotivoFijaTxt: Label 'Ubicación fija del producto.';
         MotivoConsolidacionTxt: Label 'Ya hay este producto ahí: se consolida.';
         MotivoPrimeraLibreTxt: Label 'Primer hueco con sitio en el orden de recorrido (pasillo, hueco y nivel, según la "Secuencia picking" de cada ubicación).';
@@ -320,53 +436,58 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     begin
         prm_Motivo := '';
 
-        case prm_Estrategia of
-            prm_Estrategia::"Solo Ubicacion Fija":
-                begin
-                    codigo := BuscarFija(prm_Almacen, prm_Producto, prm_Lote, prm_UM, prm_Cantidad, prm_Excluidas);
-                    if codigo <> '' then
-                        prm_Motivo := MotivoFijaTxt;
-                end;
-            prm_Estrategia::"Solo Hueco Vacio":
-                begin
-                    codigo := BuscarVacia(prm_Almacen, prm_Producto, prm_Lote, prm_UM, prm_Cantidad, prm_Excluidas);
-                    if codigo <> '' then
-                        prm_Motivo := MotivoPrimeraVaciaTxt;
-                end;
-            prm_Estrategia::"Priorizar Consolidacion":
-                begin
-                    codigo := BuscarConsolidacion(prm_Almacen, prm_Producto, prm_Variante, prm_Lote, prm_UM, prm_Cantidad, prm_Excluidas);
-                    if codigo <> '' then
-                        prm_Motivo := MotivoConsolidacionTxt
-                    else begin
-                        codigo := BuscarLibre(prm_Almacen, prm_Producto, prm_Lote, prm_UM, prm_Cantidad, prm_Excluidas);
+        // La clase de hueco y lo que ocupa la cantidad en ella dependen solo del producto: se
+        // calculan una vez y no en cada ubicación que se mira. Sin clase no sirve ningún hueco.
+        tipo := cUM.TipoHuecoDestino(prm_Producto, prm_UM, prm_Cantidad);
+        entrada := EntradaEnClase(prm_Producto, prm_UM, prm_Cantidad, tipo);
+        if tipo <> tipo::" " then
+            case prm_Estrategia of
+                prm_Estrategia::"Solo Ubicacion Fija":
+                    begin
+                        codigo := BuscarFija(prm_Almacen, prm_Producto, prm_Lote, tipo, entrada, prm_Excluidas);
+                        if codigo <> '' then
+                            prm_Motivo := MotivoFijaTxt;
+                    end;
+                prm_Estrategia::"Solo Hueco Vacio":
+                    begin
+                        codigo := BuscarVacia(prm_Almacen, prm_Producto, prm_Lote, tipo, entrada, prm_Excluidas);
+                        if codigo <> '' then
+                            prm_Motivo := MotivoPrimeraVaciaTxt;
+                    end;
+                prm_Estrategia::"Priorizar Consolidacion":
+                    begin
+                        codigo := BuscarConsolidacion(prm_Almacen, prm_Producto, prm_Variante, prm_Lote, tipo, entrada, prm_Excluidas);
+                        if codigo <> '' then
+                            prm_Motivo := MotivoConsolidacionTxt
+                        else begin
+                            codigo := BuscarLibre(prm_Almacen, prm_Producto, prm_Lote, tipo, entrada, prm_Excluidas);
+                            if codigo <> '' then
+                                prm_Motivo := MotivoPrimeraLibreTxt;
+                        end;
+                    end;
+                prm_Estrategia::"Primera Libre por Ruta":
+                    begin
+                        codigo := BuscarLibre(prm_Almacen, prm_Producto, prm_Lote, tipo, entrada, prm_Excluidas);
                         if codigo <> '' then
                             prm_Motivo := MotivoPrimeraLibreTxt;
                     end;
-                end;
-            prm_Estrategia::"Primera Libre por Ruta":
-                begin
-                    codigo := BuscarLibre(prm_Almacen, prm_Producto, prm_Lote, prm_UM, prm_Cantidad, prm_Excluidas);
-                    if codigo <> '' then
-                        prm_Motivo := MotivoPrimeraLibreTxt;
-                end;
-            else begin
-                // Estándar: su casa, si no consolidar, si no el primer hueco por ruta.
-                codigo := BuscarFija(prm_Almacen, prm_Producto, prm_Lote, prm_UM, prm_Cantidad, prm_Excluidas);
-                if codigo <> '' then
-                    prm_Motivo := MotivoFijaTxt
                 else begin
-                    codigo := BuscarConsolidacion(prm_Almacen, prm_Producto, prm_Variante, prm_Lote, prm_UM, prm_Cantidad, prm_Excluidas);
+                    // Estándar: su casa, si no consolidar, si no el primer hueco por ruta.
+                    codigo := BuscarFija(prm_Almacen, prm_Producto, prm_Lote, tipo, entrada, prm_Excluidas);
                     if codigo <> '' then
-                        prm_Motivo := MotivoConsolidacionTxt
+                        prm_Motivo := MotivoFijaTxt
                     else begin
-                        codigo := BuscarLibre(prm_Almacen, prm_Producto, prm_Lote, prm_UM, prm_Cantidad, prm_Excluidas);
+                        codigo := BuscarConsolidacion(prm_Almacen, prm_Producto, prm_Variante, prm_Lote, tipo, entrada, prm_Excluidas);
                         if codigo <> '' then
-                            prm_Motivo := MotivoPrimeraLibreTxt;
+                            prm_Motivo := MotivoConsolidacionTxt
+                        else begin
+                            codigo := BuscarLibre(prm_Almacen, prm_Producto, prm_Lote, tipo, entrada, prm_Excluidas);
+                            if codigo <> '' then
+                                prm_Motivo := MotivoPrimeraLibreTxt;
+                        end;
                     end;
                 end;
             end;
-        end;
 
         if codigo = '' then
             prm_Motivo := ExplicarSinHuecoLote(prm_Almacen, prm_Producto, prm_Lote, prm_UM, prm_Cantidad);
@@ -487,7 +608,7 @@ codeunit 51101 "Gestion Ubicaciones SGA"
 
     /// <summary>
     /// Explica por qué no se ha podido proponer ningún hueco y qué hacer. La primera frase es
-    /// siempre la causa, para poder agrupar por ella (resultado de la carga inicial):
+    /// siempre la causa:
     ///   - la unidad no es palé, caja ni unidad del producto;
     ///   - no hay ninguna ubicación de esa clase configurada (o son de otro uso);
     ///   - las hay, pero ninguna sirve: cuántas por cada motivo (bloqueadas, sin sitio,
@@ -504,9 +625,13 @@ codeunit 51101 "Gestion Ubicaciones SGA"
         deUso: Integer;
         otrosUsos: Integer;
         motivo: Integer;
+        entrada: Decimal;
         cuenta: array[6] of Integer;
         detalle: Text;
+        donde: Text;
+        AlmacenZonaTxt: Label '%1, zona %2', Comment = '%1 = almacén, %2 = zona';
         UMSinClaseTxt: Label 'La unidad %1 no es el palé, la caja ni la unidad del producto. Ubique en el "Cód. palé por defecto", la "Unidad de medida de venta" o la unidad base, o revise la ficha del producto.', Comment = '%1 = unidad';
+        CajasSinPaleTxt: Label 'El producto %1 no tiene palé en su ficha: %2 %3 son demasiadas para un hueco de caja, y sin el tamaño del palé no se puede medir cuánto ocupan en uno de palé. Cree la unidad de palé en sus unidades de medida (con su "Unidad anterior") y póngala en "Cód. palé por defecto".', Comment = '%1 = producto, %2 = cantidad, %3 = unidad';
         SinUbicacionClaseTxt: Label 'No hay ninguna ubicación de %1 en el almacén %2. Configure alguna: ficha de una ubicación de tipo Picking o Reserva, "Admite" = %1 y su "Capacidad".', Comment = '%1 = clase (Palé/Caja/Unidad), %2 = almacén';
         UbicacionesOtroUsoTxt: Label 'Las %1 ubicaciones de %2 del almacén %3 son de muelle, cuarentena, ajustes u otro uso, y solo se proponen las de Picking o Reserva. Cambie el "Tipo ubicación" de alguna.', Comment = '%1 = número, %2 = clase, %3 = almacén';
         SinEspacioTxt: Label 'No queda espacio en ubicaciones de %1 (almacén %2): %3 de %4 están llenas o sin sitio para %5 %6.%7 Libere ubicaciones o configure más de %1.', Comment = '%1 = clase, %2 = almacén, %3 = sin sitio, %4 = total, %5 = cantidad, %6 = unidad, %7 = resto del detalle';
@@ -526,10 +651,22 @@ codeunit 51101 "Gestion Ubicaciones SGA"
         // La misma clase de hueco que se propone: las cajas, a caja o a palé según cuántas sean.
         // Los huecos sin configurar no cuentan: no se proponen nunca.
         tipo := cUM.TipoHuecoDestino(prm_Producto, um, prm_Cantidad);
-        if tipo = tipo::" " then
+        if tipo = tipo::" " then begin
+            // Unas cajas sin clase de hueco son demasiadas para un hueco de caja y el producto
+            // no tiene palé con que medirlas en uno de palé: lo que falta es la ficha.
+            if cUM.TipoUMProducto(prm_Producto, um) = tipo::Caja then
+                exit(StrSubstNo(CajasSinPaleTxt, prm_Producto, prm_Cantidad, um));
             exit(StrSubstNo(UMSinClaseTxt, um));
+        end;
 
+        // Con la búsqueda limitada a una zona (ProponerEnZona) se cuentan solo las suyas, y los
+        // mensajes dicen "almacén X, zona Y".
         rUbicacionSGA.SetRange("Cod. Almacen", prm_Almacen);
+        donde := prm_Almacen;
+        if ZonaDestino <> '' then begin
+            rUbicacionSGA.SetRange("Cod. Zona SGA", ZonaDestino);
+            donde := StrSubstNo(AlmacenZonaTxt, prm_Almacen, ZonaDestino);
+        end;
         rUbicacionSGA.SetRange("Tipo UM Admitida", tipo);
         rUbicacionSGA.FiltrarDeAlmacenaje();
         deUso := rUbicacionSGA.Count();
@@ -538,13 +675,14 @@ codeunit 51101 "Gestion Ubicaciones SGA"
             rUbicacionSGA.SetRange("Tipo Ubicacion");
             otrosUsos := rUbicacionSGA.Count();
             if otrosUsos > 0 then
-                exit(StrSubstNo(UbicacionesOtroUsoTxt, otrosUsos, tipo, prm_Almacen));
-            exit(StrSubstNo(SinUbicacionClaseTxt, tipo, prm_Almacen));
+                exit(StrSubstNo(UbicacionesOtroUsoTxt, otrosUsos, tipo, donde));
+            exit(StrSubstNo(SinUbicacionClaseTxt, tipo, donde));
         end;
 
+        entrada := EntradaEnClase(prm_Producto, um, prm_Cantidad, tipo);
         if rUbicacionSGA.FindSet() then
             repeat
-                motivo := MotivoRechazo(rUbicacionSGA, prm_Producto, prm_Lote, um, prm_Cantidad);
+                motivo := MotivoRechazo(rUbicacionSGA, prm_Producto, prm_Lote, tipo, entrada);
                 case motivo of
                     0:
                         cuenta[6] += 1;
@@ -571,18 +709,18 @@ codeunit 51101 "Gestion Ubicaciones SGA"
         if cuenta[4] * 2 >= deUso then begin
             if detalle <> '' then
                 detalle := DelRestoTxt + detalle;
-            exit(StrSubstNo(SinEspacioTxt, tipo, prm_Almacen, cuenta[4], deUso, prm_Cantidad, um, detalle));
+            exit(StrSubstNo(SinEspacioTxt, tipo, donde, cuenta[4], deUso, prm_Cantidad, um, detalle));
         end;
 
         if cuenta[4] > 0 then
             detalle += StrSubstNo(SinSitioTxt, cuenta[4]);
-        exit(StrSubstNo(NingunaSirveTxt, deUso, tipo, prm_Almacen, prm_Cantidad, um, detalle));
+        exit(StrSubstNo(NingunaSirveTxt, deUso, tipo, donde, prm_Cantidad, um, detalle));
     end;
 
     /// <summary>
     /// Casa del producto, si la tiene y sigue admitiéndolo.
     /// </summary>
-    local procedure BuscarFija(prm_Almacen: Code[10]; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_UM: Code[10]; prm_Cantidad: Decimal; prm_Excluidas: Text): Code[20]
+    local procedure BuscarFija(prm_Almacen: Code[10]; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_Tipo: Enum "Tipo UM SGA"; prm_Entrada: Decimal; prm_Excluidas: Text): Code[20]
     var
         rUbicacionSGA: Record "Ubicacion SGA";
         codigo: Code[20];
@@ -597,7 +735,7 @@ codeunit 51101 "Gestion Ubicaciones SGA"
         if EstaExcluida(prm_Almacen, codigo, prm_Excluidas) then
             exit('');
 
-        if not UbicacionAdmite(rUbicacionSGA, prm_Producto, prm_Lote, prm_UM, prm_Cantidad) then
+        if not UbicacionAdmite(rUbicacionSGA, prm_Producto, prm_Lote, prm_Tipo, prm_Entrada) then
             exit('');
 
         exit(codigo);
@@ -607,27 +745,85 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     /// Primer hueco completamente vacío siguiendo la ruta de picking. Es la estrategia que
     /// usan los ensamblados: lo que sale de producción va a un hueco limpio, no se mezcla.
     /// </summary>
-    local procedure BuscarVacia(prm_Almacen: Code[10]; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_UM: Code[10]; prm_Cantidad: Decimal; prm_Excluidas: Text): Code[20]
+    local procedure BuscarVacia(prm_Almacen: Code[10]; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_Tipo: Enum "Tipo UM SGA"; prm_Entrada: Decimal; prm_Excluidas: Text): Code[20]
     var
         rUbicacionSGA: Record "Ubicacion SGA";
     begin
-        rUbicacionSGA.SetCurrentKey("Cod. Almacen", "Secuencia Picking", "Cod. Bin");
-        rUbicacionSGA.SetRange("Cod. Almacen", prm_Almacen);
-        rUbicacionSGA.SetRange(Bloqueada, false);
-        rUbicacionSGA.FiltrarDeAlmacenaje();
-        if prm_Excluidas <> '' then
-            rUbicacionSGA.SetFilter("Cod. Bin", prm_Excluidas);
+        FiltrarCandidatas(rUbicacionSGA, prm_Almacen, prm_Tipo, prm_Excluidas);
         if not rUbicacionSGA.FindSet() then
             exit('');
 
         repeat
-            rUbicacionSGA.CalcFields("Lineas Contenido");
-            if rUbicacionSGA."Lineas Contenido" = 0 then
-                if UbicacionAdmite(rUbicacionSGA, prm_Producto, prm_Lote, prm_UM, prm_Cantidad) then
-                    exit(rUbicacionSGA."Cod. Bin");
+            if VaciaYAdmite(rUbicacionSGA, prm_Producto, prm_Lote, prm_Tipo, prm_Entrada) then
+                exit(rUbicacionSGA."Cod. Bin");
         until rUbicacionSGA.Next() = 0;
 
         exit('');
+    end;
+
+    /// <summary>
+    /// Hueco de palé vacío para un palé completo del producto, en el reparto por huecos libres de
+    /// Cod. "Carga Inicial SGA": primero los reservados a ese producto y luego el siguiente libre
+    /// de la ruta. Mismas reglas que la propuesta, pero solo huecos vacíos.
+    ///
+    /// Los huecos sin producto fijo se recorren con un cursor que solo avanza y que vive en esta
+    /// instancia del codeunit. Vale porque, vacío y sin producto fijo, un hueco de palé admite
+    /// cualquier palé: el que se salta una vez no le sirve a nadie después. Así no se recorre la
+    /// nave entera por cada palé. Para volver a empezar, Clear de la instancia.
+    /// </summary>
+    procedure ProponerHuecoPaleRuta(prm_Almacen: Code[10]; prm_Producto: Code[20]; var prm_Motivo: Text): Code[20]
+    var
+        rFijo: Record "Ubicacion SGA";
+        HuecoReservadoLbl: Label 'Hueco reservado al producto.';
+        HuecoRutaLbl: Label 'Hueco de palé vacío siguiendo la ruta.';
+    begin
+        // Un palé completo ocupa uno en un hueco de palé.
+        FiltrarCandidatas(rFijo, prm_Almacen, "Tipo UM SGA"::Pale, '');
+        rFijo.SetRange("Producto Fijo", prm_Producto);
+        if rFijo.FindSet() then
+            repeat
+                if VaciaYAdmite(rFijo, prm_Producto, '', "Tipo UM SGA"::Pale, 1) then begin
+                    prm_Motivo := HuecoReservadoLbl;
+                    exit(rFijo."Cod. Bin");
+                end;
+            until rFijo.Next() = 0;
+
+        if HuecosRutaAgotados then
+            exit('');
+
+        if not HuecoRutaPosicionado then begin
+            FiltrarCandidatas(HuecoRuta, prm_Almacen, "Tipo UM SGA"::Pale, '');
+            HuecoRuta.SetRange("Producto Fijo", '');
+            HuecoRutaPosicionado := true;
+            if not HuecoRuta.FindSet() then begin
+                HuecosRutaAgotados := true;
+                exit('');
+            end;
+        end;
+
+        repeat
+            if VaciaYAdmite(HuecoRuta, prm_Producto, '', "Tipo UM SGA"::Pale, 1) then begin
+                prm_Motivo := HuecoRutaLbl;
+                exit(HuecoRuta."Cod. Bin");
+            end;
+        until HuecoRuta.Next() = 0;
+
+        HuecosRutaAgotados := true;
+        exit('');
+    end;
+
+    /// <summary>
+    /// Ubicación sin contenido que admite el producto. Lo vacío se cuenta en el contenido y no
+    /// en el estado guardado: el cursor de ProponerHuecoPaleRuta lee los huecos por adelantado,
+    /// y la carga puede haber llenado alguno después.
+    /// </summary>
+    local procedure VaciaYAdmite(var prm_Ubicacion: Record "Ubicacion SGA"; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_Tipo: Enum "Tipo UM SGA"; prm_Entrada: Decimal): Boolean
+    begin
+        prm_Ubicacion.CalcFields("Lineas Contenido");
+        if prm_Ubicacion."Lineas Contenido" > 0 then
+            exit(false);
+
+        exit(UbicacionAdmite(prm_Ubicacion, prm_Producto, prm_Lote, prm_Tipo, prm_Entrada));
     end;
 
     /// <summary>
@@ -675,23 +871,34 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     /// </summary>
     procedure ComprobarUbicacionExiste(prm_Almacen: Code[10]; prm_Ubicacion: Code[20])
     var
-        rBin: Record Bin;
         UbicacionNoExisteErr: Label 'La ubicación %1 no existe en el almacén %2.', Comment = '%1 = ubicación, %2 = almacén';
     begin
         if (prm_Almacen = '') or (prm_Ubicacion = '') then
             exit;
 
+        if not UbicacionExiste(prm_Almacen, prm_Ubicacion) then
+            Error(UbicacionNoExisteErr, prm_Ubicacion, prm_Almacen);
+    end;
+
+    /// <summary>
+    /// Si existe el Bin prm_Ubicacion en el almacén. Con la ubicación en blanco, no.
+    /// </summary>
+    procedure UbicacionExiste(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]): Boolean
+    var
+        rBin: Record Bin;
+    begin
+        if prm_Ubicacion = '' then
+            exit(false);
         rBin.SetRange("Location Code", prm_Almacen);
         rBin.SetRange(Code, prm_Ubicacion);
-        if rBin.IsEmpty() then
-            Error(UbicacionNoExisteErr, prm_Ubicacion, prm_Almacen);
+        exit(not rBin.IsEmpty());
     end;
 
     /// <summary>
     /// Ubicación que ya tiene ese producto y aún admite más: agrupar antes que dispersar.
     /// Se recorre por secuencia de picking para quedarse con la más cercana en la ruta.
     /// </summary>
-    local procedure BuscarConsolidacion(prm_Almacen: Code[10]; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50]; prm_UM: Code[10]; prm_Cantidad: Decimal; prm_Excluidas: Text): Code[20]
+    local procedure BuscarConsolidacion(prm_Almacen: Code[10]; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50]; prm_Tipo: Enum "Tipo UM SGA"; prm_Entrada: Decimal; prm_Excluidas: Text): Code[20]
     var
         rContenido: Record "Contenido Ubicacion SGA";
         rUbicacionSGA: Record "Ubicacion SGA";
@@ -709,7 +916,7 @@ codeunit 51101 "Gestion Ubicaciones SGA"
         repeat
             if not EstaExcluida(prm_Almacen, rContenido."Cod. Bin", prm_Excluidas) then
                 if rUbicacionSGA.Get(prm_Almacen, rContenido."Cod. Bin") then
-                    if UbicacionAdmite(rUbicacionSGA, prm_Producto, prm_Lote, prm_UM, prm_Cantidad) then
+                    if UbicacionAdmite(rUbicacionSGA, prm_Producto, prm_Lote, prm_Tipo, prm_Entrada) then
                     if (mejorCodigo = '') or (rUbicacionSGA."Secuencia Picking" < mejorSecuencia) then begin
                         mejorSecuencia := rUbicacionSGA."Secuencia Picking";
                         mejorCodigo := rUbicacionSGA."Cod. Bin";
@@ -722,21 +929,16 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     /// <summary>
     /// Primer hueco de picking o reserva que admita el producto, siguiendo la ruta física.
     /// </summary>
-    local procedure BuscarLibre(prm_Almacen: Code[10]; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_UM: Code[10]; prm_Cantidad: Decimal; prm_Excluidas: Text): Code[20]
+    local procedure BuscarLibre(prm_Almacen: Code[10]; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_Tipo: Enum "Tipo UM SGA"; prm_Entrada: Decimal; prm_Excluidas: Text): Code[20]
     var
         rUbicacionSGA: Record "Ubicacion SGA";
     begin
-        rUbicacionSGA.SetCurrentKey("Cod. Almacen", "Secuencia Picking", "Cod. Bin");
-        rUbicacionSGA.SetRange("Cod. Almacen", prm_Almacen);
-        rUbicacionSGA.SetRange(Bloqueada, false);
-        rUbicacionSGA.FiltrarDeAlmacenaje();
-        if prm_Excluidas <> '' then
-            rUbicacionSGA.SetFilter("Cod. Bin", prm_Excluidas);
+        FiltrarCandidatas(rUbicacionSGA, prm_Almacen, prm_Tipo, prm_Excluidas);
         if not rUbicacionSGA.FindSet() then
             exit('');
 
         repeat
-            if UbicacionAdmite(rUbicacionSGA, prm_Producto, prm_Lote, prm_UM, prm_Cantidad) then
+            if UbicacionAdmite(rUbicacionSGA, prm_Producto, prm_Lote, prm_Tipo, prm_Entrada) then
                 exit(rUbicacionSGA."Cod. Bin");
         until rUbicacionSGA.Next() = 0;
 
@@ -744,25 +946,126 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     end;
 
     /// <summary>
+    /// Reubicación por ABC al ubicar una entrada de palé ("Reubicar Pale A por ABC" de la
+    /// configuración): si el primer hueco de palé vacío de la ruta lo puede ocupar un palé de un
+    /// producto A que está más atrás en la ruta, propone llevarlo ahí antes de ubicar la entrada.
+    /// Se elige el palé A más lejano, que es el que más gana. Solo palés solos en su hueco, sin
+    /// reservar ni bloquear y fuera de su ubicación fija. Si la entrada es de un producto A, no
+    /// se propone nada: ella misma se queda el hueco bueno. Devuelve false si no hay propuesta.
+    /// </summary>
+    procedure ProponerReubicacionABC(prm_Almacen: Code[10]; prm_Producto: Code[20]; prm_UM: Code[10]; prm_Cantidad: Decimal; prm_Excluidas: Text; var prm_Origen: Code[20]; var prm_Destino: Code[20]): Boolean
+    var
+        rConfig: Record "Config. SGA";
+        rDestino: Record "Ubicacion SGA";
+        rOrigen: Record "Ubicacion SGA";
+        rContenido: Record "Contenido Ubicacion SGA";
+        cABC: Codeunit "Analisis ABC SGA";
+        clases: Dictionary of [Code[20], Integer];
+        claseA: Integer;
+        clase: Integer;
+    begin
+        prm_Origen := '';
+        prm_Destino := '';
+        rConfig.ObtenerConfig();
+        if not rConfig."Reubicar Pale A por ABC" then
+            exit(false);
+        if cUM.TipoHuecoDestino(prm_Producto, prm_UM, prm_Cantidad) <> "Tipo UM SGA"::Pale then
+            exit(false);
+
+        // Sin un cálculo ABC no se sabe qué es A.
+        cABC.ClasesUltimoCalculo(prm_Almacen, clases);
+        claseA := "Clase ABC SGA"::A.AsInteger();
+        if clases.Get(prm_Producto, clase) and (clase = claseA) then
+            exit(false);
+        if not clases.Values().Contains(claseA) then
+            exit(false);
+
+        // El hueco que tomaría la entrada: el primer palé vacío de la ruta.
+        FiltrarCandidatas(rDestino, prm_Almacen, "Tipo UM SGA"::Pale, prm_Excluidas);
+        rDestino.SetRange("Producto Fijo", '');
+        rDestino.SetRange("Lineas Contenido", 0);
+        if not rDestino.FindFirst() then
+            exit(false);
+
+        // Palés de la ruta más allá de ese hueco, del más lejano al más cercano.
+        FiltrarCandidatas(rOrigen, prm_Almacen, "Tipo UM SGA"::Pale, prm_Excluidas);
+        rOrigen.SetFilter("Secuencia Picking", '>%1', rDestino."Secuencia Picking");
+        rOrigen.SetRange("Producto Fijo", '');
+        rOrigen.SetRange("Lineas Contenido", 1);
+        rOrigen.SetLoadFields("Cod. Almacen", "Cod. Bin");
+        rOrigen.Ascending(false);
+        if not rOrigen.FindSet() then
+            exit(false);
+
+        rContenido.SetLoadFields("No. Producto", "No. Lote", "Cantidad Base", "Cantidad Reservada", Bloqueado);
+        repeat
+            rContenido.SetRange("Cod. Almacen", rOrigen."Cod. Almacen");
+            rContenido.SetRange("Cod. Bin", rOrigen."Cod. Bin");
+            if rContenido.FindFirst() then
+                if clases.Get(rContenido."No. Producto", clase) and (clase = claseA) and
+                   (rContenido."Cantidad Reservada" = 0) and not rContenido.Bloqueado
+                then
+                    if VaciaYAdmite(rDestino, rContenido."No. Producto", rContenido."No. Lote", "Tipo UM SGA"::Pale,
+                        cUM.CantidadEnClase(rContenido."No. Producto", "Tipo UM SGA"::Pale, rContenido."Cantidad Base"))
+                    then begin
+                        prm_Origen := rOrigen."Cod. Bin";
+                        prm_Destino := rDestino."Cod. Bin";
+                        exit(true);
+                    end;
+        until rOrigen.Next() = 0;
+        exit(false);
+    end;
+
+    /// <summary>
+    /// Huecos que se recorren por la ruta buscando sitio: de almacenaje, sin bloquear, fuera de
+    /// las exclusiones y solo de la clase que toca. Las de otra clase las descartaría igual
+    /// MotivoRechazo; filtrarlas aquí evita leerlas una a una.
+    /// </summary>
+    local procedure FiltrarCandidatas(var prm_Ubicacion: Record "Ubicacion SGA"; prm_Almacen: Code[10]; prm_Tipo: Enum "Tipo UM SGA"; prm_Excluidas: Text)
+    begin
+        prm_Ubicacion.SetCurrentKey("Cod. Almacen", "Secuencia Picking", "Cod. Bin");
+        prm_Ubicacion.SetRange("Cod. Almacen", prm_Almacen);
+        prm_Ubicacion.SetRange(Bloqueada, false);
+        prm_Ubicacion.FiltrarDeAlmacenaje();
+        prm_Ubicacion.SetRange("Tipo UM Admitida", prm_Tipo);
+        if ZonaDestino <> '' then
+            prm_Ubicacion.SetRange("Cod. Zona SGA", ZonaDestino);
+        if prm_Excluidas <> '' then
+            prm_Ubicacion.SetFilter("Cod. Bin", prm_Excluidas);
+    end;
+
+    /// <summary>
+    /// Lo que ocupa una cantidad del producto en un hueco de la clase prm_Tipo (palés, cajas):
+    /// lo que se compara con la capacidad libre del hueco.
+    /// </summary>
+    local procedure EntradaEnClase(prm_Producto: Code[20]; prm_UM: Code[10]; prm_Cantidad: Decimal; prm_Tipo: Enum "Tipo UM SGA"): Decimal
+    begin
+        exit(cUM.CantidadEnClase(prm_Producto, prm_Tipo, prm_Cantidad * cUM.FactorUM(prm_Producto, prm_UM)));
+    end;
+
+    /// <summary>
     /// Comprobación de si una ubicación puede recibir el producto. Es la criba para
     /// proponer; la validación que manda es la de Cod. "Gestion Contenido SGA" al registrar.
     /// </summary>
-    local procedure UbicacionAdmite(var prm_Ubicacion: Record "Ubicacion SGA"; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_UM: Code[10]; prm_Cantidad: Decimal): Boolean
+    local procedure UbicacionAdmite(var prm_Ubicacion: Record "Ubicacion SGA"; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_Tipo: Enum "Tipo UM SGA"; prm_Entrada: Decimal): Boolean
     begin
-        exit(MotivoRechazo(prm_Ubicacion, prm_Producto, prm_Lote, prm_UM, prm_Cantidad) = 0);
+        exit(MotivoRechazo(prm_Ubicacion, prm_Producto, prm_Lote, prm_Tipo, prm_Entrada) = 0);
     end;
 
     /// <summary>
     /// Por qué una ubicación no puede recibir el producto, en el orden en que se comprueba:
     ///   0 = sí puede; 1 = bloqueada (ella o su zona); 2 = reservada a otro producto;
-    ///   3 = no es de la clase que toca (o no está configurada); 4 = sin sitio suficiente;
+    ///   3 = no es de la clase que toca (o no está configurada, o es de otra zona que la de
+    ///   ProponerEnZona); 4 = sin sitio suficiente;
     ///   5 = tiene otro producto y no acepta mezcla; 6 = tiene otro lote y no acepta mezcla.
     /// Es la única regla: la usan la propuesta (UbicacionAdmite) y la explicación de por qué no
     /// hay hueco (ExplicarSinHuecoLote), para que digan siempre lo mismo.
+    ///
+    /// prm_Tipo es la clase de hueco que toca (TipoHuecoDestino) y prm_Entrada lo que ocupa la
+    /// cantidad en esa clase (EntradaEnClase): quien llama los calcula una vez para todas las
+    /// ubicaciones que mira.
     /// </summary>
-    local procedure MotivoRechazo(var prm_Ubicacion: Record "Ubicacion SGA"; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_UM: Code[10]; prm_Cantidad: Decimal): Integer
-    var
-        cantidadBase: Decimal;
+    local procedure MotivoRechazo(var prm_Ubicacion: Record "Ubicacion SGA"; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_Tipo: Enum "Tipo UM SGA"; prm_Entrada: Decimal): Integer
     begin
         if not prm_Ubicacion.EsUtilizable() then
             exit(1);
@@ -775,16 +1078,21 @@ codeunit 51101 "Gestion Ubicaciones SGA"
         // UMAdmitida, que es más amplia: deja que el operario use otro hueco que también sirva.
         if prm_Ubicacion."Tipo UM Admitida" = prm_Ubicacion."Tipo UM Admitida"::" " then
             exit(3);
-        if prm_Ubicacion."Tipo UM Admitida" <> cUM.TipoHuecoDestino(prm_Producto, prm_UM, prm_Cantidad) then
+        if prm_Ubicacion."Tipo UM Admitida" <> prm_Tipo then
+            exit(3);
+        // Fuera de la zona a la que se limita la búsqueda (ProponerEnZona), tampoco toca.
+        if (ZonaDestino <> '') and (prm_Ubicacion."Cod. Zona SGA" <> ZonaDestino) then
             exit(3);
 
         // La capacidad está en la clase del hueco (palés, cajas): lo que hay y lo que entra se
-        // cuentan en esa clase, con el palé o la caja de cada producto.
-        if prm_Ubicacion."Capacidad Uds." > 0 then begin
-            cantidadBase := prm_Cantidad * cUM.FactorUM(prm_Producto, prm_UM);
-            if prm_Ubicacion.OcupadoEnUMHueco() + prm_Ubicacion.EnUMHueco(prm_Producto, cantidadBase) > prm_Ubicacion."Capacidad Uds." then
-                exit(4);
-        end;
+        // cuentan en esa clase, con el palé o la caja de cada producto. CabeEntrada parte de la
+        // ocupación guardada, sin volver a sumar el contenido de cada hueco que se mira.
+        if not prm_Ubicacion.CabeEntrada(prm_Entrada) then
+            exit(4);
+
+        // Vacía no tiene nada con que mezclar: no hace falta consultar su contenido.
+        if prm_Ubicacion."Estado SGA" = prm_Ubicacion."Estado SGA"::Vacia then
+            exit(0);
 
         // 5 = otro producto, 6 = otro lote; 0 si nada impide la mezcla.
         exit(prm_Ubicacion.ContenidoQueImpideMezcla(prm_Producto, prm_Lote));
@@ -811,17 +1119,61 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     end;
 
     /// <summary>
-    /// Cuántas ubicaciones del almacén están en ese estado.
+    /// Cuántas ubicaciones del almacén (o de su zona, si prm_Zona no va en blanco) están en
+    /// ese estado.
     /// </summary>
-    procedure ContarUbicaciones(prm_Almacen: Code[10]; prm_Estado: Enum "Estado Ubicacion SGA"): Integer
+    procedure ContarUbicaciones(prm_Almacen: Code[10]; prm_Zona: Code[10]; prm_Estado: Enum "Estado Ubicacion SGA"): Integer
     var
         rUbicacionSGA: Record "Ubicacion SGA";
     begin
         rUbicacionSGA.SetRange("Cod. Almacen", prm_Almacen);
+        if prm_Zona <> '' then
+            rUbicacionSGA.SetRange("Cod. Zona SGA", prm_Zona);
         rUbicacionSGA.SetRange("Estado SGA", prm_Estado);
         exit(rUbicacionSGA.Count());
     end;
 
+    /// <summary>
+    /// Hueco para trasladar a otra zona: la propuesta de siempre (estrategia de la
+    /// configuración, mismas reglas de clase, capacidad y mezcla), pero solo entre las
+    /// ubicaciones de prm_Zona y sin la de origen. Sin hueco devuelve '' y en prm_Motivo el
+    /// porqué, contado sobre esa zona. Con la zona en blanco busca en todo el almacén.
+    /// </summary>
+    procedure ProponerEnZona(prm_Almacen: Code[10]; prm_Zona: Code[10]; prm_Origen: Code[20]; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50]; prm_UM: Code[10]; prm_Cantidad: Decimal; var prm_Motivo: Text): Code[20]
     var
+        rConfig: Record "Config. SGA";
+        codigo: Code[20];
+    begin
+        rConfig.ObtenerConfig();
+        ZonaDestino := prm_Zona;
+        codigo := ProponerUbicacionCon(rConfig."Estrategia Ubicacion", AnadirExclusion('', prm_Origen), prm_Almacen,
+                                       prm_Producto, prm_Variante, prm_Lote, prm_UM, prm_Cantidad, prm_Motivo);
+        ZonaDestino := '';
+        exit(codigo);
+    end;
+
+    /// <summary>
+    /// Error si la ubicación no es de la zona. Una zona en blanco no exige nada.
+    /// </summary>
+    procedure TestUbicacionEnZona(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]; prm_Zona: Code[10])
+    var
+        rUbicacionSGA: Record "Ubicacion SGA";
+        FueraDeZonaErr: Label 'La ubicación %1 no es de la zona %2.', Comment = '%1 = ubicación, %2 = zona';
+    begin
+        if (prm_Zona = '') or (prm_Ubicacion = '') then
+            exit;
+        rUbicacionSGA.SetLoadFields("Cod. Zona SGA");
+        if rUbicacionSGA.Get(prm_Almacen, prm_Ubicacion) then;
+        if rUbicacionSGA."Cod. Zona SGA" <> prm_Zona then
+            Error(FueraDeZonaErr, prm_Ubicacion, prm_Zona);
+    end;
+
+    var
+        // Cursor de ProponerHuecoPaleRuta: el último hueco de palé libre mirado en la ruta.
+        HuecoRuta: Record "Ubicacion SGA";
         cUM: Codeunit "Unidades Producto SGA";
+        // Zona a la que ProponerEnZona limita la propuesta mientras dura; en blanco, todas.
+        ZonaDestino: Code[10];
+        HuecoRutaPosicionado: Boolean;
+        HuecosRutaAgotados: Boolean;
 }

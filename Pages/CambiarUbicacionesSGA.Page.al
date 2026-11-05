@@ -2,8 +2,8 @@ namespace AntonioNadal.SGA;
 
 /// <summary>
 /// Page Cambiar Ubicaciones SGA (ID 51126).
-/// Diálogo para cambiar de golpe los datos de gestión de muchas ubicaciones: capacidad, qué
-/// admiten, tipo de uso, zona y mezcla de productos. Lo abre la lista de ubicaciones con las
+/// Diálogo para cambiar de golpe los datos de gestión de muchas ubicaciones: capacidad, control
+/// de capacidad, qué admiten, tipo de uso, zona y mezcla de productos. Lo abre la lista de ubicaciones con las
 /// líneas seleccionadas.
 ///
 /// Cada dato lleva su casilla "Cambiar": solo se toca lo marcado. Hace falta porque 0 o
@@ -51,6 +51,19 @@ page 51126 "Cambiar Ubicaciones SGA"
                     DecimalPlaces = 0 : 5;
                     MinValue = 0;
                     Editable = CambiarCapacidad;
+                }
+                field(CambiarControlCapacidad; CambiarControlCapacidad)
+                {
+                    Caption = 'Cambiar control de capacidad';
+                    ToolTip = 'Marque para cambiar qué pasa cuando algo no cabe en la ubicación.';
+                    ApplicationArea = All;
+                }
+                field(ControlCapacidad; ControlCapacidad)
+                {
+                    Caption = 'Control capacidad';
+                    ToolTip = 'Qué hacer cuando una entrada no cabe: lo que diga la configuración de SGA, avisar (y dejar seguir si se confirma) o bloquear.';
+                    ApplicationArea = All;
+                    Editable = CambiarControlCapacidad;
                 }
                 field(CambiarAdmite; CambiarAdmite)
                 {
@@ -115,6 +128,8 @@ page 51126 "Cambiar Ubicaciones SGA"
         Resumen: Text;
         CambiarCapacidad: Boolean;
         Capacidad: Decimal;
+        CambiarControlCapacidad: Boolean;
+        ControlCapacidad: Enum "Control Capacidad Ubic. SGA";
         CambiarAdmite: Boolean;
         Admite: Enum "Tipo UM SGA";
         CambiarMezcla: Boolean;
@@ -156,11 +171,12 @@ page 51126 "Cambiar Ubicaciones SGA"
         TempPlantilla."Tipo UM Admitida" := Admite;
         TempPlantilla."Permite Mezcla Producto" := Mezcla;
         TempPlantilla."Capacidad Uds." := Capacidad;
+        TempPlantilla."Control Capacidad" := ControlCapacidad;
         TempPlantilla."Tipo Ubicacion" := TipoUbicacion;
         TempPlantilla."Cod. Zona SGA" := Zona;
 
-        exit(cUbicaciones.AplicarCambiosUbicaciones(rSeleccion, TempPlantilla, CambiarCapacidad, CambiarAdmite,
-                                                    CambiarMezcla, CambiarTipoUbicacion, CambiarZona,
+        exit(cUbicaciones.AplicarCambiosUbicaciones(rSeleccion, TempPlantilla, CambiarCapacidad, CambiarControlCapacidad,
+                                                    CambiarAdmite, CambiarMezcla, CambiarTipoUbicacion, CambiarZona,
                                                     Omitidas, OmitidasEjemplo));
     end;
 

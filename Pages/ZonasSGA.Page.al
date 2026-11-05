@@ -34,11 +34,6 @@ page 51105 "Zonas SGA"
                     ToolTip = 'Descripción de la zona.';
                     ApplicationArea = All;
                 }
-                field("Cod. Nave"; Rec."Cod. Nave")
-                {
-                    ToolTip = 'Nave de la topología a la que corresponde la zona. Informativo.';
-                    ApplicationArea = All;
-                }
                 field("Tipo Ubicacion"; Rec."Tipo Ubicacion")
                 {
                     ToolTip = 'Tipo que se propone por defecto a las ubicaciones de esta zona.';

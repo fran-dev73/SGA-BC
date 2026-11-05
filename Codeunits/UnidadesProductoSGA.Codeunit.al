@@ -43,13 +43,32 @@ codeunit 51108 "Unidades Producto SGA"
     /// </summary>
     procedure UMBase(prm_Producto: Code[20]): Code[10]
     var
+        unidadBase: Code[10];
+    begin
+        if LeerUMBase(prm_Producto, unidadBase) then;
+        exit(unidadBase);
+    end;
+
+    /// <summary>
+    /// Unidad base del producto, leída de la ficha una vez por producto en cada instancia del
+    /// codeunit: quien recorre muchas líneas la pide sin volver a leer la ficha. False (y en
+    /// blanco) si el producto no existe.
+    /// </summary>
+    procedure LeerUMBase(prm_Producto: Code[20]; var prm_UMBase: Code[10]): Boolean
+    var
         rItem: Record Item;
     begin
+        if UMBasesLeidas.Get(prm_Producto, prm_UMBase) then
+            exit(true);
+
+        prm_UMBase := '';
         rItem.SetLoadFields("Base Unit of Measure");
         if not rItem.Get(prm_Producto) then
-            exit('');
+            exit(false);
 
-        exit(rItem."Base Unit of Measure");
+        prm_UMBase := rItem."Base Unit of Measure";
+        UMBasesLeidas.Add(prm_Producto, prm_UMBase);
+        exit(true);
     end;
 
     /// <summary>
@@ -147,8 +166,11 @@ codeunit 51108 "Unidades Producto SGA"
     /// <summary>
     /// Clase de hueco que se propone para una cantidad: el palé a palé, las unidades sueltas a
     /// Unidad, y las cajas a Caja si son menos de "Cajas Minimas Hueco Pale" o a Palé (palé
-    /// incompleto de una referencia) si son esas o más. En blanco si la unidad no tiene clase:
-    /// entonces no se propone ningún hueco. Con la UM en blanco se entiende la base del producto.
+    /// incompleto de una referencia) si son esas o más. En blanco si la unidad no tiene clase, o
+    /// si son esas cajas o más y el producto no tiene palé (sin su tamaño no se sabe cuánto
+    /// ocupan en un hueco de palé, y un hueco de caja no es para tantas): entonces no se propone
+    /// ningún hueco y ExplicarSinHuecoLote dice por qué. Con la UM en blanco se entiende la base
+    /// del producto.
     /// </summary>
     procedure TipoHuecoDestino(prm_Producto: Code[20]; prm_UM: Code[10]; prm_Cantidad: Decimal): Enum "Tipo UM SGA"
     var
@@ -166,6 +188,8 @@ codeunit 51108 "Unidades Producto SGA"
             rConfig."Cajas Minimas Hueco Pale" := 10;
         if prm_Cantidad < rConfig."Cajas Minimas Hueco Pale" then
             exit(clase::Caja);
+        if UMProductoDeTipo(prm_Producto, clase::Pale) = '' then
+            exit(clase::" ");
         exit(clase::Pale);
     end;
 
@@ -200,6 +224,27 @@ codeunit 51108 "Unidades Producto SGA"
         if TipoUMProducto(prm_Producto, um) <> prm_Tipo then
             exit('');
         exit(um);
+    end;
+
+    /// <summary>
+    /// Una cantidad base de un producto, contada en la clase indicada: palés con su palé, cajas
+    /// con su caja. Sin clase, o si el producto no tiene unidad de esa clase, en unidades base.
+    /// Sin redondear. Es la medida de la capacidad de un hueco de esa clase.
+    /// </summary>
+    procedure CantidadEnClase(prm_Producto: Code[20]; prm_Tipo: Enum "Tipo UM SGA"; prm_CantidadBase: Decimal): Decimal
+    begin
+        exit(prm_CantidadBase / FactorClase(prm_Producto, prm_Tipo));
+    end;
+
+    /// <summary>
+    /// Unidades base que lleva la unidad de la clase indicada del producto (su palé, su caja).
+    /// Uno sin clase o si el producto no tiene unidad de esa clase. Nunca cero: se puede dividir
+    /// por él. Quien convierte muchas cantidades del mismo producto lo lee una vez.
+    /// </summary>
+    procedure FactorClase(prm_Producto: Code[20]; prm_Tipo: Enum "Tipo UM SGA"): Decimal
+    begin
+        // FactorUM nunca devuelve cero: con la unidad en blanco o desconocida, uno.
+        exit(FactorUM(prm_Producto, UMProductoDeTipo(prm_Producto, prm_Tipo)));
     end;
 
     /// <summary>
@@ -364,4 +409,8 @@ codeunit 51108 "Unidades Producto SGA"
         prm_Texto += Format(cuantos) + ' ' + prm_UM;
         prm_Resto -= cuantos * prm_Factor;
     end;
+
+    var
+        // Caché de LeerUMBase: unidad base de cada producto ya leído.
+        UMBasesLeidas: Dictionary of [Code[20], Code[10]];
 }

@@ -58,14 +58,14 @@ table 51112 "Calculo ABC SGA"
         }
         field(32; "Corte A"; Decimal)
         {
-            ToolTip = 'Son A los productos hasta este % acumulado de palés salidos.';
-            Caption = 'Corte clase A (%)';
+            ToolTip = 'Son A los productos que se suman desde el 0 % hasta este % acumulado de palés salidos.';
+            Caption = 'Clase A: del 0 % hasta (%)';
             DataClassification = ToBeClassified;
         }
         field(33; "Corte B"; Decimal)
         {
-            ToolTip = 'Son B los productos que siguen a los A hasta este % acumulado.';
-            Caption = 'Corte clase B (%)';
+            ToolTip = 'Son B los productos que siguen a los A, desde el corte de la A hasta este % acumulado. El resto son C.';
+            Caption = 'Clase B: desde la A hasta (%)';
             DataClassification = ToBeClassified;
         }
         field(40; Productos; Integer)

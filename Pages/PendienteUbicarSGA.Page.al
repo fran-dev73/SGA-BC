@@ -103,26 +103,46 @@ page 51131 "Pendiente Ubicar SGA"
                 {
                     ApplicationArea = All;
                     StyleExpr = EstiloDocumentos;
+
+                    trigger OnDrillDown()
+                    var
+                        cStock: Codeunit "Consulta Stock SGA";
+                    begin
+                        cStock.MostrarEnDocumentos(Rec);
+                        Recalcular();
+                    end;
                 }
                 field(Pendiente; Rec.Diferencia)
                 {
                     ApplicationArea = All;
                     Caption = 'Sin ubicar';
-                    ToolTip = 'Stock de BC que no está en ninguna ubicación.';
+                    ToolTip = 'Stock de BC que no está en ninguna ubicación: Stock BC menos Ubicado.';
                 }
                 field("Stock BC"; Rec."Stock BC")
                 {
                     ApplicationArea = All;
                     Caption = 'Stock BC';
-                    ToolTip = 'Existencias del lote en BC, en el almacén.';
-                    Visible = false;
+                    ToolTip = 'Existencias del lote en BC, en el almacén. Pulse para ver los movimientos de producto abiertos de los que sale.';
+
+                    trigger OnDrillDown()
+                    var
+                        cStock: Codeunit "Consulta Stock SGA";
+                    begin
+                        cStock.MostrarStockBC(Rec);
+                    end;
                 }
                 field("Stock SGA"; Rec."Stock SGA")
                 {
                     ApplicationArea = All;
                     Caption = 'Ubicado';
-                    ToolTip = 'Lo que ya está en ubicaciones de SGA.';
-                    Visible = false;
+                    ToolTip = 'Lo que ya está en ubicaciones de SGA. Pulse para ver en qué ubicaciones está el lote.';
+
+                    trigger OnDrillDown()
+                    var
+                        cStock: Codeunit "Consulta Stock SGA";
+                    begin
+                        cStock.ConsultarUbicacionesProducto(Rec."No. Producto", Rec."Cod. Variante", Rec."Cod. Almacen", Rec."No. Lote");
+                    end;
                 }
                 field("Unidad Medida Base"; Rec."Unidad Medida Base")
                 {
@@ -216,8 +236,13 @@ page 51131 "Pendiente Ubicar SGA"
                 ToolTip = 'Abre Ubicar recepciones, donde se ubica lo pendiente de los albaranes de compra.';
                 ApplicationArea = All;
                 Image = Receipt;
-                RunObject = page "Ubicar Entradas SGA";
-                RunPageView = where(Origen = const(Compra));
+
+                trigger OnAction()
+                var
+                    cEntradas: Codeunit "Gestion Entradas SGA";
+                begin
+                    cEntradas.AbrirUbicarEntradas("Origen Mov. SGA"::Compra);
+                end;
             }
             action(IrEnsamblados)
             {
@@ -225,8 +250,13 @@ page 51131 "Pendiente Ubicar SGA"
                 ToolTip = 'Abre Ubicar ensamblados, donde se ubica lo pendiente de los embotellados.';
                 ApplicationArea = All;
                 Image = Production;
-                RunObject = page "Ubicar Entradas SGA";
-                RunPageView = where(Origen = const(Produccion));
+
+                trigger OnAction()
+                var
+                    cEntradas: Codeunit "Gestion Entradas SGA";
+                begin
+                    cEntradas.AbrirUbicarEntradas("Origen Mov. SGA"::Produccion);
+                end;
             }
         }
         area(Promoted)

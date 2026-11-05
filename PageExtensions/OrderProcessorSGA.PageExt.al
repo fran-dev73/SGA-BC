@@ -1,13 +1,19 @@
 namespace AntonioNadal.SGA;
 
+using Microsoft.Inventory.Item;
+using Microsoft.Purchases.Document;
+using Microsoft.Purchases.History;
+using Microsoft.Sales.Document;
+using Microsoft.Sales.History;
 using Microsoft.Sales.RoleCenters;
 using Microsoft.Warehouse.Structure;
 
 /// <summary>
 /// PageExtension Order Processor SGA (ID 51103) extends Page "Order Processor Role Center".
 /// Añade al rol de procesador de pedidos el menú de gestión de ubicaciones, agrupado como
-/// agrupa el estándar de almacén: primero lo que se hace a diario, luego las consultas y por
-/// último la configuración.
+/// agrupa el estándar de almacén: primero lo que se hace a diario, luego ventas y compras,
+/// las consultas, los informes y por último la configuración. Son los mismos menús que los del
+/// rol "Almacén SGA" (Pag51112): si se toca uno, se toca el otro.
 ///
 /// Se hace en una extensión propia dentro de SGA, en lugar de tocar
 /// Pag-Ext50110 "Order Procesor", para que el módulo siga siendo autocontenido.
@@ -44,8 +50,7 @@ pageextension 51103 "Order Processor SGA" extends "Order Processor Role Center"
                     ToolTip = 'Reparte entre huecos lo que ha salido de los ensamblados de un día.';
                     ApplicationArea = All;
                     Image = Warehouse;
-                    RunObject = page "Ubicar Entradas SGA";
-                    RunPageView = where(Origen = const(Produccion));
+                    RunObject = codeunit "Abrir Ubicar Ensamblados SGA";
                 }
                 action(UbicarPaletsLineaSGA)
                 {
@@ -61,8 +66,7 @@ pageextension 51103 "Order Processor SGA" extends "Order Processor Role Center"
                     ToolTip = 'Reparte entre huecos lo que ha llegado en las recepciones de compra de un día.';
                     ApplicationArea = All;
                     Image = Warehouse;
-                    RunObject = page "Ubicar Entradas SGA";
-                    RunPageView = where(Origen = const(Compra));
+                    RunObject = codeunit "Abrir Ubicar Recepciones SGA";
                 }
                 action(OrdenesPickingSGA)
                 {
@@ -89,6 +93,51 @@ pageextension 51103 "Order Processor SGA" extends "Order Processor Role Center"
                     RunObject = page "Consulta Ubic. Producto SGA";
                 }
             }
+            group(SGAVentasCompras)
+            {
+                Caption = 'Almacén SGA - Ventas y compras';
+
+                action(ProductosSGA)
+                {
+                    Caption = 'Productos';
+                    ToolTip = 'Fichas de los productos: unidades de medida, palé por defecto y existencias.';
+                    ApplicationArea = All;
+                    Image = Item;
+                    RunObject = page "Item List";
+                }
+                action(PedidosVentaSGA)
+                {
+                    Caption = 'Pedidos de venta';
+                    ToolTip = 'Pedidos de venta, de los que salen las órdenes de picking al lanzarlos.';
+                    ApplicationArea = All;
+                    Image = Document;
+                    RunObject = page "Sales Order List";
+                }
+                action(AlbaranesVentaSGA)
+                {
+                    Caption = 'Histórico de albaranes de venta';
+                    ToolTip = 'Envíos de venta ya registrados.';
+                    ApplicationArea = All;
+                    Image = PostedShipment;
+                    RunObject = page "Posted Sales Shipments";
+                }
+                action(PedidosCompraSGA)
+                {
+                    Caption = 'Pedidos de compra';
+                    ToolTip = 'Pedidos de compra pendientes de recibir.';
+                    ApplicationArea = All;
+                    Image = Document;
+                    RunObject = page "Purchase Order List";
+                }
+                action(AlbaranesCompraSGA)
+                {
+                    Caption = 'Histórico de albaranes de compra';
+                    ToolTip = 'Recepciones de compra ya registradas, de las que sale lo que hay que ubicar.';
+                    ApplicationArea = All;
+                    Image = PostedReceipt;
+                    RunObject = page "Posted Purchase Receipts";
+                }
+            }
             group(SGAConsultas)
             {
                 Caption = 'Almacén SGA - Consultas';
@@ -104,7 +153,7 @@ pageextension 51103 "Order Processor SGA" extends "Order Processor Role Center"
                 action(ContenidoUbicacionesSGA)
                 {
                     Caption = 'Contenido de ubicaciones';
-                    ToolTip = 'Qué producto, variante y lote hay en cada hueco, y en qué cantidad.';
+                    ToolTip = 'Qué producto y lote hay en cada ubicación. Desde aquí se traslada (también a otra zona), se bloquea y se recuenta.';
                     ApplicationArea = All;
                     Image = ItemLines;
                     RunObject = page "Contenido Ubicaciones SGA";
@@ -120,7 +169,7 @@ pageextension 51103 "Order Processor SGA" extends "Order Processor Role Center"
                 action(Mapa3DAlmacenSGA)
                 {
                     Caption = 'Mapa 3D de almacén';
-                    ToolTip = 'El almacén en volumen, con cada ubicación coloreada según su ocupación.';
+                    ToolTip = 'El almacén en volumen, en planta o de frente, por zonas, con cada ubicación coloreada según su estado.';
                     ApplicationArea = All;
                     Image = Map;
                     RunObject = page "Mapa 3D Almacen SGA";
@@ -148,6 +197,19 @@ pageextension 51103 "Order Processor SGA" extends "Order Processor Role Center"
                     ApplicationArea = All;
                     Image = Statistics;
                     RunObject = page "Analisis ABC SGA";
+                }
+            }
+            group(SGAInformes)
+            {
+                Caption = 'Almacén SGA - Informes';
+
+                action(ConciliarSGA)
+                {
+                    Caption = 'Conciliar con el stock';
+                    ToolTip = 'Compara el contenido por ubicación con las existencias de los movimientos de producto.';
+                    ApplicationArea = All;
+                    Image = Balance;
+                    RunObject = report "Conciliacion SGA vs Stock";
                 }
             }
             group(SGAConfiguracion)
@@ -182,7 +244,7 @@ pageextension 51103 "Order Processor SGA" extends "Order Processor Role Center"
                 action(GenerarUbicacionesSGA)
                 {
                     Caption = 'Generar ubicaciones';
-                    ToolTip = 'Crea de golpe todas las ubicaciones de un rango de estanterías, columnas y alturas.';
+                    ToolTip = 'Crea de golpe todas las ubicaciones de una zona en un rango de estanterías, columnas y alturas.';
                     ApplicationArea = All;
                     Image = CreateForm;
                     RunObject = report "Generar Ubicaciones SGA";
@@ -198,10 +260,18 @@ pageextension 51103 "Order Processor SGA" extends "Order Processor Role Center"
                 action(CargaInicialSGA)
                 {
                     Caption = 'Carga inicial de contenido';
-                    ToolTip = 'Reparte el stock que ya existe en BC entre las ubicaciones.';
+                    ToolTip = 'Reparte el stock que ya existe en BC entre las ubicaciones. Conviene lanzarlo primero en simulación.';
                     ApplicationArea = All;
                     Image = Import;
                     RunObject = report "Carga Inicial Contenido SGA";
+                }
+                action(InicializarContenidoSGA)
+                {
+                    Caption = 'Inicializar contenido';
+                    ToolTip = 'Deja el almacén sin nada ubicado: borra el contenido, los movimientos de ubicación y las órdenes de picking sin terminar. Las ubicaciones se conservan. Sirve para repetir la carga inicial desde cero.';
+                    ApplicationArea = All;
+                    Image = Delete;
+                    RunObject = report "Inicializar Contenido SGA";
                 }
             }
         }

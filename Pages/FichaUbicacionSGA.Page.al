@@ -26,7 +26,7 @@ page 51101 "Ficha Ubicacion SGA"
                 }
                 field("Cod. Bin"; Rec."Cod. Bin")
                 {
-                    ToolTip = 'Código de la ubicación en la topología nave-estantería-columna-altura.';
+                    ToolTip = 'Código de la ubicación en la topología pasillo-estantería-altura (101-15-03).';
                     ApplicationArea = All;
                 }
                 field(Descripcion; Rec.Descripcion)
@@ -99,6 +99,11 @@ page 51101 "Ficha Ubicacion SGA"
                 {
                     Editable = EsVacia;
                     ToolTip = 'Cuánto cabe, en la clase que admite (palés o cajas): 1 en una ubicación de palé, 72 en una de cajas. 0 significa sin límite declarado, y entonces cualquier contenido la marca como llena.';
+                    ApplicationArea = All;
+                }
+                field("Control Capacidad"; Rec."Control Capacidad")
+                {
+                    Editable = EsVacia;
                     ApplicationArea = All;
                 }
                 field("Capacidad Palets"; Rec."Capacidad Palets")

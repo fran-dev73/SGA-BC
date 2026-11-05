@@ -132,8 +132,9 @@ cajas; así *Ubicar ensamblados* no vuelve a pedir los palés ubicados con las e
 
 El motivo dice la causa concreta, siempre en la primera frase: no hay ubicaciones de esa clase,
 no queda espacio en ellas, o las hay pero no sirven (con cuántas por cada motivo: bloqueadas,
-reservadas a otro producto, con otro producto, con otro lote). La carga inicial resume lo no
-cargado por causa, y lo que queda sin ubicar se ve y se ubica desde *Pendiente de ubicar*.
+reservadas a otro producto, con otro producto, con otro lote). La carga inicial lo da línea a
+línea en su página de resultado, y lo que queda sin ubicar se ve y se ubica desde *Pendiente de
+ubicar*.
 
 ---
 
@@ -148,7 +149,7 @@ Se mantiene **"Primer hueco vacío"** (*Solo hueco vacío* en la configuración)
 ubicación para las entradas de producción (palés de la línea y ensamblados).
 
 > Cada palé va al **primer hueco vacío** de tipo *Picking* o *Reserva*, no bloqueado, siguiendo la
-> **Secuencia picking** (pasillo, hueco y nivel). *Otra ubicación* salta al siguiente.
+> **Secuencia picking** (pasillo, estantería y altura). *Otra ubicación* salta al siguiente.
 
 **Por qué:**
 
@@ -192,7 +193,7 @@ bloqueados, por **Secuencia picking**.
 | Estrategia | Qué hace | Por qué no ahora |
 |---|---|---|
 | **Primer hueco vacío** | Primer hueco vacío por ruta | **Elegida** |
-| Junto al mismo producto | Hueco vacío más cercano a donde ya está el producto (mismo lote primero); si no está en ningún sitio, primer hueco vacío | Mejora sobre todo el orden (tiradas juntas), no los recorridos. Sin datos nuevos: la posición sale del código de ubicación (Nave-Estantería-Columna-Altura). Es la primera candidata si hace falta cambiar |
+| Junto al mismo producto | Hueco vacío más cercano a donde ya está el producto (mismo lote primero); si no está en ningún sitio, primer hueco vacío | Mejora sobre todo el orden (tiradas juntas), no los recorridos. Sin datos nuevos: la posición sale del código de ubicación (Pasillo-Estantería-Altura). Es la primera candidata si hace falta cambiar |
 | Reponer picking | Si el hueco de picking del producto está bajo mínimo, el palé va ahí; si no, a reserva | Requiere dar de alta huecos de picking por producto con *Ctdad. mínima/máxima*. Rinde si hay mucha venta en cajas sueltas |
 | Por zona | Cada familia de producto (clase, tipo de alcohol) va a sus zonas | Requiere una tabla familia → zona. Útil si hay que segregar (normativa, inflamables) o separar propios/externos |
 | Por rotación (ABC) | Lo que más se vende va abajo y cerca de la salida | Requiere clasificar productos y huecos y recalcularlo periódicamente. Solo compensa con ventas muy concentradas y recorridos largos |
@@ -262,7 +263,7 @@ anterior lo justifica con datos.
 | **1. Observar** | Clasificar productos (A/B/C por palés salidos) y huecos, y guardar cada cálculo. Pantalla *Análisis ABC* | **Hecha** |
 | 2. Ubicar según el ABC | Estrategia nueva: primer hueco vacío **de su clase**; si no hay, el de la clase más cercana. Sin movimientos extra: el almacén se ordena solo según rota | Si la fase 1 muestra ventas concentradas |
 | 3. Propuestas de reubicación | Lista de movimientos ordenada por ganancia ("este palé C ocupa un hueco A"), a hacer en ratos muertos, nunca forzados al principio | Si tras la fase 2 siguen muchos palés fuera de su clase |
-| 4. Aprovechar huecos que se liberan | Al quedar libre un hueco A, proponer traer el mejor candidato (un palé A en un hueco malo) | Junto con la 3 |
+| 4. Aprovechar huecos que se liberan | Al quedar libre un hueco A, proponer traer el mejor candidato (un palé A en un hueco malo) | **Hecha como opción**: *Proponer reubicar palés A al ubicar* (apagada por defecto). Al proponer en *Ubicar recepciones/ensamblados*, si el primer hueco de palé vacío de la ruta lo puede ocupar el palé A más lejano, se propone el traslado en la misma línea; el operario lo acepta o no |
 
 Precauciones para las fases 3 y 4: un producto solo cambia de clase si lleva varios cálculos
 seguidos en la nueva (por eso se guarda el historial), y límite de movimientos por día o turno.
@@ -274,9 +275,11 @@ seguidos en la nueva (por eso se guarda el historial), y límite de movimientos 
   completos, cada palé es un viaje. Se descartó la cantidad vendida (mezcla palés de distinto
   tamaño) y el nº de pedidos (es el criterio cuando se pica en cajas).
 - **Clases de producto**: de más a menos salidas, A hasta el 80 % acumulado, B hasta el 95 %, el
-  resto C. Los cortes están en *Configuración SGA*. Sin ventas, C.
+  resto C (los A mueven el 80 % de los palés, los B el 15 % y los C el 5 %). Los cortes están
+  en *Configuración SGA* y son acumulados. Sin ventas, C.
 - **Clases de hueco**: los de Picking y Reserva no bloqueados, del mejor al peor por altura
-  (más baja mejor) y *Secuencia picking*. Hay tantos huecos A como palés A en almacén, luego tantos
+  (más baja mejor; un código que no sigue el formato `pasillo-estantería-altura` cuenta como la
+  peor) y *Secuencia picking*. Hay tantos huecos A como palés A en almacén, luego tantos
   B como palés B, y el resto C.
 - **Qué mirar para decidir la fase 2**: el *% de salidas del 20 % que más sale* y su evolución
   en *Cálculos anteriores*. Si se queda alrededor del 50 %, las ventas están repartidas y el ABC

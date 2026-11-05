@@ -31,6 +31,14 @@ table 51104 "Config. SGA"
             TableRelation = Location;
             ToolTip = 'Almacén que se propone en las consultas y el mapa, y sobre el que se resuelven las ubicaciones por defecto de esta configuración.';
         }
+        field(12; "Zona por Defecto"; Code[10])
+        {
+            Caption = 'Zona por defecto';
+            DataClassification = ToBeClassified;
+            TableRelation = "Zona SGA".Code where("Cod. Almacen" = field("Almacen por Defecto"));
+            ToolTip = 'Zona que se propone en las consultas y el mapa, y sobre la que se resuelven las ubicaciones por defecto de esta configuración.';
+        }
+
         field(20; "Ubic. Recepcion Compras"; Code[20])
         {
             Caption = 'Ubic. recepción compras';
@@ -100,7 +108,8 @@ table 51104 "Config. SGA"
         {
             Caption = 'Control capacidad';
             DataClassification = ToBeClassified;
-            ToolTip = 'Qué hacer cuando una entrada supera la capacidad declarada de la ubicación.';
+            InitValue = Bloquear;
+            ToolTip = 'Qué hacer cuando una entrada supera la capacidad de una ubicación que tiene "Control capacidad" = Según configuración: bloquearla, o avisar y dejar seguir si se confirma. Cada ubicación puede llevar el suyo. La capacidad se controla siempre.';
         }
         field(41; "Permitir Cantidad Negativa"; Boolean)
         {
@@ -163,6 +172,9 @@ table 51104 "Config. SGA"
             MinValue = 1;
             MaxValue = 32;
             ToolTip = 'Número de columnas (huecos) que muestra el mapa por estantería. Máximo 32.';
+            ObsoleteState = Removed;
+            ObsoleteReason = 'El mapa enseña siempre las columnas que existen, hasta el tope de la rejilla.';
+            ObsoleteTag = 'SGA';
         }
         field(80; "Dias Analisis ABC"; Integer)
         {
@@ -174,23 +186,23 @@ table 51104 "Config. SGA"
         }
         field(81; "Corte ABC Clase A"; Decimal)
         {
-            Caption = 'Corte clase A (%)';
+            Caption = 'Clase A: del 0 % hasta (%)';
             DataClassification = ToBeClassified;
             InitValue = 80;
             MinValue = 1;
             MaxValue = 100;
             DecimalPlaces = 0 : 1;
-            ToolTip = 'Son A los productos que, de más a menos vendido, suman hasta este % de los palés salidos.';
+            ToolTip = 'Los productos se ordenan de más a menos palés salidos y se van sumando. Son A los que se suman desde el 0 % hasta este % acumulado. Con 80, los A mueven el 80 % de los palés.';
         }
         field(82; "Corte ABC Clase B"; Decimal)
         {
-            Caption = 'Corte clase B (%)';
+            Caption = 'Clase B: desde la A hasta (%)';
             DataClassification = ToBeClassified;
             InitValue = 95;
             MinValue = 1;
             MaxValue = 100;
             DecimalPlaces = 0 : 1;
-            ToolTip = 'Son B los productos que siguen a los A hasta este % de los palés salidos. El resto son C.';
+            ToolTip = 'Son B los productos que siguen a los A, desde el corte de la A hasta este % acumulado; el resto, hasta el 100 %, son C. Es acumulado, así que no puede ser menor que el de la A. Con A 80 y B 95: A mueven el 80 %, B el 15 % y C el 5 %.';
         }
         field(83; "Cajas Minimas Hueco Pale"; Integer)
         {
@@ -199,6 +211,12 @@ table 51104 "Config. SGA"
             InitValue = 10;
             MinValue = 1;
             ToolTip = 'Las cajas sueltas de una referencia se proponen en un hueco de palé a partir de esta cantidad; por debajo, en un hueco de caja.';
+        }
+        field(84; "Reubicar Pale A por ABC"; Boolean)
+        {
+            Caption = 'Proponer reubicar palés A al ubicar';
+            DataClassification = ToBeClassified;
+            ToolTip = 'Si está activo, al ubicar una entrada se propone trasladar un palé de clase A que esté lejos de la salida a un hueco libre más cercano, antes de buscar el hueco de la entrada. Requiere haber calculado el análisis ABC. Desactivado, la ubicación sigue el orden de recorrido como siempre.';
         }
     }
 
@@ -230,6 +248,20 @@ table 51104 "Config. SGA"
     procedure DesvioPermitido(prm_Propuesta: Code[20]; prm_Confirmada: Code[20]): Boolean
     begin
         exit("Permitir Desvio Ubicacion" or (prm_Confirmada = prm_Propuesta));
+    end;
+
+    /// <summary>
+    /// Qué parte de los palés salidos mueve cada clase con los cortes actuales, que son
+    /// acumulados: con 80 y 95, "A 80 % · B 15 % · C 5 %".
+    /// </summary>
+    procedure RepartoABC(): Text
+    var
+        RepartoABCLbl: Label 'A %1 % · B %2 % · C %3 %', Comment = '%1 = parte de la A, %2 = parte de la B, %3 = parte de la C';
+        CortesABCMalLbl: Label 'El corte de la B tiene que ser mayor o igual que el de la A.';
+    begin
+        if "Corte ABC Clase B" < "Corte ABC Clase A" then
+            exit(CortesABCMalLbl);
+        exit(StrSubstNo(RepartoABCLbl, "Corte ABC Clase A", "Corte ABC Clase B" - "Corte ABC Clase A", 100 - "Corte ABC Clase B"));
     end;
 
     /// <summary>

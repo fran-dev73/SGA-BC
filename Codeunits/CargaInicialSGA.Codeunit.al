@@ -36,20 +36,18 @@ codeunit 51106 "Carga Inicial SGA"
         // Modo "solo pendientes" (página Pendiente Ubicar SGA): en vez de todo el stock, se reparte
         // la cantidad indicada de cada lote.
         TempPendientes: Record "Buffer Conciliacion SGA" temporary;
-        rHueco: Record "Ubicacion SGA";
         rConfig: Record "Config. SGA";
         cContenido: Codeunit "Gestion Contenido SGA";
         cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
         cStock: Codeunit "Consulta Stock SGA";
         cUM: Codeunit "Unidades Producto SGA";
+        cVentana: Codeunit "Ventana Progreso SGA";
         Almacen: Code[10];
         UbicacionIndicada: Code[20];
         VistaProductos: Text;
         Destino: Option "Ubicacion Fija del Producto","Ubicacion Indicada","Huecos Libres";
         OmitirConContenido: Boolean;
         Simular: Boolean;
-        HuecoPosicionado: Boolean;
-        HuecosAgotados: Boolean;
         MotivoSinHuecoPale: Text[500];
         SoloPendientes: Boolean;
         DescripcionMovimiento: Text;
@@ -126,8 +124,8 @@ codeunit 51106 "Carga Inicial SGA"
 
         TempResultado.Reset();
         TempResultado.DeleteAll();
-        HuecoPosicionado := false;
-        HuecosAgotados := false;
+        // Instancia nueva: el cursor de huecos de palé (ProponerHuecoPaleRuta) empieza de cero.
+        Clear(cUbicaciones);
         MotivoSinHuecoPale := '';
         cContenido.FijarModoSilencioso(true);
 
@@ -139,10 +137,32 @@ codeunit 51106 "Carga Inicial SGA"
         if VistaProductos <> '' then
             rProducto.SetView(VistaProductos);
         rProducto.SetRange(Type, rProducto.Type::Inventory);
+        AbrirVentana(rProducto.Count());
         if rProducto.FindSet() then
             repeat
+                AvanzarVentana(rProducto."No.");
                 ProcesarProducto(rProducto);
             until rProducto.Next() = 0;
+        cVentana.Cerrar();
+    end;
+
+    /// <summary>
+    /// Ventana de progreso (Cod. "Ventana Progreso SGA"): producto en curso y barra. Sin nada
+    /// que recorrer no se abre.
+    /// </summary>
+    local procedure AbrirVentana(prm_Total: Integer)
+    var
+        TituloLbl: Label 'Carga inicial de contenido…';
+    begin
+        if prm_Total > 0 then
+            cVentana.Abrir(TituloLbl, prm_Total);
+    end;
+
+    local procedure AvanzarVentana(prm_Producto: Code[20])
+    var
+        ProductoLbl: Label 'Producto %1', Comment = '%1 = nº de producto';
+    begin
+        cVentana.Avanzar(StrSubstNo(ProductoLbl, prm_Producto));
     end;
 
     /// <summary>
@@ -157,14 +177,18 @@ codeunit 51106 "Carga Inicial SGA"
         // Por la clave primaria, que agrupa por producto (las líneas son de un usuario y un almacén).
         TempPendientes.Reset();
         TempPendientes.SetFilter("A Ubicar", '>0');
+        // La barra avanza por línea: aquí no se sabe cuántos productos hay sin recorrerlas.
+        AbrirVentana(TempPendientes.Count());
         if TempPendientes.FindSet() then
             repeat
+                AvanzarVentana(TempPendientes."No. Producto");
                 if TempPendientes."No. Producto" <> ultimo then begin
                     ultimo := TempPendientes."No. Producto";
                     if rProducto.Get(ultimo) then
                         ProcesarProducto(rProducto);
                 end;
             until TempPendientes.Next() = 0;
+        cVentana.Cerrar();
         TempPendientes.Reset();
     end;
 
@@ -282,13 +306,13 @@ codeunit 51106 "Carga Inicial SGA"
         // "Ubicar producto"; aquí solo cambia cómo se busca el hueco de los palés.
         cUM.Repartir(prm_Producto."No.", prm_Stock."Stock BC", '', 0, TempTrozo);
 
-        // Palés completos: uno por hueco, con el cursor de huecos de palé.
+        // Palés completos: uno por hueco vacío, siguiendo la ruta.
         TempTrozo.SetRange("Cod. Unidad Medida", umPale);
         pales := TempTrozo.Count();
         i := 0;
         if TempTrozo.FindSet() then
             repeat
-                hueco := BuscarHuecoPale(prm_Producto."No.", motivo);
+                hueco := cUbicaciones.ProponerHuecoPaleRuta(Almacen, prm_Producto."No.", motivo);
                 if hueco = '' then begin
                     // Sin hueco para este palé no lo habrá para los siguientes: se anotan juntos.
                     // Agotados los huecos de palé, el motivo es el mismo para todos los productos: se
@@ -322,83 +346,6 @@ codeunit 51106 "Carga Inicial SGA"
                         Cargar(prm_Producto, prm_Stock, hueco, TempTrozo."Cod. Unidad Medida", TempTrozo.Cantidad, TempTrozo."Cantidad Base", motivo);
                 end;
             until TempTrozo.Next() = 0;
-    end;
-
-    /// <summary>
-    /// Hueco de palé vacío para un producto: primero los reservados a ese producto y luego el
-    /// siguiente libre de la ruta.
-    ///
-    /// Los huecos sin producto fijo se recorren con un cursor que solo avanza. Vale porque, vacío
-    /// y sin producto fijo, un hueco admite cualquier producto: el que se salta una vez no le
-    /// sirve a nadie después. Así se evita volver a recorrer la nave entera por cada palé.
-    /// </summary>
-    local procedure BuscarHuecoPale(prm_Producto: Code[20]; var prm_Motivo: Text): Code[20]
-    var
-        rFijo: Record "Ubicacion SGA";
-        HuecoReservadoLbl: Label 'Hueco reservado al producto.';
-        HuecoRutaLbl: Label 'Hueco de palé vacío siguiendo la ruta.';
-    begin
-        rFijo.SetCurrentKey("Cod. Almacen", "Secuencia Picking", "Cod. Bin");
-        FiltrarHuecosPale(rFijo);
-        rFijo.SetRange("Producto Fijo", prm_Producto);
-        if rFijo.FindSet() then
-            repeat
-                if HuecoPaleLibre(rFijo) then begin
-                    prm_Motivo := HuecoReservadoLbl;
-                    exit(rFijo."Cod. Bin");
-                end;
-            until rFijo.Next() = 0;
-
-        if HuecosAgotados then
-            exit('');
-
-        if not HuecoPosicionado then begin
-            rHueco.Reset();
-            rHueco.SetCurrentKey("Cod. Almacen", "Secuencia Picking", "Cod. Bin");
-            FiltrarHuecosPale(rHueco);
-            rHueco.SetRange("Producto Fijo", '');
-            HuecoPosicionado := true;
-            if not rHueco.FindSet() then begin
-                HuecosAgotados := true;
-                exit('');
-            end;
-        end;
-
-        repeat
-            if HuecoPaleLibre(rHueco) then begin
-                prm_Motivo := HuecoRutaLbl;
-                exit(rHueco."Cod. Bin");
-            end;
-        until rHueco.Next() = 0;
-
-        HuecosAgotados := true;
-        exit('');
-    end;
-
-    local procedure FiltrarHuecosPale(var prm_Hueco: Record "Ubicacion SGA")
-    begin
-        prm_Hueco.SetRange("Cod. Almacen", Almacen);
-        prm_Hueco.SetRange(Bloqueada, false);
-        prm_Hueco.FiltrarDeAlmacenaje();
-        // Solo huecos de palé: los que no tienen "Admite" configurado no se proponen. No depende
-        // del producto: un hueco de palé admite cualquier palé, y eso es lo que permite que el
-        // cursor de huecos libres solo avance.
-        prm_Hueco.SetRange("Tipo UM Admitida", prm_Hueco."Tipo UM Admitida"::Pale);
-    end;
-
-    /// <summary>
-    /// Vacío, utilizable y con sitio para un palé. Con capacidad 0 no hay límite declarado.
-    /// </summary>
-    local procedure HuecoPaleLibre(var prm_Hueco: Record "Ubicacion SGA"): Boolean
-    begin
-        if not prm_Hueco.EsUtilizable() then
-            exit(false);
-
-        if (prm_Hueco."Capacidad Uds." > 0) and (prm_Hueco."Capacidad Uds." < 1) then
-            exit(false);
-
-        prm_Hueco.CalcFields("Lineas Contenido");
-        exit(prm_Hueco."Lineas Contenido" = 0);
     end;
 
     local procedure Cargar(var prm_Producto: Record Item; var prm_Stock: Record "Buffer Conciliacion SGA"; prm_Bin: Code[20]; prm_UM: Code[10]; prm_Cantidad: Decimal; prm_CantidadBase: Decimal; prm_Motivo: Text)

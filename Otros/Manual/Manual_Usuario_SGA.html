@@ -176,7 +176,7 @@
     <li><a href="#c6">Ver el almacén</a>
       <ul><li><a href="#c6-lista">Lista de ubicaciones</a></li><li><a href="#c6-mapa">Mapa de almacén</a></li><li><a href="#c6-3d">Mapa 3D</a></li></ul></li>
     <li><a href="#c7">Control e informes</a>
-      <ul><li><a href="#c7-conc">Conciliación</a></li><li><a href="#c7-diario">Diario de movimientos</a></li><li><a href="#c7-inf">Informes a Excel</a></li></ul></li>
+      <ul><li><a href="#c7-conc">Conciliación</a></li><li><a href="#c7-diario">Diario de movimientos</a></li><li><a href="#c7-inf">Exportar a Excel</a></li></ul></li>
     <li><a href="#c8">Conceptos que conviene conocer</a></li>
     <li><a href="#c9">Un día de trabajo</a></li>
     <li><a href="#c10">Problemas frecuentes</a></li>
@@ -223,7 +223,7 @@
   <div class="donde"><span class="k">Dónde</span><span><span class="ui">Configuración SGA</span> · Almacén SGA › Configuración, o en el buscador.</span></div>
   <table>
     <tr><th style="width:32%">Apartado</th><th>Qué se fija</th></tr>
-    <tr><td><b>General</b></td><td>El <b>almacén por defecto</b> de todos los procesos y las <b>columnas del mapa</b> (cuántos huecos dibuja la rejilla, máximo 32).</td></tr>
+    <tr><td><b>General</b></td><td>El <b>almacén por defecto</b> de todos los procesos.</td></tr>
     <tr><td><b>Ubicaciones por flujo</b></td><td>Ubicaciones especiales: <i>Expedición</i>, <i>Desbordamiento</i> y <i>Ajustes</i> (a donde van las diferencias de la conciliación).</td></tr>
     <tr><td><b>Estrategias</b></td><td>Cómo se elige el hueco al ubicar (en general, para compras y para ensamblados) y de dónde se coge al preparar (FEFO, FIFO…). Ver capítulos 3 y 4.</td></tr>
     <tr><td><b>Controles</b></td><td>Si avisar o bloquear al llenarse un hueco, si permitir desviarse del hueco propuesto, si exigir el <b>dígito de control</b> al recoger y si exigir que un responsable <b>asigne</b> las órdenes de picking.</td></tr>
@@ -243,17 +243,17 @@
 
   <h3 id="c2-gen">Generar ubicaciones</h3>
   <div class="donde"><span class="k">Dónde</span><span><span class="ui">Generar ubicaciones</span> · Almacén SGA › Puesta en marcha. También desde Configuración SGA y desde la lista Ubicaciones.</span></div>
-  <p>Crea de golpe todos los huecos de una nave. Cada hueco recibe un código <b>nave-pasillo-hueco-nivel</b> (por ejemplo <b>A-01-15-3</b>), del que salen el mapa y el orden de recorrido del picking.</p>
+  <p>Crea de golpe todos los huecos de un grupo de pasillos. Cada hueco recibe un código <b>pasillo-estantería-altura</b> (por ejemplo <b>101-15-03</b>), del que salen el mapa y el orden de recorrido del picking: primero el pasillo, luego la estantería y luego la altura. El código lleva siempre ceros a la izquierda: pasillo con tres cifras, estantería y altura con dos (pasillo 1, estantería 5, altura 2 → <b>001-05-02</b>).</p>
   <table>
     <tr><th>Campo</th><th>Qué es en el almacén</th><th>Ejemplo</th></tr>
     <tr><td>Almacén</td><td>El almacén de BC</td><td>PRINCIPAL</td></tr>
-    <tr><td>Nave</td><td>Una letra por nave</td><td>A</td></tr>
-    <tr><td>Estantería desde / hasta</td><td>El <b>pasillo</b></td><td>1 a 10</td></tr>
-    <tr><td>Columna desde / hasta</td><td>El <b>hueco</b> a lo largo del pasillo</td><td>1 a 31</td></tr>
-    <tr><td>Altura desde / hasta</td><td>El <b>nivel</b>, de abajo arriba</td><td>1 a 4</td></tr>
-    <tr><td>Zona, tipo y capacidad</td><td>Lo que reciben las ubicaciones nuevas</td><td>Reserva, Reserva, 1</td></tr>
+    <tr><td>Zona</td><td>La zona en la que nacen las ubicaciones nuevas. Al elegirla propone su tipo de ubicación</td><td>RESERVA</td></tr>
+    <tr><td>Pasillo desde / hasta</td><td>El <b>pasillo</b>, de 1 a 999</td><td>101 a 110</td></tr>
+    <tr><td>Estantería desde / hasta</td><td>La <b>estantería</b>: el hueco a lo largo del pasillo, de 1 a 99</td><td>1 a 31</td></tr>
+    <tr><td>Altura desde / hasta</td><td>El <b>nivel</b>, de abajo arriba, de 1 a 99</td><td>1 a 4</td></tr>
+    <tr><td>Tipo y capacidad</td><td>Lo que reciben las ubicaciones nuevas</td><td>Reserva, 1</td></tr>
   </table>
-  <p>El ejemplo crea 10 × 31 × 4 = <b>1.240 huecos</b>. Si los pasillos tienen distinto número de huecos o de niveles, lánzalo una vez por cada grupo de pasillos iguales. Lo que ya existe no se toca, así que se puede relanzar para ampliar.</p>
+  <p>El ejemplo crea 10 × 31 × 4 = <b>1.240 huecos</b>. Las ubicaciones que ya existen no cambian de zona. Si los pasillos tienen distinto número de estanterías o de alturas, lánzalo una vez por cada grupo de pasillos iguales. Lo que ya existe no se toca, así que se puede relanzar para ampliar.</p>
   <div class="aviso"><span class="t">Atención</span>
     <ul style="margin:0">
       <li><b>Tipo de ubicación:</b> solo los huecos de tipo <b>Picking</b> o <b>Reserva</b> se proponen al ubicar. Los de muelle, cuarentena o ajustes no.</li>
@@ -266,7 +266,7 @@
   <h3 id="c2-bloque">Ajustar capacidad, tipo y zona en bloque</h3>
   <div class="donde"><span class="k">Dónde</span><span>Lista <span class="ui">Ubicaciones</span> de SGA · acción <b>Cambiar en bloque</b>. (No en <i>Ubicaciones del almacén</i>: esa es la lista estándar de BC y no tiene estos datos.)</span></div>
   <ol class="pasos">
-    <li>Filtra lo que quieras cambiar. Por ejemplo, un pasillo: <i>Cód. ubicación</i> = <b>A-03-*</b>.</li>
+    <li>Filtra lo que quieras cambiar. Por ejemplo, un pasillo: <i>Cód. ubicación</i> = <b>103-*</b>.</li>
     <li>Selecciona todas con <b>Ctrl+A</b>, o marca las que quieras.</li>
     <li>Pulsa <b>Cambiar en bloque</b> y marca <b>solo</b> lo que quieres cambiar.</li>
   </ol>
@@ -282,7 +282,7 @@
   <div class="donde"><span class="k">Dónde</span><span>Lista <span class="ui">Ubicaciones</span> · selecciona los huecos · <b>Imprimir etiquetas</b>. También <span class="ui">Etiquetas de ubicación</span> en el buscador.</span></div>
   <div class="fila-etiq evitar">
     <div class="etiq">
-      <div class="cod">A-01-15-3</div><div class="ctl">CONTROL</div><div class="dig">47</div>
+      <div class="cod">101-15-03</div><div class="ctl">CONTROL</div><div class="dig">47</div>
       <div class="bar"><i class="g"></i><i class="f"></i><i class="m"></i><i class="f"></i><i class="g"></i><i class="f"></i><i class="f"></i><i class="m"></i><i class="g"></i><i class="f"></i><i class="m"></i><i class="m"></i><i class="f"></i><i class="g"></i><i class="f"></i><i class="m"></i><i class="f"></i><i class="g"></i><i class="m"></i><i class="f"></i><i class="f"></i><i class="g"></i><i class="m"></i><i class="f"></i><i class="m"></i><i class="g"></i><i class="f"></i><i class="f"></i><i class="m"></i><i class="g"></i><i class="f"></i><i class="m"></i><i class="f"></i><i class="g"></i><i class="f"></i><i class="m"></i><i class="g"></i><i class="f"></i><i class="m"></i><i class="f"></i><i class="g"></i><i class="f"></i><i class="m"></i><i class="g"></i><i class="f"></i><i class="g"></i></div><div class="pie">PRINCIPAL · Palé</div>
     </div>
     <ul>
@@ -320,10 +320,10 @@
 A ubicar ahora: 56 CAJA (1 PALE45, 11 CAJA)
 
 Propuesta:
-  · palé 1 de 1 (1 PALE45)   → <span class="ok">A-01-03-1</span>
-  · cajas sueltas (11 CAJA)  → <span class="ok">M-01-01-1</span>
+  · palé 1 de 1 (1 PALE45)   → <span class="ok">101-03-01</span>
+  · cajas sueltas (11 CAJA)  → <span class="ok">201-01-01</span>
 
-<span class="hl">¿Ubicar ahora palé 1 de 1 (1 PALE45) en A-01-03-1?</span>
+<span class="hl">¿Ubicar ahora palé 1 de 1 (1 PALE45) en 101-03-01?</span>
 Lo demás quedará pendiente para volver a proponer.</div>
   <ol class="pasos" style="counter-reset: paso 3">
     <li><b>Sí</b>: se ubica ese palé y lo demás queda pendiente en pantalla. Pulsa otra vez <b>Proponer ubicación</b> para el siguiente trozo.<br>
@@ -459,7 +459,7 @@ Lo demás quedará pendiente para volver a proponer.</div>
 
   <h3 id="c6-mapa">Mapa de almacén (rejilla)</h3>
   <div class="donde"><span class="k">Dónde</span><span><span class="ui">Mapa de almacén</span> · Almacén SGA › Almacén.</span></div>
-  <p>La nave como rejilla: cada celda es un hueco con su color. Filtrando por estantería se ve un pasillo de frente, con los niveles en vertical. Al pulsar una celda se ve lo que contiene. Se reconstruye cada vez que se abre.</p>
+  <p>El almacén como rejilla: una fila por cada altura de cada pasillo y una columna por estantería (E01 a E32); cada celda es un hueco con su color. Se filtra por <i>Almacén</i> y <i>Pasillo</i>: filtrando un pasillo se ve de frente, con las alturas en vertical. Si hay estanterías más allá de la 32, avisa. Al pulsar una celda se ve lo que contiene. Se reconstruye cada vez que se abre. Los códigos que no siguen el formato <b>pasillo-estantería-altura</b> no se dibujan, ni aquí ni en el mapa 3D.</p>
 
   <h3 id="c6-3d">Mapa 3D</h3>
   <div class="donde"><span class="k">Dónde</span><span><span class="ui">Mapa 3D de almacén</span> · Almacén SGA › Almacén.</span></div>
@@ -497,10 +497,11 @@ Lo demás quedará pendiente para volver a proponer.</div>
   <div class="donde"><span class="k">Dónde</span><span><span class="ui">Movimientos de ubicación</span> · Control.</span></div>
   <p>Registro de <b>todo</b> lo que entra, sale o se mueve en SGA: tipo de movimiento, de dónde a dónde, producto, lote, cantidad, quién y cuándo. <b>No se puede editar ni borrar</b>: un error se corrige con un movimiento nuevo que lo compensa.</p>
 
-  <h3 id="c7-inf">Informes a Excel</h3>
+  <h3 id="c7-inf">Exportar a Excel</h3>
+  <p>Las listas se sacan a Excel con <span class="ui">Compartir › Abrir en Excel</span>, con los filtros que tengan puestos:</p>
   <ul>
-    <li><span class="ui">Inventario por ubicación</span>: todo el contenido, con producto, lote, caducidad, cantidad y bloqueo.</li>
-    <li><span class="ui">Ocupación de ubicaciones</span>: capacidad y ocupación de cada hueco, para ver si falta o sobra espacio.</li>
+    <li><span class="ui">Contenido de ubicaciones</span>: todo el contenido, con producto, lote, caducidad, cantidad y bloqueo.</li>
+    <li><span class="ui">Ubicaciones</span>: capacidad y ocupación de cada hueco, para ver si falta o sobra espacio.</li>
   </ul>
 </section>
 
@@ -570,7 +571,7 @@ Lo demás quedará pendiente para volver a proponer.</div>
     <tr><th>Necesito…</th><th>Voy a…</th></tr>
     <tr><td>Configurar SGA</td><td>Configuración SGA</td></tr>
     <tr><td>Marcar un código como palé o caja</td><td>Unidades de medida › Tipo SGA</td></tr>
-    <tr><td>Crear las ubicaciones de una nave</td><td>Generar ubicaciones</td></tr>
+    <tr><td>Crear las ubicaciones del almacén</td><td>Generar ubicaciones</td></tr>
     <tr><td>Cambiar capacidad o tipo de muchos huecos</td><td>Ubicaciones › Cambiar en bloque</td></tr>
     <tr><td>Imprimir etiquetas de ubicación</td><td>Ubicaciones › Imprimir etiquetas</td></tr>
     <tr><td>Saber dónde dejar lo que entra</td><td>Ubicar producto</td></tr>
@@ -588,7 +589,7 @@ Lo demás quedará pendiente para volver a proponer.</div>
     <tr><td>Comprobar que SGA y BC cuadran</td><td>Conciliar con el stock</td></tr>
     <tr><td>Ver quién movió qué y cuándo</td><td>Movimientos de ubicación</td></tr>
     <tr><td>Ver el almacén en 3D</td><td>Mapa 3D de almacén</td></tr>
-    <tr><td>Exportar el inventario a Excel</td><td>Inventario por ubicación</td></tr>
+    <tr><td>Exportar el inventario a Excel</td><td>Contenido de ubicaciones › Abrir en Excel</td></tr>
   </table>
 </section>
 

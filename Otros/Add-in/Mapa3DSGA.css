@@ -24,7 +24,9 @@ body {
     box-sizing: border-box;
 }
 
+/* La barra no se encoge: el lienzo toma su alto de lo que queda (ajustarTamano). */
 .sga3d-barra {
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     gap: 6px;
@@ -66,10 +68,13 @@ body {
     background: #1d4ed8;
 }
 
+/* La ayuda va en su propia línea, debajo de los controles: con tres vistas no cabe al lado. */
 .sga3d-ayuda {
-    margin-left: 8px;
+    flex-basis: 100%;
     color: #6b7280;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* Selector de pasillo: aislar una estantería es la única forma de llegar a las del medio. */
@@ -115,10 +120,22 @@ body {
     border-radius: 2px;
 }
 
-.sga3d-m0 { background: #d9dde3; }
-.sga3d-m1 { background: #7cc47f; }
-.sga3d-m2 { background: #e8a33d; }
-.sga3d-m3 { background: #d9534f; }
+/* Grupo de botones que van juntos: las vistas, el zoom. */
+.sga3d-grupo {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    white-space: nowrap;
+}
+
+.sga3d-grupo + .sga3d-grupo,
+.sga3d-sel + .sga3d-grupo {
+    margin-left: 8px;
+}
+
+.sga3d-buscar {
+    width: 160px;
+}
 
 .sga3d-info {
     margin-left: auto;
@@ -141,10 +158,21 @@ body {
     cursor: grabbing;
 }
 
-/* Modo traslado: se arrastra mercancía, no se gira la nave. */
-.sga3d-canvas.sga3d-trasladar,
-.sga3d-canvas.sga3d-trasladar:active {
+/* Sobre un bloque con contenido: se puede coger para llevarlo a otro. */
+.sga3d-canvas.sga3d-cogible {
+    cursor: pointer;
+}
+
+/* Llevando mercancía de un bloque a otro: no se gira la nave. */
+.sga3d-canvas.sga3d-trasladando,
+.sga3d-canvas.sga3d-trasladando:active {
     cursor: copy;
+}
+
+/* Arrastrando sobre una ubicación de otra zona: ahí no se puede soltar. */
+.sga3d-canvas.sga3d-trasladando.sga3d-prohibido,
+.sga3d-canvas.sga3d-trasladando.sga3d-prohibido:active {
+    cursor: not-allowed;
 }
 
 /* Ficha flotante con el contenido de la ubicación bajo el ratón. */
@@ -200,6 +228,23 @@ body {
 
 .sga3d-tip-bloq td {
     color: #b91c1c;
+}
+
+/* Por qué no se puede medir la ocupación. */
+.sga3d-tip-aviso {
+    margin: 2px 0 4px;
+    padding: 3px 6px;
+    background: #eef2ff;
+    border-left: 3px solid #6366f1;
+    color: #1e1b4b;
+    font-size: 11px;
+}
+
+/* Rotación y caducidad más próxima de todo lo que hay en la ubicación. */
+.sga3d-tip-resumen {
+    margin: 0 0 4px;
+    color: #374151;
+    font-size: 11px;
 }
 
 .sga3d-tip-vacia,

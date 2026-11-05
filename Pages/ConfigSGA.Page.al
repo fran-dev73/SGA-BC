@@ -28,14 +28,14 @@ page 51106 "Config. SGA"
                     ToolTip = 'Almacén que se propone en las consultas y el mapa, y sobre el que se resuelven las ubicaciones por defecto de esta configuración.';
                     ApplicationArea = All;
                 }
+                field("Zona por Defecto"; Rec."Zona por Defecto")
+                {
+                    ToolTip = 'Zona que se propone en las consultas y el mapa, y sobre la que se resuelven las ubicaciones por defecto de esta configuración.';
+                    ApplicationArea = All;
+                }
                 field("Crear Ubicacion SGA Auto"; Rec."Crear Ubicacion SGA Auto")
                 {
                     ToolTip = 'Crea la fila de datos SGA la primera vez que se usa una ubicación de la topología. Si se desactiva, la ubicación debe estar dada de alta previamente.';
-                    ApplicationArea = All;
-                }
-                field("Columnas Mapa"; Rec."Columnas Mapa")
-                {
-                    ToolTip = 'Número de columnas que muestra el mapa de almacén por estantería. Máximo 20.';
                     ApplicationArea = All;
                 }
             }
@@ -92,6 +92,10 @@ page 51106 "Config. SGA"
                 {
                     ApplicationArea = All;
                 }
+                field("Reubicar Pale A por ABC"; Rec."Reubicar Pale A por ABC")
+                {
+                    ApplicationArea = All;
+                }
                 field("Estrategia Picking"; Rec."Estrategia Picking")
                 {
                     ToolTip = 'Política con la que el motor decide de dónde sacar la mercancía. La consume el motor de la Fase 2.';
@@ -111,6 +115,7 @@ page 51106 "Config. SGA"
             group(AnalisisABC)
             {
                 Caption = 'Análisis ABC';
+                InstructionalText = 'Los productos se ordenan de más a menos palés salidos y se van sumando. Los cortes son porcentajes acumulados: A va del 0 % al corte de la A, B del corte de la A al de la B, y C del corte de la B al 100 %.';
 
                 field("Dias Analisis ABC"; Rec."Dias Analisis ABC")
                 {
@@ -124,6 +129,13 @@ page 51106 "Config. SGA"
                 {
                     ApplicationArea = All;
                 }
+                field(RepartoABC; Rec.RepartoABC())
+                {
+                    Caption = 'Reparto de los palés salidos';
+                    ToolTip = 'Qué parte de los palés salidos mueve cada clase con los cortes de arriba.';
+                    ApplicationArea = All;
+                    Editable = false;
+                }
             }
             group(Controles)
             {
@@ -131,8 +143,9 @@ page 51106 "Config. SGA"
 
                 field("Control Capacidad"; Rec."Control Capacidad")
                 {
-                    ToolTip = 'Qué hacer cuando una entrada supera la capacidad declarada de la ubicación.';
+                    ToolTip = 'Qué hacer cuando una entrada supera la capacidad de una ubicación que tiene "Control capacidad" = Según configuración: bloquearla, o avisar y dejar seguir si se confirma. Cada ubicación puede llevar el suyo. La capacidad se controla siempre.';
                     ApplicationArea = All;
+                    ValuesAllowed = Avisar, Bloquear;
                 }
                 field("Permitir Cantidad Negativa"; Rec."Permitir Cantidad Negativa")
                 {
@@ -180,7 +193,7 @@ page 51106 "Config. SGA"
             action(GenerarUbicaciones)
             {
                 Caption = 'Generar ubicaciones';
-                ToolTip = 'Crea la estructura del almacén: todas las ubicaciones de una nave a partir de los rangos de estantería (pasillo), columna (hueco) y altura.';
+                ToolTip = 'Crea la estructura del almacén: todas las ubicaciones a partir de los rangos de pasillo, estantería y altura.';
                 ApplicationArea = All;
                 Image = CreateForm;
                 RunObject = report "Generar Ubicaciones SGA";

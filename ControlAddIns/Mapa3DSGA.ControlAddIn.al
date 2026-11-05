@@ -2,10 +2,11 @@ namespace AntonioNadal.SGA;
 
 /// <summary>
 /// ControlAddIn Mapa 3D SGA.
-/// Lienzo que dibuja el almacén en tres dimensiones dentro de Business Central.
+/// Lienzo que dibuja el almacén dentro de Business Central, en tres vistas: 3D, planta y frente
+/// de una estantería, coloreadas por estado, rotación ABC o caducidad, y con búsqueda.
 ///
 /// El render vive en JavaScript porque BC no tiene ningún control nativo capaz de dibujar
-/// volumen; AL se limita a mandarle los datos y a recoger el clic sobre una ubicación.
+/// así; AL se limita a mandarle los datos y a recoger lo que hace el operario.
 ///
 /// Los recursos son locales a propósito: la política de contenido del cliente bloquea los
 /// scripts de fuera, así que una librería traída de un CDN dejaría el panel en blanco.
@@ -31,8 +32,9 @@ controladdin "Mapa 3D SGA"
     procedure Dibujar(prm_DatosJson: Text);
 
     /// <summary>
-    /// Igual que Dibujar, pero sin tocar la vista: conserva el giro, el zoom y el pasillo
-    /// aislado. Se usa tras un traslado, para que el operario siga donde estaba.
+    /// Igual que Dibujar, pero sin tocar la vista: conserva la vista elegida, el giro, el zoom,
+    /// la estantería, el color y la búsqueda. Se usa tras un traslado, para que el operario
+    /// siga donde estaba.
     /// </summary>
     procedure Actualizar(prm_DatosJson: Text);
 
@@ -47,15 +49,15 @@ controladdin "Mapa 3D SGA"
     event CeldaPulsada(prm_CodBin: Text);
 
     /// <summary>
-    /// El operario ha aislado un pasillo en el mapa, o ha vuelto a verlos todos (estantería
-    /// en blanco). Sirve para que la página acompañe la vista y sus acciones trabajen sobre
-    /// el pasillo que se está mirando.
+    /// El operario ha elegido un pasillo en el mapa (aislado en la 3D o visto de frente), o ha
+    /// vuelto a verlos todos (pasillo en blanco). Sirve para que la página acompañe la vista y
+    /// sus acciones trabajen sobre el pasillo que se está mirando.
     /// </summary>
-    event PasilloSeleccionado(prm_Estanteria: Text);
+    event PasilloSeleccionado(prm_Pasillo: Text);
 
     /// <summary>
-    /// El operario ha arrastrado una ubicación con contenido hasta otra (modo Trasladar o
-    /// Ctrl+arrastrar). El lienzo no mueve nada: la página pregunta qué y cuánto, y registra.
+    /// El operario ha arrastrado una ubicación con contenido hasta otra, en cualquier vista. El
+    /// lienzo no mueve nada: la página pregunta qué y cuánto, y registra.
     /// </summary>
     event TrasladoSolicitado(prm_Origen: Text; prm_Destino: Text);
 

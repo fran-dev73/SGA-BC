@@ -7,6 +7,7 @@ using Microsoft.Inventory.Item;
 using Microsoft.Inventory.Item.Catalog;
 using Microsoft.Inventory.Ledger;
 using Microsoft.Inventory.Setup;
+using Microsoft.Inventory.Tracking;
 using Microsoft.Purchases.Vendor;
 using System.Environment;
 
@@ -35,6 +36,19 @@ codeunit 51105 "Gestion Entradas SGA"
     Access = Public;
 
     /// <summary>
+    /// Abre "Ubicar entradas" en un origen: Compra para las recepciones de compra, Produccion
+    /// para los ensamblados. Es la entrada de los menús: el origen se le pasa a la página antes
+    /// de abrirla, porque un filtro de RunPageView no le llega (es temporal).
+    /// </summary>
+    procedure AbrirUbicarEntradas(prm_Origen: Enum "Origen Mov. SGA")
+    var
+        pEntradas: Page "Ubicar Entradas SGA";
+    begin
+        pEntradas.FijarOrigen(prm_Origen);
+        pEntradas.Run();
+    end;
+
+    /// <summary>
     /// Rellena las líneas con lo que ha entrado por el origen indicado (Producción para los
     /// ensamblados, Compra para las recepciones) entre dos fechas de registro. Cualquiera de las
     /// dos fechas puede ir en blanco: sin fechas se mira todo.
@@ -43,6 +57,25 @@ codeunit 51105 "Gestion Entradas SGA"
     /// Devuelve cuántas filas ha cargado. prm_Buffer queda sin filtros y ordenado por documento.
     /// </summary>
     procedure CargarEntradas(var prm_Buffer: Record "Linea Ubicacion SGA" temporary; prm_Origen: Enum "Origen Mov. SGA"; prm_FechaDesde: Date; prm_FechaHasta: Date; prm_Almacen: Code[10]; prm_SoloPendientes: Boolean; prm_Clase: Integer; prm_Producto: Code[20]): Integer
+    begin
+        FiltrarLote := false;
+        exit(Cargar(prm_Buffer, prm_Origen, prm_FechaDesde, prm_FechaHasta, prm_Almacen, prm_SoloPendientes, prm_Clase, prm_Producto));
+    end;
+
+    /// <summary>
+    /// Lo pendiente de ubicar de un solo lote (producto, variante y lote) por el origen indicado,
+    /// sin fechas ni clase. Es lo que usa "Pendiente de ubicar" para saber cuánto de un lote
+    /// espera en estas pantallas: filtrar por el lote evita repasar toda la historia del producto.
+    /// </summary>
+    procedure CargarEntradasLote(var prm_Buffer: Record "Linea Ubicacion SGA" temporary; prm_Origen: Enum "Origen Mov. SGA"; prm_Almacen: Code[10]; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50]): Integer
+    begin
+        FiltrarLote := true;
+        VarianteFiltro := prm_Variante;
+        LoteFiltro := prm_Lote;
+        exit(Cargar(prm_Buffer, prm_Origen, 0D, 0D, prm_Almacen, true, -1, prm_Producto));
+    end;
+
+    local procedure Cargar(var prm_Buffer: Record "Linea Ubicacion SGA" temporary; prm_Origen: Enum "Origen Mov. SGA"; prm_FechaDesde: Date; prm_FechaHasta: Date; prm_Almacen: Code[10]; prm_SoloPendientes: Boolean; prm_Clase: Integer; prm_Producto: Code[20]): Integer
     var
         OrigenNoUbicableErr: Label 'Solo se pueden ubicar entradas de compra o de producción.';
     begin
@@ -96,14 +129,19 @@ codeunit 51105 "Gestion Entradas SGA"
     end;
 
     /// <summary>
-    /// Ensamblados de tipo Embotellado registrados en una fecha. Una fila por ensamblado. Las
-    /// elaboraciones quedan fuera: su salida es granel a depósito, no va a hueco.
+    /// Ensamblados de tipo Embotellado registrados en una fecha. Una fila por ensamblado y lote
+    /// (los da LotesEnsamblado). Las elaboraciones quedan fuera: su salida es granel a depósito,
+    /// no va a hueco.
     /// </summary>
     local procedure CargarEnsamblados(var prm_Buffer: Record "Linea Ubicacion SGA" temporary; prm_Almacen: Code[10]; prm_SoloPendientes: Boolean): Integer
     var
         rCabEns: Record "Posted Assembly Header";
         rItem: Record Item;
         rConfig: Record "Config. SGA";
+        lotes: Dictionary of [Code[50], Decimal];
+        lote: Code[50];
+        filtroEnsamblados: Text;
+        qtyPorUM: Decimal;
         almacenFila: Code[10];
         cargadas: Integer;
     begin
@@ -115,6 +153,21 @@ codeunit 51105 "Gestion Entradas SGA"
         rCabEns.SetRange("Tipo documento", rCabEns."Tipo documento"::Embotellado);
         if ProductoFiltro <> '' then
             rCabEns.SetRange("Item No.", ProductoFiltro);
+        if FiltrarLote then begin
+            rCabEns.SetRange("Variant Code", VarianteFiltro);
+            if cStock.LoteEstandar(ProductoFiltro) then begin
+                // El lote estándar no está en la cabecera: se buscan los ensamblados que lo sacaron.
+                filtroEnsamblados := EnsambladosDelLote();
+                if filtroEnsamblados = '' then
+                    exit(0);
+                rCabEns.SetFilter("No.", filtroEnsamblados);
+            end else begin
+                // Un lote más largo que el del ensamblado no puede ser de ningún ensamblado.
+                if StrLen(LoteFiltro) > MaxStrLen(rCabEns.Lote) then
+                    exit(0);
+                rCabEns.SetRange(Lote, LoteFiltro);
+            end;
+        end;
         // El almacén no se filtra en la consulta: está oculto en el pedido de ensamblado
         // (Pag-Ext50105), así que casi todos se registran en blanco y filtrar por él dejaba la
         // lista siempre vacía. Se compara más abajo, ya con el almacén de la fila resuelto.
@@ -133,35 +186,123 @@ codeunit 51105 "Gestion Entradas SGA"
                 if almacenFila = '' then
                     almacenFila := rConfig."Almacen por Defecto";
 
-                prm_Buffer.Init();
-                prm_Buffer.Origen := prm_Buffer.Origen::Produccion;
-                prm_Buffer."No. Documento" := rCabEns."No.";
-                prm_Buffer."Fecha Registro" := rCabEns."Posting Date";
-                prm_Buffer."Cod. Almacen" := almacenFila;
-                prm_Buffer."No. Producto" := rCabEns."Item No.";
-                prm_Buffer."Cod. Variante" := rCabEns."Variant Code";
-                prm_Buffer."No. Lote" := rCabEns.Lote;
-                prm_Buffer."Cod. Unidad Medida" := rCabEns."Unit of Measure Code";
-                prm_Buffer."Cantidad Entrada" := rCabEns.Quantity;
-                prm_Buffer."Documento Relacionado" := rCabEns."Order No.";
-
-                prm_Buffer."Descripcion Producto" := CopyStr(rItem.Description, 1, MaxStrLen(prm_Buffer."Descripcion Producto"));
-
-                CalcularPendiente(prm_Buffer);
-
                 // Si la pantalla pide un almacén concreto, el ensamblado registrado en otro no
                 // es de esta lista; los que vienen en blanco ya han heredado el del filtro.
-                // Cada ensamblado es un documento distinto, así que no hay dos filas iguales.
-                if ((prm_Almacen = '') or (almacenFila = prm_Almacen)) and
-                   ((not prm_SoloPendientes) or (prm_Buffer.Estado <> prm_Buffer.Estado::Ubicado)) then begin
-                    cargadas += 1;
-                    prm_Buffer.Linea := cargadas;
-                    prm_Buffer.Insert();
+                if (prm_Almacen = '') or (almacenFila = prm_Almacen) then begin
+                    prm_Buffer.Init();
+                    prm_Buffer.Origen := prm_Buffer.Origen::Produccion;
+                    prm_Buffer."No. Documento" := rCabEns."No.";
+                    prm_Buffer."Fecha Registro" := rCabEns."Posting Date";
+                    prm_Buffer."Cod. Almacen" := almacenFila;
+                    prm_Buffer."No. Producto" := rCabEns."Item No.";
+                    prm_Buffer."Cod. Variante" := rCabEns."Variant Code";
+                    prm_Buffer."Cod. Unidad Medida" := rCabEns."Unit of Measure Code";
+                    prm_Buffer."Documento Relacionado" := rCabEns."Order No.";
+                    prm_Buffer."Descripcion Producto" := CopyStr(rItem.Description, 1, MaxStrLen(prm_Buffer."Descripcion Producto"));
+                    qtyPorUM := rCabEns."Qty. per Unit of Measure";
+                    if qtyPorUM <= 0 then
+                        qtyPorUM := 1;
+
+                    // Cada ensamblado es un documento distinto: no hay dos filas con el mismo
+                    // documento y lote. Un lote deshecho del todo suma cero y no sale.
+                    LotesEnsamblado(rCabEns."Item No.", rCabEns.Lote, '', rCabEns."No.", rCabEns."Quantity (Base)", lotes);
+                    foreach lote in lotes.Keys() do
+                        if ((not FiltrarLote) or (lote = LoteFiltro)) and (lotes.Get(lote) > 0) then begin
+                            prm_Buffer."No. Lote" := lote;
+                            prm_Buffer."Cantidad Entrada" := Round(lotes.Get(lote) / qtyPorUM, 0.00001);
+                            CalcularPendiente(prm_Buffer);
+                            if (not prm_SoloPendientes) or (prm_Buffer.Estado <> prm_Buffer.Estado::Ubicado) then begin
+                                cargadas += 1;
+                                prm_Buffer.Linea := cargadas;
+                                prm_Buffer.Insert();
+                            end;
+                        end;
                 end;
             end;
         until rCabEns.Next() = 0;
 
         exit(cargadas);
+    end;
+
+    /// <summary>
+    /// Lotes que saca un ensamblado, con su cantidad en unidad base. Es el único sitio que decide
+    /// de dónde sale el lote de un ensamblado, y lo decide el producto (LoteEstandar), no si un
+    /// campo está relleno:
+    /// - Con lotes estándar, del seguimiento de BC: de los movimientos de producto si está
+    ///   registrado (prm_NoRegistrado), del seguimiento del pedido si no. Puede haber varios, o
+    ///   ninguno si aún no se ha puesto.
+    /// - Sin ellos, toda la cantidad con el lote propio de la cabecera (prm_LotePropio).
+    /// </summary>
+    local procedure LotesEnsamblado(prm_Producto: Code[20]; prm_LotePropio: Code[50]; prm_NoPedido: Code[20]; prm_NoRegistrado: Code[20]; prm_CantidadBase: Decimal; var prm_Lotes: Dictionary of [Code[50], Decimal])
+    var
+        rItemLedgEntry: Record "Item Ledger Entry";
+        rSeguimiento: Record "Reservation Entry";
+    begin
+        Clear(prm_Lotes);
+        if not cStock.LoteEstandar(prm_Producto) then begin
+            prm_Lotes.Add(prm_LotePropio, prm_CantidadBase);
+            exit;
+        end;
+
+        if prm_NoRegistrado <> '' then begin
+            // Deshacer el registro deja movimientos de signo contrario en el mismo documento.
+            rItemLedgEntry.SetRange("Document No.", prm_NoRegistrado);
+            rItemLedgEntry.SetRange("Entry Type", rItemLedgEntry."Entry Type"::"Assembly Output");
+            rItemLedgEntry.SetRange("Item No.", prm_Producto);
+            rItemLedgEntry.SetLoadFields("Lot No.", Quantity);
+            if rItemLedgEntry.FindSet() then
+                repeat
+                    SumarLote(prm_Lotes, rItemLedgEntry."Lot No.", rItemLedgEntry.Quantity);
+                until rItemLedgEntry.Next() = 0;
+            exit;
+        end;
+
+        rSeguimiento.SetSourceFilter(Database::"Assembly Header", "Assembly Document Type"::Order.AsInteger(), prm_NoPedido, 0, true);
+        rSeguimiento.SetSourceFilter('', 0);
+        rSeguimiento.SetFilter("Lot No.", '<>%1', '');
+        rSeguimiento.SetLoadFields("Lot No.", "Quantity (Base)");
+        if rSeguimiento.FindSet() then
+            repeat
+                SumarLote(prm_Lotes, rSeguimiento."Lot No.", rSeguimiento."Quantity (Base)");
+            until rSeguimiento.Next() = 0;
+    end;
+
+    local procedure SumarLote(var prm_Lotes: Dictionary of [Code[50], Decimal]; prm_Lote: Code[50]; prm_Cantidad: Decimal)
+    var
+        acumulado: Decimal;
+    begin
+        if prm_Lotes.Get(prm_Lote, acumulado) then
+            prm_Lotes.Set(prm_Lote, acumulado + prm_Cantidad)
+        else
+            prm_Lotes.Add(prm_Lote, prm_Cantidad);
+    end;
+
+    /// <summary>
+    /// Filtro con los ensamblados registrados que sacaron el lote de CargarEntradasLote, leídos
+    /// de sus movimientos de producto. En blanco si no hay ninguno.
+    /// </summary>
+    local procedure EnsambladosDelLote(): Text
+    var
+        rItemLedgEntry: Record "Item Ledger Entry";
+        documentos: List of [Code[20]];
+        filtro: Text;
+    begin
+        rItemLedgEntry.SetRange("Item No.", ProductoFiltro);
+        rItemLedgEntry.SetRange("Entry Type", rItemLedgEntry."Entry Type"::"Assembly Output");
+        rItemLedgEntry.SetRange("Variant Code", VarianteFiltro);
+        rItemLedgEntry.SetRange("Lot No.", LoteFiltro);
+        rItemLedgEntry.SetLoadFields("Document No.");
+        if rItemLedgEntry.FindSet() then
+            repeat
+                if not documentos.Contains(rItemLedgEntry."Document No.") then begin
+                    documentos.Add(rItemLedgEntry."Document No.");
+                    if filtro <> '' then
+                        filtro += '|';
+                    filtro += rItemLedgEntry."Document No.";
+                end;
+            until rItemLedgEntry.Next() = 0;
+
+        exit(filtro);
     end;
 
     /// <summary>
@@ -197,6 +338,10 @@ codeunit 51105 "Gestion Entradas SGA"
             rItemLedgEntry.SetRange("Location Code", prm_Almacen);
         if ProductoFiltro <> '' then
             rItemLedgEntry.SetRange("Item No.", ProductoFiltro);
+        if FiltrarLote then begin
+            rItemLedgEntry.SetRange("Variant Code", VarianteFiltro);
+            rItemLedgEntry.SetRange("Lot No.", LoteFiltro);
+        end;
         if not rItemLedgEntry.FindSet() then
             exit(0);
 
@@ -293,6 +438,9 @@ codeunit 51105 "Gestion Entradas SGA"
         // Sin hueco la fila sigue Pendiente, con el motivo: en las entradas no se usa "Sin Sitio".
         repeat
             if (TempFila.Estado <> TempFila.Estado::Ubicado) and (TempFila."Ubicacion Propuesta" = '') then begin
+                // Primero el traslado ABC; la entrada busca después, sin sus dos huecos.
+                ProponerTrasladoABC(TempFila, asignadas);
+                asignadas := ExclusionesTraslado(asignadas, TempFila);
                 codigo := ProponerParaFila(TempFila, asignadas, motivo);
                 TempFila."Ubicacion Propuesta" := codigo;
                 TempFila.Motivo := CopyStr(motivo, 1, MaxStrLen(TempFila.Motivo));
@@ -303,9 +451,10 @@ codeunit 51105 "Gestion Entradas SGA"
                     asignadas := cUbicaciones.AnadirExclusion(asignadas, codigo);
                     propuestas += 1;
                 end;
-            end else
-                if TempFila."Ubicacion Propuesta" <> '' then
-                    asignadas := cUbicaciones.AnadirExclusion(asignadas, TempFila."Ubicacion Propuesta");
+            end else begin
+                asignadas := cUbicaciones.AnadirExclusion(asignadas, TempFila."Ubicacion Propuesta");
+                asignadas := ExclusionesTraslado(asignadas, TempFila);
+            end;
         until TempFila.Next() = 0;
 
         exit(propuestas);
@@ -323,8 +472,8 @@ codeunit 51105 "Gestion Entradas SGA"
         SinOtraUbicacionMsg: Label 'No hay otra ubicación disponible para %1. Se mantiene la propuesta anterior.', Comment = '%1 = producto';
     begin
         excluidas := ExclusionesDeOtrasFilas(prm_Fila);
-        if prm_Fila."Ubicacion Propuesta" <> '' then
-            excluidas := cUbicaciones.AnadirExclusion(excluidas, prm_Fila."Ubicacion Propuesta");
+        excluidas := cUbicaciones.AnadirExclusion(excluidas, prm_Fila."Ubicacion Propuesta");
+        excluidas := ExclusionesTraslado(excluidas, prm_Fila);
 
         codigo := ProponerParaFila(prm_Fila, excluidas, motivo);
 
@@ -368,6 +517,9 @@ codeunit 51105 "Gestion Entradas SGA"
             descripcion := StrSubstNo(RecepcionLbl, prm_Fila."No. Documento")
         else
             descripcion := StrSubstNo(EnsambladoLbl, prm_Fila."No. Documento");
+
+        // El traslado ABC aceptado va antes: si falla, tampoco se registra la entrada.
+        HacerTrasladoABC(prm_Fila);
 
         cContenido.RegistrarEntrada(prm_Fila."Cod. Almacen", prm_Fila."Ubicacion Confirmada",
                                     prm_Fila."No. Producto", prm_Fila."Cod. Variante", prm_Fila."No. Lote",
@@ -425,6 +577,8 @@ codeunit 51105 "Gestion Entradas SGA"
     /// "Unidades Producto SGA"); las botellas que no lleguen a una caja quedan pendientes y se avisa. Si
     /// no llega a una caja, se ubica en unidades sueltas.
     ///
+    /// Sin hueco libre, la ubicación queda en blanco y prm_Aviso dice por qué no lo hay.
+    ///
     /// Devuelve false, con el porqué en prm_Aviso, si no hay palé que ubicar. Con true, en
     /// prm_Aviso puede venir un aviso que no impide ubicar.
     /// </summary>
@@ -447,13 +601,15 @@ codeunit 51105 "Gestion Entradas SGA"
         yaUbicadoBase: Decimal;
         umDestino: Code[10];
         cantidadDestino: Decimal;
+        lotes: Dictionary of [Code[50], Decimal];
+        lote: Code[50];
+        LoteDesconocidoLbl: Label 'No se sabe el lote del palé: el ensamblado %1 no tiene lote en sus líneas de seguimiento, o tiene varios y ninguno es el de la tarea (%2).', Comment = '%1 = nº ensamblado, %2 = lote de la tarea';
         SueltasPendientesLbl: Label 'Palé incompleto: %1 %2 no llegan a una caja y quedan pendientes; ubíquelas desde "Ubicar producto".', Comment = '%1 = cantidad, %2 = unidad base';
         TareaSinEnsambladoLbl: Label 'La tarea %1 no tiene pedido de ensamblado enlazado: no se sabe a qué entrada apuntar el palé.', Comment = '%1 = nº tarea';
         SinUnidadPaleLbl: Label 'El producto %1 no tiene la unidad de palé %2 definida.', Comment = '%1 = producto, %2 = unidad de palé';
         EnsambladoYaUbicadoLbl: Label 'Ya está ubicado todo lo del ensamblado %1.', Comment = '%1 = nº pedido de ensamblado';
         SinAlmacenLbl: Label 'No hay almacén: ni el ensamblado lo lleva ni hay uno por defecto en la configuración SGA.';
-        SinUbicacionLibreLbl: Label 'No hay ninguna ubicación libre que admita este palé.';
-    begin
+        SinUbicacionLibreLbl: Label 'No hay ninguna ubicación libre que admita este palé: %1', Comment = '%1 = motivo';    begin
         prm_Fila.Reset();
         prm_Fila.DeleteAll();
         prm_Aviso := '';
@@ -469,10 +625,9 @@ codeunit 51105 "Gestion Entradas SGA"
             prm_Fila."Cod. Almacen" := rCabEns."Location Code";
             prm_Fila."No. Producto" := rCabEns."Item No.";
             prm_Fila."Cod. Variante" := rCabEns."Variant Code";
-            prm_Fila."No. Lote" := rCabEns.Lote;
             prm_Fila."Cod. Unidad Medida" := rCabEns."Unit of Measure Code";
-            prm_Fila."Cantidad Entrada" := rCabEns.Quantity;
             qtyPorUM := rCabEns."Qty. per Unit of Measure";
+            LotesEnsamblado(rCabEns."Item No.", rCabEns.Lote, rCabEns."No.", '', rCabEns."Quantity (Base)", lotes);
         end else begin
             rCabEnsReg.SetRange("Linked Tarea", prm_Tarea.Linea);
             if not rCabEnsReg.FindLast() then begin
@@ -485,11 +640,26 @@ codeunit 51105 "Gestion Entradas SGA"
             prm_Fila."Cod. Almacen" := rCabEnsReg."Location Code";
             prm_Fila."No. Producto" := rCabEnsReg."Item No.";
             prm_Fila."Cod. Variante" := rCabEnsReg."Variant Code";
-            prm_Fila."No. Lote" := rCabEnsReg.Lote;
             prm_Fila."Cod. Unidad Medida" := rCabEnsReg."Unit of Measure Code";
-            prm_Fila."Cantidad Entrada" := rCabEnsReg.Quantity;
             qtyPorUM := rCabEnsReg."Qty. per Unit of Measure";
+            LotesEnsamblado(rCabEnsReg."Item No.", rCabEnsReg.Lote, '', rCabEnsReg."No.", rCabEnsReg."Quantity (Base)", lotes);
         end;
+        if qtyPorUM <= 0 then
+            qtyPorUM := 1;
+
+        // El palé es de un solo lote: el único del ensamblado o, si saca varios, el de la tarea,
+        // que es el que lleva la etiqueta.
+        if lotes.Count() = 1 then
+            lote := lotes.Keys().Get(1)
+        else
+            if lotes.ContainsKey(prm_Tarea.Lote) then
+                lote := prm_Tarea.Lote
+            else begin
+                prm_Aviso := StrSubstNo(LoteDesconocidoLbl, prm_Fila."No. Documento", prm_Tarea.Lote);
+                exit(false);
+            end;
+        prm_Fila."No. Lote" := lote;
+        prm_Fila."Cantidad Entrada" := Round(lotes.Get(lote) / qtyPorUM, 0.00001);
 
         // Mismo criterio que CargarEnsamblados: el almacén suele ir en blanco en el ensamblado.
         if prm_Fila."Cod. Almacen" = '' then begin
@@ -510,8 +680,6 @@ codeunit 51105 "Gestion Entradas SGA"
             prm_Aviso := StrSubstNo(SinUnidadPaleLbl, prm_Fila."No. Producto", prm_Tarea."Cod. Pale Defecto");
             exit(false);
         end;
-        if qtyPorUM <= 0 then
-            qtyPorUM := 1;
         factorPale := rUMPale."Qty. per Unit of Measure";
 
         CalcularPendiente(prm_Fila);
@@ -558,13 +726,15 @@ codeunit 51105 "Gestion Entradas SGA"
         prm_Fila.Cantidad := cantidadDestino;
         prm_Fila.Insert();
 
-        if ProponerParaTodos(prm_Fila) = 0 then
-            prm_Aviso := SinUbicacionLibreLbl
+        ProponerParaTodos(prm_Fila);
+        // La propuesta se ha guardado desde otra variable: se relee para traerla.
+        prm_Fila.FindFirst();
+        if prm_Fila."Ubicacion Propuesta" = '' then
+            // El motivo de la fila dice por qué no hay hueco (sin sitio, sin ubicaciones de la clase...).
+            prm_Aviso := StrSubstNo(SinUbicacionLibreLbl, prm_Fila.Motivo)
         else
             if sueltasBase > 0 then
                 prm_Aviso := StrSubstNo(SueltasPendientesLbl, sueltasBase, rItem."Base Unit of Measure");
-        // La propuesta se ha guardado desde otra variable: se relee para traerla.
-        prm_Fila.FindFirst();
 
         exit(true);
     end;
@@ -921,19 +1091,80 @@ codeunit 51105 "Gestion Entradas SGA"
         // Se compara la fila entera y no solo el documento: un albarán trae varias filas y
         // cada una necesita su propio hueco.
         repeat
-            if TempOtra.GetPosition() <> prm_Fila.GetPosition() then
-                if TempOtra."Ubicacion Propuesta" <> '' then
-                    excluidas := cUbicaciones.AnadirExclusion(excluidas, TempOtra."Ubicacion Propuesta");
+            if TempOtra.GetPosition() <> prm_Fila.GetPosition() then begin
+                excluidas := cUbicaciones.AnadirExclusion(excluidas, TempOtra."Ubicacion Propuesta");
+                excluidas := ExclusionesTraslado(excluidas, TempOtra);
+            end;
         until TempOtra.Next() = 0;
 
         exit(excluidas);
     end;
 
+    /// <summary>
+    /// Añade al filtro los dos huecos del traslado ABC de una fila: el hueco libre queda para el
+    /// palé A y el palé A no se propone a otra fila.
+    /// </summary>
+    local procedure ExclusionesTraslado(prm_Excluidas: Text; var prm_Fila: Record "Linea Ubicacion SGA" temporary): Text
+    begin
+        exit(cUbicaciones.AnadirExclusion(cUbicaciones.AnadirExclusion(prm_Excluidas, prm_Fila."Traslado Origen"), prm_Fila."Traslado Destino"));
+    end;
+
+    /// <summary>
+    /// Antes de buscar hueco para la fila, mira si conviene acercar un palé A al primer hueco
+    /// libre de la ruta (ProponerReubicacionABC, solo con la opción activada en la
+    /// configuración). La propuesta queda en la fila sin aceptar: la decide el operario.
+    /// </summary>
+    local procedure ProponerTrasladoABC(var prm_Fila: Record "Linea Ubicacion SGA" temporary; prm_Excluidas: Text)
+    var
+        cantidad: Decimal;
+    begin
+        cantidad := prm_Fila.Cantidad;
+        if cantidad <= 0 then
+            cantidad := prm_Fila.Pendiente();
+        prm_Fila."Aceptar Traslado" := false;
+        cUbicaciones.ProponerReubicacionABC(prm_Fila."Cod. Almacen", prm_Fila."No. Producto", prm_Fila."Cod. Unidad Medida",
+            cantidad, prm_Excluidas, prm_Fila."Traslado Origen", prm_Fila."Traslado Destino");
+    end;
+
+    /// <summary>
+    /// Hace el traslado ABC aceptado de una fila: lleva el palé entero de su hueco al libre. Lo
+    /// valida la puerta de escritura como cualquier traslado.
+    /// </summary>
+    local procedure HacerTrasladoABC(var prm_Fila: Record "Linea Ubicacion SGA" temporary)
+    var
+        rContenido: Record "Contenido Ubicacion SGA";
+        cContenido: Codeunit "Gestion Contenido SGA";
+        PaleNoEncontradoErr: Label 'El palé de la ubicación %1 ya no está. Quite la marca de Aceptar traslado o vuelva a proponer.', Comment = '%1 = ubicación';
+        ReubicacionABCLbl: Label 'Reubicación ABC: palé A más cerca de la salida';
+    begin
+        if not prm_Fila."Aceptar Traslado" or (prm_Fila."Traslado Origen" = '') then
+            exit;
+
+        rContenido.SetRange("Cod. Almacen", prm_Fila."Cod. Almacen");
+        rContenido.SetRange("Cod. Bin", prm_Fila."Traslado Origen");
+        rContenido.SetLoadFields("No. Producto", "Cod. Variante", "No. Lote", "Cod. Unidad Medida", Cantidad);
+        if not rContenido.FindFirst() then
+            Error(PaleNoEncontradoErr, prm_Fila."Traslado Origen");
+
+        cContenido.RegistrarTraslado(prm_Fila."Cod. Almacen", prm_Fila."Traslado Origen", prm_Fila."Traslado Destino",
+            rContenido."No. Producto", rContenido."Cod. Variante", rContenido."No. Lote", rContenido."Cod. Unidad Medida",
+            rContenido.Cantidad, "Origen Mov. SGA"::Manual, '', 0, ReubicacionABCLbl);
+
+        prm_Fila."Traslado Origen" := '';
+        prm_Fila."Traslado Destino" := '';
+        prm_Fila."Aceptar Traslado" := false;
+    end;
+
     var
         cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
         cUM: Codeunit "Unidades Producto SGA";
+        cStock: Codeunit "Consulta Stock SGA";
         FechaDesde: Date;
         FechaHasta: Date;
         ClaseFiltro: Integer;
         ProductoFiltro: Code[20];
+        // Solo con CargarEntradasLote: deja la carga en un lote.
+        FiltrarLote: Boolean;
+        VarianteFiltro: Code[10];
+        LoteFiltro: Code[50];
 }

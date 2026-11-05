@@ -71,10 +71,12 @@ page 51125 "Resultado Carga Inicial SGA"
                     ToolTip = 'La misma cantidad en la unidad de medida base.';
                     ApplicationArea = All;
                 }
-                field(Cargado; Cargado)
+                // El campo de la tabla y no un booleano de la página: solo los campos de la tabla
+                // se pueden filtrar desde la columna.
+                field(Estado; Rec.Estado)
                 {
-                    Caption = 'Cargado';
-                    ToolTip = 'Marcado si se ha dejado en una ubicación. Lo que no se carga sale en la conciliación como sin ubicar.';
+                    Caption = 'Resultado';
+                    ToolTip = 'Ubicado si se ha dejado en una ubicación; No se puede ubicar si no se ha cargado (el motivo dice por qué). Lo que no se carga sale en la conciliación como sin ubicar.';
                     ApplicationArea = All;
                     StyleExpr = EstiloFila;
                 }
@@ -102,12 +104,10 @@ page 51125 "Resultado Carga Inicial SGA"
     }
 
     var
-        Cargado: Boolean;
         EstiloFila: Text;
 
     trigger OnAfterGetRecord()
     begin
-        Cargado := Rec.Estado = Rec.Estado::Ubicado;
         EstiloFila := Rec.EstiloCargaInicial();
     end;
 
