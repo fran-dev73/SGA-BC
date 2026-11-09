@@ -1,10 +1,18 @@
+# Genera el PDF de un documento SGA, junto al md con el mismo nombre. Sin parámetros, la guía de
+# uso. Ejemplo: -Documento ARQUITECTURA -Titulo 'Arquitectura de SGA' -Eyebrow 'Documentación técnica'
+param(
+    [string]$Documento = 'GUIA_USO_SGA',
+    [string]$Titulo = 'Guía de uso de SGA',
+    [string]$Eyebrow = 'Guía de uso · Business Central'
+)
+
 $ErrorActionPreference = 'Stop'
 
-$sourcePath = Join-Path $PSScriptRoot 'MANUAL_SGA.md'
-$outputPath = Join-Path $PSScriptRoot 'MANUAL_SGA.pdf'
+$sourcePath = Join-Path $PSScriptRoot "$Documento.md"
+$outputPath = Join-Path $PSScriptRoot "$Documento.pdf"
 $edgePath = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
 
-if (-not (Test-Path $sourcePath)) { throw "No se encuentra el manual: $sourcePath" }
+if (-not (Test-Path $sourcePath)) { throw "No se encuentra el documento: $sourcePath" }
 if (-not (Test-Path $edgePath)) { throw "No se encuentra Microsoft Edge: $edgePath" }
 
 function Convert-InlineMarkdown([string]$text) {
@@ -134,7 +142,7 @@ $layerDiagram = @'
 
 $html = @"
 <!doctype html>
-<html lang="es"><head><meta charset="utf-8"><title>Manual SGA — Gestión de Ubicaciones</title>
+<html lang="es"><head><meta charset="utf-8"><title>$Titulo</title>
 <style>
 @page { size: A4; margin: 17mm 16mm 18mm; }
 * { box-sizing: border-box; }
@@ -170,8 +178,8 @@ hr { border: 0; border-top: 1px solid #d5e0e3; margin: 15pt 0; }
 .body-content h1 { font-size: 19pt; margin-top: 0; }
 </style></head><body>
 <section class="cover">
-  <div class="eyebrow">Guía de usuario · Business Central</div>
-  <h1>Manual SGA</h1><p class="subtitle">Gestión de ubicaciones y operaciones de almacén</p><div class="rule"></div>
+  <div class="eyebrow">$Eyebrow</div>
+  <h1>$Titulo</h1><p class="subtitle">Gestión de ubicaciones y operaciones de almacén</p><div class="rule"></div>
   <div class="introbox">SGA organiza el stock por ubicación, producto, lote y caducidad. Business Central sigue siendo la referencia del stock global; SGA aporta el detalle físico y permite detectar diferencias mediante conciliación.</div>
   <div class="diagram-title">El circuito habitual</div>
   $coverDiagram

@@ -2,8 +2,8 @@
 
 Documento de decisión: recoge cómo decide SGA dónde
 va la mercancía, qué alternativas se valoraron y qué haría replantearlo. Sirve para volver a él
-cuando cambie el almacén, no como manual de uso (eso está en [MANUAL_SGA.md](MANUAL_SGA.md)); el
-detalle técnico está en [ARQUITECTURA.md](ARQUITECTURA.md).
+cuando cambie el almacén, no como manual de uso (eso está en la [guía de uso](GUIA_USO_SGA.md)); el
+detalle técnico está en la [documentación técnica](DOCUMENTACION_TECNICA_SGA.md).
 
 SGA decide la ubicación en **dos pasos**, y este documento trata los dos:
 
@@ -145,8 +145,7 @@ clase.
 
 ### Decisión
 
-Se mantiene **"Primer hueco vacío"** (*Solo hueco vacío* en la configuración) como estrategia de
-ubicación para las entradas de producción (palés de la línea y ensamblados).
+Se mantiene **"Solo hueco vacío"** como estrategia para los **ensamblados y los palés de producción** (campo *Estrategia ubic. ensamblados*, que es su valor por defecto). Las **compras y el resto** usan **"Estándar"**, que es el valor por defecto de *Estrategia ubicación* (la primera de la lista en el código). Las dos se configuran en *Configuración SGA*, pestaña *Estrategias*.
 
 > Cada palé va al **primer hueco vacío** de tipo *Picking* o *Reserva*, no bloqueado, siguiendo la
 > **Secuencia picking** (pasillo, estantería y altura). *Otra ubicación* salta al siguiente.
@@ -186,16 +185,16 @@ bloqueados, por **Secuencia picking**.
 | Priorizar consolidación | Consolidar → primer hueco con sitio | Consolidar no aplica |
 | Solo ubicación fija | Solo la ubicación fija del producto | Demasiado rígida para producción |
 | Primera libre por ruta | Primer hueco con sitio | Igual que *Solo hueco vacío* |
-| Solo hueco vacío | Primer hueco vacío | **Elegida** |
+| Solo hueco vacío | Primer hueco vacío | **Elegida** para ensamblados y palés de producción |
 
 ### Alternativas valoradas
 
 | Estrategia | Qué hace | Por qué no ahora |
 |---|---|---|
-| **Primer hueco vacío** | Primer hueco vacío por ruta | **Elegida** |
+| **Estándar** | Ubicación fija → consolidar → primer hueco con sitio | **Por defecto** para compras y el resto (ver la tabla de estrategias) |
 | Junto al mismo producto | Hueco vacío más cercano a donde ya está el producto (mismo lote primero); si no está en ningún sitio, primer hueco vacío | Mejora sobre todo el orden (tiradas juntas), no los recorridos. Sin datos nuevos: la posición sale del código de ubicación (Pasillo-Estantería-Altura). Es la primera candidata si hace falta cambiar |
 | Reponer picking | Si el hueco de picking del producto está bajo mínimo, el palé va ahí; si no, a reserva | Requiere dar de alta huecos de picking por producto con *Ctdad. mínima/máxima*. Rinde si hay mucha venta en cajas sueltas |
-| Por zona | Cada familia de producto (clase, tipo de alcohol) va a sus zonas | Requiere una tabla familia → zona. Útil si hay que segregar (normativa, inflamables) o separar propios/externos |
+| Por zona | Cada familia de producto (clase, tipo de alcohol) va a sus zonas | **Parcial**: ya existe por grupo IIEE (las zonas tienen un grupo y el producto se prefiere a sus zonas, sin reserva). Una tabla familia → zona completa seguiría siendo útil para segregar (normativa, inflamables) o separar propios/externos |
 | Por rotación (ABC) | Lo que más se vende va abajo y cerca de la salida | Requiere clasificar productos y huecos y recalcularlo periódicamente. Solo compensa con ventas muy concentradas y recorridos largos |
 
 Descartadas para este almacén:
