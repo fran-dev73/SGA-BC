@@ -2,8 +2,10 @@ namespace AntonioNadal.SGA;
 
 using Microsoft.Foundation.NoSeries;
 using Microsoft.Foundation.UOM;
+using Microsoft.Inventory.Item;
 using Microsoft.Inventory.Location;
 using Microsoft.Warehouse.Structure;
+using System.Reflection;
 
 /// <summary>
 /// Table Config. SGA (ID 51104).
@@ -31,34 +33,14 @@ table 51104 "Config. SGA"
             TableRelation = Location;
             ToolTip = 'Almacén que se propone en las consultas y el mapa, y sobre el que se resuelven las ubicaciones por defecto de esta configuración.';
         }
-        field(20; "Ubic. Recepcion Compras"; Code[20])
+        field(12; "Zona por Defecto"; Code[10])
         {
-            Caption = 'Ubic. recepción compras';
+            Caption = 'Zona por defecto';
             DataClassification = ToBeClassified;
-            TableRelation = Bin.Code where("Location Code" = field("Almacen por Defecto"));
-            ToolTip = 'Ubicación de muelle donde queda la mercancía de compra hasta que se ubica.';
+            TableRelation = "Zona SGA".Code where("Cod. Almacen" = field("Almacen por Defecto"));
+            ToolTip = 'Zona que se propone en las consultas y el mapa, y sobre la que se resuelven las ubicaciones por defecto de esta configuración.';
         }
-        field(21; "Ubic. Entrada Produccion"; Code[20])
-        {
-            Caption = 'Ubic. entrada producción';
-            DataClassification = ToBeClassified;
-            TableRelation = Bin.Code where("Location Code" = field("Almacen por Defecto"));
-            ToolTip = 'Ubicación donde se deposita el producto terminado de fabricación propia hasta que se ubica.';
-        }
-        field(22; "Ubic. Expedicion"; Code[20])
-        {
-            Caption = 'Ubic. expedición';
-            DataClassification = ToBeClassified;
-            TableRelation = Bin.Code where("Location Code" = field("Almacen por Defecto"));
-            ToolTip = 'Ubicación de muelle de salida donde se concentra lo recogido para servir.';
-        }
-        field(23; "Ubic. Desbordamiento"; Code[20])
-        {
-            Caption = 'Ubic. desbordamiento';
-            DataClassification = ToBeClassified;
-            TableRelation = Bin.Code where("Location Code" = field("Almacen por Defecto"));
-            ToolTip = 'Ubicación donde el motor deja la mercancía cuando no encuentra hueco válido.';
-        }
+
         field(24; "Ubic. Ajustes"; Code[20])
         {
             Caption = 'Ubic. ajustes';
@@ -84,23 +66,33 @@ table 51104 "Config. SGA"
             DataClassification = ToBeClassified;
             ToolTip = 'Cómo se propone el hueco para lo que llega en una recepción de compra. Por defecto la estándar: la casa del producto, si no consolidar y si no el primer hueco libre.';
         }
+        field(36; "Campo Grupo IIEE"; Integer)
+        {
+            Caption = 'Campo del grupo IIEE en el producto';
+            DataClassification = ToBeClassified;
+            TableRelation = Field."No." where(TableNo = const(27), Type = filter(Code | Text));
+            BlankZero = true;
+            ToolTip = 'Campo de la ficha del producto que guarda su grupo IIEE. Con él, al ubicar se buscan primero huecos en las zonas de ese grupo ("Grupo IIEE" de la zona) y, si no queda sitio, en el resto del almacén. En blanco no se agrupa por grupo IIEE.';
+        }
+        field(37; "Nombre Campo Grupo IIEE"; Text[80])
+        {
+            Caption = 'Nombre del campo del grupo IIEE';
+            Editable = false;
+            FieldClass = FlowField;
+            CalcFormula = lookup(Field."Field Caption" where(TableNo = const(27), "No." = field("Campo Grupo IIEE")));
+            ToolTip = 'Nombre del campo de la ficha del producto elegido como grupo IIEE.';
+        }
         field(31; "Estrategia Picking"; Enum "Estrategia Picking SGA")
         {
             Caption = 'Estrategia picking';
             DataClassification = ToBeClassified;
         }
-        field(37; "Tipo Ubic. Nuevas"; Enum "Tipo UM SGA")
-        {
-            Caption = 'Tipo de hueco al generar';
-            DataClassification = ToBeClassified;
-            InitValue = Pale;
-            ToolTip = 'Qué admiten las ubicaciones que se crean con "Generar ubicaciones": Palé, Caja o Unidad. Los huecos de caja o de unidades sueltas se suelen configurar después en su ficha.';
-        }
         field(40; "Control Capacidad"; Enum "Control Capacidad SGA")
         {
             Caption = 'Control capacidad';
             DataClassification = ToBeClassified;
-            ToolTip = 'Qué hacer cuando una entrada supera la capacidad declarada de la ubicación.';
+            InitValue = Bloquear;
+            ToolTip = 'Qué hacer cuando una entrada supera la capacidad de una ubicación que tiene "Control capacidad" = Según configuración: bloquearla, o avisar y dejar seguir si se confirma. Cada ubicación puede llevar el suyo. La capacidad se controla siempre.';
         }
         field(41; "Permitir Cantidad Negativa"; Boolean)
         {
@@ -113,7 +105,7 @@ table 51104 "Config. SGA"
             Caption = 'Exigir confirmar ubicación';
             DataClassification = ToBeClassified;
             InitValue = true;
-            ToolTip = 'Obliga al operario a escanear la ubicación para cerrar la tarea.';
+            ToolTip = 'Obliga al operario a escanear la ubicación para cerrar la tarea. En el picking no se pide si se exige el dígito de control: el dígito certifica el hueco, y mientras no esté colocado no hay etiqueta que escanear.';
         }
         field(43; "Permitir Desvio Ubicacion"; Boolean)
         {
@@ -132,7 +124,13 @@ table 51104 "Config. SGA"
         {
             Caption = 'Exigir dígito de control al recoger';
             DataClassification = ToBeClassified;
-            ToolTip = 'Si está activo, al confirmar cada parada de picking el preparador tiene que teclear el dígito de control impreso en la etiqueta del hueco del que recoge. Certifica que está delante del hueco. Requiere haber impreso las etiquetas de ubicación.';
+            ToolTip = 'Si está activo, al confirmar cada parada de picking el preparador tiene que escanear o teclear el dígito de control de la etiqueta del hueco del que recoge. Certifica que está delante del hueco. Solo se pide en los huecos marcados con "Dígito colocado"; en los demás basta con escanear el producto. Así el almacén funciona mientras se van poniendo los dígitos.';
+        }
+        field(47; "Exigir Escanear Producto"; Boolean)
+        {
+            Caption = 'Exigir escanear producto al recoger';
+            DataClassification = ToBeClassified;
+            ToolTip = 'Si está activo, al confirmar cada parada de picking el preparador tiene que escanear el código de barras del producto que recoge (GTIN, referencia de código de barras o GS1-128). Si el GS1-128 trae lote, se comprueba contra el lote de la parada.';
         }
         field(44; "Dias Aviso Caducidad"; Integer)
         {
@@ -155,15 +153,6 @@ table 51104 "Config. SGA"
             InitValue = true;
             ToolTip = 'Crea la fila de datos SGA la primera vez que se usa una ubicación de la topología. Si se desactiva, la ubicación debe estar dada de alta previamente.';
         }
-        field(70; "Columnas Mapa"; Integer)
-        {
-            Caption = 'Columnas mapa';
-            DataClassification = ToBeClassified;
-            InitValue = 31;
-            MinValue = 1;
-            MaxValue = 32;
-            ToolTip = 'Número de columnas (huecos) que muestra el mapa por estantería. Máximo 32.';
-        }
         field(80; "Dias Analisis ABC"; Integer)
         {
             Caption = 'Días de ventas del análisis ABC';
@@ -174,31 +163,23 @@ table 51104 "Config. SGA"
         }
         field(81; "Corte ABC Clase A"; Decimal)
         {
-            Caption = 'Corte clase A (%)';
+            Caption = 'Clase A: del 0 % hasta (%)';
             DataClassification = ToBeClassified;
             InitValue = 80;
             MinValue = 1;
             MaxValue = 100;
             DecimalPlaces = 0 : 1;
-            ToolTip = 'Son A los productos que, de más a menos vendido, suman hasta este % de los palés salidos.';
+            ToolTip = 'Los productos se ordenan de más a menos palés salidos y se van sumando. Son A los que se suman desde el 0 % hasta este % acumulado. Con 80, los A mueven el 80 % de los palés.';
         }
         field(82; "Corte ABC Clase B"; Decimal)
         {
-            Caption = 'Corte clase B (%)';
+            Caption = 'Clase B: desde la A hasta (%)';
             DataClassification = ToBeClassified;
             InitValue = 95;
             MinValue = 1;
             MaxValue = 100;
             DecimalPlaces = 0 : 1;
-            ToolTip = 'Son B los productos que siguen a los A hasta este % de los palés salidos. El resto son C.';
-        }
-        field(83; "Cajas Minimas Hueco Pale"; Integer)
-        {
-            Caption = 'Cajas mínimas para hueco de palé';
-            DataClassification = ToBeClassified;
-            InitValue = 10;
-            MinValue = 1;
-            ToolTip = 'Las cajas sueltas de una referencia se proponen en un hueco de palé a partir de esta cantidad; por debajo, en un hueco de caja.';
+            ToolTip = 'Son B los productos que siguen a los A, desde el corte de la A hasta este % acumulado; el resto, hasta el 100 %, son C. Es acumulado, así que no puede ser menor que el de la A. Con A 80 y B 95: A mueven el 80 %, B el 15 % y C el 5 %.';
         }
     }
 
@@ -230,6 +211,40 @@ table 51104 "Config. SGA"
     procedure DesvioPermitido(prm_Propuesta: Code[20]; prm_Confirmada: Code[20]): Boolean
     begin
         exit("Permitir Desvio Ubicacion" or (prm_Confirmada = prm_Propuesta));
+    end;
+
+    /// <summary>
+    /// Grupo IIEE del producto, leído del campo de su ficha que diga "Campo Grupo IIEE". Se lee
+    /// por número de campo para que SGA no dependa de la extensión que lo define. En blanco si no
+    /// está configurado o el producto no lo tiene. Trabaja sobre la configuración ya leída.
+    /// </summary>
+    procedure GrupoIIEEProducto(prm_Producto: Code[20]) grupo: Code[20]
+    var
+        rItem: Record Item;
+        ref: RecordRef;
+    begin
+        if ("Campo Grupo IIEE" = 0) or (prm_Producto = '') then
+            exit('');
+        ref.Open(Database::Item);
+        ref.SetLoadFields("Campo Grupo IIEE");
+        ref.Field(rItem.FieldNo("No.")).SetRange(prm_Producto);
+        if ref.FindFirst() then
+            grupo := CopyStr(Format(ref.Field("Campo Grupo IIEE").Value()), 1, MaxStrLen(grupo));
+        ref.Close();
+    end;
+
+    /// <summary>
+    /// Qué parte de los palés salidos mueve cada clase con los cortes actuales, que son
+    /// acumulados: con 80 y 95, "A 80 % · B 15 % · C 5 %".
+    /// </summary>
+    procedure RepartoABC(): Text
+    var
+        RepartoABCLbl: Label 'A %1 % · B %2 % · C %3 %', Comment = '%1 = parte de la A, %2 = parte de la B, %3 = parte de la C';
+        CortesABCMalLbl: Label 'El corte de la B tiene que ser mayor o igual que el de la A.';
+    begin
+        if "Corte ABC Clase B" < "Corte ABC Clase A" then
+            exit(CortesABCMalLbl);
+        exit(StrSubstNo(RepartoABCLbl, "Corte ABC Clase A", "Corte ABC Clase B" - "Corte ABC Clase A", 100 - "Corte ABC Clase B"));
     end;
 
     /// <summary>

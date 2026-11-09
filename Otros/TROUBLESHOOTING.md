@@ -37,7 +37,7 @@ Lo que no se carga se ve, lote a lote, en **Pendiente de ubicar**, desde donde s
 
 **Síntoma**: `% Ocupacion` > 100 en una ubicación, o el `Estado SGA` dice "Llena" pero quedaría un 20% libre.
 
-**Causa**: La ocupación se calculó con datos obsoletos, o las capacidades cambiaron sin recalcular.
+**Causa**: La ocupación se calculó con datos obsoletos, o las capacidades cambiaron sin recalcular. Lo típico: se ha cambiado el palé por defecto o la unidad de venta de un producto que ya está ubicado, y eso cambia cuántos palés o cajas cuenta su contenido. La propuesta de hueco se fía del estado y del % guardados: mientras no se recalcule, puede no ofrecer una ubicación que en realidad tiene sitio (o tenerla por libre de más).
 
 **Solución**:
 1. Abre la ficha de la ubicación (`Ubicaciones SGA` > pulsa en la ubicación).
@@ -128,18 +128,17 @@ Si ves un error específico en pantalla, cópialo y pregunta. Probablemente sea 
 
 ---
 
-## "El mapa de almacén no muestra todos los huecos de mi pasillo"
+## "El mapa de almacén no muestra todas las estanterías de mi pasillo"
 
 **Síntoma**: Abres el mapa y ves celdas en blanco a la derecha, aunque sabes que hay ubicaciones allí.
 
-**Causa**: El mapa dibuja hasta 32 columnas (es un límite de pantalla, no de datos: SGA guarda las que haya). Por defecto viene configurado a 31, que es lo que ocupa un pasillo estándar.
+**Causa**: El mapa dibuja una columna por estantería, de la E01 a la E32 (es un límite de pantalla, no de datos: SGA guarda las que haya).
 
 **Solución**:
-1. Abre *Configuración SGA* y sube `Columnas mapa` hasta 32.
-2. Filtra por **Estantería** para ver ese pasillo de frente: es la vista de alzado y entra entera en pantalla.
-3. Si un pasillo tiene más de 32 huecos, el mapa te avisa con el número real. Para verlo completo usa la lista (`Ubicaciones SGA`) o el Excel de `Ocupación de ubicaciones`.
+1. Filtra por **Pasillo** para ver ese pasillo de frente: es la vista de alzado y entra entera en pantalla.
+2. Si hay estanterías más allá de la 32, el mapa te avisa con el número real. Para verlas usa el **mapa 3D** o la lista (`Ubicaciones SGA`) y, si lo quieres en Excel, *Abrir en Excel* desde esa lista.
 
-**Nota**: el mapa se reconstruye al abrirlo, así que los cambios de estanterías aparecen solos. Si no ves una ubicación recién creada, cierra y vuelve a abrir.
+**Nota**: el mapa se reconstruye al abrirlo, así que los cambios de ubicaciones aparecen solos. Si no ves una ubicación recién creada, cierra y vuelve a abrir.
 
 ---
 
@@ -167,6 +166,7 @@ Si ves un error específico en pantalla, cópialo y pregunta. Probablemente sea 
 | *…pero son de muelle, cuarentena, ajustes u otro uso* | Cambiar el *Tipo ubicación* de alguna a *Picking* o *Reserva*. |
 | *…pero ninguna tiene sitio* | Liberar una, ampliar su *Capacidad* o configurar más ubicaciones de esa clase. |
 | *La unidad … no es ni el palé por defecto, ni la unidad de venta, ni la unidad base* | Ubica en una de esas tres unidades del producto, o revisa su ficha (*Unidad de medida de venta*, *Cód. palé por defecto*). |
+| *El producto … no tiene palé en su ficha: … son demasiadas para un hueco de caja* | Son 10 cajas o más de un producto sin palé: no se mandan a un hueco de caja, y sin el tamaño del palé no se puede medir cuánto ocupan en uno de palé. En *Unidades de medida del producto* crea el palé con su cantidad y su *Unidad anterior* (la caja), y ponlo en *Cód. palé por defecto*. BC deja añadir unidades a un producto con movimientos. |
 
 Si quieres mover el corte de las 10 cajas: *Configuración SGA* > **Cajas mínimas para hueco de palé**.
 
@@ -184,7 +184,7 @@ Después vuelve a pulsar *Proponer ubicación*: la pantalla conserva lo que falt
 
 ## "Me dice que la ubicación admite otra cosa"
 
-**Síntoma**: Al confirmar sale *"La ubicación A-01-15-3 admite Palé y no se puede dejar mercancía en BOTELLA en ella…"*.
+**Síntoma**: Al confirmar sale *"La ubicación 101-15-03 admite Palé y no se puede dejar mercancía en BOTELLA en ella…"*.
 
 **Causa**: lo que se deja no es de la clase que admite el hueco:
 - Un hueco de **Palé** acepta palés y cajas de una referencia, pero no botellas sueltas.
@@ -216,9 +216,8 @@ Después vuelve a pulsar *Proponer ubicación*: la pantalla conserva lo que falt
 
 **Causas por orden de probabilidad**:
 1. **No hay almacén seleccionado**: el campo *Almacén* está vacío. Se rellena con el almacén por defecto de la configuración; si no hay ninguno configurado, elígelo a mano.
-2. **Las ubicaciones no siguen el formato de código**: el mapa deduce la posición de cada bloque del código `nave-estantería-columna-altura` (`A-01-15-3`). Las ubicaciones con otro formato no se pueden colocar y no se dibujan. Compruébalo en la lista de ubicaciones.
-3. **La estantería o la altura no son numéricas**: si el código trae letras donde debería ir el número de estantería o de altura, ese bloque se salta.
-4. **Filtro demasiado estrecho**: tienes puesta una nave o una estantería que no existe. Vacía los filtros.
+2. **Las ubicaciones no siguen el formato de código**: el mapa deduce la posición de cada bloque del código `pasillo-estantería-altura` (`101-15-03`: pasillo de 3 dígitos, estantería de 2 y altura de 2). Las ubicaciones con otro formato (otro número de partes, letras o una cantidad de dígitos distinta) no se pueden colocar y no se dibujan. Compruébalo en la lista de ubicaciones.
+3. **Filtro demasiado estrecho**: tienes puesta una zona o un pasillo que no existe. Vacía los filtros.
 
 ---
 
@@ -509,10 +508,10 @@ La Fase 1 no tiene herramientas de importación masiva, así que tendrás que:
 
 ---
 
-## "Necesito un reporte personalizado (no está en los 6 que hay)"
+## "Necesito un reporte personalizado"
 
 **Opciones**:
-1. **Usa los que hay**: *Inventario por ubicación* y *Ocupación de ubicaciones* son bastante completos. Descarga a Excel y personaliza ahí.
+1. **Usa las listas**: *Contenido de ubicaciones* y *Ubicaciones SGA* tienen todos los datos. Filtra, pulsa *Abrir en Excel* y personaliza ahí.
 2. **Crea un reporte propio**: Basándote en `Contenido SGA` y `Ubicacion SGA`. Puedo ayudarte si necesitas una query específica.
 3. **Pide funcionalidad**: Si es algo que repetirás cada semana, mejor integrado. Avisa qué necesitas.
 

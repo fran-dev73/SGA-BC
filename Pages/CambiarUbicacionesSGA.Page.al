@@ -2,17 +2,17 @@ namespace AntonioNadal.SGA;
 
 /// <summary>
 /// Page Cambiar Ubicaciones SGA (ID 51126).
-/// Diálogo para cambiar de golpe los datos de gestión de muchas ubicaciones: capacidad, qué
-/// admiten, tipo de uso, zona y mezcla de productos. Lo abre la lista de ubicaciones con las
-/// líneas seleccionadas.
+/// Diálogo para cambiar de golpe los datos de gestión de muchas ubicaciones: capacidad, control
+/// de capacidad, tipo (almacenamiento o picking), zona y mezcla de productos. Lo abre la lista de
+/// ubicaciones con las líneas seleccionadas.
 ///
 /// Cada dato lleva su casilla "Cambiar": solo se toca lo marcado. Hace falta porque 0 o
-/// "en blanco" son valores válidos (capacidad sin límite, admite cualquiera) y no sirven para
-/// decir "no cambiar".
+/// "en blanco" son valores válidos (capacidad sin límite, sin tipo) y no sirven para decir "no
+/// cambiar".
 /// </summary>
 page 51126 "Cambiar Ubicaciones SGA"
 {
-    Caption = 'Cambiar ubicaciones en bloque';
+    Caption = 'Cambiar ubicaciones en bloque SGA';
     PageType = StandardDialog;
     ApplicationArea = All;
 
@@ -45,25 +45,25 @@ page 51126 "Cambiar Ubicaciones SGA"
                 }
                 field(Capacidad; Capacidad)
                 {
-                    Caption = 'Capacidad';
-                    ToolTip = 'Cuánto cabe, en la clase que admite el hueco: 1 = un palé (lleve lo que lleve), 72 = setenta y dos cajas. 0 = sin límite.';
+                    Caption = 'Capacidad (palés)';
+                    ToolTip = 'Cuántos palés caben; cada producto se cuenta con su palé por defecto. 0 = sin límite.';
                     ApplicationArea = All;
                     DecimalPlaces = 0 : 5;
                     MinValue = 0;
                     Editable = CambiarCapacidad;
                 }
-                field(CambiarAdmite; CambiarAdmite)
+                field(CambiarControlCapacidad; CambiarControlCapacidad)
                 {
-                    Caption = 'Cambiar qué admite';
-                    ToolTip = 'Marque para cambiar qué admite el hueco.';
+                    Caption = 'Cambiar control de capacidad';
+                    ToolTip = 'Marque para cambiar qué pasa cuando algo no cabe en la ubicación.';
                     ApplicationArea = All;
                 }
-                field(Admite; Admite)
+                field(ControlCapacidad; ControlCapacidad)
                 {
-                    Caption = 'Admite';
-                    ToolTip = 'Palé (el palé del producto y cajas de una referencia), Caja (cajas sueltas), Unidad (botellas sueltas) o en blanco (sin configurar: no se propone). Caja y Unidad marcan "Acepta múltiples productos"; Palé lo quita.';
+                    Caption = 'Control capacidad';
+                    ToolTip = 'Qué hacer cuando una entrada no cabe: lo que diga la configuración de SGA, avisar (y dejar seguir si se confirma) o bloquear.';
                     ApplicationArea = All;
-                    Editable = CambiarAdmite;
+                    Editable = CambiarControlCapacidad;
                 }
                 field(CambiarMezcla; CambiarMezcla)
                 {
@@ -73,8 +73,8 @@ page 51126 "Cambiar Ubicaciones SGA"
                 }
                 field(Mezcla; Mezcla)
                 {
-                    Caption = 'Acepta múltiples productos';
-                    ToolTip = 'Solo se puede marcar en ubicaciones que admiten Caja (las mixtas).';
+                    Caption = 'Permite mezcla de productos';
+                    ToolTip = 'Si pueden contener productos distintos, como una estantería de picking con varias referencias.';
                     ApplicationArea = All;
                     Editable = CambiarMezcla;
                 }
@@ -87,7 +87,7 @@ page 51126 "Cambiar Ubicaciones SGA"
                 field(TipoUbicacion; TipoUbicacion)
                 {
                     Caption = 'Tipo ubicación';
-                    ToolTip = 'Uso de la ubicación. Solo las de Picking y Reserva se proponen al ubicar.';
+                    ToolTip = 'Almacenamiento (se busca primero al ubicar) o Picking (de donde se prepara; se repone desde almacenamiento). En blanco no se propone al ubicar.';
                     ApplicationArea = All;
                     Editable = CambiarTipoUbicacion;
                 }
@@ -115,8 +115,8 @@ page 51126 "Cambiar Ubicaciones SGA"
         Resumen: Text;
         CambiarCapacidad: Boolean;
         Capacidad: Decimal;
-        CambiarAdmite: Boolean;
-        Admite: Enum "Tipo UM SGA";
+        CambiarControlCapacidad: Boolean;
+        ControlCapacidad: Enum "Control Capacidad Ubic. SGA";
         CambiarMezcla: Boolean;
         Mezcla: Boolean;
         CambiarTipoUbicacion: Boolean;
@@ -153,13 +153,13 @@ page 51126 "Cambiar Ubicaciones SGA"
     begin
         // La plantilla solo lleva los valores: se asignan sin validar, porque las validaciones
         // de la tabla son para una ubicación de verdad.
-        TempPlantilla."Tipo UM Admitida" := Admite;
         TempPlantilla."Permite Mezcla Producto" := Mezcla;
         TempPlantilla."Capacidad Uds." := Capacidad;
+        TempPlantilla."Control Capacidad" := ControlCapacidad;
         TempPlantilla."Tipo Ubicacion" := TipoUbicacion;
         TempPlantilla."Cod. Zona SGA" := Zona;
 
-        exit(cUbicaciones.AplicarCambiosUbicaciones(rSeleccion, TempPlantilla, CambiarCapacidad, CambiarAdmite,
+        exit(cUbicaciones.AplicarCambiosUbicaciones(rSeleccion, TempPlantilla, CambiarCapacidad, CambiarControlCapacidad,
                                                     CambiarMezcla, CambiarTipoUbicacion, CambiarZona,
                                                     Omitidas, OmitidasEjemplo));
     end;

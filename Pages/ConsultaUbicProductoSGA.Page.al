@@ -10,7 +10,7 @@ using Microsoft.Inventory.Location;
 /// </summary>
 page 51108 "Consulta Ubic. Producto SGA"
 {
-    Caption = '¿Dónde está el producto?';
+    Caption = '¿Dónde está el producto? SGA';
     PageType = List;
     SourceTable = "Contenido Ubicacion SGA";
     UsageCategory = Tasks;

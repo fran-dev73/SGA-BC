@@ -58,14 +58,14 @@ table 51112 "Calculo ABC SGA"
         }
         field(32; "Corte A"; Decimal)
         {
-            ToolTip = 'Son A los productos hasta este % acumulado de palés salidos.';
-            Caption = 'Corte clase A (%)';
+            ToolTip = 'Son A los productos que se suman desde el 0 % hasta este % acumulado de palés salidos.';
+            Caption = 'Clase A: del 0 % hasta (%)';
             DataClassification = ToBeClassified;
         }
         field(33; "Corte B"; Decimal)
         {
-            ToolTip = 'Son B los productos que siguen a los A hasta este % acumulado.';
-            Caption = 'Corte clase B (%)';
+            ToolTip = 'Son B los productos que siguen a los A, desde el corte de la A hasta este % acumulado. El resto son C.';
+            Caption = 'Clase B: desde la A hasta (%)';
             DataClassification = ToBeClassified;
         }
         field(40; Productos; Integer)
@@ -120,13 +120,13 @@ table 51112 "Calculo ABC SGA"
         }
         field(60; "Huecos Utiles"; Integer)
         {
-            ToolTip = 'Huecos de picking y reserva no bloqueados.';
-            Caption = 'Huecos de picking y reserva';
+            ToolTip = 'Huecos de picking y almacenamiento no bloqueados.';
+            Caption = 'Huecos de picking y almacenamiento';
             DataClassification = ToBeClassified;
         }
         field(61; "Palets en Almacen"; Integer)
         {
-            ToolTip = 'Palés que hay ahora en huecos de picking y reserva.';
+            ToolTip = 'Palés que hay ahora en huecos de picking y almacenamiento.';
             Caption = 'Palés en almacén';
             DataClassification = ToBeClassified;
         }
@@ -213,7 +213,7 @@ table 51112 "Calculo ABC SGA"
         InfoCalculoLbl: Label 'Nº %1 del %2 (%3). Ventas del %4 al %5. Cortes: A hasta %6 %, B hasta %7 %.', Comment = '%1 = nº, %2 = fecha, %3 = usuario, %4 = desde, %5 = hasta, %6 = corte A, %7 = corte B';
         ResumenConcentracionLbl: Label 'El 20 % de los productos (%1 de %2) hace el %3 % de los palés salidos (%4 palés).', Comment = '%1 = productos top, %2 = productos, %3 = %, %4 = palés salidos';
         ResumenClasesLbl: Label 'A: %1 productos (%2 palés en almacén) · B: %3 productos · C: %4 productos.', Comment = '%1 = productos A, %2 = palés A, %3 = productos B, %4 = productos C';
-        ResumenHuecosLbl: Label '%1 de %2 palés están en un hueco de su clase (%3 %). De los palés A, el %4 % está en huecos A. Huecos de picking y reserva: %5.', Comment = '%1 = bien ubicados, %2 = palés, %3 = %, %4 = % A en A, %5 = huecos';
+        ResumenHuecosLbl: Label '%1 de %2 palés están en un hueco de su clase (%3 %). De los palés A, el %4 % está en huecos A. Huecos de picking y almacenamiento: %5.', Comment = '%1 = bien ubicados, %2 = palés, %3 = %, %4 = % A en A, %5 = huecos';
         ProductosSinUMPaleLbl: Label '%1 productos con ventas no tienen unidad de palé: quedan como C. Márquelos en la columna "Unidad de palé".', Comment = '%1 = nº productos';
     begin
         prm_Info := StrSubstNo(InfoCalculoLbl, "No.", "Fecha Calculo", Usuario, "Fecha Desde", "Fecha Hasta", "Corte A", "Corte B");

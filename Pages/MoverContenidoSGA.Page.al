@@ -6,10 +6,14 @@ using Microsoft.Warehouse.Structure;
 /// Page Mover Contenido SGA (ID 51114).
 /// Diálogo de traslado: pregunta a dónde y cuánto se mueve, partiendo de una línea de
 /// contenido concreta. No registra nada; el traslado lo hace Cod. "Gestion Contenido SGA".
+///
+/// Con una zona destino, propone hueco en esa zona (ProponerEnZona) y solo admite
+/// ubicaciones suyas; el operario puede cambiar la propuesta por otra de la zona. Así se
+/// traslada de una zona a otra.
 /// </summary>
 page 51114 "Mover Contenido SGA"
 {
-    Caption = 'Trasladar contenido';
+    Caption = 'Trasladar contenido SGA';
     PageType = StandardDialog;
     ApplicationArea = All;
 
@@ -32,6 +36,13 @@ page 51114 "Mover Contenido SGA"
                 {
                     Caption = 'Ubicación origen';
                     ToolTip = 'Ubicación de la que se saca la mercancía.';
+                    ApplicationArea = All;
+                    Editable = false;
+                }
+                field(ZonaOrigen; ZonaOrigen)
+                {
+                    Caption = 'Zona origen';
+                    ToolTip = 'Zona de la ubicación de origen.';
                     ApplicationArea = All;
                     Editable = false;
                 }
@@ -61,13 +72,53 @@ page 51114 "Mover Contenido SGA"
             {
                 Caption = 'Destino';
 
+                field(ZonaDestino; ZonaDestino)
+                {
+                    Caption = 'Zona destino';
+                    ToolTip = 'Zona a la que se lleva la mercancía. Al elegirla se propone un hueco de esa zona con las reglas de ubicar (clase, capacidad, mezcla); se puede cambiar por otra ubicación de la misma zona. En blanco, cualquier ubicación del almacén.';
+                    ApplicationArea = All;
+                    Editable = ZonaEditable;
+
+                    trigger OnLookup(var Text: Text): Boolean
+                    var
+                        rZona: Record "Zona SGA";
+                    begin
+                        rZona.SetRange("Cod. Almacen", Almacen);
+                        if Page.RunModal(0, rZona) <> Action::LookupOK then
+                            exit(false);
+                        Text := rZona.Code;
+                        exit(true);
+                    end;
+
+                    trigger OnValidate()
+                    var
+                        rZona: Record "Zona SGA";
+                    begin
+                        if ZonaDestino <> '' then
+                            rZona.Get(Almacen, ZonaDestino);
+                        Proponer();
+                    end;
+                }
                 field(UbicacionDestino; UbicacionDestino)
                 {
                     Caption = 'Ubicación destino';
-                    ToolTip = 'Ubicación a la que se lleva la mercancía.';
+                    ToolTip = 'Ubicación a la que se lleva la mercancía. Con zona destino, tiene que ser de esa zona.';
                     ApplicationArea = All;
                     ShowMandatory = true;
-                    TableRelation = Bin;
+                    TableRelation = Bin.Code;
+
+                    trigger OnLookup(var Text: Text): Boolean
+                    var
+                        rUbicacionSGA: Record "Ubicacion SGA";
+                    begin
+                        rUbicacionSGA.SetRange("Cod. Almacen", Almacen);
+                        if ZonaDestino <> '' then
+                            rUbicacionSGA.SetRange("Cod. Zona SGA", ZonaDestino);
+                        if Page.RunModal(0, rUbicacionSGA) <> Action::LookupOK then
+                            exit(false);
+                        Text := rUbicacionSGA."Cod. Bin";
+                        exit(true);
+                    end;
 
                     trigger OnValidate()
                     var
@@ -75,7 +126,19 @@ page 51114 "Mover Contenido SGA"
                     begin
                         if UbicacionDestino = UbicacionOrigen then
                             Error(MismaUbicacionErr);
+                        ComprobarZona();
+                        // Elegida a mano: ya no se cambia sola al tocar la cantidad.
+                        DestinoPropuesto := false;
+                        MotivoPropuesta := '';
                     end;
+                }
+                field(MotivoPropuesta; MotivoPropuesta)
+                {
+                    Caption = 'Propuesta';
+                    ToolTip = 'Por qué se propone esa ubicación o, si no hay ninguna en la zona, por qué.';
+                    ApplicationArea = All;
+                    Editable = false;
+                    MultiLine = true;
                 }
                 field(Cantidad; Cantidad)
                 {
@@ -92,6 +155,9 @@ page 51114 "Mover Contenido SGA"
                     begin
                         if Cantidad > CantidadDisponible then
                             Error(CantidadExcesivaErr, CantidadDisponible);
+                        // El sitio depende de cuánto se lleva: la propuesta se rehace.
+                        if DestinoPropuesto then
+                            Proponer();
                     end;
                 }
                 field(Motivo; Motivo)
@@ -113,18 +179,80 @@ page 51114 "Mover Contenido SGA"
         CantidadDisponible: Decimal;
         Cantidad: Decimal;
         Motivo: Text[100];
+        Variante: Code[10];
+        UM: Code[10];
+        ZonaOrigen: Code[10];
+        ZonaDestino: Code[10];
+        MotivoPropuesta: Text;
+        DestinoPropuesto: Boolean;
+        SoloMismaZona: Boolean;
+        ZonaEditable: Boolean;
+
+    trigger OnOpenPage()
+    begin
+        ZonaEditable := not SoloMismaZona;
+    end;
+
+    /// <summary>
+    /// El destino tiene que ser de la misma zona que el origen. Lo pide el mapa 3D, que no
+    /// traslada entre zonas: la zona destino es la del origen y no se puede cambiar. Va
+    /// después de Inicializar, que lee la zona del origen.
+    /// </summary>
+    procedure LimitarAMismaZona()
+    begin
+        SoloMismaZona := true;
+        ZonaDestino := ZonaOrigen;
+    end;
+
+    local procedure ComprobarZona()
+    var
+        cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
+    begin
+        if UbicacionDestino = '' then
+            exit;
+        if SoloMismaZona then
+            cUbicaciones.TestMismaZona(Almacen, UbicacionOrigen, UbicacionDestino);
+        cUbicaciones.TestUbicacionEnZona(Almacen, UbicacionDestino, ZonaDestino);
+    end;
+
+    /// <summary>
+    /// Hueco en la zona destino para la cantidad que se lleva. Sin zona no se propone nada: el
+    /// operario elige la ubicación como siempre.
+    /// </summary>
+    local procedure Proponer()
+    var
+        cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
+    begin
+        UbicacionDestino := '';
+        MotivoPropuesta := '';
+        DestinoPropuesto := false;
+        if ZonaDestino = '' then
+            exit;
+
+        UbicacionDestino := cUbicaciones.ProponerEnZona(Almacen, ZonaDestino, UbicacionOrigen, Producto, Variante, Lote,
+                                                        UM, Cantidad, MotivoPropuesta);
+        DestinoPropuesto := UbicacionDestino <> '';
+    end;
 
     /// <summary>
     /// Carga el diálogo desde una línea de contenido y propone trasladarlo entero.
     /// </summary>
     procedure Inicializar(var rContenido: Record "Contenido Ubicacion SGA")
+    var
+        rUbicacionSGA: Record "Ubicacion SGA";
     begin
         Almacen := rContenido."Cod. Almacen";
         UbicacionOrigen := rContenido."Cod. Bin";
         Producto := rContenido."No. Producto";
+        Variante := rContenido."Cod. Variante";
         Lote := rContenido."No. Lote";
+        UM := rContenido."Cod. Unidad Medida";
         CantidadDisponible := rContenido."Cantidad Disponible";
         Cantidad := rContenido."Cantidad Disponible";
+
+        rUbicacionSGA.SetLoadFields("Cod. Zona SGA");
+        if rUbicacionSGA.Get(Almacen, UbicacionOrigen) then
+            ZonaOrigen := rUbicacionSGA."Cod. Zona SGA";
     end;
 
     /// <summary>
@@ -139,6 +267,7 @@ page 51114 "Mover Contenido SGA"
             Error(MismaUbicacionErr);
 
         UbicacionDestino := prm_Destino;
+        ComprobarZona();
     end;
 
     procedure ObtenerDestino(): Code[20]
@@ -147,6 +276,7 @@ page 51114 "Mover Contenido SGA"
     begin
         if UbicacionDestino = '' then
             Error(DestinoObligatorioErr);
+        ComprobarZona();
 
         exit(UbicacionDestino);
     end;

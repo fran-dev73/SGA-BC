@@ -21,7 +21,7 @@ using AntonioNadal.Produccion;
 /// </summary>
 page 51127 "Ubicar Palets Linea SGA"
 {
-    Caption = 'Imprimir y ubicar palés de producción';
+    Caption = 'Imprimir y ubicar palés de producción SGA';
     // Worksheet y no List: en una lista BC abre en modo consulta y no se podría cambiar la
     // ubicación propuesta sin pulsar antes "Editar lista".
     PageType = Worksheet;
@@ -247,6 +247,28 @@ page 51127 "Ubicar Palets Linea SGA"
                     ImprimirYUbicarPale();
                 end;
             }
+            action(ProponerUbicacion)
+            {
+                Caption = 'Proponer ubicación';
+                ToolTip = 'Calcula ahora el hueco del almacén en el que dejar el siguiente palé, con la estrategia de ensamblados de la configuración, y lo pone arriba. Se puede cambiar antes de imprimir. Si no hay hueco, dice por qué.';
+                ApplicationArea = All;
+                Image = Suggest;
+
+                trigger OnAction()
+                var
+                    SinHuecoMsg: Label 'No se ha podido proponer ubicación.\\%1', Comment = '%1 = motivo';
+                    PropuestaMsg: Label 'El palé va a %1.\\%2', Comment = '%1 = ubicación, %2 = por qué ahí';
+                begin
+                    CargarPale();
+                    CurrPage.Update(false);
+                    if not HayPale then
+                        Error(Situacion);
+                    if TempPaleActual."Ubicacion Propuesta" = '' then
+                        Message(SinHuecoMsg, Situacion)
+                    else
+                        Message(PropuestaMsg, TempPaleActual."Ubicacion Propuesta", TempPaleActual.Motivo);
+                end;
+            }
             action(OtraUbicacion)
             {
                 Caption = 'Otra ubicación';
@@ -322,6 +344,9 @@ page 51127 "Ubicar Palets Linea SGA"
             {
                 Caption = 'Proceso';
 
+                actionref(ProponerUbicacion_Promoted; ProponerUbicacion)
+                {
+                }
                 actionref(ImprimirYUbicar_Promoted; ImprimirYUbicar)
                 {
                 }

@@ -6,7 +6,7 @@ namespace AntonioNadal.SGA;
 /// </summary>
 page 51120 "Lineas Orden Picking Subpag"
 {
-    Caption = 'Paradas';
+    Caption = 'Paradas SGA';
     PageType = ListPart;
     SourceTable = "Linea Orden Picking SGA";
     AutoSplitKey = false;
@@ -33,6 +33,10 @@ page 51120 "Lineas Orden Picking Subpag"
                     ToolTip = 'Ubicación a la que hay que ir a recoger.';
                     ApplicationArea = All;
                     Style = Strong;
+                }
+                field("Cod. Bin Destino"; Rec."Cod. Bin Destino")
+                {
+                    ApplicationArea = All;
                 }
                 field("No. Producto"; Rec."No. Producto")
                 {

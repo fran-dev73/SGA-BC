@@ -45,8 +45,9 @@ enum 51103 "Origen Mov. SGA"
     {
         Caption = 'Carga inicial';
     }
+    // Reubicación de almacenamiento a picking (Cod. "Reubicaciones SGA").
     value(9; Reposicion)
     {
-        Caption = 'Reposición';
+        Caption = 'Reubicación';
     }
 }

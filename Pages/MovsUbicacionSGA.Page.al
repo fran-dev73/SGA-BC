@@ -6,7 +6,7 @@ namespace AntonioNadal.SGA;
 /// </summary>
 page 51104 "Movs. Ubicacion SGA"
 {
-    Caption = 'Movimientos de ubicación';
+    Caption = 'Movimientos de ubicación SGA';
     PageType = List;
     SourceTable = "Movimiento Ubicacion SGA";
     UsageCategory = History;

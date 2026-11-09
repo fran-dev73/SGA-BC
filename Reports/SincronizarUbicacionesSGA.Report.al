@@ -30,22 +30,17 @@ report 51101 "Sincronizar Ubicaciones SGA"
             var
                 cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
                 cContenido: Codeunit "Gestion Contenido SGA";
-                creadas: Integer;
-                actualizadas: Integer;
-                movimientos: Integer;
                 ConfirmarReconstruirQst: Label 'Se va a borrar el contenido por ubicación del almacén %1 y a reconstruirlo desde el diario de movimientos. Las reservas de las órdenes abiertas se perderán. ¿Desea continuar?', Comment = '%1 = almacén, o "todos" si no se ha filtrado';
                 TodosAlmacenesLbl: Label 'todos los almacenes';
-                ProcesoTerminadoMsg: Label 'Proceso terminado.\Ubicaciones dadas de alta: %1.\Ocupaciones recalculadas: %2.', Comment = '%1 = ubicaciones creadas, %2 = ocupaciones recalculadas';
-                ProcesoReconstruidoMsg: Label 'Proceso terminado.\Ubicaciones dadas de alta: %1.\Movimientos reproducidos: %2.\Ocupaciones recalculadas: %3.', Comment = '%1 = ubicaciones creadas, %2 = movimientos reproducidos, %3 = ocupaciones recalculadas';
+                ProcesoFinalizadoMsg: Label 'Proceso finalizado.';
                 textoAlmacen: Text;
             begin
                 cUbicaciones.SincronizarTopologia(codAlmacen);
-                creadas := 0;
 
                 if not blnReconstruirContenido then begin
-                    actualizadas := cUbicaciones.RecalcularEstados(codAlmacen);
+                    cUbicaciones.RecalcularEstados(codAlmacen);
                     if GuiAllowed() then
-                        Message(ProcesoTerminadoMsg, creadas, actualizadas);
+                        Message(ProcesoFinalizadoMsg);
                     exit;
                 end;
 
@@ -59,11 +54,11 @@ report 51101 "Sincronizar Ubicaciones SGA"
                         exit;
 
                 cContenido.FijarModoSilencioso(true);
-                movimientos := cContenido.ReconstruirContenido(codAlmacen);
-                actualizadas := cUbicaciones.RecalcularEstados(codAlmacen);
+                cContenido.ReconstruirContenido(codAlmacen);
+                cUbicaciones.RecalcularEstados(codAlmacen);
 
                 if GuiAllowed() then
-                    Message(ProcesoReconstruidoMsg, creadas, movimientos, actualizadas);
+                    Message(ProcesoFinalizadoMsg);
             end;
         }
     }

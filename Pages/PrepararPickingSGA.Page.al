@@ -1,254 +1,102 @@
 namespace AntonioNadal.SGA;
 
+using System.Device;
+
 /// <summary>
 /// Page Preparar Picking SGA (ID 51121).
 /// Pantalla del preparador: le dice a qué ubicación ir, qué producto y qué lote coger y en
-/// qué cantidad. El preparador escanea o teclea la ubicación de la que recoge y confirma.
+/// qué cantidad, y recoge lo que lee o teclea para confirmar la parada.
+///
+/// La pantalla la dibuja el control "Picking PDA SGA", pensado para un terminal de mano y que
+/// funciona igual en el navegador. La página solo le manda la parada (Pintar) y atiende lo que
+/// devuelve; la lógica es de Cod. "Gestion Picking SGA".
+///
+/// En la app móvil de BC sobre un terminal con escáner, las lecturas llegan por el control
+/// BarcodeScannerProviderAddIn. Se escanee o se teclee, una ubicación va a la ubicación de la
+/// que recoge y lo demás al producto, que se comprueba al momento; el dígito se comprueba al
+/// teclearlo. Un error de lectura se avisa en la pantalla, con pitido, sin ventana. La parada
+/// se confirma sola en cuanto tiene lo que exige la configuración (ParadaCompleta).
 ///
 /// La confirmación es la que retira el stock de la ubicación y deja la huella en el diario
 /// de movimientos, con el documento origen y el usuario, para la trazabilidad inversa.
 ///
-/// Trabaja sobre las paradas pendientes de una orden, ordenadas por recorrido físico.
+/// Trabaja sobre las paradas pendientes de una orden, ordenadas por recorrido físico. Abierta
+/// desde una orden, trabaja esa y se cierra al terminarla. Abierta sola (menú de la PDA,
+/// "Siguiente orden"), está "en turno": toma la orden que le toca (SiguienteOrdenPreparar) y, al
+/// terminarla, pasa a la siguiente sin cerrarse.
 /// </summary>
 page 51121 "Preparar Picking SGA"
 {
-    Caption = 'Preparar picking';
+    Caption = 'Preparar picking SGA';
     PageType = Card;
     SourceTable = "Linea Orden Picking SGA";
     InsertAllowed = false;
     DeleteAllowed = false;
     ModifyAllowed = false;
+    LinksAllowed = false;
+    // La barra de título de BC dice la orden; la pantalla propia no la repite.
+    DataCaptionFields = "No. Orden";
     SourceTableView = sorting("No. Orden", Estado, "Secuencia Picking");
 
     layout
     {
         area(Content)
         {
-            group(Avance)
+            usercontrol(Pantalla; "Picking PDA SGA")
             {
-                Caption = 'Recorrido';
-
-                field(Progreso; Progreso)
-                {
-                    Caption = 'Progreso';
-                    ToolTip = 'Paradas recogidas sobre el total de la orden.';
-                    ApplicationArea = All;
-                    Editable = false;
-                    Style = Strong;
-                }
-                field("No. Orden"; Rec."No. Orden")
-                {
-                    ToolTip = 'Orden que se está preparando.';
-                    ApplicationArea = All;
-                    Editable = false;
-                }
-            }
-            group(Destino)
-            {
-                Caption = 'Vaya a esta ubicación';
-
-                field("Cod. Bin Propuesto"; Rec."Cod. Bin Propuesto")
-                {
-                    Caption = 'Ubicación';
-                    ToolTip = 'Ubicación a la que hay que ir a recoger.';
-                    ApplicationArea = All;
-                    Editable = false;
-                    Style = StrongAccent;
-                }
-                field("Secuencia Picking"; Rec."Secuencia Picking")
-                {
-                    Caption = 'Secuencia';
-                    ToolTip = 'Posición de la parada en el recorrido.';
-                    ApplicationArea = All;
-                    Editable = false;
-                }
-            }
-            group(Mercancia)
-            {
-                Caption = 'Y coja esto';
-
-                field("No. Producto"; Rec."No. Producto")
-                {
-                    Caption = 'Producto';
-                    ToolTip = 'Producto que hay que recoger.';
-                    ApplicationArea = All;
-                    Editable = false;
-                    Style = Strong;
-                }
-                field("Descripcion Producto"; Rec."Descripcion Producto")
-                {
-                    Caption = 'Descripción';
-                    ToolTip = 'Descripción del producto.';
-                    ApplicationArea = All;
-                    Editable = false;
-                }
-                field("No. Lote"; Rec."No. Lote")
-                {
-                    Caption = 'Lote';
-                    ToolTip = 'Lote concreto que hay que recoger.';
-                    ApplicationArea = All;
-                    Editable = false;
-                    Style = Strong;
-                }
-                field("Fecha Caducidad"; Rec."Fecha Caducidad")
-                {
-                    Caption = 'Caducidad';
-                    ToolTip = 'Caducidad del lote que hay que recoger.';
-                    ApplicationArea = All;
-                    Editable = false;
-                }
-                field(PendienteDocumento; PendienteDocumento)
-                {
-                    Caption = 'Cantidad a recoger';
-                    ToolTip = 'Cantidad que queda por recoger en esta parada, en la unidad del pedido.';
-                    ApplicationArea = All;
-                    Editable = false;
-                    DecimalPlaces = 0 : 5;
-                    Style = Strong;
-                }
-                field(UMPedido; UMPedido)
-                {
-                    Caption = 'Unidad';
-                    ToolTip = 'Unidad de medida del pedido: cajas, palés o la que lleve la línea.';
-                    ApplicationArea = All;
-                    Editable = false;
-                    Style = Strong;
-                }
-                field(PendienteBase; Rec."Cantidad Pendiente")
-                {
-                    Caption = 'En unidades base';
-                    ToolTip = 'La misma cantidad en la unidad de medida base del producto.';
-                    ApplicationArea = All;
-                    Editable = false;
-                    Visible = MostrarBase;
-                }
-            }
-            group(Validacion)
-            {
-                Caption = 'Confirme lo recogido';
-
-                field(UbicacionEscaneada; UbicacionEscaneada)
-                {
-                    Caption = 'Ubicación de la que recoge';
-                    ToolTip = 'Escanee o teclee la ubicación de la que está recogiendo. Debe coincidir con la indicada.';
-                    ApplicationArea = All;
-                    ShowMandatory = true;
-
-                    trigger OnValidate()
-                    begin
-                        ComprobarUbicacion();
-                    end;
-                }
-                field(DigitoControl; DigitoControl)
-                {
-                    Caption = 'Dígito de control';
-                    ToolTip = 'Número grande de la etiqueta del hueco del que recoge. Certifica que está delante del hueco.';
-                    ApplicationArea = All;
-                    Visible = ExigeDigito;
-                    ShowMandatory = true;
-                    Style = StrongAccent;
-                }
-                field(CantidadRecogida; CantidadRecogida)
-                {
-                    Caption = 'Cantidad recogida';
-                    ToolTip = 'Cantidad que ha cogido realmente, en la unidad del pedido. Por defecto, la pendiente de la parada.';
-                    DecimalPlaces = 0 : 5;
-                    ApplicationArea = All;
-                    MinValue = 0;
-                    ShowMandatory = true;
-                }
-                field(Aviso; Aviso)
-                {
-                    Caption = 'Aviso';
-                    ToolTip = 'Avisos sobre la ubicación escaneada.';
-                    ApplicationArea = All;
-                    Editable = false;
-                    Style = Unfavorable;
-                    Visible = HayAviso;
-                    MultiLine = true;
-                }
-            }
-        }
-    }
-
-    actions
-    {
-        area(Processing)
-        {
-            action(ConfirmarParada)
-            {
-                Caption = 'Confirmar recogida';
-                ToolTip = 'Registra lo recogido, retira el stock de la ubicación y pasa a la siguiente parada.';
                 ApplicationArea = All;
-                Image = Approve;
 
-                trigger OnAction()
+                trigger Listo()
                 begin
-                    Confirmar();
+                    PantallaLista := true;
+                    Pintar();
+                end;
+
+                trigger Lectura(prm_Texto: Text)
+                begin
+                    ProcesarLectura(prm_Texto);
+                end;
+
+                trigger Digito(prm_Texto: Text)
+                begin
+                    LeerDigito(prm_Texto);
+                end;
+
+                trigger Cantidad(prm_Valor: Text)
+                begin
+                    LeerCantidad(prm_Valor);
+                end;
+
+                trigger Accion(prm_Accion: Text)
+                begin
+                    EjecutarAccion(prm_Accion);
                 end;
             }
-            action(SaltarParada)
+            // Escáner de la PDA. Sin interfaz: solo recibe lo leído.
+            usercontrol(Escaner; BarcodeScannerProviderAddIn)
             {
-                Caption = 'Saltar parada';
-                ToolTip = 'Deja esta parada para el final y pasa a la siguiente.';
                 ApplicationArea = All;
-                Image = NextRecord;
 
-                trigger OnAction()
+                trigger ControlAddInReady(IsSupported: Boolean)
                 var
-                    SinMasParadasMsg: Label 'No hay más paradas pendientes.';
+                    IntentAccionTok: Label 'com.businesscentral.barcode.receive_barcode', Locked = true;
+                    IntentCategoriaTok: Label 'com.businesscentral.barcode.receive_category', Locked = true;
+                    IntentDatoTok: Label 'com.symbol.datawedge.data_string', Locked = true;
+                    IntentFormatoTok: Label 'com.symbol.datawedge.label_type', Locked = true;
                 begin
-                    if Rec.Next() = 0 then
-                        Message(SinMasParadasMsg)
-                    else
-                        Preparar();
-                    CurrPage.Update(false);
+                    EscanerDisponible := IsSupported;
+                    // Claves del dato de Zebra DataWedge, que no se pueden cambiar en el
+                    // terminal; Honeywell y Datalogic se configuran con las mismas.
+                    if EscanerDisponible then
+                        CurrPage.Escaner.RequestBarcodeScannerAsync(IntentAccionTok, IntentCategoriaTok, IntentDatoTok, IntentFormatoTok);
+                    // Con escáner la pantalla no pone el foco en los campos (abriría el teclado).
+                    Pintar();
                 end;
-            }
-            action(NoHayStock)
-            {
-                Caption = 'No hay stock aquí';
-                ToolTip = 'Cancela esta parada porque la mercancía no está en la ubicación. Queda constancia para revisar el hueco.';
-                ApplicationArea = All;
-                Image = Cancel;
 
-                trigger OnAction()
+                trigger BarcodeReceived(Barcode: Text; Format: Text)
                 begin
-                    MarcarSinStock();
+                    ProcesarLectura(Barcode);
                 end;
-            }
-            action(VerContenidoUbicacion)
-            {
-                Caption = 'Ver qué hay en la ubicación';
-                ToolTip = 'Muestra el contenido registrado de la ubicación indicada.';
-                ApplicationArea = All;
-                Image = BinContent;
-
-                trigger OnAction()
-                var
-                    rContenido: Record "Contenido Ubicacion SGA";
-                begin
-                    rContenido.SetRange("Cod. Almacen", Rec."Cod. Almacen");
-                    rContenido.SetRange("Cod. Bin", Rec."Cod. Bin Propuesto");
-                    Page.Run(Page::"Contenido Ubicaciones SGA", rContenido);
-                end;
-            }
-        }
-        area(Promoted)
-        {
-            group(Category_Process)
-            {
-                Caption = 'Proceso';
-
-                actionref(ConfirmarParada_Promoted; ConfirmarParada)
-                {
-                }
-                actionref(SaltarParada_Promoted; SaltarParada)
-                {
-                }
-                actionref(NoHayStock_Promoted; NoHayStock)
-                {
-                }
             }
         }
     }
@@ -260,31 +108,55 @@ page 51121 "Preparar Picking SGA"
         UMPedido: Code[10];
         MostrarBase: Boolean;
         Aviso: Text;
-        HayAviso: Boolean;
+        AvisoEsError: Boolean;
         Progreso: Text;
         LineaMostrada: Integer;
         DigitoControl: Text[10];
+        ExigeUbicacion: Boolean;
         ExigeDigito: Boolean;
+        ProductoEscaneado: Text[100];
+        ExigeProducto: Boolean;
+        EscanerDisponible: Boolean;
+        PantallaLista: Boolean;
+        HayParada: Boolean;
+        EnTurno: Boolean;
+        MotivoSinParadas: Text;
 
     trigger OnOpenPage()
-    var
-        rConfig: Record "Config. SGA";
     begin
-        rConfig.ObtenerConfig();
-        ExigeDigito := rConfig."Exigir Digito Control";
-        Rec.FiltrarPendientes();
-        if Rec.FindFirst() then;
+        // Abierta desde una orden, trabaja esa. Abierta sola (menú de la PDA, Siguiente
+        // orden), busca la que le toca y, al terminarla, pasa a la siguiente.
+        EnTurno := Rec.GetFilter("No. Orden") = '';
+        if EnTurno then
+            BuscarSiguienteOrden()
+        else begin
+            Rec.FiltrarPendientes();
+            HayParada := Rec.FindFirst();
+            Preparar();
+        end;
+    end;
+
+    /// <summary>
+    /// Carga la siguiente orden que le toca al usuario. Si no hay, la pantalla lo dice y ofrece
+    /// volver a buscar.
+    /// </summary>
+    local procedure BuscarSiguienteOrden()
+    var
+        rOrden: Record "Orden Picking SGA";
+        cPicking: Codeunit "Gestion Picking SGA";
+    begin
+        if cPicking.SiguienteOrdenPreparar(rOrden, MotivoSinParadas) then
+            HayParada := CargarParadas(rOrden."No. Orden")
+        else
+            HayParada := false;
         Preparar();
     end;
 
     trigger OnAfterGetRecord()
     begin
-        // La captura solo se reinicia al cambiar de parada. Si se reiniciara en cada
-        // refresco se borraría la ubicación que el preparador está tecleando.
+        // La captura solo se reinicia al cambiar de parada.
         if LineaMostrada <> Rec."No. Linea" then
-            Preparar()
-        else
-            CalcularProgreso();
+            Preparar();
     end;
 
     /// <summary>
@@ -299,9 +171,10 @@ page 51121 "Preparar Picking SGA"
         CantidadRecogida := PendienteDocumento;
         UbicacionEscaneada := '';
         DigitoControl := '';
-        Aviso := '';
-        HayAviso := false;
+        ProductoEscaneado := '';
+        Avisar('', false);
         CalcularProgreso();
+        Pintar();
     end;
 
     local procedure CalcularProgreso()
@@ -318,8 +191,63 @@ page 51121 "Preparar Picking SGA"
     end;
 
     /// <summary>
-    /// Avisa en pantalla si la ubicación escaneada no es la indicada. Que el desvío se
-    /// admita o no lo decide el motor al confirmar, según la configuración.
+    /// Manda a la pantalla la parada actual y lo capturado. Antes de que el control esté
+    /// montado no hace nada: al montarse, él mismo lo pide.
+    /// </summary>
+    local procedure Pintar()
+    var
+        cPicking: Codeunit "Gestion Picking SGA";
+        datos: JsonObject;
+        BaseLbl: Label '%1 %2', Locked = true, Comment = '%1 = cantidad, %2 = unidad';
+    begin
+        if not PantallaLista then
+            exit;
+
+        // Lo que se pide depende del hueco (con etiqueta SGA o antigua) y puede cambiar si escanea
+        // otro: se recalcula en cada pintada.
+        if HayParada then
+            cPicking.QueExige(Rec, UbicacionEscaneada, ExigeUbicacion, ExigeDigito, ExigeProducto);
+
+        datos.Add('vacia', not HayParada);
+        datos.Add('mensaje', MotivoSinParadas);
+        datos.Add('enTurno', EnTurno);
+        datos.Add('escaner', EscanerDisponible);
+        datos.Add('progreso', Progreso);
+        datos.Add('ubicacion', Rec."Cod. Bin Propuesto");
+        datos.Add('producto', Rec."No. Producto");
+        datos.Add('descripcion', Rec."Descripcion Producto");
+        datos.Add('lote', Rec."No. Lote");
+        datos.Add('caducidad', Format(Rec."Fecha Caducidad"));
+        datos.Add('cantidad', Format(PendienteDocumento));
+        datos.Add('unidad', UMPedido);
+        if MostrarBase then
+            datos.Add('cantidadBase', StrSubstNo(BaseLbl, Format(Rec."Cantidad Pendiente"), Rec."Cod. Unidad Medida"))
+        else
+            datos.Add('cantidadBase', '');
+        datos.Add('destino', Rec."Cod. Bin Destino");
+        datos.Add('exigeUbicacion', ExigeUbicacion);
+        datos.Add('exigeDigito', ExigeDigito);
+        datos.Add('exigeProducto', ExigeProducto);
+        datos.Add('ubicacionLeida', UbicacionEscaneada);
+        datos.Add('digito', DigitoControl);
+        datos.Add('productoLeido', ProductoEscaneado <> '');
+        datos.Add('cantidadRecogida', CantidadRecogida);
+        datos.Add('aviso', Aviso);
+        datos.Add('avisoError', AvisoEsError);
+        CurrPage.Pantalla.Mostrar(datos);
+    end;
+
+    local procedure Avisar(prm_Texto: Text; prm_EsError: Boolean)
+    begin
+        Aviso := prm_Texto;
+        AvisoEsError := prm_EsError;
+        if prm_EsError and PantallaLista then
+            CurrPage.Pantalla.Senal('error');
+    end;
+
+    /// <summary>
+    /// Avisa si la ubicación de la que recoge no es la indicada. Que el desvío se admita o no
+    /// lo decide el motor al confirmar, según la configuración.
     /// </summary>
     local procedure ComprobarUbicacion()
     var
@@ -327,21 +255,142 @@ page 51121 "Preparar Picking SGA"
         DesvioUbicacionLbl: Label 'Esa no es la ubicación indicada (%1). Se registrará como desvío.', Comment = '%1 = ubicación indicada';
         DesvioNoPermitidoLbl: Label 'Esa no es la ubicación indicada (%1) y la configuración no permite desviarse.', Comment = '%1 = ubicación indicada';
     begin
-        Aviso := '';
-        HayAviso := false;
-
-        if UbicacionEscaneada = '' then
-            exit;
-
-        if UbicacionEscaneada = Rec."Cod. Bin Propuesto" then
+        Avisar('', false);
+        if (UbicacionEscaneada = '') or (UbicacionEscaneada = Rec."Cod. Bin Propuesto") then
             exit;
 
         rConfig.ObtenerConfig();
-        HayAviso := true;
         if rConfig.DesvioPermitido(Rec."Cod. Bin Propuesto", UbicacionEscaneada) then
-            Aviso := StrSubstNo(DesvioUbicacionLbl, Rec."Cod. Bin Propuesto")
+            Avisar(StrSubstNo(DesvioUbicacionLbl, Rec."Cod. Bin Propuesto"), false)
         else
-            Aviso := StrSubstNo(DesvioNoPermitidoLbl, Rec."Cod. Bin Propuesto");
+            Avisar(StrSubstNo(DesvioNoPermitidoLbl, Rec."Cod. Bin Propuesto"), true);
+    end;
+
+    /// <summary>
+    /// Lo escaneado o tecleado en la lectura: si es una ubicación del almacén, es la ubicación
+    /// de la que recoge, y si es la etiqueta, que trae también su dígito, el dígito, que se
+    /// comprueba como si se hubiera tecleado; si no, el producto, que se comprueba al momento.
+    /// </summary>
+    local procedure ProcesarLectura(prm_Lectura: Text)
+    var
+        cLectura: Codeunit "Lectura Codigos SGA";
+        bin: Code[20];
+        digito: Text;
+    begin
+        prm_Lectura := DelChr(prm_Lectura, '<>', ' ');
+        if (prm_Lectura = '') or not HayParada then
+            exit;
+
+        if cLectura.EsUbicacion(Rec."Cod. Almacen", prm_Lectura, bin, digito) then begin
+            UbicacionEscaneada := bin;
+            ComprobarUbicacion();
+            if (digito <> '') and not AvisoEsError then begin
+                LeerDigito(digito);
+                exit;
+            end;
+        end else
+            if ProbarProducto(prm_Lectura) then begin
+                ProductoEscaneado := CopyStr(prm_Lectura, 1, MaxStrLen(ProductoEscaneado));
+                Avisar('', false);
+            end else begin
+                Avisar(GetLastErrorText(), true);
+                Pintar();
+                exit;
+            end;
+
+        if not AvisoEsError then
+            CurrPage.Pantalla.Senal('ok');
+        Pintar();
+        ConfirmarSiCompleta();
+    end;
+
+    [TryFunction]
+    local procedure ProbarProducto(prm_Lectura: Text)
+    var
+        cPicking: Codeunit "Gestion Picking SGA";
+    begin
+        cPicking.TestProductoLeido(Rec, prm_Lectura);
+    end;
+
+    /// <summary>
+    /// El dígito tecleado se comprueba al momento contra la ubicación de la que recoge (la
+    /// indicada si no ha escaneado otra). Si no es, se borra para que lo vuelva a teclear.
+    /// </summary>
+    local procedure LeerDigito(prm_Texto: Text)
+    begin
+        DigitoControl := CopyStr(DelChr(prm_Texto, '<>', ' '), 1, MaxStrLen(DigitoControl));
+        if DigitoControl = '' then
+            exit;
+
+        if not ProbarDigito() then begin
+            DigitoControl := '';
+            Avisar(GetLastErrorText(), true);
+            Pintar();
+            exit;
+        end;
+
+        Avisar('', false);
+        CurrPage.Pantalla.Senal('ok');
+        Pintar();
+        ConfirmarSiCompleta();
+    end;
+
+    [TryFunction]
+    local procedure ProbarDigito()
+    var
+        rUbicacion: Record "Ubicacion SGA";
+        bin: Code[20];
+    begin
+        bin := UbicacionEscaneada;
+        if bin = '' then
+            bin := Rec."Cod. Bin Propuesto";
+        rUbicacion.TestDigitoControl(Rec."Cod. Almacen", bin, DigitoControl);
+    end;
+
+    /// <summary>
+    /// Cantidad recogida que manda la pantalla, en la unidad del pedido y con punto decimal.
+    /// </summary>
+    local procedure LeerCantidad(prm_Valor: Text)
+    var
+        valor: Decimal;
+    begin
+        // 9 = formato XML: el punto decimal, sea cual sea el idioma del usuario.
+        if not Evaluate(valor, prm_Valor, 9) then
+            exit;
+        if valor < 0 then
+            valor := 0;
+        CantidadRecogida := valor;
+    end;
+
+    local procedure EjecutarAccion(prm_Accion: Text)
+    begin
+        if prm_Accion = 'siguiente' then begin
+            BuscarSiguienteOrden();
+            exit;
+        end;
+        if not HayParada then
+            exit;
+        case prm_Accion of
+            'confirmar':
+                Confirmar();
+            'saltar':
+                Saltar();
+            'sinstock':
+                MarcarSinStock();
+        end;
+    end;
+
+    /// <summary>
+    /// Confirma la parada en cuanto tiene todo lo que exige la configuración.
+    /// </summary>
+    local procedure ConfirmarSiCompleta()
+    var
+        cPicking: Codeunit "Gestion Picking SGA";
+    begin
+        if AvisoEsError then
+            exit;
+        if cPicking.ParadaCompleta(Rec, UbicacionEscaneada, DigitoControl, ProductoEscaneado) then
+            Confirmar();
     end;
 
     local procedure Confirmar()
@@ -353,7 +402,8 @@ page 51121 "Preparar Picking SGA"
             Error(CantidadNoIndicadaErr);
 
         // El preparador habla en la UM del pedido; la parada, en base.
-        cPicking.ConfirmarLinea(Rec, UbicacionEscaneada, Rec.CantidadBaseDesdeDocumento(CantidadRecogida, PendienteDocumento), DigitoControl);
+        cPicking.ConfirmarLinea(Rec, UbicacionEscaneada, Rec.CantidadBaseDesdeDocumento(CantidadRecogida, PendienteDocumento), DigitoControl, ProductoEscaneado);
+        CurrPage.Pantalla.Senal('ok');
 
         // Al quedar recogida sale del filtro de pendientes, así que se recarga la vista.
         if not SiguienteParada() then begin
@@ -362,18 +412,36 @@ page 51121 "Preparar Picking SGA"
         end;
 
         Preparar();
-        CurrPage.Update(false);
     end;
 
+    /// <summary>
+    /// Deja esta parada para el final y pasa a la siguiente.
+    /// </summary>
+    local procedure Saltar()
+    var
+        SinMasParadasMsg: Label 'No hay más paradas pendientes.';
+    begin
+        if Rec.Next() = 0 then
+            Message(SinMasParadasMsg)
+        else
+            Preparar();
+    end;
+
+    /// <summary>
+    /// "Sin stock": la parada se cancela y lo que faltaba se busca en otra ubicación del producto.
+    /// Lo que ha pasado sale como aviso en la parada siguiente, en rojo si no se ha encontrado todo.
+    /// </summary>
     local procedure MarcarSinStock()
     var
         cPicking: Codeunit "Gestion Picking SGA";
-        SinStockQst: Label 'Se cancelará la parada de %1 en %2 y quedará constancia. ¿Continuar?', Comment = '%1 = producto, %2 = ubicación';
+        resultado: Text;
+        cubierta: Boolean;
+        SinStockQst: Label '¿Buscar en otra ubicación?';
     begin
-        if not Confirm(SinStockQst, false, Rec."No. Producto", Rec."Cod. Bin Propuesto") then
+        if not Confirm(SinStockQst, true) then
             exit;
 
-        cPicking.CancelarLinea(Rec);
+        resultado := cPicking.SustituirParadaSinStock(Rec, cubierta);
 
         if not SiguienteParada() then begin
             TerminarOrden();
@@ -381,38 +449,51 @@ page 51121 "Preparar Picking SGA"
         end;
 
         Preparar();
-        CurrPage.Update(false);
+        Avisar(resultado, not cubierta);
+        Pintar();
     end;
 
     /// <summary>
     /// Cierra el recorrido y pasa lo recogido al pedido. Se guarda antes lo confirmado: si el
     /// pedido no acepta los datos, el preparador no pierde su trabajo y oficina lo repite
     /// desde la orden con "Pasar al pedido".
+    ///
+    /// En turno no se cierra: el resultado sale como aviso y se carga la siguiente orden. Si no
+    /// pasa al pedido, el aviso va en rojo.
     /// </summary>
     local procedure TerminarOrden()
     var
         rOrden: Record "Orden Picking SGA";
-        OrdenTerminadaPasadaMsg: Label 'Orden terminada. Lo recogido ya está en el pedido %1.', Comment = '%1 = nº pedido';
-        OrdenTerminadaSinPasarMsg: Label 'Orden terminada, pero no se ha podido pasar al pedido %1:\%2\\Avise a oficina para que lo pase desde la orden.', Comment = '%1 = nº pedido, %2 = error';
-        OrdenTerminadaMsg: Label 'Orden terminada.';
+        resultado: Text;
+        fallo: Boolean;
+        OrdenTerminadaPasadaMsg: Label 'Orden %1 terminada. Lo recogido ya está en el pedido %2.', Comment = '%1 = nº orden, %2 = nº pedido';
+        OrdenTerminadaSinPasarMsg: Label 'Orden %1 terminada, pero no se ha podido pasar al pedido %2: %3 Avise a oficina para que lo pase desde la orden.', Comment = '%1 = nº orden, %2 = nº pedido, %3 = error';
+        OrdenTerminadaMsg: Label 'Orden %1 terminada.', Comment = '%1 = nº orden';
     begin
         Commit();
 
-        if not rOrden.Get(Rec."No. Orden") then begin
-            Message(OrdenTerminadaMsg);
+        resultado := StrSubstNo(OrdenTerminadaMsg, Rec."No. Orden");
+        if rOrden.Get(Rec."No. Orden") then
+            if rOrden.Origen = rOrden.Origen::Venta then
+                if Codeunit.Run(Codeunit::"Gestion Picking SGA", rOrden) then
+                    resultado := StrSubstNo(OrdenTerminadaPasadaMsg, rOrden."No. Orden", rOrden."No. Documento Origen")
+                else begin
+                    resultado := StrSubstNo(OrdenTerminadaSinPasarMsg, rOrden."No. Orden", rOrden."No. Documento Origen", GetLastErrorText());
+                    fallo := true;
+                end;
+
+        if not EnTurno then begin
+            Message(resultado);
             CurrPage.Close();
             exit;
         end;
 
-        if rOrden.Origen <> rOrden.Origen::Venta then
-            Message(OrdenTerminadaMsg)
+        BuscarSiguienteOrden();
+        if HayParada then
+            Avisar(resultado, fallo)
         else
-            if Codeunit.Run(Codeunit::"Gestion Picking SGA", rOrden) then
-                Message(OrdenTerminadaPasadaMsg, rOrden."No. Documento Origen")
-            else
-                Message(OrdenTerminadaSinPasarMsg, rOrden."No. Documento Origen", GetLastErrorText());
-
-        CurrPage.Close();
+            MotivoSinParadas := resultado + ' ' + MotivoSinParadas;
+        Pintar();
     end;
 
     /// <summary>
@@ -420,16 +501,21 @@ page 51121 "Preparar Picking SGA"
     /// ninguna, que es la señal de que la orden está terminada.
     /// </summary>
     local procedure SiguienteParada(): Boolean
-    var
-        orden: Code[20];
     begin
-        orden := Rec."No. Orden";
+        exit(CargarParadas(Rec."No. Orden"));
+    end;
 
+    /// <summary>
+    /// Deja la vista en las paradas pendientes de la orden, en orden de recorrido, con el
+    /// cursor en la primera. Devuelve false si no queda ninguna.
+    /// </summary>
+    local procedure CargarParadas(prm_Orden: Code[20]): Boolean
+    begin
         Rec.Reset();
         Rec.SetCurrentKey("No. Orden", Estado, "Secuencia Picking");
-        Rec.SetRange("No. Orden", orden);
+        Rec.SetRange("No. Orden", prm_Orden);
         Rec.FiltrarPendientes();
-
-        exit(Rec.FindFirst());
+        HayParada := Rec.FindFirst();
+        exit(HayParada);
     end;
 }

@@ -7,7 +7,7 @@ namespace AntonioNadal.SGA;
 /// </summary>
 page 51119 "Ficha Orden Picking SGA"
 {
-    Caption = 'Orden de picking';
+    Caption = 'Orden de picking SGA';
     PageType = Document;
     SourceTable = "Orden Picking SGA";
     InsertAllowed = false;

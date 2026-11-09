@@ -34,19 +34,13 @@ page 51105 "Zonas SGA"
                     ToolTip = 'Descripción de la zona.';
                     ApplicationArea = All;
                 }
-                field("Cod. Nave"; Rec."Cod. Nave")
-                {
-                    ToolTip = 'Nave de la topología a la que corresponde la zona. Informativo.';
-                    ApplicationArea = All;
-                }
                 field("Tipo Ubicacion"; Rec."Tipo Ubicacion")
                 {
                     ToolTip = 'Tipo que se propone por defecto a las ubicaciones de esta zona.';
                     ApplicationArea = All;
                 }
-                field("Zona de Picking"; Rec."Zona de Picking")
+                field("Grupo IIEE"; Rec."Grupo IIEE")
                 {
-                    ToolTip = 'Si está activo, la zona se sirve directamente y es candidata a reposición desde reserva.';
                     ApplicationArea = All;
                 }
                 field("Prioridad Ubicacion"; Rec."Prioridad Ubicacion")

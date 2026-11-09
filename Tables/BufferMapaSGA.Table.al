@@ -3,12 +3,12 @@ namespace AntonioNadal.SGA;
 /// <summary>
 /// Table Buffer Mapa SGA (ID 51106).
 /// Tabla temporal que alimenta la página "Mapa Almacen SGA". Cada fila es una altura de
-/// una estantería y cada columna "Columna NN" es la ubicación de esa columna, con su
+/// un pasillo y cada columna "Columna NN" es la ubicación de la estantería NN, con su
 /// texto de ocupación y su estilo de color en "Estilo NN".
 ///
 /// Se rellena en memoria con Cod. "Gestion Mapa SGA"; no persiste datos.
-/// El límite de 20 columnas es el de la rejilla: si una estantería tiene más columnas,
-/// el mapa avisa y muestra las primeras 20.
+/// El límite de 32 columnas es el de la rejilla: si un pasillo tiene más estanterías,
+/// el mapa avisa y muestra las primeras 32.
 /// </summary>
 table 51106 "Buffer Mapa SGA"
 {
@@ -23,17 +23,12 @@ table 51106 "Buffer Mapa SGA"
             Caption = 'Cód. almacén';
             DataClassification = ToBeClassified;
         }
-        field(20; "Cod. Nave"; Code[1])
+        field(30; Pasillo; Integer)
         {
-            Caption = 'Cód. nave';
+            Caption = 'Pasillo';
             DataClassification = ToBeClassified;
         }
-        field(30; "Cod. Estanteria"; Code[2])
-        {
-            Caption = 'Cód. estantería';
-            DataClassification = ToBeClassified;
-        }
-        field(40; "Cod. Altura"; Code[1])
+        field(40; Altura; Integer)
         {
             Caption = 'Altura';
             DataClassification = ToBeClassified;
@@ -45,336 +40,336 @@ table 51106 "Buffer Mapa SGA"
         }
         field(100; "Columna 01"; Text[50])
         {
-            Caption = 'C01';
+            Caption = 'E01';
             DataClassification = ToBeClassified;
         }
         field(101; "Columna 02"; Text[50])
         {
-            Caption = 'C02';
+            Caption = 'E02';
             DataClassification = ToBeClassified;
         }
         field(102; "Columna 03"; Text[50])
         {
-            Caption = 'C03';
+            Caption = 'E03';
             DataClassification = ToBeClassified;
         }
         field(103; "Columna 04"; Text[50])
         {
-            Caption = 'C04';
+            Caption = 'E04';
             DataClassification = ToBeClassified;
         }
         field(104; "Columna 05"; Text[50])
         {
-            Caption = 'C05';
+            Caption = 'E05';
             DataClassification = ToBeClassified;
         }
         field(105; "Columna 06"; Text[50])
         {
-            Caption = 'C06';
+            Caption = 'E06';
             DataClassification = ToBeClassified;
         }
         field(106; "Columna 07"; Text[50])
         {
-            Caption = 'C07';
+            Caption = 'E07';
             DataClassification = ToBeClassified;
         }
         field(107; "Columna 08"; Text[50])
         {
-            Caption = 'C08';
+            Caption = 'E08';
             DataClassification = ToBeClassified;
         }
         field(108; "Columna 09"; Text[50])
         {
-            Caption = 'C09';
+            Caption = 'E09';
             DataClassification = ToBeClassified;
         }
         field(109; "Columna 10"; Text[50])
         {
-            Caption = 'C10';
+            Caption = 'E10';
             DataClassification = ToBeClassified;
         }
         field(110; "Columna 11"; Text[50])
         {
-            Caption = 'C11';
+            Caption = 'E11';
             DataClassification = ToBeClassified;
         }
         field(111; "Columna 12"; Text[50])
         {
-            Caption = 'C12';
+            Caption = 'E12';
             DataClassification = ToBeClassified;
         }
         field(112; "Columna 13"; Text[50])
         {
-            Caption = 'C13';
+            Caption = 'E13';
             DataClassification = ToBeClassified;
         }
         field(113; "Columna 14"; Text[50])
         {
-            Caption = 'C14';
+            Caption = 'E14';
             DataClassification = ToBeClassified;
         }
         field(114; "Columna 15"; Text[50])
         {
-            Caption = 'C15';
+            Caption = 'E15';
             DataClassification = ToBeClassified;
         }
         field(115; "Columna 16"; Text[50])
         {
-            Caption = 'C16';
+            Caption = 'E16';
             DataClassification = ToBeClassified;
         }
         field(116; "Columna 17"; Text[50])
         {
-            Caption = 'C17';
+            Caption = 'E17';
             DataClassification = ToBeClassified;
         }
         field(117; "Columna 18"; Text[50])
         {
-            Caption = 'C18';
+            Caption = 'E18';
             DataClassification = ToBeClassified;
         }
         field(118; "Columna 19"; Text[50])
         {
-            Caption = 'C19';
+            Caption = 'E19';
             DataClassification = ToBeClassified;
         }
         field(119; "Columna 20"; Text[50])
         {
-            Caption = 'C20';
+            Caption = 'E20';
             DataClassification = ToBeClassified;
         }
         field(120; "Columna 21"; Text[50])
         {
-            Caption = 'C21';
+            Caption = 'E21';
             DataClassification = ToBeClassified;
         }
         field(121; "Columna 22"; Text[50])
         {
-            Caption = 'C22';
+            Caption = 'E22';
             DataClassification = ToBeClassified;
         }
         field(122; "Columna 23"; Text[50])
         {
-            Caption = 'C23';
+            Caption = 'E23';
             DataClassification = ToBeClassified;
         }
         field(123; "Columna 24"; Text[50])
         {
-            Caption = 'C24';
+            Caption = 'E24';
             DataClassification = ToBeClassified;
         }
         field(124; "Columna 25"; Text[50])
         {
-            Caption = 'C25';
+            Caption = 'E25';
             DataClassification = ToBeClassified;
         }
         field(125; "Columna 26"; Text[50])
         {
-            Caption = 'C26';
+            Caption = 'E26';
             DataClassification = ToBeClassified;
         }
         field(126; "Columna 27"; Text[50])
         {
-            Caption = 'C27';
+            Caption = 'E27';
             DataClassification = ToBeClassified;
         }
         field(127; "Columna 28"; Text[50])
         {
-            Caption = 'C28';
+            Caption = 'E28';
             DataClassification = ToBeClassified;
         }
         field(128; "Columna 29"; Text[50])
         {
-            Caption = 'C29';
+            Caption = 'E29';
             DataClassification = ToBeClassified;
         }
         field(129; "Columna 30"; Text[50])
         {
-            Caption = 'C30';
+            Caption = 'E30';
             DataClassification = ToBeClassified;
         }
         field(130; "Columna 31"; Text[50])
         {
-            Caption = 'C31';
+            Caption = 'E31';
             DataClassification = ToBeClassified;
         }
         field(131; "Columna 32"; Text[50])
         {
-            Caption = 'C32';
+            Caption = 'E32';
             DataClassification = ToBeClassified;
         }
         field(200; "Estilo 01"; Text[20])
         {
-            Caption = 'Estilo C01';
+            Caption = 'Estilo E01';
             DataClassification = ToBeClassified;
         }
         field(201; "Estilo 02"; Text[20])
         {
-            Caption = 'Estilo C02';
+            Caption = 'Estilo E02';
             DataClassification = ToBeClassified;
         }
         field(202; "Estilo 03"; Text[20])
         {
-            Caption = 'Estilo C03';
+            Caption = 'Estilo E03';
             DataClassification = ToBeClassified;
         }
         field(203; "Estilo 04"; Text[20])
         {
-            Caption = 'Estilo C04';
+            Caption = 'Estilo E04';
             DataClassification = ToBeClassified;
         }
         field(204; "Estilo 05"; Text[20])
         {
-            Caption = 'Estilo C05';
+            Caption = 'Estilo E05';
             DataClassification = ToBeClassified;
         }
         field(205; "Estilo 06"; Text[20])
         {
-            Caption = 'Estilo C06';
+            Caption = 'Estilo E06';
             DataClassification = ToBeClassified;
         }
         field(206; "Estilo 07"; Text[20])
         {
-            Caption = 'Estilo C07';
+            Caption = 'Estilo E07';
             DataClassification = ToBeClassified;
         }
         field(207; "Estilo 08"; Text[20])
         {
-            Caption = 'Estilo C08';
+            Caption = 'Estilo E08';
             DataClassification = ToBeClassified;
         }
         field(208; "Estilo 09"; Text[20])
         {
-            Caption = 'Estilo C09';
+            Caption = 'Estilo E09';
             DataClassification = ToBeClassified;
         }
         field(209; "Estilo 10"; Text[20])
         {
-            Caption = 'Estilo C10';
+            Caption = 'Estilo E10';
             DataClassification = ToBeClassified;
         }
         field(210; "Estilo 11"; Text[20])
         {
-            Caption = 'Estilo C11';
+            Caption = 'Estilo E11';
             DataClassification = ToBeClassified;
         }
         field(211; "Estilo 12"; Text[20])
         {
-            Caption = 'Estilo C12';
+            Caption = 'Estilo E12';
             DataClassification = ToBeClassified;
         }
         field(212; "Estilo 13"; Text[20])
         {
-            Caption = 'Estilo C13';
+            Caption = 'Estilo E13';
             DataClassification = ToBeClassified;
         }
         field(213; "Estilo 14"; Text[20])
         {
-            Caption = 'Estilo C14';
+            Caption = 'Estilo E14';
             DataClassification = ToBeClassified;
         }
         field(214; "Estilo 15"; Text[20])
         {
-            Caption = 'Estilo C15';
+            Caption = 'Estilo E15';
             DataClassification = ToBeClassified;
         }
         field(215; "Estilo 16"; Text[20])
         {
-            Caption = 'Estilo C16';
+            Caption = 'Estilo E16';
             DataClassification = ToBeClassified;
         }
         field(216; "Estilo 17"; Text[20])
         {
-            Caption = 'Estilo C17';
+            Caption = 'Estilo E17';
             DataClassification = ToBeClassified;
         }
         field(217; "Estilo 18"; Text[20])
         {
-            Caption = 'Estilo C18';
+            Caption = 'Estilo E18';
             DataClassification = ToBeClassified;
         }
         field(218; "Estilo 19"; Text[20])
         {
-            Caption = 'Estilo C19';
+            Caption = 'Estilo E19';
             DataClassification = ToBeClassified;
         }
         field(219; "Estilo 20"; Text[20])
         {
-            Caption = 'Estilo C20';
+            Caption = 'Estilo E20';
             DataClassification = ToBeClassified;
         }
         field(220; "Estilo 21"; Text[20])
         {
-            Caption = 'Estilo C21';
+            Caption = 'Estilo E21';
             DataClassification = ToBeClassified;
         }
         field(221; "Estilo 22"; Text[20])
         {
-            Caption = 'Estilo C22';
+            Caption = 'Estilo E22';
             DataClassification = ToBeClassified;
         }
         field(222; "Estilo 23"; Text[20])
         {
-            Caption = 'Estilo C23';
+            Caption = 'Estilo E23';
             DataClassification = ToBeClassified;
         }
         field(223; "Estilo 24"; Text[20])
         {
-            Caption = 'Estilo C24';
+            Caption = 'Estilo E24';
             DataClassification = ToBeClassified;
         }
         field(224; "Estilo 25"; Text[20])
         {
-            Caption = 'Estilo C25';
+            Caption = 'Estilo E25';
             DataClassification = ToBeClassified;
         }
         field(225; "Estilo 26"; Text[20])
         {
-            Caption = 'Estilo C26';
+            Caption = 'Estilo E26';
             DataClassification = ToBeClassified;
         }
         field(226; "Estilo 27"; Text[20])
         {
-            Caption = 'Estilo C27';
+            Caption = 'Estilo E27';
             DataClassification = ToBeClassified;
         }
         field(227; "Estilo 28"; Text[20])
         {
-            Caption = 'Estilo C28';
+            Caption = 'Estilo E28';
             DataClassification = ToBeClassified;
         }
         field(228; "Estilo 29"; Text[20])
         {
-            Caption = 'Estilo C29';
+            Caption = 'Estilo E29';
             DataClassification = ToBeClassified;
         }
         field(229; "Estilo 30"; Text[20])
         {
-            Caption = 'Estilo C30';
+            Caption = 'Estilo E30';
             DataClassification = ToBeClassified;
         }
         field(230; "Estilo 31"; Text[20])
         {
-            Caption = 'Estilo C31';
+            Caption = 'Estilo E31';
             DataClassification = ToBeClassified;
         }
         field(231; "Estilo 32"; Text[20])
         {
-            Caption = 'Estilo C32';
+            Caption = 'Estilo E32';
             DataClassification = ToBeClassified;
         }
     }
 
     keys
     {
-        key(PK; "Cod. Almacen", "Cod. Nave", "Cod. Estanteria", Orden)
+        key(PK; "Cod. Almacen", Pasillo, Orden)
         {
             Clustered = true;
         }
     }
 
     /// <summary>
-    /// Asigna el texto y el estilo de una columna de la rejilla (1-20).
+    /// Asigna el texto y el estilo de una columna de la rejilla (1-32).
     /// </summary>
     procedure FijarColumna(prm_Columna: Integer; prm_Texto: Text; prm_Estilo: Text)
     begin

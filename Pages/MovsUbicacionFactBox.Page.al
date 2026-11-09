@@ -6,7 +6,7 @@ namespace AntonioNadal.SGA;
 /// </summary>
 page 51110 "Movs. Ubicacion FactBox"
 {
-    Caption = 'Últimos movimientos';
+    Caption = 'Últimos movimientos SGA';
     PageType = ListPart;
     SourceTable = "Movimiento Ubicacion SGA";
     ApplicationArea = All;

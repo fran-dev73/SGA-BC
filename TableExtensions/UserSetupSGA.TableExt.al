@@ -19,5 +19,11 @@ tableextension 51100 "User Setup SGA" extends "User Setup"
             DataClassification = ToBeClassified;
             ToolTip = 'Puede repartir las órdenes de picking entre preparadores y cambiar su prioridad. Solo se comprueba si la configuración de SGA exige asignación de picking.';
         }
+        field(51101; "Carretillero SGA"; Boolean)
+        {
+            Caption = 'Carretillero SGA';
+            DataClassification = ToBeClassified;
+            ToolTip = 'Con "Siguiente orden" recibe las reubicaciones de almacenamiento a picking y no los pedidos; sin marcar, al revés. Lo que un responsable le asigna le llega siempre, sea lo que sea.';
+        }
     }
 }

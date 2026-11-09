@@ -49,13 +49,13 @@ table 51103 "Movimiento Ubicacion SGA"
         }
         field(30; "Cod. Bin Origen"; Code[20])
         {
-            Caption = 'Cód. bin origen';
+            Caption = 'Cód. ubicación origen';
             DataClassification = ToBeClassified;
             Editable = false;
         }
         field(31; "Cod. Bin Destino"; Code[20])
         {
-            Caption = 'Cód. bin destino';
+            Caption = 'Cód. ubicación destino';
             DataClassification = ToBeClassified;
             Editable = false;
         }

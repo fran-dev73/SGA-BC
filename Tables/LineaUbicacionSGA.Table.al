@@ -7,7 +7,7 @@ using Microsoft.Warehouse.Structure;
 /// Un trozo de mercancía a ubicar, con su unidad, el hueco propuesto, el que se confirma y si se
 /// ha podido ubicar o por qué no. Es la tabla única de "trozo a ubicar"; Origen dice para qué es
 /// cada línea:
-/// - Manual: el reparto de "Ubicar producto" (cada palé, las cajas o las unidades sueltas).
+/// - Manual: el reparto de "Ubicar producto" (cada palé y el resto).
 /// - "Carga Inicial": el resultado de la carga inicial y de "Ubicar seleccionadas".
 /// - Compra y Produccion: lo que ha entrado en "Ubicar entradas" (un ensamblado, o un producto,
 ///   variante, lote y unidad de un albarán de compra) y el palé de una tarea en "Imprimir y

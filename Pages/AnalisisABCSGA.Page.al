@@ -12,7 +12,7 @@ using Microsoft.Inventory.Location;
 /// </summary>
 page 51128 "Analisis ABC SGA"
 {
-    Caption = 'Análisis ABC';
+    Caption = 'Análisis ABC SGA';
     // Worksheet y no List: hace falta la cabecera con el almacén y el resumen.
     PageType = Worksheet;
     SourceTable = "Clasificacion ABC SGA";

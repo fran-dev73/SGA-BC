@@ -7,7 +7,7 @@ namespace AntonioNadal.SGA;
 /// </summary>
 page 51115 "Recontar Contenido SGA"
 {
-    Caption = 'Recontar contenido';
+    Caption = 'Recontar contenido SGA';
     PageType = StandardDialog;
     ApplicationArea = All;
 

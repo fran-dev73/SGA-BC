@@ -3,6 +3,9 @@ namespace AntonioNadal.SGA;
 /// <summary>
 /// Enum Control Capacidad SGA (ID 51106).
 /// Qué hacer cuando una entrada supera la capacidad declarada de la ubicación.
+/// "No comprobar" ya no se ofrece (la configuración solo deja Avisar o Bloquear) y, si una
+/// configuración antigua lo tiene, Cod. "Gestion Contenido SGA" bloquea igual que Bloquear.
+/// El valor se queda para no dejar sin sentido los datos guardados.
 /// </summary>
 enum 51106 "Control Capacidad SGA"
 {

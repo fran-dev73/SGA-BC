@@ -15,7 +15,7 @@ using Microsoft.Inventory.Location;
 /// </summary>
 page 51131 "Pendiente Ubicar SGA"
 {
-    Caption = 'Pendiente de ubicar';
+    Caption = 'Pendiente de ubicar SGA';
     // Worksheet y no List: hace falta la cabecera con el almacén.
     PageType = Worksheet;
     SourceTable = "Buffer Conciliacion SGA";
@@ -103,26 +103,46 @@ page 51131 "Pendiente Ubicar SGA"
                 {
                     ApplicationArea = All;
                     StyleExpr = EstiloDocumentos;
+
+                    trigger OnDrillDown()
+                    var
+                        cStock: Codeunit "Consulta Stock SGA";
+                    begin
+                        cStock.MostrarEnDocumentos(Rec);
+                        Recalcular();
+                    end;
                 }
                 field(Pendiente; Rec.Diferencia)
                 {
                     ApplicationArea = All;
                     Caption = 'Sin ubicar';
-                    ToolTip = 'Stock de BC que no está en ninguna ubicación.';
+                    ToolTip = 'Stock de BC que no está en ninguna ubicación: Stock BC menos Ubicado.';
                 }
                 field("Stock BC"; Rec."Stock BC")
                 {
                     ApplicationArea = All;
                     Caption = 'Stock BC';
-                    ToolTip = 'Existencias del lote en BC, en el almacén.';
-                    Visible = false;
+                    ToolTip = 'Existencias del lote en BC, en el almacén. Pulse para ver los movimientos de producto abiertos de los que sale.';
+
+                    trigger OnDrillDown()
+                    var
+                        cStock: Codeunit "Consulta Stock SGA";
+                    begin
+                        cStock.MostrarStockBC(Rec);
+                    end;
                 }
                 field("Stock SGA"; Rec."Stock SGA")
                 {
                     ApplicationArea = All;
                     Caption = 'Ubicado';
-                    ToolTip = 'Lo que ya está en ubicaciones de SGA.';
-                    Visible = false;
+                    ToolTip = 'Lo que ya está en ubicaciones de SGA. Pulse para ver en qué ubicaciones está el lote.';
+
+                    trigger OnDrillDown()
+                    var
+                        cStock: Codeunit "Consulta Stock SGA";
+                    begin
+                        cStock.ConsultarUbicacionesProducto(Rec."No. Producto", Rec."Cod. Variante", Rec."Cod. Almacen", Rec."No. Lote");
+                    end;
                 }
                 field("Unidad Medida Base"; Rec."Unidad Medida Base")
                 {
@@ -168,7 +188,7 @@ page 51131 "Pendiente Ubicar SGA"
             action(UbicarSeleccionadas)
             {
                 Caption = 'Ubicar seleccionadas';
-                ToolTip = 'Busca hueco para lo que hay que ubicar aquí de las líneas seleccionadas, como la carga inicial: palés a huecos de palé, cajas a caja o a palé según cuántas sean, y botellas a huecos de unidad. Se puede simular antes. Al terminar enseña lo ubicado y, de lo que no cabe, el motivo.';
+                ToolTip = 'Busca hueco para lo que hay que ubicar aquí de las líneas seleccionadas, como la carga inicial: cada palé a un hueco vacío y el resto junto, primero en almacenamiento y luego en picking. Se puede simular antes. Al terminar enseña lo ubicado y, de lo que no cabe, el motivo.';
                 ApplicationArea = All;
                 Image = PutawayLines;
 

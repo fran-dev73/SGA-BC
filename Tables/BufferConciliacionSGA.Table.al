@@ -101,7 +101,7 @@ table 51107 "Buffer Conciliacion SGA"
             Caption = 'En recepciones o ensamblados';
             DataClassification = ToBeClassified;
             DecimalPlaces = 0 : 5;
-            ToolTip = 'Parte de lo sin ubicar que está pendiente en "Ubicar recepciones" o "Ubicar ensamblados". Se ubica desde esas pantallas, no desde aquí: si se ubicara aquí, ellas lo volverían a pedir.';
+            ToolTip = 'Parte de lo sin ubicar que está pendiente en "Ubicar recepciones" o "Ubicar ensamblados". Se ubica desde esas pantallas, no desde aquí: si se ubicara aquí, ellas lo volverían a pedir. En Pendiente de ubicar, pulse para abrir esa pantalla con los documentos del producto.';
         }
         field(92; "A Ubicar"; Decimal)
         {
