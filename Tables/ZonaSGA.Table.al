@@ -4,7 +4,7 @@ using Microsoft.Inventory.Location;
 
 /// <summary>
 /// Table Zona SGA (ID 51100).
-/// Agrupación lógica de ubicaciones dentro de un almacén (cámara, reserva, zona de picking...).
+/// Agrupación lógica de ubicaciones dentro de un almacén (cámara, almacenamiento, picking...).
 /// La zona fija las prioridades por defecto que heredan sus ubicaciones.
 /// </summary>
 table 51100 "Zona SGA"
@@ -40,6 +40,12 @@ table 51100 "Zona SGA"
             DataClassification = ToBeClassified;
             ToolTip = 'Tipo que se propone por defecto a las ubicaciones que se creen en esta zona.';
         }
+        field(55; "Grupo IIEE"; Code[20])
+        {
+            Caption = 'Grupo IIEE';
+            DataClassification = ToBeClassified;
+            ToolTip = 'Grupo IIEE de los productos que se guardan en esta zona. Al ubicar un producto de ese grupo se buscan primero huecos en sus zonas y, si no queda sitio, en el resto del almacén. La zona sigue admitiendo cualquier producto. Un grupo puede tener varias zonas. Requiere "Campo del grupo IIEE en el producto" en la configuración SGA.';
+        }
         field(60; "Prioridad Ubicacion"; Integer)
         {
             Caption = 'Prioridad ubicación';
@@ -51,12 +57,6 @@ table 51100 "Zona SGA"
             Caption = 'Prioridad picking';
             DataClassification = ToBeClassified;
             ToolTip = 'Orden en que el motor de picking considera esta zona. Menor valor, antes.';
-        }
-        field(80; "Zona de Picking"; Boolean)
-        {
-            Caption = 'Zona de picking';
-            DataClassification = ToBeClassified;
-            ToolTip = 'Si está activo, la zona se sirve directamente y es candidata a reposición desde reserva.';
         }
         field(90; Bloqueada; Boolean)
         {

@@ -7,7 +7,7 @@ namespace AntonioNadal.SGA;
 /// </summary>
 page 51129 "Calculos ABC SGA"
 {
-    Caption = 'Cálculos ABC';
+    Caption = 'Cálculos ABC SGA';
     PageType = List;
     SourceTable = "Calculo ABC SGA";
     SourceTableView = sorting("No.") order(descending);

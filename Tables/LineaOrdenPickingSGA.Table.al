@@ -11,6 +11,8 @@ using Microsoft.Warehouse.Structure;
 ///
 /// Una línea del documento origen puede dar varias líneas de picking si la cantidad está
 /// repartida entre varias ubicaciones o varios lotes, por eso se guarda "No. Linea Origen".
+/// En una reubicación (orden de origen Reposicion) la parada lleva además "Cod. Bin Destino":
+/// lo recogido no sale del almacén, se deja en esa ubicación de picking.
 /// Las líneas se ordenan por "Secuencia Picking" para que el recorrido sea el físico.
 /// </summary>
 table 51109 "Linea Orden Picking SGA"
@@ -122,15 +124,23 @@ table 51109 "Linea Orden Picking SGA"
         {
             Caption = 'Ubicación propuesta';
             DataClassification = ToBeClassified;
-            TableRelation = Bin where("Location Code" = field("Cod. Almacen"));
+            TableRelation = Bin.Code where("Location Code" = field("Cod. Almacen"));
             ToolTip = 'Ubicación de la que el sistema dice que hay que recoger.';
         }
         field(61; "Cod. Bin Confirmado"; Code[20])
         {
             Caption = 'Ubicación confirmada';
             DataClassification = ToBeClassified;
-            TableRelation = Bin where("Location Code" = field("Cod. Almacen"));
+            TableRelation = Bin.Code where("Location Code" = field("Cod. Almacen"));
             ToolTip = 'Ubicación de la que el preparador ha recogido realmente.';
+        }
+        field(62; "Cod. Bin Destino"; Code[20])
+        {
+            Caption = 'Ubicación destino';
+            DataClassification = ToBeClassified;
+            TableRelation = Bin.Code where("Location Code" = field("Cod. Almacen"));
+            Editable = false;
+            ToolTip = 'En una reubicación, ubicación de picking en la que se deja lo recogido. En blanco en el picking de un pedido.';
         }
         field(70; Estado; Enum "Estado Linea Picking SGA")
         {
@@ -180,6 +190,10 @@ table 51109 "Linea Orden Picking SGA"
         key(LineaPedido; "No. Documento Origen", "No. Linea Origen")
         {
             SumIndexFields = "Cantidad Recogida UM Pedido";
+        }
+        // Reubicaciones pendientes hacia una ubicación (la propuesta no la da a otro producto).
+        key(Destino; "Cod. Almacen", "Cod. Bin Destino", Estado)
+        {
         }
     }
 

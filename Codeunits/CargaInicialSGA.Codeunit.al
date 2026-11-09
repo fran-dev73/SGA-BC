@@ -11,9 +11,13 @@ using Microsoft.Inventory.Item;
 /// Tres formas de elegir el destino:
 /// - Ubicación fija del producto: su casa (Shelf No.) o, si no tiene, la ubicación indicada.
 /// - Ubicación indicada: todo a una ubicación de paso, para repartir después a mano.
-/// - Huecos libres: cada palé completo a un hueco de palé vacío siguiendo la ruta; el resto en
-///   cajas a un hueco mixto de caja (consolidando con el mismo producto); un producto sin
-///   unidad de palé, a la ubicación indicada; y lo que no cabe, sin cargar.
+/// - Huecos libres: cada palé completo a un hueco vacío siguiendo la ruta; el resto junto,
+///   consolidando con el mismo producto o en el primer hueco con sitio; un producto sin unidad
+///   de palé, a la ubicación indicada; y lo que no cabe, sin cargar. En la carga inicial se
+///   llena primero picking y luego almacenamiento, para arrancar con los huecos de picking
+///   servidos, pero cada producto ocupa como mucho FijarMaxPickingProducto ubicaciones de
+///   picking (por defecto 1) para que picking no se llene de palés de unos pocos; en "Ubicar
+///   seleccionadas" (solo pendientes), almacenamiento y luego picking, como cualquier entrada.
 ///
 /// Se lanza con Run. La simulación hace la carga de verdad y al final la deshace con un error
 /// marcado: así cada propuesta ve los huecos que han ocupado las anteriores, y lo único que
@@ -50,6 +54,7 @@ codeunit 51106 "Carga Inicial SGA"
         Simular: Boolean;
         MotivoSinHuecoPale: Text[500];
         SoloPendientes: Boolean;
+        MaxPickingProducto: Integer;
         DescripcionMovimiento: Text;
         ProductosConStock: Integer;
         UnidadesCargadas: Decimal;
@@ -67,6 +72,16 @@ codeunit 51106 "Carga Inicial SGA"
         OmitirConContenido := prm_OmitirConContenido;
         Simular := prm_Simular;
         VistaProductos := prm_VistaProductos;
+    end;
+
+    /// <summary>
+    /// Cuántas ubicaciones de picking puede ocupar cada producto en el reparto por huecos libres
+    /// de la carga inicial; lo que pase de ahí va a almacenamiento. 0, sin límite. Se llama
+    /// después de Configurar.
+    /// </summary>
+    procedure FijarMaxPickingProducto(prm_Max: Integer)
+    begin
+        MaxPickingProducto := prm_Max;
     end;
 
     /// <summary>
@@ -94,7 +109,7 @@ codeunit 51106 "Carga Inicial SGA"
     end;
 
     /// <summary>
-    /// Lo que ha hecho la carga: una línea por palé, grupo de cajas o resto, con Estado Ubicado
+    /// Lo que ha hecho la carga: una línea por palé o resto, con Estado Ubicado
     /// (y su ubicación) o "Sin Sitio" (y el motivo).
     /// </summary>
     procedure ObtenerResultado(var prm_Resultado: Record "Linea Ubicacion SGA" temporary)
@@ -124,8 +139,9 @@ codeunit 51106 "Carga Inicial SGA"
 
         TempResultado.Reset();
         TempResultado.DeleteAll();
-        // Instancia nueva: el cursor de huecos de palé (ProponerHuecoPaleRuta) empieza de cero.
+        // Instancia nueva: los cursores de huecos vacíos (ProponerHuecoPaleRuta) empiezan de cero.
         Clear(cUbicaciones);
+        cUbicaciones.FijarPickingPrimero(not SoloPendientes, MaxPickingProducto);
         MotivoSinHuecoPale := '';
         cContenido.FijarModoSilencioso(true);
 
@@ -274,26 +290,22 @@ codeunit 51106 "Carga Inicial SGA"
     end;
 
     /// <summary>
-    /// Huecos libres: palés completos a huecos de palé vacíos, el resto en cajas a huecos mixtos.
+    /// Huecos libres: palés completos a huecos vacíos, el resto junto a un hueco con sitio.
     /// </summary>
     local procedure RepartirPorHuecos(var prm_Producto: Record Item; var prm_Stock: Record "Buffer Conciliacion SGA")
     var
         TempTrozo: Record "Linea Ubicacion SGA" temporary;
         umPale: Code[10];
-        umCaja: Code[10];
         pales: Integer;
         i: Integer;
         hueco: Code[20];
         motivo: Text;
         SinPaleUbicacionIndicadaLbl: Label 'El producto no tiene palé por defecto en su ficha: se deja en la ubicación indicada.';
         SinPaleSinUbicacionLbl: Label 'El producto no tiene palé por defecto en su ficha, así que no se puede repartir por huecos. Rellene su "Cód. palé por defecto" y vuelva a lanzar la carga.';
-        SinCajaLbl: Label 'El producto no tiene caja: su unidad de venta está vacía, es la unidad base o es tan grande como el palé.';
     begin
-        // El palé y la caja de cada producto salen de su ficha: el palé por defecto y la unidad
-        // de venta, se llamen como se llamen (PALE200, EUROPALE, CAJA6…).
-        // Solo salen unidades que el producto tiene y que llevan más de una unidad base.
-        umPale := cUM.UMProductoDeTipo(prm_Producto."No.", "Tipo UM SGA"::Pale);
-        umCaja := cUM.UMProductoDeTipo(prm_Producto."No.", "Tipo UM SGA"::Caja);
+        // El palé de cada producto sale de su ficha (palé por defecto), se llame como se llame
+        // (PALE200, EUROPALE…), si lo tiene y lleva más de una unidad base.
+        umPale := cUM.UMPale(prm_Producto."No.");
 
         if umPale = '' then begin
             if UbicacionIndicada <> '' then
@@ -302,11 +314,12 @@ codeunit 51106 "Carga Inicial SGA"
                 AnotarNoCargado(prm_Producto, prm_Stock, prm_Stock."Unidad Medida Base", prm_Stock."Stock BC", prm_Stock."Stock BC", SinPaleSinUbicacionLbl);
             exit;
         end;
-        // El reparto (cada palé, las cajas y lo que no llega a una caja) es el mismo que en
-        // "Ubicar producto"; aquí solo cambia cómo se busca el hueco de los palés.
+        // El reparto (cada palé y el resto) es el mismo que en "Ubicar producto"; aquí solo cambia
+        // cómo se busca el hueco de los palés.
         cUM.Repartir(prm_Producto."No.", prm_Stock."Stock BC", '', 0, TempTrozo);
 
-        // Palés completos: uno por hueco vacío, siguiendo la ruta.
+        // Palés completos: uno por hueco vacío, siguiendo la ruta (en la carga inicial, picking y
+        // luego almacenamiento; en solo pendientes, al revés).
         TempTrozo.SetRange("Cod. Unidad Medida", umPale);
         pales := TempTrozo.Count();
         i := 0;
@@ -315,7 +328,7 @@ codeunit 51106 "Carga Inicial SGA"
                 hueco := cUbicaciones.ProponerHuecoPaleRuta(Almacen, prm_Producto."No.", motivo);
                 if hueco = '' then begin
                     // Sin hueco para este palé no lo habrá para los siguientes: se anotan juntos.
-                    // Agotados los huecos de palé, el motivo es el mismo para todos los productos: se
+                    // Agotados los huecos vacíos, el motivo es el mismo para todos los productos: se
                     // calcula una vez, porque recorre todos los huecos.
                     if MotivoSinHuecoPale = '' then
                         MotivoSinHuecoPale := CopyStr(cUbicaciones.ExplicarSinHuecoLote(Almacen, prm_Producto."No.", prm_Stock."No. Lote", umPale, 1), 1, MaxStrLen(MotivoSinHuecoPale));
@@ -327,25 +340,20 @@ codeunit 51106 "Carga Inicial SGA"
                 end;
             until (i >= pales) or (TempTrozo.Next() = 0);
 
-        // El resto: las cajas a un hueco de caja o de palé y lo que no llega a una caja, a un
-        // hueco de unidades sueltas. Sin caja, todo ese resto va en la línea de sueltas y no se
-        // carga.
+        // El resto (una sola línea, en cajas o en unidades): consolidando con lo que ya haya del
+        // producto o en el primer hueco con sitio, con el mismo orden de tipos que los palés.
         TempTrozo.SetFilter("Cod. Unidad Medida", '<>%1', umPale);
-        if TempTrozo.FindSet() then
-            repeat
-                if umCaja = '' then
-                    AnotarNoCargado(prm_Producto, prm_Stock, TempTrozo."Cod. Unidad Medida", TempTrozo.Cantidad, TempTrozo."Cantidad Base", SinCajaLbl)
-                else begin
-                    hueco := cUbicaciones.ProponerUbicacionCon("Estrategia Ubicacion SGA"::"Priorizar Consolidacion", '', Almacen,
-                                                               prm_Producto."No.", prm_Stock."Cod. Variante", prm_Stock."No. Lote",
-                                                               TempTrozo."Cod. Unidad Medida", TempTrozo.Cantidad, motivo);
-                    // Sin hueco, el motivo ya trae la causa.
-                    if hueco = '' then
-                        AnotarNoCargado(prm_Producto, prm_Stock, TempTrozo."Cod. Unidad Medida", TempTrozo.Cantidad, TempTrozo."Cantidad Base", motivo)
-                    else
-                        Cargar(prm_Producto, prm_Stock, hueco, TempTrozo."Cod. Unidad Medida", TempTrozo.Cantidad, TempTrozo."Cantidad Base", motivo);
-                end;
-            until TempTrozo.Next() = 0;
+        if not TempTrozo.FindFirst() then
+            exit;
+
+        hueco := cUbicaciones.ProponerUbicacionCon("Estrategia Ubicacion SGA"::"Priorizar Consolidacion", '', Almacen,
+                                                   prm_Producto."No.", prm_Stock."Cod. Variante", prm_Stock."No. Lote",
+                                                   TempTrozo."Cod. Unidad Medida", TempTrozo.Cantidad, motivo);
+        // Sin hueco, el motivo ya trae la causa.
+        if hueco = '' then
+            AnotarNoCargado(prm_Producto, prm_Stock, TempTrozo."Cod. Unidad Medida", TempTrozo.Cantidad, TempTrozo."Cantidad Base", motivo)
+        else
+            Cargar(prm_Producto, prm_Stock, hueco, TempTrozo."Cod. Unidad Medida", TempTrozo.Cantidad, TempTrozo."Cantidad Base", motivo);
     end;
 
     local procedure Cargar(var prm_Producto: Record Item; var prm_Stock: Record "Buffer Conciliacion SGA"; prm_Bin: Code[20]; prm_UM: Code[10]; prm_Cantidad: Decimal; prm_CantidadBase: Decimal; prm_Motivo: Text)

@@ -8,7 +8,7 @@ namespace AntonioNadal.SGA;
 /// </summary>
 page 51125 "Resultado Carga Inicial SGA"
 {
-    Caption = 'Resultado de la carga inicial';
+    Caption = 'Resultado de la carga inicial SGA';
     PageType = List;
     SourceTable = "Linea Ubicacion SGA";
     SourceTableTemporary = true;

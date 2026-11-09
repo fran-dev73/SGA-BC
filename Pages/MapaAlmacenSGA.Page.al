@@ -12,7 +12,7 @@ using Microsoft.Inventory.Location;
 /// </summary>
 page 51107 "Mapa Almacen SGA"
 {
-    Caption = 'Mapa de almacén';
+    Caption = 'Mapa de almacén SGA';
     PageType = List;
     SourceTable = "Buffer Mapa SGA";
     SourceTableTemporary = true;

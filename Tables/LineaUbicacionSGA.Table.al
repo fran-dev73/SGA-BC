@@ -7,7 +7,7 @@ using Microsoft.Warehouse.Structure;
 /// Un trozo de mercancía a ubicar, con su unidad, el hueco propuesto, el que se confirma y si se
 /// ha podido ubicar o por qué no. Es la tabla única de "trozo a ubicar"; Origen dice para qué es
 /// cada línea:
-/// - Manual: el reparto de "Ubicar producto" (cada palé, las cajas o las unidades sueltas).
+/// - Manual: el reparto de "Ubicar producto" (cada palé y el resto).
 /// - "Carga Inicial": el resultado de la carga inicial y de "Ubicar seleccionadas".
 /// - Compra y Produccion: lo que ha entrado en "Ubicar entradas" (un ensamblado, o un producto,
 ///   variante, lote y unidad de un albarán de compra) y el palé de una tarea en "Imprimir y
@@ -169,26 +169,6 @@ table 51114 "Linea Ubicacion SGA"
             ToolTip = 'Cantidad de esta entrada que SGA ya tiene colocada en ubicaciones.';
             DataClassification = ToBeClassified;
             DecimalPlaces = 0 : 5;
-        }
-        field(70; "Traslado Origen"; Code[20])
-        {
-            Caption = 'Traslado: desde';
-            ToolTip = 'Ubicación del palé A que se propone trasladar antes de ubicar esta entrada. En blanco si no hay propuesta.';
-            DataClassification = ToBeClassified;
-            Editable = false;
-        }
-        field(71; "Traslado Destino"; Code[20])
-        {
-            Caption = 'Traslado: hasta';
-            ToolTip = 'Hueco libre al que se propone llevar el palé A. Si se acepta el traslado, la entrada se ubica a partir de ese cambio.';
-            DataClassification = ToBeClassified;
-            Editable = false;
-        }
-        field(72; "Aceptar Traslado"; Boolean)
-        {
-            Caption = 'Aceptar traslado';
-            ToolTip = 'Marca el traslado propuesto: se hace al confirmar esta línea, antes de registrar la entrada.';
-            DataClassification = ToBeClassified;
         }
     }
 

@@ -16,6 +16,10 @@ pageextension 51105 "User Setup SGA" extends "User Setup"
             {
                 ApplicationArea = All;
             }
+            field("Carretillero SGA"; Rec."Carretillero SGA")
+            {
+                ApplicationArea = All;
+            }
         }
     }
 }

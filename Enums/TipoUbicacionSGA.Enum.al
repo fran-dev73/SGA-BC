@@ -2,7 +2,11 @@ namespace AntonioNadal.SGA;
 
 /// <summary>
 /// Enum Tipo Ubicacion SGA (ID 51100).
-/// Clasifica el uso funcional de una ubicación dentro del almacén.
+/// Para qué es una ubicación:
+///   - Almacenamiento: reserva. Es la primera que se busca al ubicar.
+///   - Picking: de donde se prepara. Se busca al ubicar si no queda sitio en almacenamiento, y se
+///     repone desde almacenamiento con las reubicaciones.
+///   - En blanco: sin tipo (muelles, ajustes…). No se propone al ubicar ni se repone.
 /// </summary>
 enum 51100 "Tipo Ubicacion SGA"
 {
@@ -17,32 +21,9 @@ enum 51100 "Tipo Ubicacion SGA"
     {
         Caption = 'Picking';
     }
-    value(2; Reserva)
+    // Ordinal 2: era "Reserva", así que las ubicaciones de reserva pasan a ser de almacenamiento.
+    value(2; Almacenamiento)
     {
-        Caption = 'Reserva';
-    }
-    value(3; "Muelle Entrada")
-    {
-        Caption = 'Muelle entrada';
-    }
-    value(4; "Muelle Salida")
-    {
-        Caption = 'Muelle salida';
-    }
-    value(5; Produccion)
-    {
-        Caption = 'Producción';
-    }
-    value(6; Cuarentena)
-    {
-        Caption = 'Cuarentena';
-    }
-    value(7; Desbordamiento)
-    {
-        Caption = 'Desbordamiento';
-    }
-    value(8; Ajustes)
-    {
-        Caption = 'Ajustes';
+        Caption = 'Almacenamiento';
     }
 }

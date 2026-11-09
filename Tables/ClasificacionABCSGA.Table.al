@@ -106,7 +106,7 @@ table 51113 "Clasificacion ABC SGA"
         }
         field(40; "Palets en Almacen"; Integer)
         {
-            ToolTip = 'Palés del producto que hay ahora en huecos de picking y reserva.';
+            ToolTip = 'Palés del producto que hay ahora en huecos de picking y almacenamiento.';
             Caption = 'Palés en almacén';
             DataClassification = ToBeClassified;
         }

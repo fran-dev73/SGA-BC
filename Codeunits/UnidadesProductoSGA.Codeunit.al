@@ -5,8 +5,8 @@ using Microsoft.Inventory.Item;
 /// <summary>
 /// Codeunit Unidades Producto SGA (ID 51108).
 /// Lo que SGA sabe de las unidades de medida de un producto: cuántas unidades base lleva cada
-/// una, cuál es la base y de qué clase es (palé, caja o unidad suelta). Las excepciones que aún
-/// leen el factor de la ficha por su cuenta están en ARQUITECTURA.md.
+/// una, cuál es la base y cuáles son su palé y su caja. El mapa (Cod. "Gestion Mapa SGA") y el
+/// palé de una tarea (Cod. "Gestion Entradas SGA") leen el factor de la ficha por su cuenta.
 ///
 /// Las conversiones que llevan el factor guardado en el propio documento (línea de venta,
 /// ensamblado, línea de picking) no pasan por aquí: usan el de su registro, porque la ficha
@@ -98,164 +98,54 @@ codeunit 51108 "Unidades Producto SGA"
     end;
 
     /// <summary>
-    /// Clase SGA de una unidad para un producto concreto. Sale solo de la ficha del producto,
-    /// sin configurar nada en las unidades de medida:
-    ///   - Unidad: la unidad base (1 unidad), las unidades sueltas;
-    ///   - Palé: el "Cód. palé por defecto", y cualquier unidad que lleve al menos lo mismo;
-    ///   - Caja: la unidad de venta, si lleva más de una unidad y menos que el palé.
-    /// Cualquier otra unidad queda sin clase: no se le propone hueco y el motivo lo explica.
+    /// El palé del producto: su "Cód. palé por defecto", si lo tiene entre sus unidades y lleva
+    /// más de una unidad base. En blanco si no. Es la unidad con la que se mide la capacidad de
+    /// las ubicaciones.
     /// </summary>
-    procedure TipoUMProducto(prm_Producto: Code[20]; prm_UM: Code[10]): Enum "Tipo UM SGA"
+    procedure UMPale(prm_Producto: Code[20]): Code[10]
     var
         rItem: Record Item;
-        rItemUM: Record "Item Unit of Measure";
-        factor: Decimal;
-        factorPale: Decimal;
     begin
-        if (prm_Producto = '') or (prm_UM = '') then
-            exit("Tipo UM SGA"::" ");
-        // Una unidad que el producto no tiene no es de ninguna clase, ni siquiera Unidad.
-        rItemUM.SetLoadFields("Qty. per Unit of Measure");
-        if not rItemUM.Get(prm_Producto, prm_UM) then
-            exit("Tipo UM SGA"::" ");
-        factor := rItemUM."Qty. per Unit of Measure";
-        if factor <= 1 then
-            exit("Tipo UM SGA"::Unidad);
-        rItem.SetLoadFields("Cod. Pale por Defecto", "Sales Unit of Measure");
-        if not rItem.Get(prm_Producto) then
-            exit("Tipo UM SGA"::" ");
-
-        // FactorUM da 1 si el producto no tiene palé: entonces no hay tamaño de palé que comparar.
-        factorPale := FactorUM(prm_Producto, rItem."Cod. Pale por Defecto");
-        if (prm_UM = rItem."Cod. Pale por Defecto") or ((factorPale > 1) and (factor >= factorPale)) then
-            exit("Tipo UM SGA"::Pale);
-        if prm_UM = rItem."Sales Unit of Measure" then
-            exit("Tipo UM SGA"::Caja);
-        exit("Tipo UM SGA"::" ");
-    end;
-
-    /// <summary>
-    /// Si un hueco que admite prm_Tipo acepta mercancía de prm_Producto en prm_UM. Es lo que se
-    /// valida al dejar algo en un hueco, también cuando el operario elige otro distinto del
-    /// propuesto. Con la UM en blanco se entiende la base del producto.
-    ///   - Palé: el palé y también cajas de la misma referencia (un palé incompleto). Que sea de
-    ///     una sola referencia lo garantiza "Acepta múltiples productos", que en palé va apagado.
-    ///   - Caja: solo cajas, de cualquier referencia.
-    ///   - Unidad: solo unidades sueltas.
-    ///   - En blanco (sin configurar): cualquier cosa menos unidades sueltas, que solo van a
-    ///     huecos de Unidad. Estos huecos no se proponen nunca (ver TipoHuecoDestino).
-    /// </summary>
-    procedure UMAdmitida(prm_Producto: Code[20]; prm_Tipo: Enum "Tipo UM SGA"; prm_UM: Code[10]): Boolean
-    var
-        clase: Enum "Tipo UM SGA";
-    begin
-        if prm_UM = '' then
-            prm_UM := UMBase(prm_Producto);
-        clase := TipoUMProducto(prm_Producto, prm_UM);
-
-        case prm_Tipo of
-            prm_Tipo::Pale:
-                exit(clase in [clase::Pale, clase::Caja]);
-            prm_Tipo::" ":
-                exit(clase <> clase::Unidad);
-            else
-                exit(clase = prm_Tipo);
-        end;
-    end;
-
-    /// <summary>
-    /// Clase de hueco que se propone para una cantidad: el palé a palé, las unidades sueltas a
-    /// Unidad, y las cajas a Caja si son menos de "Cajas Minimas Hueco Pale" o a Palé (palé
-    /// incompleto de una referencia) si son esas o más. En blanco si la unidad no tiene clase, o
-    /// si son esas cajas o más y el producto no tiene palé (sin su tamaño no se sabe cuánto
-    /// ocupan en un hueco de palé, y un hueco de caja no es para tantas): entonces no se propone
-    /// ningún hueco y ExplicarSinHuecoLote dice por qué. Con la UM en blanco se entiende la base
-    /// del producto.
-    /// </summary>
-    procedure TipoHuecoDestino(prm_Producto: Code[20]; prm_UM: Code[10]; prm_Cantidad: Decimal): Enum "Tipo UM SGA"
-    var
-        rConfig: Record "Config. SGA";
-        clase: Enum "Tipo UM SGA";
-    begin
-        if prm_UM = '' then
-            prm_UM := UMBase(prm_Producto);
-        clase := TipoUMProducto(prm_Producto, prm_UM);
-        if clase <> clase::Caja then
-            exit(clase);
-
-        rConfig.ObtenerConfig();
-        if rConfig."Cajas Minimas Hueco Pale" <= 0 then
-            rConfig."Cajas Minimas Hueco Pale" := 10;
-        if prm_Cantidad < rConfig."Cajas Minimas Hueco Pale" then
-            exit(clase::Caja);
-        if UMProductoDeTipo(prm_Producto, clase::Pale) = '' then
-            exit(clase::" ");
-        exit(clase::Pale);
-    end;
-
-    /// <summary>
-    /// La unidad del producto de la clase indicada, de su ficha: Palé → "Cód. palé por defecto",
-    /// Caja → unidad de venta, Unidad → unidad base. En blanco si no la tiene o no es de esa
-    /// clase (por ejemplo, una unidad de venta que es la base). Es también la unidad en la que
-    /// se mide la capacidad de un hueco de esa clase para ese producto.
-    /// </summary>
-    procedure UMProductoDeTipo(prm_Producto: Code[20]; prm_Tipo: Enum "Tipo UM SGA"): Code[10]
-    var
-        rItem: Record Item;
-        um: Code[10];
-    begin
-        rItem.SetLoadFields("Cod. Pale por Defecto", "Sales Unit of Measure", "Base Unit of Measure");
+        rItem.SetLoadFields("Cod. Pale por Defecto");
         if not rItem.Get(prm_Producto) then
             exit('');
-
-        case prm_Tipo of
-            prm_Tipo::Pale:
-                um := rItem."Cod. Pale por Defecto";
-            prm_Tipo::Caja:
-                um := rItem."Sales Unit of Measure";
-            prm_Tipo::Unidad:
-                um := rItem."Base Unit of Measure";
-            else
-                exit('');
-        end;
-
-        if um = '' then
+        if rItem."Cod. Pale por Defecto" = '' then
             exit('');
-        if TipoUMProducto(prm_Producto, um) <> prm_Tipo then
+        // FactorUM da 1 si el producto no tiene esa unidad.
+        if FactorUM(prm_Producto, rItem."Cod. Pale por Defecto") <= 1 then
             exit('');
-        exit(um);
+        exit(rItem."Cod. Pale por Defecto");
     end;
 
     /// <summary>
-    /// Una cantidad base de un producto, contada en la clase indicada: palés con su palé, cajas
-    /// con su caja. Sin clase, o si el producto no tiene unidad de esa clase, en unidades base.
-    /// Sin redondear. Es la medida de la capacidad de un hueco de esa clase.
+    /// Unidades base que lleva el palé del producto (UMPale). Uno si no tiene palé: entonces lo
+    /// que hay se cuenta en unidades base. Nunca cero: se puede dividir por él. Quien convierte
+    /// muchas cantidades del mismo producto lo lee una vez.
     /// </summary>
-    procedure CantidadEnClase(prm_Producto: Code[20]; prm_Tipo: Enum "Tipo UM SGA"; prm_CantidadBase: Decimal): Decimal
-    begin
-        exit(prm_CantidadBase / FactorClase(prm_Producto, prm_Tipo));
-    end;
-
-    /// <summary>
-    /// Unidades base que lleva la unidad de la clase indicada del producto (su palé, su caja).
-    /// Uno sin clase o si el producto no tiene unidad de esa clase. Nunca cero: se puede dividir
-    /// por él. Quien convierte muchas cantidades del mismo producto lo lee una vez.
-    /// </summary>
-    procedure FactorClase(prm_Producto: Code[20]; prm_Tipo: Enum "Tipo UM SGA"): Decimal
+    procedure FactorPale(prm_Producto: Code[20]): Decimal
     begin
         // FactorUM nunca devuelve cero: con la unidad en blanco o desconocida, uno.
-        exit(FactorUM(prm_Producto, UMProductoDeTipo(prm_Producto, prm_Tipo)));
+        exit(FactorUM(prm_Producto, UMPale(prm_Producto)));
+    end;
+
+    /// <summary>
+    /// Una cantidad base de un producto, en palés de ese producto (medio palé = 0,5). Sin palé,
+    /// en unidades base. Sin redondear. Es la medida de la capacidad de una ubicación.
+    /// </summary>
+    procedure EnPales(prm_Producto: Code[20]; prm_CantidadBase: Decimal): Decimal
+    begin
+        exit(prm_CantidadBase / FactorPale(prm_Producto));
     end;
 
     /// <summary>
     /// Reparte una cantidad en unidad base en los trozos que se ubican por separado: una línea
-    /// por palé completo (Cantidad 1), una con las cajas completas y una con las unidades
-    /// sueltas que no llegan a una caja, en ese orden y con Linea correlativa. No deja líneas
-    /// con cantidad cero; sin caja, todo lo que no llega a un palé va en la línea de sueltas.
+    /// por palé completo (Cantidad 1) y una con el resto, en ese orden y con Linea correlativa.
+    /// El resto va en cajas si son cajas exactas y, si no, en unidades base. No deja líneas con
+    /// cantidad cero; sin palé, todo va en la línea del resto.
     ///
-    /// prm_UMPale en blanco: el palé y la caja de la ficha (UMProductoDeTipo). Con un palé
-    /// indicado (el de una tarea de embotellado) se usa ese, con su factor, y la caja es la
-    /// unidad de venta si lleva más de una unidad y menos que ese palé.
+    /// prm_UMPale en blanco: el palé y la caja de la ficha. Con un palé indicado (el de una tarea
+    /// de embotellado) se usa ese, con su factor, y la caja es la unidad de venta si lleva más
+    /// de una unidad y menos que ese palé.
     ///
     /// Solo rellena producto, unidad, cantidades y el texto del trozo (Paso): el almacén, el lote
     /// y el hueco los pone quien lo usa. Borra antes lo que hubiera en TempLinea.
@@ -265,72 +155,79 @@ codeunit 51108 "Unidades Producto SGA"
     /// </summary>
     procedure Repartir(prm_Producto: Code[20]; prm_CantidadBase: Decimal; prm_UMPale: Code[10]; prm_MaxLineas: Integer; var TempLinea: Record "Linea Ubicacion SGA" temporary)
     var
-        umPale: Code[10];
+        umPaleReparto: Code[10];
         umCaja: Code[10];
-        factorPale: Decimal;
+        factorPaleReparto: Decimal;
         factorCaja: Decimal;
         resto: Decimal;
+        cajas: Decimal;
+        paso: Text;
         pales: Integer;
         palesACrear: Integer;
         i: Integer;
         linea: Integer;
-        cajas: Decimal;
         PaleDeLbl: Label 'Palé %1 de %2', Comment = '%1 = nº de palé, %2 = total';
-        UnidadesVentaLbl: Label 'Unidades de venta';
-        UnidadesSueltasLbl: Label 'Unidades sueltas';
+        RestoLbl: Label 'Resto: %1', Comment = '%1 = desglose, p. ej. 12 CAJA12, 6 BOTELLA';
     begin
         TempLinea.Reset();
         TempLinea.DeleteAll();
         if (prm_Producto = '') or (prm_CantidadBase <= 0) then
             exit;
 
-        UnidadesReparto(prm_Producto, prm_UMPale, umPale, factorPale, umCaja, factorCaja);
+        UnidadesReparto(prm_Producto, prm_UMPale, umPaleReparto, factorPaleReparto, umCaja, factorCaja);
         resto := prm_CantidadBase;
 
-        if umPale <> '' then begin
-            pales := Round(resto / factorPale, 1, '<');
+        if umPaleReparto <> '' then begin
+            pales := Round(resto / factorPaleReparto, 1, '<');
             palesACrear := pales;
             if (prm_MaxLineas > 0) and (palesACrear > prm_MaxLineas) then
                 palesACrear := prm_MaxLineas;
             for i := 1 to palesACrear do
-                AnadirTrozo(TempLinea, linea, prm_MaxLineas, prm_Producto, StrSubstNo(PaleDeLbl, i, pales), umPale, 1, factorPale);
-            resto := Round(resto - pales * factorPale, 0.00001);
+                AnadirTrozo(TempLinea, linea, prm_MaxLineas, prm_Producto, StrSubstNo(PaleDeLbl, i, pales), umPaleReparto, 1, factorPaleReparto);
+            resto := Round(resto - pales * factorPaleReparto, 0.00001);
         end;
 
-        if umCaja <> '' then begin
+        if resto <= 0 then
+            exit;
+
+        // El resto es un solo trozo, que va a un solo hueco: en cajas si son cajas exactas.
+        paso := StrSubstNo(RestoLbl, DesgloseCon(prm_Producto, resto, umPaleReparto, factorPaleReparto, umCaja, factorCaja));
+        if umCaja <> '' then
             cajas := Round(resto / factorCaja, 1, '<');
-            if cajas > 0 then begin
-                AnadirTrozo(TempLinea, linea, prm_MaxLineas, prm_Producto, UnidadesVentaLbl, umCaja, cajas, cajas * factorCaja);
-                resto := Round(resto - cajas * factorCaja, 0.00001);
-            end;
-        end;
-
-        if resto > 0 then
-            AnadirTrozo(TempLinea, linea, prm_MaxLineas, prm_Producto, UnidadesSueltasLbl, UMBase(prm_Producto), resto, resto);
+        if (cajas > 0) and (cajas * factorCaja = resto) then
+            AnadirTrozo(TempLinea, linea, prm_MaxLineas, prm_Producto, paso, umCaja, cajas, resto)
+        else
+            AnadirTrozo(TempLinea, linea, prm_MaxLineas, prm_Producto, paso, UMBase(prm_Producto), resto, resto);
     end;
 
     /// <summary>
-    /// Una cantidad en unidad base dicha en palés, cajas y unidades sueltas, con las mismas
-    /// unidades que Repartir con el palé de la ficha: 690 botellas con palé de 540 y CAJA12 son
-    /// "1 PALE, 12 CAJA12, 6 BOTELLA". Divide en lugar de recorrer los trozos, así que no tiene
-    /// límite de palés. Vacío si el producto va en blanco o la cantidad no es positiva.
+    /// Una cantidad en unidad base dicha en palés, cajas y unidades sueltas, con el palé y la
+    /// caja de la ficha: 690 botellas con palé de 540 y CAJA12 son "1 PALE, 12 CAJA12, 6
+    /// BOTELLA". Divide en lugar de recorrer los trozos, así que no tiene límite de palés. Vacío
+    /// si el producto va en blanco o la cantidad no es positiva.
     /// </summary>
     procedure Desglose(prm_Producto: Code[20]; prm_CantidadBase: Decimal): Text
     var
-        umPale: Code[10];
+        umPaleReparto: Code[10];
         umCaja: Code[10];
-        factorPale: Decimal;
+        factorPaleReparto: Decimal;
         factorCaja: Decimal;
-        resto: Decimal;
-        texto: Text;
     begin
         if (prm_Producto = '') or (prm_CantidadBase <= 0) then
             exit('');
 
-        UnidadesReparto(prm_Producto, '', umPale, factorPale, umCaja, factorCaja);
+        UnidadesReparto(prm_Producto, '', umPaleReparto, factorPaleReparto, umCaja, factorCaja);
+        exit(DesgloseCon(prm_Producto, prm_CantidadBase, umPaleReparto, factorPaleReparto, umCaja, factorCaja));
+    end;
+
+    local procedure DesgloseCon(prm_Producto: Code[20]; prm_CantidadBase: Decimal; prm_UMPale: Code[10]; prm_FactorPale: Decimal; prm_UMCaja: Code[10]; prm_FactorCaja: Decimal): Text
+    var
+        resto: Decimal;
+        texto: Text;
+    begin
         resto := prm_CantidadBase;
-        AnadirAlDesglose(umPale, factorPale, resto, texto);
-        AnadirAlDesglose(umCaja, factorCaja, resto, texto);
+        AnadirAlDesglose(prm_UMPale, prm_FactorPale, resto, texto);
+        AnadirAlDesglose(prm_UMCaja, prm_FactorCaja, resto, texto);
 
         resto := Round(resto, 0.00001);
         if resto > 0 then begin
@@ -343,7 +240,8 @@ codeunit 51108 "Unidades Producto SGA"
 
     /// <summary>
     /// El palé y la caja con los que se reparte (ver Repartir). Unidad en blanco y factor 0 si el
-    /// producto no la tiene.
+    /// producto no la tiene. La caja es la unidad de venta si lleva más de una unidad y menos
+    /// que el palé.
     /// </summary>
     local procedure UnidadesReparto(prm_Producto: Code[20]; prm_UMPaleIndicada: Code[10]; var prm_UMPale: Code[10]; var prm_FactorPale: Decimal; var prm_UMCaja: Code[10]; var prm_FactorCaja: Decimal)
     var
@@ -351,28 +249,26 @@ codeunit 51108 "Unidades Producto SGA"
     begin
         prm_FactorPale := 0;
         prm_FactorCaja := 0;
-        if prm_UMPaleIndicada = '' then begin
-            prm_UMPale := UMProductoDeTipo(prm_Producto, "Tipo UM SGA"::Pale);
-            prm_UMCaja := UMProductoDeTipo(prm_Producto, "Tipo UM SGA"::Caja);
-        end else begin
+        prm_UMCaja := '';
+        if prm_UMPaleIndicada = '' then
+            prm_UMPale := UMPale(prm_Producto)
+        else
             prm_UMPale := prm_UMPaleIndicada;
-            prm_UMCaja := '';
-            rItem.SetLoadFields("Sales Unit of Measure");
-            if rItem.Get(prm_Producto) then
-                prm_UMCaja := rItem."Sales Unit of Measure";
-        end;
-
         if prm_UMPale <> '' then
             prm_FactorPale := FactorUM(prm_Producto, prm_UMPale);
-        if prm_UMCaja = '' then
+
+        rItem.SetLoadFields("Sales Unit of Measure");
+        if not rItem.Get(prm_Producto) then
+            exit;
+        if rItem."Sales Unit of Measure" = '' then
             exit;
 
-        prm_FactorCaja := FactorUM(prm_Producto, prm_UMCaja);
-        // Con el palé de la ficha, UMProductoDeTipo ya lo garantiza; con otro palé, se comprueba.
+        prm_FactorCaja := FactorUM(prm_Producto, rItem."Sales Unit of Measure");
         if (prm_FactorCaja <= 1) or ((prm_FactorPale > 0) and (prm_FactorCaja >= prm_FactorPale)) then begin
-            prm_UMCaja := '';
             prm_FactorCaja := 0;
+            exit;
         end;
+        prm_UMCaja := rItem."Sales Unit of Measure";
     end;
 
     /// <summary>

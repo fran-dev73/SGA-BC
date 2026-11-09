@@ -24,6 +24,7 @@ page 51100 "Ubicaciones SGA"
             {
                 field("Cod. Bin"; Rec."Cod. Bin")
                 {
+                    Caption = 'Cód. Ubicación';
                     ToolTip = 'Código de la ubicación en la topología pasillo-estantería-altura (101-15-03).';
                     ApplicationArea = All;
                     StyleExpr = EstiloFila;
@@ -57,7 +58,6 @@ page 51100 "Ubicaciones SGA"
                 }
                 field("Tipo Ubicacion"; Rec."Tipo Ubicacion")
                 {
-                    ToolTip = 'Uso funcional de la ubicación: picking, reserva, muelle, cuarentena...';
                     ApplicationArea = All;
                 }
                 field("Secuencia Picking"; Rec."Secuencia Picking")
@@ -78,7 +78,7 @@ page 51100 "Ubicaciones SGA"
                 }
                 field("Capacidad Uds."; Rec."Capacidad Uds.")
                 {
-                    ToolTip = 'Cuánto cabe, en la clase que admite el hueco: 1 = un palé (lleve lo que lleve), 72 = setenta y dos cajas. 0 = sin límite. Para cambiar muchas a la vez, use "Cambiar en bloque".';
+                    ToolTip = 'Cuántos palés caben; cada producto se cuenta con su palé por defecto. 0 = sin límite. Para cambiar muchas a la vez, use "Cambiar en bloque".';
                     ApplicationArea = All;
                 }
                 field("Control Capacidad"; Rec."Control Capacidad")
@@ -96,11 +96,6 @@ page 51100 "Ubicaciones SGA"
                     ToolTip = 'Razón del bloqueo.';
                     ApplicationArea = All;
                 }
-                field("Tipo UM Admitida"; Rec."Tipo UM Admitida")
-                {
-                    ToolTip = 'Qué admite el hueco: Palé (el palé del producto), Caja (su unidad de venta) o Unidad (unidades sueltas). La capacidad se cuenta en esa clase. En blanco, acepta cualquiera.';
-                    ApplicationArea = All;
-                }
                 field("Producto Fijo"; Rec."Producto Fijo")
                 {
                     ToolTip = 'Producto que tiene esta ubicación como casa. Solo se admite este producto.';
@@ -108,7 +103,7 @@ page 51100 "Ubicaciones SGA"
                 }
                 field("Permite Mezcla Producto"; Rec."Permite Mezcla Producto")
                 {
-                    ToolTip = 'Marcado, el hueco admite productos distintos a la vez. Solo se puede marcar si el hueco admite Caja.';
+                    ToolTip = 'Marcado, el hueco admite productos distintos a la vez, como una estantería de picking con varias referencias.';
                     ApplicationArea = All;
                 }
                 field("Permite Mezcla Lote"; Rec."Permite Mezcla Lote")
@@ -116,6 +111,10 @@ page 51100 "Ubicaciones SGA"
                     ToolTip = 'Si se desactiva, la ubicación solo puede contener un lote a la vez.';
                     ApplicationArea = All;
                     Visible = false;
+                }
+                field("Digito Colocado"; Rec."Digito Colocado")
+                {
+                    ApplicationArea = All;
                 }
                 field("Fecha Ultimo Movimiento"; Rec."Fecha Ultimo Movimiento")
                 {
@@ -235,6 +234,31 @@ page 51100 "Ubicaciones SGA"
                     Message(DigitosRegeneradosMsg, hechas);
                 end;
             }
+            action(DigitoColocado)
+            {
+                Caption = 'Dígito colocado';
+                ToolTip = 'Marca o desmarca las ubicaciones seleccionadas como que ya tienen puesto su dígito de control. Desde que se marcan, al recoger de ellas se pide el dígito (si la configuración lo exige). Márquelas después de pegar las etiquetas.';
+                ApplicationArea = All;
+                Image = Approve;
+
+                trigger OnAction()
+                var
+                    rSeleccion: Record "Ubicacion SGA";
+                    cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
+                    opcion: Integer;
+                    OpcionesTxt: Label 'Ya tienen el dígito puesto,Todavía no lo tienen';
+                    PreguntaTxt: Label '%1 ubicaciones seleccionadas:', Comment = '%1 = número';
+                    MarcadasMsg: Label 'Se han actualizado %1 ubicaciones.', Comment = '%1 = número';
+                begin
+                    CurrPage.SetSelectionFilter(rSeleccion);
+                    opcion := StrMenu(OpcionesTxt, 1, StrSubstNo(PreguntaTxt, rSeleccion.Count()));
+                    if opcion = 0 then
+                        exit;
+
+                    Message(MarcadasMsg, cUbicaciones.MarcarDigitoColocado(rSeleccion, opcion = 1));
+                    CurrPage.Update(false);
+                end;
+            }
             action(CambiarEnBloque)
             {
                 Caption = 'Cambiar en bloque';
@@ -332,7 +356,8 @@ page 51100 "Ubicaciones SGA"
                 actionref(CambiarEnBloque_Promoted; CambiarEnBloque)
                 {
                 }
-actionref(ImprimirEtiquetas_Promoted; ImprimirEtiquetas)                {                }
+                actionref(ImprimirEtiquetas_Promoted; ImprimirEtiquetas) { }
+                actionref(DigitoColocado_Promoted; DigitoColocado) { }
                 actionref(AlternarBloqueo_Promoted; AlternarBloqueo)
                 {
                 }
@@ -393,8 +418,23 @@ actionref(ImprimirEtiquetas_Promoted; ImprimirEtiquetas)                {       
         }
         view(Picking)
         {
-            Caption = 'Zona de picking';
+            Caption = 'Picking';
             Filters = where("Tipo Ubicacion" = const(Picking));
+        }
+        view(Almacenamiento)
+        {
+            Caption = 'Almacenamiento';
+            Filters = where("Tipo Ubicacion" = const(Almacenamiento));
+        }
+        view(SinTipo)
+        {
+            Caption = 'Sin tipo';
+            Filters = where("Tipo Ubicacion" = const(" "));
+        }
+        view(SinDigitoColocado)
+        {
+            Caption = 'Sin dígito colocado';
+            Filters = where("Digito Colocado" = const(false), "Tipo Ubicacion" = filter(<> " "));
         }
     }
 

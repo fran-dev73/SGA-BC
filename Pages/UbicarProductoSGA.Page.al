@@ -14,7 +14,7 @@ using Microsoft.Inventory.Location;
 /// </summary>
 page 51117 "Ubicar Producto SGA"
 {
-    Caption = 'Ubicar producto';
+    Caption = 'Ubicar producto SGA';
     PageType = Card;
     UsageCategory = Tasks;
     ApplicationArea = All;
@@ -201,7 +201,7 @@ page 51117 "Ubicar Producto SGA"
             action(UsarPendiente)
             {
                 Caption = 'Ubicar todo lo pendiente';
-                ToolTip = 'Pone como cantidad todo lo que queda por ubicar del producto y lo reparte: cada palé a un hueco de palé, las unidades de venta a un hueco de caja y lo que no llega a una unidad de venta, suelto.';
+                ToolTip = 'Pone como cantidad todo lo que queda por ubicar del producto y lo reparte: cada palé a un hueco y el resto junto a otro, primero en almacenamiento y luego en picking.';
                 ApplicationArea = All;
                 Image = AllLines;
 

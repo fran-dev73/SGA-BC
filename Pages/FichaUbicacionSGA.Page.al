@@ -43,13 +43,16 @@ page 51101 "Ficha Ubicacion SGA"
                 field("Tipo Ubicacion"; Rec."Tipo Ubicacion")
                 {
                     Editable = EsVacia;
-                    ToolTip = 'Uso funcional de la ubicación: picking, reserva, muelle, cuarentena...';
                     ApplicationArea = All;
                 }
                 field("Secuencia Picking"; Rec."Secuencia Picking")
                 {
                     Editable = EsVacia;
                     ToolTip = 'Orden de recorrido físico. Los motores de picking y de ubicación recorren las ubicaciones por este valor.';
+                    ApplicationArea = All;
+                }
+                field("Digito Colocado"; Rec."Digito Colocado")
+                {
                     ApplicationArea = All;
                 }
             }
@@ -89,27 +92,15 @@ page 51101 "Ficha Ubicacion SGA"
             {
                 Caption = 'Capacidad';
 
-                field("Tipo UM Admitida"; Rec."Tipo UM Admitida")
-                {
-                    Editable = EsVacia;
-                    ToolTip = 'Qué admite el hueco: Palé (el palé del producto), Caja (su unidad de venta) o Unidad (unidades sueltas). La capacidad se cuenta en esa clase. En blanco, acepta cualquiera.';
-                    ApplicationArea = All;
-                }
                 field("Capacidad Uds."; Rec."Capacidad Uds.")
                 {
                     Editable = EsVacia;
-                    ToolTip = 'Cuánto cabe, en la clase que admite (palés o cajas): 1 en una ubicación de palé, 72 en una de cajas. 0 significa sin límite declarado, y entonces cualquier contenido la marca como llena.';
+                    ToolTip = 'Cuántos palés caben; cada producto se cuenta con su palé por defecto. 0 significa sin límite declarado, y entonces cualquier contenido la marca como llena.';
                     ApplicationArea = All;
                 }
                 field("Control Capacidad"; Rec."Control Capacidad")
                 {
                     Editable = EsVacia;
-                    ApplicationArea = All;
-                }
-                field("Capacidad Palets"; Rec."Capacidad Palets")
-                {
-                    Editable = EsVacia;
-                    ToolTip = 'Palés que caben en la ubicación. Informativo.';
                     ApplicationArea = All;
                 }
                 field("Capacidad Volumen"; Rec."Capacidad Volumen")

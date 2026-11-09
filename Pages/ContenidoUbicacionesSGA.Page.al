@@ -7,7 +7,7 @@ namespace AntonioNadal.SGA;
 /// </summary>
 page 51103 "Contenido Ubicaciones SGA"
 {
-    Caption = 'Contenido de ubicaciones';
+    Caption = 'Contenido de ubicaciones SGA';
     PageType = List;
     SourceTable = "Contenido Ubicacion SGA";
     UsageCategory = Lists;

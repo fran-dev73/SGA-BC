@@ -48,12 +48,17 @@ pageextension 51104 "Sales Order SGA" extends "Sales Order"
                         rOrden: Record "Orden Picking SGA";
                         cPicking: Codeunit "Gestion Picking SGA";
                         noOrden: Code[20];
+                        faltas: Text;
                         OrdenPickingCreadaMsg: Label 'Se ha creado la orden de picking %1.', Comment = '%1 = nº orden';
+                        OrdenConFaltasMsg: Label 'Se ha creado la orden de picking %1 con lo que hay ubicado. Falta:\%2\\Lo que falta se prepara en una segunda ronda, cuando haya stock ubicado: vuelva a pulsar Enviar a picking al terminar esta orden, o use Segunda ronda de picking en Órdenes de picking SGA.', Comment = '%1 = nº orden, %2 = lista de faltas';
                     begin
                         CurrPage.SaveRecord();
-                        noOrden := cPicking.CrearOrdenDesdeVenta(Rec."No.");
+                        noOrden := cPicking.CrearOrdenDesdeVenta(Rec."No.", faltas);
 
-                        Message(OrdenPickingCreadaMsg, noOrden);
+                        if faltas = '' then
+                            Message(OrdenPickingCreadaMsg, noOrden)
+                        else
+                            Message(OrdenConFaltasMsg, noOrden, faltas);
 
                         if rOrden.Get(noOrden) then
                             Page.Run(Page::"Ficha Orden Picking SGA", rOrden);

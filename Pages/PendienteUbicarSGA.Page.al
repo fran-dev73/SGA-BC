@@ -15,7 +15,7 @@ using Microsoft.Inventory.Location;
 /// </summary>
 page 51131 "Pendiente Ubicar SGA"
 {
-    Caption = 'Pendiente de ubicar';
+    Caption = 'Pendiente de ubicar SGA';
     // Worksheet y no List: hace falta la cabecera con el almacén.
     PageType = Worksheet;
     SourceTable = "Buffer Conciliacion SGA";
@@ -188,7 +188,7 @@ page 51131 "Pendiente Ubicar SGA"
             action(UbicarSeleccionadas)
             {
                 Caption = 'Ubicar seleccionadas';
-                ToolTip = 'Busca hueco para lo que hay que ubicar aquí de las líneas seleccionadas, como la carga inicial: palés a huecos de palé, cajas a caja o a palé según cuántas sean, y botellas a huecos de unidad. Se puede simular antes. Al terminar enseña lo ubicado y, de lo que no cabe, el motivo.';
+                ToolTip = 'Busca hueco para lo que hay que ubicar aquí de las líneas seleccionadas, como la carga inicial: cada palé a un hueco vacío y el resto junto, primero en almacenamiento y luego en picking. Se puede simular antes. Al terminar enseña lo ubicado y, de lo que no cabe, el motivo.';
                 ApplicationArea = All;
                 Image = PutawayLines;
 
@@ -236,13 +236,8 @@ page 51131 "Pendiente Ubicar SGA"
                 ToolTip = 'Abre Ubicar recepciones, donde se ubica lo pendiente de los albaranes de compra.';
                 ApplicationArea = All;
                 Image = Receipt;
-
-                trigger OnAction()
-                var
-                    cEntradas: Codeunit "Gestion Entradas SGA";
-                begin
-                    cEntradas.AbrirUbicarEntradas("Origen Mov. SGA"::Compra);
-                end;
+                RunObject = page "Ubicar Entradas SGA";
+                RunPageView = where(Origen = const(Compra));
             }
             action(IrEnsamblados)
             {
@@ -250,13 +245,8 @@ page 51131 "Pendiente Ubicar SGA"
                 ToolTip = 'Abre Ubicar ensamblados, donde se ubica lo pendiente de los embotellados.';
                 ApplicationArea = All;
                 Image = Production;
-
-                trigger OnAction()
-                var
-                    cEntradas: Codeunit "Gestion Entradas SGA";
-                begin
-                    cEntradas.AbrirUbicarEntradas("Origen Mov. SGA"::Produccion);
-                end;
+                RunObject = page "Ubicar Entradas SGA";
+                RunPageView = where(Origen = const(Produccion));
             }
         }
         area(Promoted)

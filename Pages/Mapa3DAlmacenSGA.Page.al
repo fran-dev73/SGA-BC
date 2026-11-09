@@ -16,7 +16,7 @@ using Microsoft.Inventory.Location;
 /// </summary>
 page 51122 "Mapa 3D Almacen SGA"
 {
-    Caption = 'Mapa 3D de almacén';
+    Caption = 'Mapa 3D de almacén SGA';
     PageType = Card;
     UsageCategory = Tasks;
     ApplicationArea = All;

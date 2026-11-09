@@ -21,7 +21,7 @@ using AntonioNadal.Produccion;
 /// </summary>
 page 51127 "Ubicar Palets Linea SGA"
 {
-    Caption = 'Imprimir y ubicar palés de producción';
+    Caption = 'Imprimir y ubicar palés de producción SGA';
     // Worksheet y no List: en una lista BC abre en modo consulta y no se podría cambiar la
     // ubicación propuesta sin pulsar antes "Editar lista".
     PageType = Worksheet;

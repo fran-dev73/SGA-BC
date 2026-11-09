@@ -7,7 +7,7 @@ namespace AntonioNadal.SGA;
 /// </summary>
 page 51102 "Contenido Ubicacion Subpag"
 {
-    Caption = 'Contenido de la ubicación';
+    Caption = 'Contenido de la ubicación SGA';
     PageType = ListPart;
     SourceTable = "Contenido Ubicacion SGA";
     ApplicationArea = All;

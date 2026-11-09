@@ -8,7 +8,7 @@ namespace AntonioNadal.SGA;
 /// </summary>
 page 51130 "Plan Ubicacion SGA Subpag"
 {
-    Caption = 'Reparto';
+    Caption = 'Reparto SGA';
     PageType = ListPart;
     SourceTable = "Linea Ubicacion SGA";
     InsertAllowed = false;

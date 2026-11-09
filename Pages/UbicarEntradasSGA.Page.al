@@ -9,9 +9,9 @@ using Microsoft.Inventory.Location;
 /// los ensamblados y para las recepciones de compra: el operario ve la lista, el sistema le
 /// propone una ubicación para cada línea, y él confirma o pide otra.
 ///
-/// El origen lo fija quien abre la página con FijarOrigen (los menús, a través de Cod51109
-/// "Abrir Ubicar Recepciones SGA" y Cod51110 "Abrir Ubicar Ensamblados SGA") o Preparar. Sin
-/// nada, se abre en ensamblados.
+/// El origen lo fija quien abre la página con un filtro de Origen (los menús, con
+/// RunPageView = where(Origen = const(Compra)) o const(Produccion)) o con Preparar. Sin nada,
+/// se abre en ensamblados.
 ///
 /// Las filas son líneas de "Linea Ubicacion SGA" con Origen Compra o Produccion, ordenadas por
 /// documento. La lista se reconstruye cada vez que se cambia un filtro: lo que ya está colocado
@@ -19,7 +19,7 @@ using Microsoft.Inventory.Location;
 /// </summary>
 page 51123 "Ubicar Entradas SGA"
 {
-    Caption = 'Ubicar entradas';
+    Caption = 'Ubicar entradas SGA';
     // Worksheet y no List: BC abre las listas del menú en modo consulta y los filtros de arriba
     // no se podían tocar sin pulsar antes "Editar lista".
     PageType = Worksheet;
@@ -213,22 +213,6 @@ page 51123 "Ubicar Entradas SGA"
                 {
                     ToolTip = 'Hueco en el que se ha dejado realmente. Escanéelo o tecléelo si no es el propuesto.';
                     ApplicationArea = All;
-                }
-                field("Traslado Origen"; Rec."Traslado Origen")
-                {
-                    ApplicationArea = All;
-                    Visible = ReubicarABC;
-                }
-                field("Traslado Destino"; Rec."Traslado Destino")
-                {
-                    ApplicationArea = All;
-                    Visible = ReubicarABC;
-                }
-                field("Aceptar Traslado"; Rec."Aceptar Traslado")
-                {
-                    ApplicationArea = All;
-                    Visible = ReubicarABC;
-                    Editable = Rec."Traslado Origen" <> '';
                 }
                 field("Cod. Almacen"; Rec."Cod. Almacen")
                 {
@@ -432,22 +416,18 @@ page 51123 "Ubicar Entradas SGA"
         EstiloFila: Text;
         LineaUbicada: Boolean;
         Preparada: Boolean;
-        OrigenFijado: Boolean;
-        // Con la reubicación por ABC apagada en la configuración, el traslado no se enseña.
-        ReubicarABC: Boolean;
 
     trigger OnOpenPage()
     var
         rConfig: Record "Config. SGA";
-        CaptionEnsambladosLbl: Label 'Ubicar ensamblados';
-        CaptionRecepcionesLbl: Label 'Ubicar recepciones de compra';
+        CaptionEnsambladosLbl: Label 'Ubicar ensamblados SGA';
+        CaptionRecepcionesLbl: Label 'Ubicar recepciones de compra SGA';
     begin
-        // El origen llega de FijarOrigen o Preparar; si no, ensamblados.
-        if not (Preparada or OrigenFijado) then
-            OrigenPagina := OrigenPagina::Produccion;
-
-        rConfig.ObtenerConfig();
-        ReubicarABC := rConfig."Reubicar Pale A por ABC";
+        // El origen llega de Preparar o del RunPageView de quien la abre
+        // (where(Origen = const(Compra))), que BC deja en el grupo de filtros 3; sin nada,
+        // ensamblados.
+        if not Preparada then
+            OrigenPagina := OrigenDelMenu();
 
         EsCompra := OrigenPagina = OrigenPagina::Compra;
         if EsCompra then
@@ -478,20 +458,20 @@ page 51123 "Ubicar Entradas SGA"
         Recargar();
     end;
 
-    /// <summary>
-    /// Abre la página en un origen (Compra o Produccion), con los filtros de partida de ese
-    /// origen. Se llama antes de abrirla; es lo que usan los menús (Cod. "Gestion Entradas
-    /// SGA".AbrirUbicarEntradas), porque un filtro de RunPageView no llega a esta página, que es
-    /// temporal.
-    /// </summary>
-    procedure FijarOrigen(prm_Origen: Enum "Origen Mov. SGA")
+    local procedure OrigenDelMenu() Origen: Enum "Origen Mov. SGA"
+    var
+        grupo: Integer;
     begin
-        OrigenFijado := true;
-        OrigenPagina := prm_Origen;
+        Origen := Origen::Produccion;
+        grupo := Rec.FilterGroup();
+        Rec.FilterGroup(3);
+        if Rec.GetFilter(Origen) <> '' then
+            Origen := Rec.GetRangeMin(Origen);
+        Rec.FilterGroup(grupo);
     end;
 
     /// <summary>
-    /// Como FijarOrigen, pero con lo pendiente de un producto en un almacén, sin fechas ni
+    /// Abre la página en un origen con lo pendiente de un producto en un almacén, sin fechas ni
     /// clase. Es como la usa "Pendiente de ubicar" para enseñar de qué documentos sale lo que
     /// tiene en "En documentos". Se llama antes de abrirla.
     /// </summary>

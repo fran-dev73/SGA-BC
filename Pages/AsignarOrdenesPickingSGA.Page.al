@@ -19,7 +19,7 @@ using System.Security.User;
 /// </summary>
 page 51124 "Asignar Ordenes Picking SGA"
 {
-    Caption = 'Asignar órdenes de picking';
+    Caption = 'Asignar órdenes de picking SGA';
     PageType = List;
     SourceTable = "Orden Picking SGA";
     SourceTableView = sorting(Estado, Prioridad, "No. Orden")
@@ -43,6 +43,11 @@ page 51124 "Asignar Ordenes Picking SGA"
                     ApplicationArea = All;
                     Editable = false;
                     StyleExpr = EstiloFila;
+                }
+                field(Origen; Rec.Origen)
+                {
+                    ApplicationArea = All;
+                    Editable = false;
                 }
                 field("No. Documento Origen"; Rec."No. Documento Origen")
                 {

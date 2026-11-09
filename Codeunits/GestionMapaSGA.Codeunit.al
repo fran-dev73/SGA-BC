@@ -98,9 +98,8 @@ codeunit 51102 "Gestion Mapa SGA"
     /// son más de mil ubicaciones. Con prm_Pasillo distinto de 0, solo las de ese pasillo.
     ///
     /// El % se redondea hacia abajo para que no diga 100 % de una ubicación que aún tiene
-    /// hueco. No se puede medir sin capacidad declarada, ni en un hueco de palé o de caja si
-    /// algún producto de dentro no tiene esa unidad en su ficha: su contenido se contaría en
-    /// unidades base como si cada una fuera un palé o una caja.
+    /// hueco. No se puede medir sin capacidad declarada, ni si algún producto de dentro no tiene
+    /// palé en su ficha: su contenido se contaría en unidades base como si cada una fuera un palé.
     /// </summary>
     procedure DatosMapa3D(prm_Almacen: Code[10]; prm_Zona: Code[10]; prm_Pasillo: Integer): Text
     var
@@ -181,18 +180,17 @@ codeunit 51102 "Gestion Mapa SGA"
     ///   g = palé por defecto del producto (ficha del producto), gf = cuántas "u" lleva ese palé.
     ///
     /// La cantidad no se enseña en la unidad en que se registró, sino como se cuenta en el
-    /// almacén (ver UnidadParaMostrar): en un hueco de palé, el palé si está completo y, si no
-    /// llega al 100 %, el número de cajas; en un hueco de unidades sueltas, botellas; en el
-    /// resto, cajas. Con el palé completo no se manda "gf": diría "1 PALE/palé".
+    /// almacén (ver UnidadParaMostrar): el palé si está completo y, si no llega al 100 %, el
+    /// número de cajas. Con el palé completo no se manda "gf": diría "1 PALE/palé".
     ///
     /// Se envía con el resto del mapa y no se pide al pasar el ratón: una ida y vuelta a BC por
     /// cada bloque haría la ficha lenta. Se limita a las primeras líneas para que un hueco
     /// mixto con muchas referencias no engorde el JSON; el lienzo dice cuántas faltan con "l".
     ///
     /// Mira además todas las líneas, no solo las enviadas, para saber si la ocupación se puede
-    /// medir: en un hueco de palé o de caja con capacidad, cada producto tiene que tener esa
-    /// unidad en su ficha. Si no, deja el porqué en prm_MotivoSinMedir (el primer producto que
-    /// falla). prm_SinUnidad guarda lo ya mirado de cada producto y clase en todo el mapa.
+    /// medir: con capacidad declarada (en palés), cada producto tiene que tener palé en su
+    /// ficha. Si no, deja el porqué en prm_MotivoSinMedir (el primer producto que falla).
+    /// prm_SinUnidad guarda lo ya mirado de cada producto en todo el mapa.
     ///
     /// De todas las líneas devuelve también, para colorear y buscar: los productos sin repetir
     /// (prm_Productos), la caducidad más próxima (prm_Caducidad, 0D si ninguna lleva) y la mejor
@@ -207,33 +205,30 @@ codeunit 51102 "Gestion Mapa SGA"
         enviadas: Integer;
         MaxLineas: Integer;
         clase: Integer;
-        clave: Text;
         falta: Boolean;
-        medirPorUnidad: Boolean;
-        SinUnidadLbl: Label 'El producto %1 no tiene unidad de %2 en su ficha ("Cód. palé por defecto" o "Unidad de medida de venta"): no se puede medir cuánto ocupa.', Comment = '%1 = producto, %2 = clase (Palé o Caja)';
+        medirEnPales: Boolean;
+        SinPaleLbl: Label 'El producto %1 no tiene palé en su ficha ("Cód. palé por defecto"): no se puede medir cuánto ocupa.', Comment = '%1 = producto';
     begin
         MaxLineas := 8;
         enviadas := 0;
         Clear(prm_Productos);
         prm_Caducidad := 0D;
         prm_ClaseABC := 0;
-        medirPorUnidad := (prm_Ubicacion."Capacidad Uds." > 0) and
-                          (prm_Ubicacion."Tipo UM Admitida" in [prm_Ubicacion."Tipo UM Admitida"::Pale, prm_Ubicacion."Tipo UM Admitida"::Caja]);
+        medirEnPales := prm_Ubicacion."Capacidad Uds." > 0;
         rContenido.SetRange("Cod. Almacen", prm_Ubicacion."Cod. Almacen");
         rContenido.SetRange("Cod. Bin", prm_Ubicacion."Cod. Bin");
         if rContenido.FindSet() then
             repeat
-                if medirPorUnidad and (prm_MotivoSinMedir = '') then begin
-                    clave := rContenido."No. Producto" + '|' + Format(prm_Ubicacion."Tipo UM Admitida".AsInteger());
-                    if not prm_SinUnidad.Get(clave, falta) then begin
-                        falta := cUM.UMProductoDeTipo(rContenido."No. Producto", prm_Ubicacion."Tipo UM Admitida") = '';
-                        prm_SinUnidad.Add(clave, falta);
+                if medirEnPales and (prm_MotivoSinMedir = '') then begin
+                    if not prm_SinUnidad.Get(rContenido."No. Producto", falta) then begin
+                        falta := cUM.UMPale(rContenido."No. Producto") = '';
+                        prm_SinUnidad.Add(rContenido."No. Producto", falta);
                     end;
                     if falta then
-                        prm_MotivoSinMedir := StrSubstNo(SinUnidadLbl, rContenido."No. Producto", prm_Ubicacion."Tipo UM Admitida");
+                        prm_MotivoSinMedir := StrSubstNo(SinPaleLbl, rContenido."No. Producto");
                 end;
                 if enviadas < MaxLineas then begin
-                    lineas.Add(LineaMapa(prm_Ubicacion, rContenido));
+                    lineas.Add(LineaMapa(rContenido));
                     enviadas += 1;
                 end;
                 if not vistos.Contains(rContenido."No. Producto") then begin
@@ -255,7 +250,7 @@ codeunit 51102 "Gestion Mapa SGA"
     /// <summary>
     /// Una línea de contenido en el formato de la ficha flotante (ver ContenidoParaMapa).
     /// </summary>
-    local procedure LineaMapa(var prm_Ubicacion: Record "Ubicacion SGA"; var prm_Contenido: Record "Contenido Ubicacion SGA"): JsonObject
+    local procedure LineaMapa(var prm_Contenido: Record "Contenido Ubicacion SGA"): JsonObject
     var
         rItem: Record Item;
         rItemUM: Record "Item Unit of Measure";
@@ -265,7 +260,7 @@ codeunit 51102 "Gestion Mapa SGA"
     begin
         if not rItem.Get(prm_Contenido."No. Producto") then
             Clear(rItem);
-        UnidadParaMostrar(prm_Ubicacion, rItem, prm_Contenido."Cantidad Base", umMostrar, factorMostrar);
+        UnidadParaMostrar(rItem, prm_Contenido."Cantidad Base", umMostrar, factorMostrar);
 
         linea.Add('p', prm_Contenido."No. Producto");
         linea.Add('t', CopyStr(rItem.Description, 1, 60));
@@ -295,13 +290,11 @@ codeunit 51102 "Gestion Mapa SGA"
     end;
 
     /// <summary>
-    /// Unidad en la que se enseña una línea de contenido y sus unidades base:
-    ///   - en un hueco de palé, el palé si la línea llena el palé al 100 %; si no, cajas;
-    ///   - en un hueco de unidades sueltas, la base (botellas);
-    ///   - en el resto, la unidad de venta (la caja) si es mayor que la base, y si no, la base.
-    /// En blanco si el producto no se reconoce.
+    /// Unidad en la que se enseña una línea de contenido y sus unidades base: el palé si la
+    /// línea llena el palé al 100 %; si no, la unidad de venta (la caja) si es mayor que la base,
+    /// y si no, la base. En blanco si el producto no se reconoce.
     /// </summary>
-    local procedure UnidadParaMostrar(var prm_Ubicacion: Record "Ubicacion SGA"; var prm_Item: Record Item; prm_CantidadBase: Decimal; var prm_UM: Code[10]; var prm_Factor: Decimal)
+    local procedure UnidadParaMostrar(var prm_Item: Record Item; prm_CantidadBase: Decimal; var prm_UM: Code[10]; var prm_Factor: Decimal)
     var
         rItemUM: Record "Item Unit of Measure";
     begin
@@ -310,18 +303,16 @@ codeunit 51102 "Gestion Mapa SGA"
         if prm_Item."No." = '' then
             exit;
 
-        // Hueco de palé con el palé completo: se enseña como palé. Si no llega, en cajas.
-        if prm_Ubicacion."Tipo UM Admitida" = prm_Ubicacion."Tipo UM Admitida"::Pale then
-            if prm_Item."Cod. Pale por Defecto" <> '' then
-                if rItemUM.Get(prm_Item."No.", prm_Item."Cod. Pale por Defecto") then
-                    if (rItemUM."Qty. per Unit of Measure" > 0) and (prm_CantidadBase >= rItemUM."Qty. per Unit of Measure") then begin
-                        prm_UM := rItemUM.Code;
-                        prm_Factor := rItemUM."Qty. per Unit of Measure";
-                        exit;
-                    end;
+        // El palé completo se enseña como palé. Si no llega, en cajas.
+        if prm_Item."Cod. Pale por Defecto" <> '' then
+            if rItemUM.Get(prm_Item."No.", prm_Item."Cod. Pale por Defecto") then
+                if (rItemUM."Qty. per Unit of Measure" > 0) and (prm_CantidadBase >= rItemUM."Qty. per Unit of Measure") then begin
+                    prm_UM := rItemUM.Code;
+                    prm_Factor := rItemUM."Qty. per Unit of Measure";
+                    exit;
+                end;
 
-        if prm_Ubicacion."Tipo UM Admitida" <> prm_Ubicacion."Tipo UM Admitida"::Unidad then
-            if prm_Item."Sales Unit of Measure" <> '' then
+        if prm_Item."Sales Unit of Measure" <> '' then
                 if rItemUM.Get(prm_Item."No.", prm_Item."Sales Unit of Measure") then
                     if rItemUM."Qty. per Unit of Measure" > 1 then begin
                         prm_UM := rItemUM.Code;

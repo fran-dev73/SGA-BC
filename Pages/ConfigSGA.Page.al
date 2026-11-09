@@ -43,26 +43,6 @@ page 51106 "Config. SGA"
             {
                 Caption = 'Ubicaciones por flujo';
 
-                field("Ubic. Recepcion Compras"; Rec."Ubic. Recepcion Compras")
-                {
-                    ToolTip = 'Ubicación de muelle donde queda la mercancía de compra hasta que se ubica.';
-                    ApplicationArea = All;
-                }
-                field("Ubic. Entrada Produccion"; Rec."Ubic. Entrada Produccion")
-                {
-                    ToolTip = 'Ubicación donde se deposita el producto terminado de fabricación propia hasta que se ubica.';
-                    ApplicationArea = All;
-                }
-                field("Ubic. Expedicion"; Rec."Ubic. Expedicion")
-                {
-                    ToolTip = 'Ubicación de muelle de salida donde se concentra lo recogido para servir.';
-                    ApplicationArea = All;
-                }
-                field("Ubic. Desbordamiento"; Rec."Ubic. Desbordamiento")
-                {
-                    ToolTip = 'Ubicación donde el motor deja la mercancía cuando no encuentra hueco válido.';
-                    ApplicationArea = All;
-                }
                 field("Ubic. Ajustes"; Rec."Ubic. Ajustes")
                 {
                     ToolTip = 'Ubicación contrapartida de los ajustes y descuadres detectados en la conciliación.';
@@ -75,7 +55,7 @@ page 51106 "Config. SGA"
 
                 field("Estrategia Ubicacion"; Rec."Estrategia Ubicacion")
                 {
-                    ToolTip = 'Política con la que se decide dónde colocar la mercancía que entra.';
+                    ToolTip = 'Política con la que se decide dónde colocar la mercancía que entra. Se aplica primero en las ubicaciones de almacenamiento y, si no queda sitio, en las de picking.';
                     ApplicationArea = All;
                 }
                 field("Estrategia Ubic. Ensamblados"; Rec."Estrategia Ubic. Ensamblados")
@@ -88,22 +68,17 @@ page 51106 "Config. SGA"
                     ToolTip = 'Política para lo que llega en una recepción de compra. Por defecto la estándar: la casa del producto, si no consolidar y si no el primer hueco libre.';
                     ApplicationArea = All;
                 }
-                field("Cajas Minimas Hueco Pale"; Rec."Cajas Minimas Hueco Pale")
+                field("Campo Grupo IIEE"; Rec."Campo Grupo IIEE")
                 {
                     ApplicationArea = All;
                 }
-                field("Reubicar Pale A por ABC"; Rec."Reubicar Pale A por ABC")
+                field("Nombre Campo Grupo IIEE"; Rec."Nombre Campo Grupo IIEE")
                 {
                     ApplicationArea = All;
                 }
                 field("Estrategia Picking"; Rec."Estrategia Picking")
                 {
-                    ToolTip = 'Política con la que el motor decide de dónde sacar la mercancía. La consume el motor de la Fase 2.';
-                    ApplicationArea = All;
-                }
-                field("Tipo Ubic. Nuevas"; Rec."Tipo Ubic. Nuevas")
-                {
-                    ToolTip = 'Qué admiten las ubicaciones que se crean con "Generar ubicaciones": Palé, Caja o Unidad.';
+                    ToolTip = 'Orden en que se coge el stock (FEFO, FIFO…), dentro de cada paso del picking: palés completos de almacenamiento, picking y lo que falte de almacenamiento. Es también el orden con que las reubicaciones eligen qué traer de almacenamiento.';
                     ApplicationArea = All;
                 }
                 field("Dias Aviso Caducidad"; Rec."Dias Aviso Caducidad")
@@ -154,7 +129,7 @@ page 51106 "Config. SGA"
                 }
                 field("Exigir Confirmar Ubicacion"; Rec."Exigir Confirmar Ubicacion")
                 {
-                    ToolTip = 'Obliga al operario a escanear la ubicación para cerrar la tarea. Lo consumen las páginas de PDA de la Fase 3.';
+                    ToolTip = 'Obliga al operario a escanear la ubicación para cerrar la tarea. En el picking, si se exige dígito de control, el dígito ya certifica la ubicación y no hace falta escanearla.';
                     ApplicationArea = All;
                 }
                 field("Permitir Desvio Ubicacion"; Rec."Permitir Desvio Ubicacion")
@@ -165,6 +140,10 @@ page 51106 "Config. SGA"
                 field("Exigir Digito Control"; Rec."Exigir Digito Control")
                 {
                     ToolTip = 'Si está activo, al confirmar cada parada de picking el preparador tiene que teclear el dígito de control impreso en la etiqueta del hueco del que recoge. Certifica que está delante del hueco. Requiere haber impreso las etiquetas de ubicación.';
+                    ApplicationArea = All;
+                }
+                field("Exigir Escanear Producto"; Rec."Exigir Escanear Producto")
+                {
                     ApplicationArea = All;
                 }
                 field("Exigir Asignacion Picking"; Rec."Exigir Asignacion Picking")

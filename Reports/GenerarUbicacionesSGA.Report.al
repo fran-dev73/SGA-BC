@@ -7,7 +7,9 @@ using System.Utilities;
 /// Report Generar Ubicaciones SGA (ID 51100).
 /// Alta masiva de ubicaciones: recorre los rangos de pasillo, estantería y altura de un
 /// almacén y crea lo que falte, tanto en la topología existente como en los datos SGA. El
-/// código sale como pasillo-estantería-altura con ceros a la izquierda (101-15-03).
+/// código sale como pasillo-estantería-altura con ceros a la izquierda (101-15-03). Pasillo y
+/// estantería van de uno en uno; la altura, de 10 en 10 desde la inicial sin pasar de la
+/// final (00, 10, 20…).
 ///
 /// Se genera por almacén y zona: las ubicaciones nuevas nacen en la zona indicada, que
 /// propone su tipo de ubicación. Sin zona, quedan sin zona.
@@ -34,9 +36,12 @@ report 51100 "Generar Ubicaciones SGA"
                 cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
                 combinaciones: Integer;
                 creadas: Integer;
-                ConfirmarGenerarQst: Label 'Se van a revisar %1 ubicaciones del almacén %2, y se crearán las que falten. ¿Desea continuar?', Comment = '%1 = nº de combinaciones, %2 = almacén';
-                ConfirmarGenerarZonaQst: Label 'Se van a revisar %1 ubicaciones del almacén %2, y se crearán las que falten en la zona %3. Las que ya existen conservan su zona. ¿Desea continuar?', Comment = '%1 = nº de combinaciones, %2 = almacén, %3 = zona';
-                ProcesoTerminadoMsg: Label 'Proceso terminado. Se han creado %1 ubicaciones nuevas.', Comment = '%1 = nº de ubicaciones creadas';
+                alturas: List of [Integer];
+                ConfirmarGenerarQst: Label 'Se van a revisar %1 ubicaciones del almacén %2 (alturas %3), y se crearán las que falten. ¿Desea continuar?', Comment = '%1 = nº de combinaciones, %2 = almacén, %3 = lista de alturas';
+                ConfirmarGenerarZonaQst: Label 'Se van a revisar %1 ubicaciones del almacén %2 (alturas %3), y se crearán las que falten en la zona %4. Las que ya existen conservan su zona. ¿Desea continuar?', Comment = '%1 = nº de combinaciones, %2 = almacén, %3 = lista de alturas, %4 = zona';
+                CreadasMsg: Label 'Proceso terminado. Se han creado %1 ubicaciones.', Comment = '%1 = nº creadas';
+                CreadasYExistentesMsg: Label 'Proceso terminado. Se han creado %1 ubicaciones; otras %2 ya existían y no se han tocado.', Comment = '%1 = nº creadas, %2 = nº que ya existían';
+                TodasExistianMsg: Label 'Proceso terminado. No se ha creado ninguna ubicación: las %1 ya existían.', Comment = '%1 = nº revisadas';
                 AlmacenObligatorioErr: Label 'Debe indicar el almacén.';
                 RangoErr: Label 'El %1 desde (%2) no puede ser mayor que el hasta (%3).', Comment = '%1 = pasillo, estantería o altura, %2 = desde, %3 = hasta';
                 PasilloLbl: Label 'pasillo';
@@ -55,16 +60,16 @@ report 51100 "Generar Ubicaciones SGA"
                 if codZona <> '' then
                     rZona.Get(codAlmacen, codZona);
 
+                alturas := cUbicaciones.AlturasDelRango(intAlturaDesde, intAlturaHasta);
                 combinaciones := (intPasilloHasta - intPasilloDesde + 1) *
-                                 (intEstanteriaHasta - intEstanteriaDesde + 1) *
-                                 (intAlturaHasta - intAlturaDesde + 1);
+                                 (intEstanteriaHasta - intEstanteriaDesde + 1) * alturas.Count();
 
                 if GuiAllowed() then
                     if codZona = '' then begin
-                        if not Confirm(ConfirmarGenerarQst, false, combinaciones, codAlmacen) then
+                        if not Confirm(ConfirmarGenerarQst, false, combinaciones, codAlmacen, ListaAlturas(alturas)) then
                             exit;
                     end else
-                        if not Confirm(ConfirmarGenerarZonaQst, false, combinaciones, codAlmacen, codZona) then
+                        if not Confirm(ConfirmarGenerarZonaQst, false, combinaciones, codAlmacen, ListaAlturas(alturas), codZona) then
                             exit;
 
                 creadas := cUbicaciones.GenerarUbicaciones(codAlmacen, intPasilloDesde, intPasilloHasta,
@@ -72,7 +77,14 @@ report 51100 "Generar Ubicaciones SGA"
                                                            codZona, enumTipoUbicacion, decCapacidadUds);
 
                 if GuiAllowed() then
-                    Message(ProcesoTerminadoMsg, creadas);
+                    case true of
+                        creadas = 0:
+                            Message(TodasExistianMsg, combinaciones);
+                        creadas = combinaciones:
+                            Message(CreadasMsg, creadas);
+                        else
+                            Message(CreadasYExistentesMsg, creadas, combinaciones - creadas);
+                    end;
             end;
         }
     }
@@ -168,21 +180,27 @@ report 51100 "Generar Ubicaciones SGA"
                         MinValue = 1;
                         MaxValue = 99;
                     }
-                    field(AlturaDesde; intAlturaDesde)
+                    field(AlturaDesde; txtAlturaDesde)
                     {
                         Caption = 'Altura desde';
-                        ToolTip = 'Primera altura de cada estantería que se crea. Entre 1 y 99; en el código va con dos dígitos (01).';
+                        ToolTip = 'Primera altura de cada estantería que se crea, con dos dígitos como en el código: de 00 a 99.';
                         ApplicationArea = All;
-                        MinValue = 1;
-                        MaxValue = 99;
+
+                        trigger OnValidate()
+                        begin
+                            LeerAltura(txtAlturaDesde, intAlturaDesde);
+                        end;
                     }
-                    field(AlturaHasta; intAlturaHasta)
+                    field(AlturaHasta; txtAlturaHasta)
                     {
                         Caption = 'Altura hasta';
-                        ToolTip = 'Última altura de cada estantería que se crea. Entre 1 y 99; en el código va con dos dígitos (01).';
+                        ToolTip = 'Altura más alta de cada estantería, con dos dígitos como en el código: de 00 a 99. Se crean las alturas desde la inicial, de 10 en 10, sin pasar de esta: de 00 a 30, las 00, 10, 20 y 30.';
                         ApplicationArea = All;
-                        MinValue = 1;
-                        MaxValue = 99;
+
+                        trigger OnValidate()
+                        begin
+                            LeerAltura(txtAlturaHasta, intAlturaHasta);
+                        end;
                     }
                 }
                 group(Atributos)
@@ -192,13 +210,13 @@ report 51100 "Generar Ubicaciones SGA"
                     field(TipoUbicacion; enumTipoUbicacion)
                     {
                         Caption = 'Tipo ubicación';
-                        ToolTip = 'Uso funcional que se asigna a las ubicaciones creadas.';
+                        ToolTip = 'Almacenamiento o Picking para las ubicaciones creadas. En blanco no se proponen al ubicar.';
                         ApplicationArea = All;
                     }
                     field(CapacidadUds; decCapacidadUds)
                     {
-                        Caption = 'Capacidad uds.';
-                        ToolTip = 'Cuánto cabe en cada ubicación creada, contado en palés (o cajas, según el tipo de hueco al generar de la configuración): 1 = un palé, lleve lo que lleve. 0 deja la capacidad sin declarar.';
+                        Caption = 'Capacidad (palés)';
+                        ToolTip = 'Cuántos palés caben en cada ubicación creada: 1 = un palé, lleve lo que lleve. 0 deja la capacidad sin declarar.';
                         ApplicationArea = All;
                         DecimalPlaces = 0 : 5;
                         MinValue = 0;
@@ -223,10 +241,8 @@ report 51100 "Generar Ubicaciones SGA"
                 intEstanteriaDesde := 1;
             if intEstanteriaHasta = 0 then
                 intEstanteriaHasta := 1;
-            if intAlturaDesde = 0 then
-                intAlturaDesde := 1;
-            if intAlturaHasta = 0 then
-                intAlturaHasta := 1;
+            LeerAltura(txtAlturaDesde, intAlturaDesde);
+            LeerAltura(txtAlturaHasta, intAlturaHasta);
         end;
     }
 
@@ -238,7 +254,46 @@ report 51100 "Generar Ubicaciones SGA"
         intEstanteriaHasta: Integer;
         intAlturaDesde: Integer;
         intAlturaHasta: Integer;
+        txtAlturaDesde: Text[2];
+        txtAlturaHasta: Text[2];
         codZona: Code[10];
         enumTipoUbicacion: Enum "Tipo Ubicacion SGA";
         decCapacidadUds: Decimal;
+
+    /// <summary>
+    /// Las alturas que se van a recorrer, a dos dígitos (00, 10, 20), para confirmarlas antes de
+    /// generar: la página guarda los valores de la última vez y un desde antiguo no se ve.
+    /// </summary>
+    local procedure ListaAlturas(prm_Alturas: List of [Integer]) lista: Text
+    var
+        altura: Integer;
+    begin
+        foreach altura in prm_Alturas do begin
+            if lista <> '' then
+                lista += ', ';
+            lista += DosDigitos(altura);
+        end;
+    end;
+
+    /// <summary>
+    /// Lee una altura tecleada (0, 5, 00, 10…) y la deja escrita a dos dígitos, como va en el
+    /// código de la ubicación. En blanco cuenta como 00.
+    /// </summary>
+    local procedure LeerAltura(var prm_Texto: Text[2]; var prm_Altura: Integer)
+    var
+        AlturaErr: Label 'La altura debe ser un número de dos dígitos, de 00 a 99.';
+    begin
+        prm_Texto := CopyStr(DelChr(prm_Texto, '<>', ' '), 1, MaxStrLen(prm_Texto));
+        if prm_Texto = '' then
+            prm_Texto := '0';
+        if DelChr(prm_Texto, '=', '0123456789') <> '' then
+            Error(AlturaErr);
+        Evaluate(prm_Altura, prm_Texto);
+        prm_Texto := CopyStr(DosDigitos(prm_Altura), 1, MaxStrLen(prm_Texto));
+    end;
+
+    local procedure DosDigitos(prm_Valor: Integer): Text
+    begin
+        exit(PadStr('', 2 - StrLen(Format(prm_Valor)), '0') + Format(prm_Valor));
+    end;
 }

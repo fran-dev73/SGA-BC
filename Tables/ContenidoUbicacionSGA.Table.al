@@ -33,9 +33,9 @@ table 51102 "Contenido Ubicacion SGA"
         }
         field(20; "Cod. Bin"; Code[20])
         {
-            Caption = 'Cód. bin';
+            Caption = 'Cód. ubicación';
             DataClassification = ToBeClassified;
-            TableRelation = Bin where("Location Code" = field("Cod. Almacen"));
+            TableRelation = Bin.Code where("Location Code" = field("Cod. Almacen"));
         }
         field(30; "No. Producto"; Code[20])
         {

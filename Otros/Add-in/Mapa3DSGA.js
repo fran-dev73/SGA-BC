@@ -5,12 +5,14 @@
 // CDN dejaría el panel en blanco.
 //
 // Ejes del almacén: pasillo (profundidad, u.e), estantería (anchura, u.c) y altura
-// (vertical, u.a), sacados del código pasillo-estantería-altura (101-15-03).
+// (vertical, u.a), sacados del código pasillo-estantería-altura (101-15-03). Las alturas
+// pueden saltar (00, 10, 20…): se dibujan por su nivel (u.n, 1 = la más baja de todo el
+// almacén) y se rotulan con su número.
 //
 // Tres vistas sobre los mismos datos:
 //   - 3D: cada ubicación es un cubo en proyección isométrica. Da la idea de conjunto.
 //   - Planta: el almacén visto desde arriba, una fila por pasillo y una columna por estantería;
-//     cada hueco se parte en franjas, una por altura (la de abajo es la altura 1).
+//     cada hueco se parte en franjas, una por altura (la de abajo es la más baja).
 //   - Frente: un pasillo de frente, estanterías por alturas, con casillas grandes en las que
 //     se lee el producto. Es la vista de trabajo.
 // En las tres se colorea por el criterio elegido (estado, rotación ABC o caducidad),
@@ -71,7 +73,7 @@ var SGA3D = (function () {
 
     var AYUDA = {
         '3d': 'Arrastre una ubicación con contenido a otra para trasladarlo · arrastre fuera de ellas (o Alt+arrastre) para girar · Mayús+arrastre para mover · doble clic para aislar su pasillo · clic derecho para vaciar · rueda para acercar',
-        'planta': 'Cada hueco se parte en sus alturas (abajo la 1) · doble clic en un pasillo para verlo de frente · arrastre una ubicación con contenido a otra para trasladarlo · arrastre fuera para mover · clic derecho para vaciar · rueda para acercar',
+        'planta': 'Cada hueco se parte en sus alturas (abajo la más baja) · doble clic en un pasillo para verlo de frente · arrastre una ubicación con contenido a otra para trasladarlo · arrastre fuera para mover · clic derecho para vaciar · rueda para acercar',
         'frente': 'Arrastre una ubicación con contenido a otra para trasladarlo · arrastre fuera para mover · clic derecho para vaciar · rueda para acercar · < > cambia de pasillo'
     };
 
@@ -504,6 +506,23 @@ var SGA3D = (function () {
             if (!vistos[e]) { vistos[e] = true; pasillos.push(e); }
         }
         pasillos.sort(function (a, b) { return Number(a) - Number(b); });
+        numerarAlturas();
+    }
+
+    // Nivel de cada altura (u.n): su posición entre las alturas que hay, de abajo arriba.
+    // Así 00, 10, 20 se dibujan seguidas y no con nueve niveles vacíos entre ellas.
+    function numerarAlturas() {
+        var vistas = {};
+        var alturas = [];
+        var i;
+        for (i = 0; i < ubicaciones.length; i++) {
+            var a = ubicaciones[i].a;
+            if (!vistas[a]) { vistas[a] = true; alturas.push(a); }
+        }
+        alturas.sort(function (x, y) { return x - y; });
+        var nivel = {};
+        for (i = 0; i < alturas.length; i++) { nivel[alturas[i]] = i + 1; }
+        for (i = 0; i < ubicaciones.length; i++) { ubicaciones[i].n = nivel[ubicaciones[i].a]; }
     }
 
     function visible(u) {
@@ -743,14 +762,14 @@ var SGA3D = (function () {
             u = ubicaciones[i];
             if (!visible(u)) { continue; }
             var g = girar(u.e * sep - centroE, u.c - centroC);
-            var p = aPantalla(g.e, g.c, u.a);
+            var p = aPantalla(g.e, g.c, u.n);
             cubos.push({
                 u: u,
                 x: p.x,
                 y: p.y,
                 // La profundidad decide el orden de pintado: lo de detrás primero, para que
                 // lo de delante lo tape y el volumen se lea bien.
-                z: g.c + g.e + u.a * 0.01
+                z: g.c + g.e + u.n * 0.01
             });
         }
 
@@ -1019,24 +1038,26 @@ var SGA3D = (function () {
     // ---------------------------------------------------------------- vistas planas
 
     // Coloca las ubicaciones como rectángulos, a escala 1. Frente: el pasillo elegido,
-    // estanterías por alturas (la 1 abajo). Planta: una fila por pasillo y una columna por
+    // estanterías por alturas (la más baja abajo). Planta: una fila por pasillo y una columna por
     // estantería, cada hueco partido en una franja por altura.
     function maquetarPlano() {
         rects = [];
         rotulos2 = [];
         if (!ubicaciones.length) { return; }
 
-        var minC = 1e9, maxC = -1e9, minA = 1e9, maxA = -1e9;
+        var minC = 1e9, maxC = -1e9, minN = 1e9, maxN = -1e9;
         var i, u;
         var lista = [];
+        var alturaDeNivel = {};
         for (i = 0; i < ubicaciones.length; i++) {
             u = ubicaciones[i];
             if (vista === 'frente' && String(u.e) !== pasilloActivo) { continue; }
             lista.push(u);
+            alturaDeNivel[u.n] = u.a;
             if (u.c < minC) { minC = u.c; }
             if (u.c > maxC) { maxC = u.c; }
-            if (u.a < minA) { minA = u.a; }
-            if (u.a > maxA) { maxA = u.a; }
+            if (u.n < minN) { minN = u.n; }
+            if (u.n > maxN) { maxN = u.n; }
         }
         if (!lista.length) { return; }
 
@@ -1046,11 +1067,12 @@ var SGA3D = (function () {
             var pasoY = FRENTE_ALTO + FRENTE_HUECO;
             for (i = 0; i < lista.length; i++) {
                 u = lista[i];
-                rects.push({ u: u, x: (u.c - minC) * pasoX, y: (maxA - u.a) * pasoY, w: FRENTE_ANCHO, h: FRENTE_ALTO });
+                rects.push({ u: u, x: (u.c - minC) * pasoX, y: (maxN - u.n) * pasoY, w: FRENTE_ANCHO, h: FRENTE_ALTO });
                 columnas[u.c] = true;
             }
-            for (var a = minA; a <= maxA; a++) {
-                rotulos2.push({ texto: 'Altura ' + a, x: -10, y: (maxA - a) * pasoY + FRENTE_ALTO / 2, alinear: 'right' });
+            for (var n = minN; n <= maxN; n++) {
+                if (alturaDeNivel[n] === undefined) { continue; }
+                rotulos2.push({ texto: 'Altura ' + conCeros(alturaDeNivel[n], 2), x: -10, y: (maxN - n) * pasoY + FRENTE_ALTO / 2, alinear: 'right' });
             }
             for (var c in columnas) {
                 if (Object.prototype.hasOwnProperty.call(columnas, c)) {
@@ -1062,7 +1084,7 @@ var SGA3D = (function () {
         }
 
         // Planta
-        var alturas = maxA - minA + 1;
+        var alturas = maxN - minN + 1;
         var franja = PLANTA_ALTO / alturas;
         var pasoC = PLANTA_ANCHO + PLANTA_HUECO;
         var pasoE = PLANTA_ALTO + PLANTA_PASILLO;
@@ -1074,7 +1096,7 @@ var SGA3D = (function () {
             rects.push({
                 u: u,
                 x: (u.c - minC) * pasoC,
-                y: fila * pasoE + (maxA - u.a) * franja,
+                y: fila * pasoE + (maxN - u.n) * franja,
                 w: PLANTA_ANCHO,
                 h: franja
             });

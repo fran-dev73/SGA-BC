@@ -58,7 +58,7 @@ report 51102 "Carga Inicial Contenido SGA"
                     {
                         Caption = 'Ubicación de destino';
                         OptionCaption = 'Ubicación fija del producto,Ubicación indicada,Huecos libres';
-                        ToolTip = 'Huecos libres: cada palé a un hueco de palé vacío por la ruta y el resto en cajas a un hueco mixto; lo que no cabe no se carga. Ubicación fija del producto: a su casa (Shelf No.) o, si no tiene, a la ubicación indicada. Ubicación indicada: todo a una ubicación de paso.';
+                        ToolTip = 'Huecos libres: cada palé a un hueco vacío por la ruta (primero picking, hasta el máximo por producto, y luego almacenamiento) y el resto junto a un hueco con sitio; lo que no cabe no se carga. Ubicación fija del producto: a su casa (Shelf No.) o, si no tiene, a la ubicación indicada. Ubicación indicada: todo a una ubicación de paso.';
                         ApplicationArea = All;
 
                         trigger OnValidate()
@@ -73,6 +73,14 @@ report 51102 "Carga Inicial Contenido SGA"
                         Editable = blnUbicacionIndicadaEditable;
                         ApplicationArea = All;
                         TableRelation = Bin.Code;
+                    }
+                    field(MaxPickingProducto; intMaxPickingProducto)
+                    {
+                        Caption = 'Máx. ubicaciones de picking por producto';
+                        ToolTip = 'Con "Huecos libres", cuántas ubicaciones de picking puede ocupar cada producto. Así picking no se llena de palés de unos pocos productos y queda sitio para todos; el resto de sus palés va a almacenamiento. Cuentan también las que ya ocupa. Sus ubicaciones reservadas (Producto fijo) se llenan igualmente.';
+                        ApplicationArea = All;
+                        MinValue = 1;
+                        Editable = blnMaxPickingEditable;
                     }
                     field(OmitirConContenido; blnOmitirConContenido)
                     {
@@ -99,6 +107,8 @@ report 51102 "Carga Inicial Contenido SGA"
                 codAlmacen := rConfig."Almacen por Defecto";
             if codUbicacionIndicada = '' then
                 codUbicacionIndicada := rConfig."Ubic. Ajustes";
+            if intMaxPickingProducto = 0 then
+                intMaxPickingProducto := 1;
             ActualizarUbicacionIndicada();
         end;
     }
@@ -111,6 +121,8 @@ report 51102 "Carga Inicial Contenido SGA"
         blnOmitirConContenido: Boolean;
         blnSimular: Boolean;
         blnUbicacionIndicadaEditable: Boolean;
+        blnMaxPickingEditable: Boolean;
+        intMaxPickingProducto: Integer;
 
     local procedure Ejecutar()
     var
@@ -126,6 +138,7 @@ report 51102 "Carga Inicial Contenido SGA"
                 exit;
 
         cCarga.Configurar(codAlmacen, optDestino, UbicacionIndicadaEfectiva(), blnOmitirConContenido, blnSimular, Producto.GetView());
+        cCarga.FijarMaxPickingProducto(intMaxPickingProducto);
 
         // Codeunit.Run para poder recoger el fin de simulación, que llega como error para que
         // la base de datos deshaga lo escrito.
@@ -151,11 +164,13 @@ report 51102 "Carga Inicial Contenido SGA"
 
     /// <summary>
     /// Con "Huecos libres" el hueco lo elige el sistema: la ubicación indicada no se deja tocar
-    /// y no se usa, tampoco para los productos sin palé, que salen como no cargados.
+    /// y no se usa, tampoco para los productos sin palé, que salen como no cargados. El máximo
+    /// de picking por producto, al revés: solo cuenta con "Huecos libres".
     /// </summary>
     local procedure ActualizarUbicacionIndicada()
     begin
         blnUbicacionIndicadaEditable := optDestino <> optDestino::"Huecos Libres";
+        blnMaxPickingEditable := not blnUbicacionIndicadaEditable;
     end;
 
     local procedure UbicacionIndicadaEfectiva(): Code[20]

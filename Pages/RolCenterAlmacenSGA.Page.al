@@ -106,7 +106,8 @@ page 51112 "Rol Center Almacen SGA"
                     ToolTip = 'Reparte entre huecos lo que ha salido de los ensamblados de un día.';
                     ApplicationArea = All;
                     Image = Warehouse;
-                    RunObject = codeunit "Abrir Ubicar Ensamblados SGA";
+                    RunObject = page "Ubicar Entradas SGA";
+                    RunPageView = where(Origen = const(Produccion));
                 }
                 action(UbicarPaletsLinea)
                 {
@@ -122,7 +123,8 @@ page 51112 "Rol Center Almacen SGA"
                     ToolTip = 'Reparte entre huecos lo que ha llegado en las recepciones de compra de un día.';
                     ApplicationArea = All;
                     Image = Warehouse;
-                    RunObject = codeunit "Abrir Ubicar Recepciones SGA";
+                    RunObject = page "Ubicar Entradas SGA";
+                    RunPageView = where(Origen = const(Compra));
                 }
                 action(OrdenesPicking)
                 {
@@ -139,6 +141,14 @@ page 51112 "Rol Center Almacen SGA"
                     ApplicationArea = All;
                     Image = Warehouse;
                     RunObject = page "Asignar Ordenes Picking SGA";
+                }
+                action(Reubicaciones)
+                {
+                    Caption = 'Reubicaciones';
+                    ToolTip = 'Lo que hay que llevar de almacenamiento a picking: planificarlo, verlo y prepararlo.';
+                    ApplicationArea = All;
+                    Image = Warehouse;
+                    RunObject = page "Reubicaciones SGA";
                 }
                 action(DondeEsta)
                 {

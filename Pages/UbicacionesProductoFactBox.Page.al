@@ -7,7 +7,7 @@ namespace AntonioNadal.SGA;
 /// </summary>
 page 51109 "Ubicaciones Producto FactBox"
 {
-    Caption = 'Ubicaciones del producto';
+    Caption = 'Ubicaciones del producto SGA';
     PageType = ListPart;
     SourceTable = "Contenido Ubicacion SGA";
     ApplicationArea = All;

@@ -13,7 +13,7 @@ using Microsoft.Warehouse.Structure;
 /// </summary>
 page 51114 "Mover Contenido SGA"
 {
-    Caption = 'Trasladar contenido';
+    Caption = 'Trasladar contenido SGA';
     PageType = StandardDialog;
     ApplicationArea = All;
 
@@ -105,7 +105,7 @@ page 51114 "Mover Contenido SGA"
                     ToolTip = 'Ubicación a la que se lleva la mercancía. Con zona destino, tiene que ser de esa zona.';
                     ApplicationArea = All;
                     ShowMandatory = true;
-                    TableRelation = Bin;
+                    TableRelation = Bin.Code;
 
                     trigger OnLookup(var Text: Text): Boolean
                     var

@@ -450,12 +450,6 @@ codeunit 51100 "Gestion Contenido SGA"
         cantidadBase := Round(prm_Cantidad * factor, 0.00001);
         caducidad := cStock.CaducidadLote(prm_Producto, prm_Variante, prm_Lote);
 
-        // La UM la fija la ubicación de destino: una ubicación de palés no admite cajas y al
-        // revés. Se comprueba contra la UM que usa el operario, no contra la base del producto.
-        if (prm_UbicacionDestino <> '') and (prm_Tipo <> "Tipo Mov. Ubicacion SGA"::"Carga Inicial") then
-            TestUMAdmitida(prm_Almacen, prm_UbicacionDestino, prm_Producto, umUsada,
-                           prm_Tipo = "Tipo Mov. Ubicacion SGA"::Traslado, cantidadBase);
-
         // Salida primero: si no hay existencias en el origen no llego a tocar el destino.
         if prm_UbicacionOrigen <> '' then
             AplicarDelta(prm_Almacen, prm_UbicacionOrigen, prm_Producto, prm_Variante, prm_Lote, umBase,
@@ -593,6 +587,8 @@ codeunit 51100 "Gestion Contenido SGA"
         rContenido: Record "Contenido Ubicacion SGA";
         ocupado: Decimal;
         entrada: Decimal;
+        grupoIIEE: Code[20];
+        FueraZonaGrupoQst: Label 'La ubicación %1 no está en ninguna zona del grupo IIEE del producto %2 (%3). ¿Desea dejarlo ahí de todos modos?', Comment = '%1 = ubicación, %2 = producto, %3 = grupo IIEE';
         UbicacionBloqueadaErr: Label 'La ubicación %1 está bloqueada: %2', Comment = '%1 = ubicación, %2 = motivo de bloqueo';
         UbicacionProductoFijoErr: Label 'La ubicación %1 está reservada para el producto %2.', Comment = '%1 = ubicación, %2 = producto fijo';
         MezclaProductoErr: Label 'La ubicación %1 no permite mezclar productos y ya contiene %2.', Comment = '%1 = ubicación, %2 = producto que ya contiene';
@@ -613,15 +609,20 @@ codeunit 51100 "Gestion Contenido SGA"
                 Error(MezclaLoteErr, rUbicacionSGA."Cod. Bin", rContenido."No. Lote");
         end;
 
+        // Fuera de las zonas de su grupo IIEE se puede dejar, pero avisando. En proceso por lotes
+        // o sin interfaz se deja pasar.
+        if not ModoSilencioso and GuiAllowed() then
+            if cUbicaciones.FueraDeZonasGrupoIIEE(rUbicacionSGA, prm_Producto, grupoIIEE) then
+                if not Confirm(FueraZonaGrupoQst, false, rUbicacionSGA."Cod. Bin", prm_Producto, grupoIIEE) then
+                    Error('');
+
         if rUbicacionSGA."Capacidad Uds." <= 0 then
             exit;
 
-        // La capacidad se declara en la clase que admite la ubicación ("1 palé", "72 cajas").
-        // Todo se cuenta en esa clase: lo que hay, convirtiendo cada línea con el palé o la caja
-        // de su producto, y lo que entra, con el de este producto. Así caben juntos palés de
-        // 200 y de 300, o cajas de 6 y de 12.
-        ocupado := rUbicacionSGA.OcupadoEnUMHueco();
-        entrada := Round(rUbicacionSGA.EnUMHueco(prm_Producto, prm_CantidadBase), 0.00001);
+        // La capacidad se declara en palés. Lo que hay se cuenta con el palé de cada producto y
+        // lo que entra, con el de este producto: así caben juntos palés de 200 y de 300.
+        ocupado := rUbicacionSGA.OcupadoEnPales();
+        entrada := Round(cUM.EnPales(prm_Producto, prm_CantidadBase), 0.00001);
 
         if ocupado + entrada <= rUbicacionSGA."Capacidad Uds." then
             exit;
@@ -637,50 +638,6 @@ codeunit 51100 "Gestion Contenido SGA"
 
         if not Confirm(SuperaCapacidadQst, false, rUbicacionSGA."Cod. Bin", ocupado + entrada, rUbicacionSGA."Capacidad Uds.") then
             Error('');
-    end;
-
-    /// <summary>
-    /// Comprueba que la UM en la que se mueve la mercancía es la que acepta la ubicación.
-    /// Una ubicación de palés no admite cajas y al revés; con "Admite" en blanco
-    /// la ubicación admite cualquiera. Los palés de distinto tamaño (PALE, PALE200…) cuentan
-    /// todos como palé.
-    ///
-    /// Un traslado mueve mercancía que ya está ubicada y viaja en UM base (lo que hay en el
-    /// hueco). Ahí basta con que el producto tenga una unidad de la clase que admite el destino:
-    /// mover el palé de A a B es mover un palé aunque se exprese en botellas.
-    ///
-    /// A una ubicación de Unidad no entra un palé entero, se exprese como se exprese: con la
-    /// cantidad en botellas la clase de la unidad no lo detecta, y la capacidad, sola, no basta
-    /// si la ubicación es grande. Lo mide prm_CantidadBase contra el palé de la ficha.
-    /// </summary>
-    local procedure TestUMAdmitida(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]; prm_Producto: Code[20]; prm_UM: Code[10]; prm_EsTraslado: Boolean; prm_CantidadBase: Decimal)
-    var
-        rUbicacionSGA: Record "Ubicacion SGA";
-        umPale: Code[10];
-        UMNoAdmitidaErr: Label 'La ubicación %1 admite %2 y no se puede dejar mercancía en %3 en ella. Las unidades sueltas solo van a ubicaciones de Unidad, y las cajas a ubicaciones de Caja o de Palé.', Comment = '%1 = ubicación, %2 = qué admite (Palé/Caja/Unidad), %3 = UM usada';
-        ProductoSinUMAdmitidaErr: Label 'La ubicación %1 admite %2 y el producto %3 no tiene ninguna unidad de esa clase.', Comment = '%1 = ubicación, %2 = qué admite (Palé/Caja/Unidad), %3 = producto';
-        PaleEnUnidadErr: Label 'La ubicación %1 es de unidades sueltas y no admite un palé entero: %2 unidades de %3 llegan a un palé (%4). Déjelo en una ubicación de Palé.', Comment = '%1 = ubicación, %2 = cantidad en unidad base, %3 = producto, %4 = palé del producto';
-    begin
-        if not rUbicacionSGA.Get(prm_Almacen, prm_Ubicacion) then
-            exit;
-
-        if rUbicacionSGA."Tipo UM Admitida" = rUbicacionSGA."Tipo UM Admitida"::Unidad then begin
-            umPale := cUM.UMProductoDeTipo(prm_Producto, "Tipo UM SGA"::Pale);
-            if umPale <> '' then
-                if prm_CantidadBase >= cUM.FactorUM(prm_Producto, umPale) then
-                    Error(PaleEnUnidadErr, prm_Ubicacion, prm_CantidadBase, prm_Producto, umPale);
-        end;
-
-        if cUM.UMAdmitida(prm_Producto, rUbicacionSGA."Tipo UM Admitida", prm_UM) then
-            exit;
-
-        if prm_EsTraslado then begin
-            if cUM.UMProductoDeTipo(prm_Producto, rUbicacionSGA."Tipo UM Admitida") <> '' then
-                exit;
-            Error(ProductoSinUMAdmitidaErr, prm_Ubicacion, rUbicacionSGA."Tipo UM Admitida", prm_Producto);
-        end;
-
-        Error(UMNoAdmitidaErr, prm_Ubicacion, rUbicacionSGA."Tipo UM Admitida", prm_UM);
     end;
 
     local procedure InsertarMovimiento(prm_Tipo: Enum "Tipo Mov. Ubicacion SGA"; prm_Origen: Enum "Origen Mov. SGA"; prm_Almacen: Code[10]; prm_UbicacionOrigen: Code[20]; prm_UbicacionDestino: Code[20]; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50]; prm_Caducidad: Date; prm_UM: Code[10]; prm_Factor: Decimal; prm_Cantidad: Decimal; prm_CantidadBase: Decimal; prm_NoDocumento: Code[20]; prm_NoLinea: Integer; prm_Descripcion: Text): Integer

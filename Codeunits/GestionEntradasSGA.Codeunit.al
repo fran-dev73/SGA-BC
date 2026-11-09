@@ -18,7 +18,7 @@ using System.Environment;
 /// la entrada cuando el operario confirma.
 ///
 /// No se engancha al registro de BC a propósito: las validaciones de SGA (capacidad, mezcla,
-/// tipo de unidad admitido) lanzan error, y dentro del registro harían fallar el albarán. BC registra como
+/// bloqueo) lanzan error, y dentro del registro harían fallar el albarán. BC registra como
 /// siempre y SGA va detrás, leyendo lo registrado.
 ///
 /// Lo que ya está colocado no se guarda en ninguna marca propia: se deduce del diario de
@@ -34,19 +34,6 @@ using System.Environment;
 codeunit 51105 "Gestion Entradas SGA"
 {
     Access = Public;
-
-    /// <summary>
-    /// Abre "Ubicar entradas" en un origen: Compra para las recepciones de compra, Produccion
-    /// para los ensamblados. Es la entrada de los menús: el origen se le pasa a la página antes
-    /// de abrirla, porque un filtro de RunPageView no le llega (es temporal).
-    /// </summary>
-    procedure AbrirUbicarEntradas(prm_Origen: Enum "Origen Mov. SGA")
-    var
-        pEntradas: Page "Ubicar Entradas SGA";
-    begin
-        pEntradas.FijarOrigen(prm_Origen);
-        pEntradas.Run();
-    end;
 
     /// <summary>
     /// Rellena las líneas con lo que ha entrado por el origen indicado (Producción para los
@@ -438,9 +425,6 @@ codeunit 51105 "Gestion Entradas SGA"
         // Sin hueco la fila sigue Pendiente, con el motivo: en las entradas no se usa "Sin Sitio".
         repeat
             if (TempFila.Estado <> TempFila.Estado::Ubicado) and (TempFila."Ubicacion Propuesta" = '') then begin
-                // Primero el traslado ABC; la entrada busca después, sin sus dos huecos.
-                ProponerTrasladoABC(TempFila, asignadas);
-                asignadas := ExclusionesTraslado(asignadas, TempFila);
                 codigo := ProponerParaFila(TempFila, asignadas, motivo);
                 TempFila."Ubicacion Propuesta" := codigo;
                 TempFila.Motivo := CopyStr(motivo, 1, MaxStrLen(TempFila.Motivo));
@@ -451,10 +435,8 @@ codeunit 51105 "Gestion Entradas SGA"
                     asignadas := cUbicaciones.AnadirExclusion(asignadas, codigo);
                     propuestas += 1;
                 end;
-            end else begin
+            end else
                 asignadas := cUbicaciones.AnadirExclusion(asignadas, TempFila."Ubicacion Propuesta");
-                asignadas := ExclusionesTraslado(asignadas, TempFila);
-            end;
         until TempFila.Next() = 0;
 
         exit(propuestas);
@@ -473,7 +455,6 @@ codeunit 51105 "Gestion Entradas SGA"
     begin
         excluidas := ExclusionesDeOtrasFilas(prm_Fila);
         excluidas := cUbicaciones.AnadirExclusion(excluidas, prm_Fila."Ubicacion Propuesta");
-        excluidas := ExclusionesTraslado(excluidas, prm_Fila);
 
         codigo := ProponerParaFila(prm_Fila, excluidas, motivo);
 
@@ -517,9 +498,6 @@ codeunit 51105 "Gestion Entradas SGA"
             descripcion := StrSubstNo(RecepcionLbl, prm_Fila."No. Documento")
         else
             descripcion := StrSubstNo(EnsambladoLbl, prm_Fila."No. Documento");
-
-        // El traslado ABC aceptado va antes: si falla, tampoco se registra la entrada.
-        HacerTrasladoABC(prm_Fila);
 
         cContenido.RegistrarEntrada(prm_Fila."Cod. Almacen", prm_Fila."Ubicacion Confirmada",
                                     prm_Fila."No. Producto", prm_Fila."Cod. Variante", prm_Fila."No. Lote",
@@ -572,10 +550,8 @@ codeunit 51105 "Gestion Entradas SGA"
     /// último palé, incompleto, con lo que queda. Tampoco se ubica nunca más de lo que falta
     /// del ensamblado.
     ///
-    /// El palé completo se ubica en la unidad de palé. El incompleto, en cajas (la unidad de
-    /// venta), que van a un hueco de caja o de palé según cuántas sean (ver TipoHuecoDestino en
-    /// "Unidades Producto SGA"); las botellas que no lleguen a una caja quedan pendientes y se avisa. Si
-    /// no llega a una caja, se ubica en unidades sueltas.
+    /// El palé completo se ubica en la unidad de palé. El incompleto se ubica entero, en cajas (la
+    /// unidad de venta) si son cajas exactas y si no en unidades sueltas.
     ///
     /// Sin hueco libre, la ubicación queda en blanco y prm_Aviso dice por qué no lo hay.
     ///
@@ -596,7 +572,6 @@ codeunit 51105 "Gestion Entradas SGA"
         pendienteBase: Decimal;
         restantePlanBase: Decimal;
         paleBase: Decimal;
-        sueltasBase: Decimal;
         entradaBase: Decimal;
         yaUbicadoBase: Decimal;
         umDestino: Code[10];
@@ -604,7 +579,6 @@ codeunit 51105 "Gestion Entradas SGA"
         lotes: Dictionary of [Code[50], Decimal];
         lote: Code[50];
         LoteDesconocidoLbl: Label 'No se sabe el lote del palé: el ensamblado %1 no tiene lote en sus líneas de seguimiento, o tiene varios y ninguno es el de la tarea (%2).', Comment = '%1 = nº ensamblado, %2 = lote de la tarea';
-        SueltasPendientesLbl: Label 'Palé incompleto: %1 %2 no llegan a una caja y quedan pendientes; ubíquelas desde "Ubicar producto".', Comment = '%1 = cantidad, %2 = unidad base';
         TareaSinEnsambladoLbl: Label 'La tarea %1 no tiene pedido de ensamblado enlazado: no se sabe a qué entrada apuntar el palé.', Comment = '%1 = nº tarea';
         SinUnidadPaleLbl: Label 'El producto %1 no tiene la unidad de palé %2 definida.', Comment = '%1 = producto, %2 = unidad de palé';
         EnsambladoYaUbicadoLbl: Label 'Ya está ubicado todo lo del ensamblado %1.', Comment = '%1 = nº pedido de ensamblado';
@@ -699,21 +673,16 @@ codeunit 51105 "Gestion Entradas SGA"
         if paleBase > pendienteBase then
             paleBase := pendienteBase;
 
-        // Unidad en la que se ubica: palé completo, cajas o, si no llega a una caja, unidades. Es
-        // el primer trozo del reparto con el palé de la tarea; las sueltas que sobren de las
-        // cajas quedan pendientes.
-        cUM.Repartir(prm_Fila."No. Producto", paleBase, rUMPale.Code, 0, TempTrozo);
+        // Unidad en la que se ubica: el palé completo, en la de palé; el incompleto, entero, en
+        // cajas si son cajas exactas y si no en unidades. Es el único trozo del reparto con el
+        // palé de la tarea.
+        cUM.Repartir(prm_Fila."No. Producto", paleBase, rUMPale.Code, 1, TempTrozo);
         if not TempTrozo.FindFirst() then begin
             prm_Aviso := StrSubstNo(EnsambladoYaUbicadoLbl, prm_Fila."No. Documento");
             exit(false);
         end;
         umDestino := TempTrozo."Cod. Unidad Medida";
         cantidadDestino := TempTrozo.Cantidad;
-        if umDestino <> rItem."Base Unit of Measure" then begin
-            TempTrozo.SetRange("Cod. Unidad Medida", rItem."Base Unit of Measure");
-            if TempTrozo.FindFirst() then
-                sueltasBase := TempTrozo."Cantidad Base";
-        end;
 
         // La fila pasa entera a esa unidad, para que el pendiente y lo ya ubicado se comparen
         // en la misma unidad que se va a registrar.
@@ -730,11 +699,8 @@ codeunit 51105 "Gestion Entradas SGA"
         // La propuesta se ha guardado desde otra variable: se relee para traerla.
         prm_Fila.FindFirst();
         if prm_Fila."Ubicacion Propuesta" = '' then
-            // El motivo de la fila dice por qué no hay hueco (sin sitio, sin ubicaciones de la clase...).
-            prm_Aviso := StrSubstNo(SinUbicacionLibreLbl, prm_Fila.Motivo)
-        else
-            if sueltasBase > 0 then
-                prm_Aviso := StrSubstNo(SueltasPendientesLbl, sueltasBase, rItem."Base Unit of Measure");
+            // El motivo de la fila dice por qué no hay hueco (sin sitio, sin ubicaciones con tipo...).
+            prm_Aviso := StrSubstNo(SinUbicacionLibreLbl, prm_Fila.Motivo);
 
         exit(true);
     end;
@@ -1001,7 +967,7 @@ codeunit 51105 "Gestion Entradas SGA"
         if cantidad <= 0 then
             cantidad := prm_Fila.Pendiente();
 
-        // Sin hueco, el motivo dice por qué: sin ubicaciones de esa clase, sin espacio, etc.
+        // Sin hueco, el motivo dice por qué: sin ubicaciones con tipo, sin espacio, etc.
         exit(cUbicaciones.ProponerUbicacionCon(estrategia, prm_Excluidas,
                                                prm_Fila."Cod. Almacen", prm_Fila."No. Producto",
                                                prm_Fila."Cod. Variante", prm_Fila."No. Lote",
@@ -1091,68 +1057,11 @@ codeunit 51105 "Gestion Entradas SGA"
         // Se compara la fila entera y no solo el documento: un albarán trae varias filas y
         // cada una necesita su propio hueco.
         repeat
-            if TempOtra.GetPosition() <> prm_Fila.GetPosition() then begin
+            if TempOtra.GetPosition() <> prm_Fila.GetPosition() then
                 excluidas := cUbicaciones.AnadirExclusion(excluidas, TempOtra."Ubicacion Propuesta");
-                excluidas := ExclusionesTraslado(excluidas, TempOtra);
-            end;
         until TempOtra.Next() = 0;
 
         exit(excluidas);
-    end;
-
-    /// <summary>
-    /// Añade al filtro los dos huecos del traslado ABC de una fila: el hueco libre queda para el
-    /// palé A y el palé A no se propone a otra fila.
-    /// </summary>
-    local procedure ExclusionesTraslado(prm_Excluidas: Text; var prm_Fila: Record "Linea Ubicacion SGA" temporary): Text
-    begin
-        exit(cUbicaciones.AnadirExclusion(cUbicaciones.AnadirExclusion(prm_Excluidas, prm_Fila."Traslado Origen"), prm_Fila."Traslado Destino"));
-    end;
-
-    /// <summary>
-    /// Antes de buscar hueco para la fila, mira si conviene acercar un palé A al primer hueco
-    /// libre de la ruta (ProponerReubicacionABC, solo con la opción activada en la
-    /// configuración). La propuesta queda en la fila sin aceptar: la decide el operario.
-    /// </summary>
-    local procedure ProponerTrasladoABC(var prm_Fila: Record "Linea Ubicacion SGA" temporary; prm_Excluidas: Text)
-    var
-        cantidad: Decimal;
-    begin
-        cantidad := prm_Fila.Cantidad;
-        if cantidad <= 0 then
-            cantidad := prm_Fila.Pendiente();
-        prm_Fila."Aceptar Traslado" := false;
-        cUbicaciones.ProponerReubicacionABC(prm_Fila."Cod. Almacen", prm_Fila."No. Producto", prm_Fila."Cod. Unidad Medida",
-            cantidad, prm_Excluidas, prm_Fila."Traslado Origen", prm_Fila."Traslado Destino");
-    end;
-
-    /// <summary>
-    /// Hace el traslado ABC aceptado de una fila: lleva el palé entero de su hueco al libre. Lo
-    /// valida la puerta de escritura como cualquier traslado.
-    /// </summary>
-    local procedure HacerTrasladoABC(var prm_Fila: Record "Linea Ubicacion SGA" temporary)
-    var
-        rContenido: Record "Contenido Ubicacion SGA";
-        cContenido: Codeunit "Gestion Contenido SGA";
-        PaleNoEncontradoErr: Label 'El palé de la ubicación %1 ya no está. Quite la marca de Aceptar traslado o vuelva a proponer.', Comment = '%1 = ubicación';
-        ReubicacionABCLbl: Label 'Reubicación ABC: palé A más cerca de la salida';
-    begin
-        if not prm_Fila."Aceptar Traslado" or (prm_Fila."Traslado Origen" = '') then
-            exit;
-
-        rContenido.SetRange("Cod. Almacen", prm_Fila."Cod. Almacen");
-        rContenido.SetRange("Cod. Bin", prm_Fila."Traslado Origen");
-        rContenido.SetLoadFields("No. Producto", "Cod. Variante", "No. Lote", "Cod. Unidad Medida", Cantidad);
-        if not rContenido.FindFirst() then
-            Error(PaleNoEncontradoErr, prm_Fila."Traslado Origen");
-
-        cContenido.RegistrarTraslado(prm_Fila."Cod. Almacen", prm_Fila."Traslado Origen", prm_Fila."Traslado Destino",
-            rContenido."No. Producto", rContenido."Cod. Variante", rContenido."No. Lote", rContenido."Cod. Unidad Medida",
-            rContenido.Cantidad, "Origen Mov. SGA"::Manual, '', 0, ReubicacionABCLbl);
-
-        prm_Fila."Traslado Origen" := '';
-        prm_Fila."Traslado Destino" := '';
-        prm_Fila."Aceptar Traslado" := false;
     end;
 
     var

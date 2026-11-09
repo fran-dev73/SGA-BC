@@ -36,10 +36,10 @@ table 51101 "Ubicacion SGA"
         }
         field(20; "Cod. Bin"; Code[20])
         {
-            Caption = 'Cód. bin';
+            Caption = 'Cód. ubicación';
             DataClassification = ToBeClassified;
             NotBlank = true;
-            TableRelation = Bin where("Location Code" = field("Cod. Almacen"));
+            TableRelation = Bin.Code where("Location Code" = field("Cod. Almacen"));
         }
         field(30; Descripcion; Text[50])
         {
@@ -72,6 +72,7 @@ table 51101 "Ubicacion SGA"
         {
             Caption = 'Tipo ubicación';
             DataClassification = ToBeClassified;
+            ToolTip = 'Almacenamiento: reserva, es la primera que se busca al ubicar. Picking: de donde se prepara; se busca al ubicar si no queda sitio en almacenamiento y se repone desde almacenamiento con las reubicaciones. En blanco (muelles, ajustes…): no se propone ni se repone.';
 
             trigger OnValidate()
             begin
@@ -91,28 +92,16 @@ table 51101 "Ubicacion SGA"
         }
         field(70; "Capacidad Uds."; Decimal)
         {
-            Caption = 'Capacidad';
+            Caption = 'Capacidad (palés)';
             DataClassification = ToBeClassified;
             DecimalPlaces = 0 : 5;
             MinValue = 0;
-            ToolTip = 'Cuánto cabe, en la clase que admite (palés o cajas): 1 en una ubicación de palé, 72 en una de cajas. 0 = sin límite declarado.';
+            ToolTip = 'Cuántos palés caben. Lo que hay se cuenta con el palé por defecto de cada producto: medio palé de un producto ocupa 0,5. 0 = sin límite declarado.';
 
             trigger OnValidate()
             begin
                 TestVacia();
                 RecalcularOcupacion();
-            end;
-        }
-        field(71; "Capacidad Palets"; Decimal)
-        {
-            Caption = 'Capacidad palés';
-            DataClassification = ToBeClassified;
-            DecimalPlaces = 0 : 2;
-            MinValue = 0;
-
-            trigger OnValidate()
-            begin
-                TestVacia();
             end;
         }
         field(72; "Capacidad Volumen"; Decimal)
@@ -168,32 +157,19 @@ table 51101 "Ubicacion SGA"
         }
         field(90; "Permite Mezcla Producto"; Boolean)
         {
-            Caption = 'Acepta múltiples productos';
+            Caption = 'Permite mezcla de productos';
             DataClassification = ToBeClassified;
             InitValue = true;
-            ToolTip = 'Si está marcado, la ubicación puede contener productos distintos. Solo se puede marcar en ubicaciones que admiten Caja o Unidad.';
+            ToolTip = 'Si está marcado, la ubicación puede contener productos distintos (una estantería de picking con varias referencias). Sin marcar, un solo producto, como un hueco de palé.';
 
             trigger OnValidate()
-            var
-                MezclaNoPermitidaErr: Label 'Solo las ubicaciones de caja o de unidades sueltas pueden aceptar varios productos. Esta admite %1.', Comment = '%1 = tipo de la ubicación';
-                AdmiteCajaOUnidadErr: Label 'Indique primero que la ubicación admite cajas o unidades sueltas.';
             begin
                 TestVacia();
-                if not "Permite Mezcla Producto" then
-                    exit;
-
-                if EsUmMixta() then
-                    exit;
-
-                if "Tipo UM Admitida" = "Tipo UM Admitida"::" " then
-                    Error(AdmiteCajaOUnidadErr);
-
-                Error(MezclaNoPermitidaErr, "Tipo UM Admitida");
             end;
         }
         field(91; "Permite Mezcla Lote"; Boolean)
         {
-            Caption = 'Permite mezcla lote';
+            Caption = 'Permite mezcla de lotes';
             DataClassification = ToBeClassified;
             InitValue = true;
             ToolTip = 'Si está desactivado, la ubicación solo puede contener un lote a la vez.';
@@ -241,30 +217,18 @@ table 51101 "Ubicacion SGA"
                 TestVacia();
             end;
         }
-        field(113; "Tipo UM Admitida"; Enum "Tipo UM SGA")
-        {
-            Caption = 'Admite';
-            DataClassification = ToBeClassified;
-            ToolTip = 'Qué admite el hueco: Palé (el palé del producto y cajas de una referencia), Caja (cajas sueltas de varios productos) o Unidad (botellas sueltas de varios productos). En blanco, sin configurar: no se propone. Al poner Caja o Unidad se marca "Acepta múltiples productos". La capacidad se cuenta en esa clase: 1 = un palé del producto que entre.';
-
-            trigger OnValidate()
-            begin
-                TestVacia();
-                // El tipo manda: las de caja y las de unidades sueltas son para varios productos;
-                // las de palé, de uno. Se puede desmarcar después si una de caja es de uno solo.
-                "Permite Mezcla Producto" := EsUmMixta();
-                // Varios productos supone varios lotes: si no, dos referencias con lotes distintos
-                // chocarían en la misma ubicación aunque tuviera sitio.
-                if EsUmMixta() then
-                    "Permite Mezcla Lote" := true;
-            end;
-        }
         field(114; "Digito Control"; Code[2])
         {
             Caption = 'Dígito de control';
             DataClassification = ToBeClassified;
             Editable = false;
-            ToolTip = 'Número de dos cifras, distinto en cada hueco, que va impreso en su etiqueta. Al recoger se teclea para certificar que el preparador está delante del hueco: no se puede saber sin verlo. Se asigna solo al crear la ubicación; si se regenera, hay que reimprimir la etiqueta.';
+            ToolTip = 'Número de dos cifras, distinto en cada hueco, que va impreso en su etiqueta. Al recoger se escanea o se teclea para certificar que el preparador está delante del hueco: no se puede saber sin verlo. Se asigna solo al crear la ubicación; si se regenera, hay que reimprimir la etiqueta.';
+        }
+        field(115; "Digito Colocado"; Boolean)
+        {
+            Caption = 'Dígito colocado';
+            DataClassification = ToBeClassified;
+            ToolTip = 'El hueco ya tiene puesto su dígito de control (la etiqueta SGA). Se marca después de colocarlo, con la acción Dígito colocado de la lista, y se desmarca solo al regenerar el dígito. Solo en los huecos marcados se pide el dígito al recoger; en los demás basta con escanear el producto. Así el almacén funciona mientras se van poniendo los dígitos.';
         }
         field(120; "Estado SGA"; Enum "Estado Ubicacion SGA")
         {
@@ -288,21 +252,21 @@ table 51101 "Ubicacion SGA"
         }
         field(140; "Zone Code"; Code[10])
         {
-            Caption = 'Código zona (estándar)';
+            Caption = 'Cód. zona BC';
             Editable = false;
             FieldClass = FlowField;
             CalcFormula = lookup(Bin."Zone Code" where("Location Code" = field("Cod. Almacen"), Code = field("Cod. Bin")));
         }
         field(141; "Bin Type Code"; Code[10])
         {
-            Caption = 'Tipo bin (estándar)';
+            Caption = 'Tipo ubicación BC';
             Editable = false;
             FieldClass = FlowField;
             CalcFormula = lookup(Bin."Bin Type Code" where("Location Code" = field("Cod. Almacen"), Code = field("Cod. Bin")));
         }
         field(142; Dedicated; Boolean)
         {
-            Caption = 'Dedicado (estándar)';
+            Caption = 'Dedicada BC';
             Editable = false;
             FieldClass = FlowField;
             CalcFormula = lookup(Bin.Dedicated where("Location Code" = field("Cod. Almacen"), Code = field("Cod. Bin")));
@@ -338,7 +302,8 @@ table 51101 "Ubicacion SGA"
         key(Zona; "Cod. Almacen", "Cod. Zona SGA", "Secuencia Picking")
         {
         }
-        key(Ubicar; "Cod. Almacen", "Tipo Ubicacion", Bloqueada, "Estado SGA", "Secuencia Picking")
+        // La de la propuesta: los huecos de un tipo, por ruta.
+        key(Ubicar; "Cod. Almacen", "Tipo Ubicacion", "Secuencia Picking", "Cod. Bin")
         {
         }
         key(Ruta; "Cod. Almacen", "Secuencia Picking", "Cod. Bin")
@@ -391,6 +356,8 @@ table 51101 "Ubicacion SGA"
             acumulado := (acumulado * 31 + StrPos('0123456789ABCDEF', CopyStr(guid, i, 1))) mod 100000;
 
         "Digito Control" := Format(acumulado mod 90 + 10);
+        // La etiqueta que tenga puesta lleva el dígito anterior: deja de valer.
+        "Digito Colocado" := false;
     end;
 
     /// <summary>
@@ -449,7 +416,7 @@ table 51101 "Ubicacion SGA"
         ocupado: Decimal;
     begin
         CalcFields("Cantidad Base", "Lineas Contenido");
-        ocupado := OcupadoEnUMHueco();
+        ocupado := OcupadoEnPales();
 
         if "Capacidad Uds." > 0 then
             "% Ocupacion" := Round(ocupado / "Capacidad Uds." * 100, 0.01)
@@ -475,11 +442,11 @@ table 51101 "Ubicacion SGA"
     end;
 
     /// <summary>
-    /// Lo que hay en el hueco, contado en la clase que admite: palés en un hueco de palé, cajas
-    /// en uno de caja. Cada línea se convierte con el palé o la caja de su producto, porque en
-    /// el mismo hueco pueden convivir palés de 200 y de 300. Sin tipo, en unidades base.
+    /// Lo que hay en el hueco, en palés. Cada línea se convierte con el palé de su producto,
+    /// porque en el mismo hueco pueden convivir palés de 200 y de 300. Un producto sin palé
+    /// cuenta en unidades base.
     /// </summary>
-    procedure OcupadoEnUMHueco(): Decimal
+    procedure OcupadoEnPales(): Decimal
     var
         rContenido: Record "Contenido Ubicacion SGA";
         cUM: Codeunit "Unidades Producto SGA";
@@ -493,11 +460,11 @@ table 51101 "Ubicacion SGA"
         if not rContenido.FindSet() then
             exit(0);
 
-        // Lo mismo que EnUMHueco de cada línea, con el factor de cada producto leído una vez:
+        // Lo mismo que EnPales de cada línea, con el factor de cada producto leído una vez:
         // un hueco suele tener varias líneas (lotes) del mismo producto.
         repeat
             if not factores.Get(rContenido."No. Producto", factor) then begin
-                factor := cUM.FactorClase(rContenido."No. Producto", "Tipo UM Admitida");
+                factor := cUM.FactorPale(rContenido."No. Producto");
                 factores.Add(rContenido."No. Producto", factor);
             end;
             total += rContenido."Cantidad Base" / factor;
@@ -526,8 +493,7 @@ table 51101 "Ubicacion SGA"
     end;
 
     /// <summary>
-    /// Si caben prm_Entrada más, contadas en la clase del hueco (EnUMHueco), sin pasar de la
-    /// capacidad. Sin capacidad declarada, siempre. Es la comprobación de la propuesta, que mira
+    /// Si caben prm_Entrada palés más (EnPales), sin pasar de la capacidad. Sin capacidad declarada, siempre. Es la comprobación de la propuesta, que mira
     /// muchos huecos seguidos: parte del estado y del "% Ocupacion" guardados, que deja al día
     /// cada movimiento (RecalcularOcupacion), y solo suma el contenido línea a línea cuando el
     /// resultado cae tan cerca de la capacidad que el redondeo del % podría cambiarlo.
@@ -552,20 +518,7 @@ table 51101 "Ubicacion SGA"
         if estimado + prm_Entrada > "Capacidad Uds." + margen then
             exit(false);
 
-        exit(OcupadoEnUMHueco() + prm_Entrada <= "Capacidad Uds.");
-    end;
-
-    /// <summary>
-    /// Una cantidad base de un producto, contada en la clase que admite el hueco: palés en uno
-    /// de palé, cajas en uno de caja, cada producto con su palé o su caja. Sin tipo, o si el
-    /// producto no tiene unidad de esa clase, en unidades base. Sin redondear: redondea quien la
-    /// usa, si le hace falta.
-    /// </summary>
-    procedure EnUMHueco(prm_Producto: Code[20]; prm_CantidadBase: Decimal): Decimal
-    var
-        cUM: Codeunit "Unidades Producto SGA";
-    begin
-        exit(cUM.CantidadEnClase(prm_Producto, "Tipo UM Admitida", prm_CantidadBase));
+        exit(OcupadoEnPales() + prm_Entrada <= "Capacidad Uds.");
     end;
 
     /// <summary>
@@ -625,20 +578,12 @@ table 51101 "Ubicacion SGA"
     end;
 
     /// <summary>
-    /// Deja en Rec solo las ubicaciones de almacenaje: Picking y Reserva. Son las únicas que se
-    /// proponen y se clasifican; muelles, cuarentena, ajustes y producción quedan fuera.
+    /// Si la ubicación tiene tipo (Almacenamiento o Picking). Solo esas se proponen y se
+    /// clasifican; las que no tienen tipo (muelles, ajustes…) quedan fuera.
     /// </summary>
-    procedure FiltrarDeAlmacenaje()
+    procedure TieneTipo(): Boolean
     begin
-        SetFilter("Tipo Ubicacion", '%1|%2', "Tipo Ubicacion"::Picking, "Tipo Ubicacion"::Reserva);
-    end;
-
-    /// <summary>
-    /// Si la ubicación es de almacenaje (Picking o Reserva). Ver FiltrarDeAlmacenaje.
-    /// </summary>
-    procedure EsDeAlmacenaje(): Boolean
-    begin
-        exit("Tipo Ubicacion" in ["Tipo Ubicacion"::Picking, "Tipo Ubicacion"::Reserva]);
+        exit("Tipo Ubicacion" <> "Tipo Ubicacion"::" ");
     end;
 
     /// <summary>
@@ -654,10 +599,10 @@ table 51101 "Ubicacion SGA"
     end;
 
     /// <summary>
-    /// Error si la ubicación tiene contenido. La configuración (qué admite, capacidad, mezclas,
-    /// zona, tipo, ruta, producto fijo, reposición) solo se cambia con la ubicación vacía: si no,
-    /// lo que ya hay dentro podría dejar de cumplirla (un palé en un hueco que pasa a ser de
-    /// cajas, dos productos en uno que deja de aceptar mezcla…). Bloquearla sí se puede siempre.
+    /// Error si la ubicación tiene contenido. La configuración (tipo, capacidad, mezclas, zona,
+    /// ruta, producto fijo, reposición) solo se cambia con la ubicación vacía: si no, lo que ya
+    /// hay dentro podría dejar de cumplirla (dos palés en un hueco que pasa a ser de uno, dos
+    /// productos en uno que deja de aceptar mezcla…). Bloquearla sí se puede siempre.
     /// </summary>
     procedure TestVacia()
     var
@@ -665,15 +610,6 @@ table 51101 "Ubicacion SGA"
     begin
         if not EstaVacia() then
             Error(UbicacionConContenidoConfigErr, "Cod. Bin");
-    end;
-
-    /// <summary>
-    /// Indica si la ubicación es de las que admiten varios productos: las de caja.
-    /// Sin tipo la ubicación no está clasificada y no se considera mixta.
-    /// </summary>
-    procedure EsUmMixta(): Boolean
-    begin
-        exit("Tipo UM Admitida" in ["Tipo UM Admitida"::Caja, "Tipo UM Admitida"::Unidad]);
     end;
 
     /// <summary>

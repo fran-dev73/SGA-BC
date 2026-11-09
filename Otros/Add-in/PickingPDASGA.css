@@ -1,0 +1,252 @@
+/* Pantalla de picking para PDA. Pensada para leerse a un brazo de distancia y pulsarse con
+   guantes: letra grande, mucho contraste y botones de al menos 52 px de alto. La pantalla es
+   pequeña, así que cada bloque junta en una línea lo que cabe (título al lado del dato, campos
+   y botones en la misma fila) y lo largo se corta con puntos suspensivos. */
+
+html,
+body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+.pk-raiz {
+    box-sizing: border-box;
+    min-height: 100%;
+    padding: 6px;
+    font-family: "Segoe UI", Roboto, Tahoma, sans-serif;
+    font-size: 17px;
+    color: #111827;
+    background: #f3f4f6;
+    overflow-y: auto;
+}
+
+.pk-raiz * {
+    box-sizing: border-box;
+}
+
+.pk-cab {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 0 4px 4px;
+    font-size: 14px;
+    color: #4b5563;
+}
+
+.pk-progreso {
+    font-weight: 600;
+}
+
+.pk-bloque {
+    margin-bottom: 6px;
+    padding: 6px 10px;
+    background: #ffffff;
+    border-radius: 8px;
+    border-left: 6px solid #2563eb;
+}
+
+.pk-reubicacion {
+    border-left-color: #d97706;
+}
+
+.pk-confirmar {
+    border-left-color: #6b7280;
+}
+
+/* Primera línea de cada bloque: el título pequeño y, a su lado, lo principal. */
+.pk-linea {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    min-width: 0;
+}
+
+.pk-titulo {
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: #6b7280;
+}
+
+/* Una línea; si no cabe, puntos suspensivos (el texto entero queda en el title). */
+.pk-corto {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.pk-ubicacion {
+    font-size: 40px;
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: 0.02em;
+}
+
+/* Lo que se coge manda: la cantidad, grande. */
+.pk-cantidad {
+    font-size: 36px;
+    font-weight: 800;
+    line-height: 1.1;
+    color: #1d4ed8;
+}
+
+/* La descripción es como se reconoce el producto: grande y hasta dos líneas antes de cortar. */
+.pk-descripcion {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    font-size: 21px;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+/* Código, lote, caducidad y base: en pequeño. */
+.pk-lote {
+    margin-top: 2px;
+    font-size: 14px;
+    color: #4b5563;
+}
+
+.pk-paso {
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 15px;
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.pk-paso.pk-hecho {
+    background: #dcfce7;
+    color: #166534;
+}
+
+/* Fila de controles: lectura y dígito; −, cantidad, + y Confirmar. */
+.pk-fila {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.pk-campo {
+    display: block;
+    min-width: 0;
+    height: 52px;
+    padding: 0 10px;
+    font-size: 20px;
+    font-family: inherit;
+    border: 2px solid #9ca3af;
+    border-radius: 8px;
+}
+
+.pk-campo:focus {
+    outline: none;
+    border-color: #2563eb;
+}
+
+.pk-lectura {
+    flex: 1;
+}
+
+.pk-digito {
+    flex: 0 0 84px;
+    font-size: 26px;
+    font-weight: 700;
+    text-align: center;
+}
+
+.pk-campo-cantidad {
+    flex: 0 0 84px;
+    font-size: 26px;
+    font-weight: 700;
+    text-align: center;
+}
+
+.pk-aviso {
+    margin-top: 6px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    font-size: 16px;
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.pk-aviso.pk-aviso-error {
+    background: #fee2e2;
+    color: #991b1b;
+    font-weight: 600;
+}
+
+.pk-btn {
+    min-height: 52px;
+    padding: 0 10px;
+    font-size: 17px;
+    font-weight: 600;
+    font-family: inherit;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.pk-mas-menos {
+    flex: 0 0 48px;
+    font-size: 26px;
+    color: #111827;
+    background: #e5e7eb;
+}
+
+.pk-principal {
+    display: block;
+    width: 100%;
+    min-height: 60px;
+    margin-bottom: 6px;
+    font-size: 22px;
+    letter-spacing: 0.04em;
+    color: #ffffff;
+    background: #16a34a;
+}
+
+.pk-unidad {
+    font-size: 17px;
+    font-weight: 600;
+}
+
+.pk-principal:active {
+    background: #15803d;
+}
+
+.pk-otros {
+    display: flex;
+    gap: 6px;
+}
+
+.pk-otros .pk-btn {
+    flex: 1;
+    min-height: 48px;
+    font-size: 15px;
+}
+
+.pk-secundario {
+    color: #111827;
+    background: #e5e7eb;
+}
+
+.pk-peligro {
+    color: #ffffff;
+    background: #dc2626;
+}
+
+.pk-vacia {
+    padding: 24px 12px;
+    font-size: 20px;
+    text-align: center;
+}
+
+.pk-vacia + .pk-principal {
+    margin-top: 8px;
+}

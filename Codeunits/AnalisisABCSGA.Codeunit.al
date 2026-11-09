@@ -8,7 +8,7 @@ using Microsoft.Inventory.Ledger;
 /// Clasifica los productos por rotación (A, B, C) y los huecos por calidad, y guarda el
 /// resultado en "Calculo ABC SGA" / "Clasificacion ABC SGA". Solo observa: no mueve nada ni
 /// cambia cómo se ubica. Sirve para decidir con datos si merece la pena ubicar por rotación
-/// (ver SGA/Otros/ESTRATEGIAS_UBICACION.md).
+/// (ver SGA/Otros/DOCUMENTACION_TECNICA_SGA.md, parte II).
 ///
 /// Productos: los que han tenido ventas en los últimos "Dias Analisis ABC" días o tienen palés
 /// en SGA. La rotación se mide en palés salidos (ventas netas en UM base entre lo que lleva el
@@ -16,7 +16,7 @@ using Microsoft.Inventory.Ledger;
 /// menos salidas, son A hasta sumar "Corte ABC Clase A" % de los palés, B hasta "Corte ABC
 /// Clase B" % y el resto C. Sin ventas, C.
 ///
-/// Huecos: los de Picking y Reserva no bloqueados, del mejor al peor: primero por altura (el
+/// Huecos: los de Picking y Almacenamiento no bloqueados, del mejor al peor: primero por altura (el
 /// nivel más bajo es el mejor) y luego por "Secuencia picking". Se reparten en clases según los
 /// palés que hay de cada clase de producto: los primeros tantos huecos como palés A hay son A,
 /// los siguientes tantos como palés B son B, y el resto C. Así cada clase tiene justo el sitio
@@ -153,7 +153,7 @@ codeunit 51107 "Analisis ABC SGA"
         NuevaLinea(prm_Calculo, prm_Producto, rLinea);
         rLinea."Cantidad Salida Base" := prm_CantidadBase;
         // Solo sale un palé que el producto tiene y que lleva más de una unidad base.
-        rLinea."Unidad Pale" := cUM.UMProductoDeTipo(prm_Producto, "Tipo UM SGA"::Pale);
+        rLinea."Unidad Pale" := cUM.UMPale(prm_Producto);
         if rLinea."Unidad Pale" <> '' then
             rLinea."Palets Salidos" := Round(prm_CantidadBase / cUM.FactorUM(prm_Producto, rLinea."Unidad Pale"), 0.1)
         else
@@ -174,7 +174,7 @@ codeunit 51107 "Analisis ABC SGA"
     end;
 
     /// <summary>
-    /// Palés que hay ahora en huecos de Picking y Reserva. Cada hueco es de un palé, así que se
+    /// Palés que hay ahora en huecos de Picking y Almacenamiento. Cada hueco es de un palé, así que se
     /// cuenta un palé por producto y hueco. Los productos con palés y sin ventas también entran:
     /// son los C que pueden estar ocupando huecos buenos.
     /// </summary>
@@ -391,17 +391,17 @@ codeunit 51107 "Analisis ABC SGA"
     end;
 
     /// <summary>
-    /// Hueco en el que se guarda stock: de picking o reserva y no bloqueado. Muelles,
-    /// cuarentena, ajustes y producción no se clasifican.
+    /// Hueco en el que se guarda stock: con tipo (picking o almacenamiento) y no bloqueado. Las
+    /// ubicaciones sin tipo (muelles, ajustes…) no se clasifican.
     /// </summary>
     local procedure EsHuecoUtil(prm_Ubicacion: Record "Ubicacion SGA"): Boolean
     begin
         // Solo cuenta el bloqueo del propio hueco, no el de su zona.
-        exit((not prm_Ubicacion.Bloqueada) and prm_Ubicacion.EsDeAlmacenaje());
+        exit((not prm_Ubicacion.Bloqueada) and prm_Ubicacion.TieneTipo());
     end;
 
     /// <summary>
-    /// Altura del hueco sacada de su código (pasillo-estantería-altura), de 1 a 99. Si el código
+    /// Altura del hueco sacada de su código (pasillo-estantería-altura), de 0 a 99. Si el código
     /// no tiene esa forma, 100: cuenta como la peor.
     /// </summary>
     local procedure NivelHueco(prm_Codigo: Code[20]): Integer

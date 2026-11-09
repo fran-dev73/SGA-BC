@@ -7,7 +7,7 @@ namespace AntonioNadal.SGA;
 /// </summary>
 page 51118 "Ordenes Picking SGA"
 {
-    Caption = 'Órdenes de picking';
+    Caption = 'Órdenes de picking SGA';
     PageType = List;
     SourceTable = "Orden Picking SGA";
     UsageCategory = Lists;
@@ -26,6 +26,10 @@ page 51118 "Ordenes Picking SGA"
                 field("No. Orden"; Rec."No. Orden")
                 {
                     ToolTip = 'Número de la orden de picking.';
+                    ApplicationArea = All;
+                }
+                field(Origen; Rec.Origen)
+                {
                     ApplicationArea = All;
                 }
                 field("No. Documento Origen"; Rec."No. Documento Origen")
@@ -90,30 +94,10 @@ page 51118 "Ordenes Picking SGA"
             action(SiguienteOrden)
             {
                 Caption = 'Siguiente orden';
-                ToolTip = 'Abre la siguiente orden que le toca, por prioridad: primero las suyas sin terminar. Si la configuración no exige asignación y no tiene ninguna, coge la siguiente sin asignar.';
+                ToolTip = 'Abre la pantalla de preparación con la siguiente orden que le toca, por prioridad: primero las suyas sin terminar. Si la configuración no exige asignación y no tiene ninguna, coge la siguiente sin asignar. Al terminar una orden pasa sola a la siguiente.';
                 ApplicationArea = All;
                 Image = NextRecord;
-
-                trigger OnAction()
-                var
-                    rOrden: Record "Orden Picking SGA";
-                    cPicking: Codeunit "Gestion Picking SGA";
-                    SinOrdenesPendientesMsg: Label 'No hay órdenes de picking pendientes.';
-                    SinOrdenesAsignadasMsg: Label 'No tiene órdenes de picking asignadas. Pida a su responsable que le asigne alguna.';
-                begin
-                    if not cPicking.TomarSiguienteOrden(rOrden) then begin
-                        if ExigeAsignacion then
-                            Message(SinOrdenesAsignadasMsg)
-                        else
-                            Message(SinOrdenesPendientesMsg);
-                        exit;
-                    end;
-
-                    Commit();
-                    Rec := rOrden;
-                    cPicking.AbrirPreparacion(rOrden);
-                    CurrPage.Update(false);
-                end;
+                RunObject = page "Preparar Picking SGA";
             }
             action(Preparar)
             {
@@ -127,6 +111,21 @@ page 51118 "Ordenes Picking SGA"
                     cPicking: Codeunit "Gestion Picking SGA";
                 begin
                     cPicking.AbrirPreparacion(Rec);
+                    CurrPage.Update(false);
+                end;
+            }
+            action(SegundaRonda)
+            {
+                Caption = 'Segunda ronda de picking';
+                ToolTip = 'Crea una orden con lo que falta para cada pedido lanzado que ya pasó por picking, no tiene orden abierta y ahora sí tiene stock ubicado de lo que le faltaba. Los que siguen sin stock esperan a la siguiente ronda.';
+                ApplicationArea = All;
+                Image = Reuse;
+
+                trigger OnAction()
+                var
+                    cPicking: Codeunit "Gestion Picking SGA";
+                begin
+                    Message(cPicking.SegundaRonda());
                     CurrPage.Update(false);
                 end;
             }
@@ -221,6 +220,9 @@ page 51118 "Ordenes Picking SGA"
                 {
                 }
                 actionref(Preparar_Promoted; Preparar)
+                {
+                }
+                actionref(SegundaRonda_Promoted; SegundaRonda)
                 {
                 }
                 actionref(MisOrdenes_Promoted; MisOrdenes)
