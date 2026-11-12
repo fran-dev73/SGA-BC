@@ -71,7 +71,6 @@ codeunit 51101 "Gestion Ubicaciones SGA"
                 else
                     rUbicacionSGA."Permite Mezcla Producto" := true;
                 rUbicacionSGA."Permite Mezcla Lote" := true;
-                rUbicacionSGA.GenerarDigitoControl();
                 rUbicacionSGA.Insert();
             end;
         until rBin.Next() = 0;
@@ -169,36 +168,6 @@ codeunit 51101 "Gestion Ubicaciones SGA"
                 if not rUbicacionSGA.EstaVacia() then
                     conContenido += 1;
             until rUbicacionSGA.Next() = 0;
-    end;
-
-    /// <summary>
-    /// Da un dígito de control nuevo a las ubicaciones de la selección (con sus filtros y
-    /// marcas). Modify sin triggers: solo cambia el dígito. Devuelve cuántas ha cambiado.
-    /// </summary>
-    procedure RegenerarDigitos(var prm_Seleccion: Record "Ubicacion SGA") hechas: Integer
-    begin
-        if prm_Seleccion.FindSet(true) then
-            repeat
-                prm_Seleccion.GenerarDigitoControl();
-                prm_Seleccion.Modify();
-                hechas += 1;
-            until prm_Seleccion.Next() = 0;
-    end;
-
-    /// <summary>
-    /// Marca (o desmarca) las ubicaciones de la selección como que tienen su dígito de control
-    /// puesto: desde entonces el picking lo pide en ellas. Solo cambia las que no lo tenían ya.
-    /// Devuelve cuántas ha cambiado.
-    /// </summary>
-    procedure MarcarDigitoColocado(var prm_Seleccion: Record "Ubicacion SGA"; prm_Colocado: Boolean) hechas: Integer
-    begin
-        prm_Seleccion.SetRange("Digito Colocado", not prm_Colocado);
-        if prm_Seleccion.FindSet(true) then
-            repeat
-                prm_Seleccion."Digito Colocado" := prm_Colocado;
-                prm_Seleccion.Modify();
-                hechas += 1;
-            until prm_Seleccion.Next() = 0;
     end;
 
     /// <summary>
@@ -356,7 +325,6 @@ codeunit 51101 "Gestion Ubicaciones SGA"
                         // picking con varias referencias se marcan después.
                         rUbicacionSGA."Permite Mezcla Producto" := false;
                         rUbicacionSGA."Permite Mezcla Lote" := true;
-                        rUbicacionSGA.GenerarDigitoControl();
                         rUbicacionSGA.Insert();
                         creadas += 1;
                     end;
@@ -832,7 +800,7 @@ codeunit 51101 "Gestion Ubicaciones SGA"
         deUso: Integer;
         motivo: Integer;
         entrada: Decimal;
-        cuenta: array[8] of Integer;
+        cuenta: array[9] of Integer;
         detalle: Text;
         donde: Text;
         deTipo: Text;
@@ -850,6 +818,7 @@ codeunit 51101 "Gestion Ubicaciones SGA"
         ReubicacionTxt: Label ' %1 vacías, esperando una reubicación de otro producto;', Comment = '%1 = número';
         PickingCompletoTxt: Label ' %1 de picking, porque el producto ya ocupa todas las ubicaciones de picking que se le permiten;', Comment = '%1 = número';
         YaPropuestasTxt: Label ' %1 con sitio, pero ya propuestas a otras líneas de este reparto;', Comment = '%1 = número';
+        ReservadasEntradaTxt: Label ' %1 reservadas para otra entrada que se está ubicando;', Comment = '%1 = número';
         DelRestoTxt: Label ' Del resto:';
     begin
         um := prm_UM;
@@ -882,17 +851,20 @@ codeunit 51101 "Gestion Ubicaciones SGA"
                 case motivo of
                     0:
                         cuenta[3] += 1;
-                    1, 2, 4, 5, 6, 7, 8:
+                    1, 2, 4, 5, 6, 7, 8, 9:
                         cuenta[motivo] += 1;
                 end;
             until rUbicacionSGA.Next() = 0;
 
-        // cuenta: 1 bloqueadas, 2 reservadas, 3 ya propuestas, 4 sin sitio, 5 otro producto,
-        // 6 otro lote, 7 esperando una reubicación, 8 picking del producto completo.
+        // cuenta: 1 bloqueadas, 2 reservadas a otro producto, 3 ya propuestas, 4 sin sitio,
+        // 5 otro producto, 6 otro lote, 7 esperando una reubicación, 8 picking del producto
+        // completo, 9 reservadas para otra entrada.
         if cuenta[8] > 0 then
             detalle += StrSubstNo(PickingCompletoTxt, cuenta[8]);
         if cuenta[1] > 0 then
             detalle += StrSubstNo(BloqueadasTxt, cuenta[1]);
+        if cuenta[9] > 0 then
+            detalle += StrSubstNo(ReservadasEntradaTxt, cuenta[9]);
         if cuenta[2] > 0 then
             detalle += StrSubstNo(ReservadasTxt, cuenta[2]);
         if cuenta[5] > 0 then
@@ -1241,7 +1213,8 @@ codeunit 51101 "Gestion Ubicaciones SGA"
 
     /// <summary>
     /// Por qué una ubicación no puede recibir el producto, en el orden en que se comprueba:
-    ///   0 = sí puede; 1 = bloqueada (ella o su zona); 2 = reservada a otro producto;
+    ///   0 = sí puede; 1 = bloqueada (ella o su zona); 9 = propuesta a otra entrada que aún no
+    ///   se ha ubicado (reservada, ver ReservarHueco); 2 = reservada a otro producto;
     ///   3 = no es del tipo que se busca (o no tiene tipo, o es de otra zona que la de
     ///   ProponerEnZona); 4 = sin sitio suficiente;
     ///   5 = tiene otro producto y no acepta mezcla; 6 = tiene otro lote y no acepta mezcla;
@@ -1257,6 +1230,10 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     begin
         if not prm_Ubicacion.EsUtilizable() then
             exit(1);
+
+        // Propuesta a otra entrada que todavía no se ha ubicado (ReservarHueco).
+        if prm_Ubicacion.ReservadaParaOtro(ParaReserva) then
+            exit(9);
 
         if (prm_Ubicacion."Producto Fijo" <> '') and (prm_Ubicacion."Producto Fijo" <> prm_Producto) then
             exit(2);
@@ -1381,11 +1358,97 @@ codeunit 51101 "Gestion Ubicaciones SGA"
             Error(FueraDeZonaErr, prm_Ubicacion, prm_Zona);
     end;
 
+    /// <summary>
+    /// Para quién se propone a partir de ahora en esta instancia: sus propias reservas no le
+    /// cuentan como ocupadas. En blanco, cualquier reserva es de otro.
+    /// </summary>
+    procedure FijarReserva(prm_Para: Text)
+    begin
+        ParaReserva := prm_Para;
+    end;
+
+    /// <summary>
+    /// Reserva un hueco para una entrada que se está ubicando (prm_Para) y suelta los que tenía
+    /// esa misma entrada en esta sesión: cada entrada tiene un solo hueco reservado. False, sin
+    /// cambiar nada, si el hueco ya está reservado para otra. Bloquea el registro, para que
+    /// dos sesiones que proponen a la vez no se queden con el mismo hueco.
+    /// </summary>
+    procedure ReservarHueco(prm_Almacen: Code[10]; prm_Bin: Code[20]; prm_Para: Text): Boolean
+    var
+        rUbicacionSGA: Record "Ubicacion SGA";
+    begin
+        rUbicacionSGA.LockTable();
+        if not rUbicacionSGA.Get(prm_Almacen, prm_Bin) then
+            exit(false);
+        if not rUbicacionSGA.Reservar(prm_Para) then
+            exit(false);
+
+        LiberarReservas(prm_Para, prm_Bin);
+        exit(true);
+    end;
+
+    /// <summary>
+    /// Error si el hueco está reservado para otra entrada. Para cuando el operario elige el
+    /// hueco a mano: si lo puede usar, queda reservado para él.
+    /// </summary>
+    procedure TestReservarHueco(prm_Almacen: Code[10]; prm_Bin: Code[20]; prm_Para: Text)
+    var
+        rUbicacionSGA: Record "Ubicacion SGA";
+        ReservadaErr: Label 'La ubicación %1 está reservada para %2 (%3). Elija otra o pida que la liberen.', Comment = '%1 = ubicación, %2 = entrada, %3 = usuario';
+    begin
+        if ReservarHueco(prm_Almacen, prm_Bin, prm_Para) then
+            exit;
+        if rUbicacionSGA.Get(prm_Almacen, prm_Bin) then
+            Error(ReservadaErr, prm_Bin, rUbicacionSGA."Reservada Para", rUbicacionSGA."Reservada Por");
+    end;
+
+    /// <summary>
+    /// Suelta los huecos reservados para prm_Para en esta sesión, menos prm_Salvo. Se usa al
+    /// cambiar de hueco, al ubicar y al cerrar la pantalla.
+    /// </summary>
+    procedure LiberarReservas(prm_Para: Text; prm_Salvo: Code[20])
+    var
+        rUbicacionSGA: Record "Ubicacion SGA";
+    begin
+        if prm_Para = '' then
+            exit;
+
+        rUbicacionSGA.SetCurrentKey("Reservada Por", "Sesion Reserva", "Reservada Para");
+        rUbicacionSGA.SetRange("Reservada Por", UserId());
+        rUbicacionSGA.SetRange("Sesion Reserva", SessionId());
+        rUbicacionSGA.SetRange("Reservada Para", CopyStr(prm_Para, 1, MaxStrLen(rUbicacionSGA."Reservada Para")));
+        if prm_Salvo <> '' then
+            rUbicacionSGA.SetFilter("Cod. Bin", '<>%1', prm_Salvo);
+        if rUbicacionSGA.FindSet(true) then
+            repeat
+                rUbicacionSGA.LiberarReserva();
+            until rUbicacionSGA.Next() = 0;
+    end;
+
+    /// <summary>
+    /// Suelta a mano la reserva de las ubicaciones, sea de quien sea: para cuando una pantalla
+    /// se ha quedado sin cerrar bien y su hueco sigue reservado. Devuelve cuántas ha soltado.
+    /// </summary>
+    procedure LiberarReservasSeleccion(var prm_Ubicaciones: Record "Ubicacion SGA") liberadas: Integer
+    var
+        rUbicacionSGA: Record "Ubicacion SGA";
+    begin
+        rUbicacionSGA.Copy(prm_Ubicaciones);
+        rUbicacionSGA.SetFilter("Reservada Por", '<>%1', '');
+        if rUbicacionSGA.FindSet(true) then
+            repeat
+                rUbicacionSGA.LiberarReserva();
+                liberadas += 1;
+            until rUbicacionSGA.Next() = 0;
+    end;
+
     var
         // Cursores de ProponerHuecoPaleRuta, uno por orden de TipoPorOrden: el último
         // hueco vacío mirado en la ruta.
         HuecoRuta: array[2] of Record "Ubicacion SGA";
         cUM: Codeunit "Unidades Producto SGA";
+        // Para quién se propone (FijarReserva): sus propias reservas no cuentan como ocupadas.
+        ParaReserva: Text;
         // Zona a la que ProponerEnZona limita la propuesta mientras dura; en blanco, todas.
         ZonaDestino: Code[10];
         // Zonas del grupo IIEE del producto en la primera vuelta de ProponerUbicacionCon; vacía,

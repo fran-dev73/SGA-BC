@@ -26,7 +26,7 @@ SGA es el módulo de gestión de ubicaciones del almacén dentro de Business Cen
 | Recepción de compra | Tras registrar el albarán, *Ubicar recepciones* propone un hueco por línea y el operario confirma. |
 | Producción | *Imprimir y ubicar palés* ubica cada palé al imprimir su etiqueta; *Ubicar ensamblados* recoge lo que falte. |
 | Venta | Oficina envía el pedido a picking, el preparador recoge parada a parada y la cantidad a enviar y los lotes pasan solos al pedido. |
-| PDA | En la app móvil de BC, con el rol *Preparador SGA (PDA)*: escanea el producto, teclea el dígito del hueco y la parada se confirma sola. |
+| PDA | En la app móvil de BC, con el rol *Preparador SGA (PDA)*: lee la ubicación de la etiqueta del hueco, escanea el producto y la parada se confirma sola. |
 | Reparto del trabajo | Un responsable asigna órdenes y prioridades; los carretilleros reciben las reubicaciones y los preparadores los pedidos. |
 | Control | La conciliación compara cada día ubicaciones contra stock de BC; las diferencias se corrigen con recuento o regularización. |
 
@@ -40,8 +40,8 @@ SGA es el módulo de gestión de ubicaciones del almacén dentro de Business Cen
 
 ## Cómo se repone el picking
 
-- Un producto necesita una **reubicación** cuando tiene stock en almacenamiento y nada en picking.
-- Se planifica **al vaciarse** una ubicación de picking por una venta, y con *Planificar reubicaciones* (a mano o programado) para todo el almacén.
+- En cuanto una ubicación de picking se queda **a cero** de un producto, por el movimiento que sea, se planifica sola su **reubicación** desde almacenamiento.
+- *Planificar reubicaciones* (a mano o programado) repone además los productos que no tienen nada en picking.
 - Se trae **un palé como mucho**, a la misma ubicación de picking o a otra con sitio, que queda guardada para ese producto.
 - Se prepara como un picking: los usuarios marcados como **Carretillero SGA** las reciben con *Siguiente orden*.
 - **Coste aceptado**: entre que se vacía el picking y llega la reubicación, una venta de ese producto coge de almacenamiento.
@@ -50,10 +50,10 @@ SGA es el módulo de gestión de ubicaciones del almacén dentro de Business Cen
 
 **Hecho** (desarrollado y documentado):
 
-- Ubicaciones, zonas, generación, etiquetas con dígito de control y cambio en bloque.
+- Ubicaciones, zonas, generación, etiquetas de ubicación y cambio en bloque.
 - Carga inicial con simulación, *Pendiente de ubicar* e inicialización.
 - Entradas: recepciones de compra, ensamblados y palés de la línea.
-- Picking de venta completo: envío, asignación, prioridades, preparación, dígito de control y paso al pedido.
+- Picking de venta completo: envío, asignación, prioridades, preparación, lectura de ubicación y paso al pedido.
 - Picking con PDA: escáner integrado en la app móvil de BC, comprobación del producto (GTIN, referencia o GS1-128 con lote) y rol propio.
 - Reubicaciones y reparto entre preparadores y carretilleros.
 - Consultas, mapa, mapa 3D con traslados arrastrando, conciliación, recuento y análisis ABC.

@@ -18,58 +18,27 @@
             <TablixBody>
               <TablixColumns>
                 <TablixColumn>
-                  <Width>6.8cm</Width>
+                  <Width>3.8cm</Width>
                 </TablixColumn>
               </TablixColumns>
               <TablixRows>
                 <TablixRow>
-                  <Height>3.3cm</Height>
+                  <Height>2.8cm</Height>
                   <TablixCells>
                     <TablixCell>
                       <CellContents>
                         <Rectangle Name="Etiqueta">
                           <ReportItems>
-                            <Textbox Name="txtCodBin">
-                              <CanGrow>false</CanGrow>
+                            <Textbox Name="txtTituloUbicacion">
                               <KeepTogether>true</KeepTogether>
                               <Paragraphs>
                                 <Paragraph>
                                   <TextRuns>
                                     <TextRun>
-                                      <Value>=Fields!CodBin.Value</Value>
+                                      <Value>UBICACIÓN</Value>
                                       <Style>
                                         <FontFamily>Segoe UI</FontFamily>
-                                        <FontSize>17pt</FontSize>
-                                        <FontWeight>Bold</FontWeight>
-                                      </Style>
-                                    </TextRun>
-                                  </TextRuns>
-                                  <Style />
-                                </Paragraph>
-                              </Paragraphs>
-                              <Top>0.05cm</Top>
-                              <Left>0.05cm</Left>
-                              <Height>0.85cm</Height>
-                              <Width>4.65cm</Width>
-                              <Style>
-                                <VerticalAlign>Middle</VerticalAlign>
-                                <PaddingLeft>1pt</PaddingLeft>
-                                <PaddingRight>1pt</PaddingRight>
-                                <PaddingTop>0pt</PaddingTop>
-                                <PaddingBottom>0pt</PaddingBottom>
-                              </Style>
-                            </Textbox>
-                            <Textbox Name="txtTituloDigito">
-                              <CanGrow>false</CanGrow>
-                              <KeepTogether>true</KeepTogether>
-                              <Paragraphs>
-                                <Paragraph>
-                                  <TextRuns>
-                                    <TextRun>
-                                      <Value>CONTROL</Value>
-                                      <Style>
-                                        <FontFamily>Segoe UI</FontFamily>
-                                        <FontSize>6pt</FontSize>
+                                        <FontSize>7pt</FontSize>
                                         <FontWeight>Bold</FontWeight>
                                       </Style>
                                     </TextRun>
@@ -79,55 +48,12 @@
                                   </Style>
                                 </Paragraph>
                               </Paragraphs>
-                              <Top>0.05cm</Top>
-                              <Left>4.85cm</Left>
-                              <Height>0.3cm</Height>
-                              <Width>1.9cm</Width>
-                              <Style>
-                                <PaddingLeft>0pt</PaddingLeft>
-                                <PaddingRight>0pt</PaddingRight>
-                                <PaddingTop>0pt</PaddingTop>
-                                <PaddingBottom>0pt</PaddingBottom>
-                              </Style>
+                              <Top>0.4cm</Top>
+                              <Height>0.35cm</Height>
+                              <Width>3.8cm</Width>
+                              <Style />
                             </Textbox>
-                            <Textbox Name="txtDigito">
-                              <CanGrow>false</CanGrow>
-                              <KeepTogether>true</KeepTogether>
-                              <Paragraphs>
-                                <Paragraph>
-                                  <TextRuns>
-                                    <TextRun>
-                                      <Value>=Fields!Digito.Value</Value>
-                                      <Style>
-                                        <FontFamily>Segoe UI</FontFamily>
-                                        <FontSize>28pt</FontSize>
-                                        <FontWeight>Bold</FontWeight>
-                                      </Style>
-                                    </TextRun>
-                                  </TextRuns>
-                                  <Style>
-                                    <TextAlign>Center</TextAlign>
-                                  </Style>
-                                </Paragraph>
-                              </Paragraphs>
-                              <Top>0.35cm</Top>
-                              <Left>4.85cm</Left>
-                              <Height>1.25cm</Height>
-                              <Width>1.9cm</Width>
-                              <Style>
-                                <Border>
-                                  <Style>Solid</Style>
-                                  <Width>1.5pt</Width>
-                                </Border>
-                                <VerticalAlign>Middle</VerticalAlign>
-                                <PaddingLeft>0pt</PaddingLeft>
-                                <PaddingRight>0pt</PaddingRight>
-                                <PaddingTop>0pt</PaddingTop>
-                                <PaddingBottom>0pt</PaddingBottom>
-                              </Style>
-                            </Textbox>
-                            <Textbox Name="txtBarras">
-                              <CanGrow>false</CanGrow>
+                            <Textbox Name="txtBarrasUbicacion">
                               <KeepTogether>true</KeepTogether>
                               <Paragraphs>
                                 <Paragraph>
@@ -136,53 +62,47 @@
                                       <Value>=Fields!Barras.Value</Value>
                                       <Style>
                                         <FontFamily>IDAutomationC128S</FontFamily>
-                                        <FontSize>12pt</FontSize>
                                       </Style>
                                     </TextRun>
                                   </TextRuns>
                                   <Style>
-                                    <TextAlign>Left</TextAlign>
+                                    <TextAlign>Center</TextAlign>
                                   </Style>
                                 </Paragraph>
                               </Paragraphs>
-                              <Top>1.7cm</Top>
-                              <Left>0.05cm</Left>
-                              <Height>1.15cm</Height>
-                              <Width>6.7cm</Width>
+                              <Top>0.75cm</Top>
+                              <Height>1cm</Height>
+                              <Width>3.8cm</Width>
+                              <ZIndex>1</ZIndex>
                               <Style>
-                                <VerticalAlign>Middle</VerticalAlign>
-                                <PaddingLeft>2pt</PaddingLeft>
-                                <PaddingRight>0pt</PaddingRight>
-                                <PaddingTop>0pt</PaddingTop>
-                                <PaddingBottom>0pt</PaddingBottom>
+                                <VerticalAlign>Bottom</VerticalAlign>
                               </Style>
                             </Textbox>
-                            <Textbox Name="txtPie">
-                              <CanGrow>false</CanGrow>
+                            <Textbox Name="txtCodBin">
                               <KeepTogether>true</KeepTogether>
                               <Paragraphs>
                                 <Paragraph>
                                   <TextRuns>
                                     <TextRun>
-                                      <Value>=Fields!Pie.Value</Value>
+                                      <Value>=Fields!CodBin.Value</Value>
                                       <Style>
                                         <FontFamily>Segoe UI</FontFamily>
-                                        <FontSize>6pt</FontSize>
+                                        <FontSize>16pt</FontSize>
+                                        <FontWeight>Bold</FontWeight>
                                       </Style>
                                     </TextRun>
                                   </TextRuns>
-                                  <Style />
+                                  <Style>
+                                    <TextAlign>Center</TextAlign>
+                                  </Style>
                                 </Paragraph>
                               </Paragraphs>
-                              <Top>2.9cm</Top>
-                              <Left>0.05cm</Left>
-                              <Height>0.35cm</Height>
-                              <Width>6.7cm</Width>
+                              <Top>1.75cm</Top>
+                              <Height>0.8cm</Height>
+                              <Width>3.8cm</Width>
+                              <ZIndex>2</ZIndex>
                               <Style>
-                                <PaddingLeft>2pt</PaddingLeft>
-                                <PaddingRight>0pt</PaddingRight>
-                                <PaddingTop>0pt</PaddingTop>
-                                <PaddingBottom>0pt</PaddingBottom>
+                                <VerticalAlign>Top</VerticalAlign>
                               </Style>
                             </Textbox>
                           </ReportItems>
@@ -219,10 +139,8 @@
               </TablixMembers>
             </TablixRowHierarchy>
             <DataSetName>DataSet_Result</DataSetName>
-            <Top>0cm</Top>
-            <Left>0cm</Left>
-            <Height>3.3cm</Height>
-            <Width>6.8cm</Width>
+            <Height>2.8cm</Height>
+            <Width>3.8cm</Width>
             <Style>
               <Border>
                 <Style>None</Style>
@@ -230,13 +148,13 @@
             </Style>
           </Tablix>
         </ReportItems>
-        <Height>3.3cm</Height>
+        <Height>2.8cm</Height>
         <Style />
       </Body>
-      <Width>6.8cm</Width>
+      <Width>3.8cm</Width>
       <Page>
-        <PageHeight>3.5cm</PageHeight>
-        <PageWidth>7cm</PageWidth>
+        <PageHeight>3cm</PageHeight>
+        <PageWidth>4cm</PageWidth>
         <LeftMargin>0.1cm</LeftMargin>
         <RightMargin>0.1cm</RightMargin>
         <TopMargin>0.1cm</TopMargin>
@@ -258,17 +176,8 @@
         <Field Name="CodBin">
           <DataField>CodBin</DataField>
         </Field>
-        <Field Name="Zona">
-          <DataField>Zona</DataField>
-        </Field>
-        <Field Name="Digito">
-          <DataField>Digito</DataField>
-        </Field>
         <Field Name="Barras">
           <DataField>Barras</DataField>
-        </Field>
-        <Field Name="Pie">
-          <DataField>Pie</DataField>
         </Field>
       </Fields>
       <Query>

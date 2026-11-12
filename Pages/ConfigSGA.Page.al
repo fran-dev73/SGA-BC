@@ -38,6 +38,10 @@ page 51106 "Config. SGA"
                     ToolTip = 'Crea la fila de datos SGA la primera vez que se usa una ubicación de la topología. Si se desactiva, la ubicación debe estar dada de alta previamente.';
                     ApplicationArea = All;
                 }
+                field("Fecha Inicio SGA"; Rec."Fecha Inicio SGA")
+                {
+                    ApplicationArea = All;
+                }
             }
             group(UbicacionesFlujo)
             {
@@ -129,17 +133,12 @@ page 51106 "Config. SGA"
                 }
                 field("Exigir Confirmar Ubicacion"; Rec."Exigir Confirmar Ubicacion")
                 {
-                    ToolTip = 'Obliga al operario a escanear la ubicación para cerrar la tarea. En el picking, si se exige dígito de control, el dígito ya certifica la ubicación y no hace falta escanearla.';
+                    ToolTip = 'Obliga al operario a escanear la ubicación para cerrar la tarea. El picking siempre lee la ubicación de la que recoge en la etiqueta del hueco.';
                     ApplicationArea = All;
                 }
                 field("Permitir Desvio Ubicacion"; Rec."Permitir Desvio Ubicacion")
                 {
                     ToolTip = 'Permite al operario dejar o coger la mercancía en una ubicación distinta de la sugerida, quedando registrado el desvío.';
-                    ApplicationArea = All;
-                }
-                field("Exigir Digito Control"; Rec."Exigir Digito Control")
-                {
-                    ToolTip = 'Si está activo, al confirmar cada parada de picking el preparador tiene que teclear el dígito de control impreso en la etiqueta del hueco del que recoge. Certifica que está delante del hueco. Requiere haber impreso las etiquetas de ubicación.';
                     ApplicationArea = All;
                 }
                 field("Exigir Escanear Producto"; Rec."Exigir Escanear Producto")

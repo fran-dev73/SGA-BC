@@ -370,9 +370,26 @@ page 51127 "Ubicar Palets Linea SGA"
         UltimoPale: Text;
 
     trigger OnOpenPage()
+    var
+        rConfig: Record "Config. SGA";
     begin
+        // Las tareas anteriores al inicio de SGA no salen nunca: en un grupo que el usuario no quita.
+        rConfig.ObtenerConfig();
+        if rConfig."Fecha Inicio SGA" <> 0D then begin
+            Rec.FilterGroup(2);
+            Rec.SetFilter(Fecha, '>=%1', rConfig."Fecha Inicio SGA");
+            Rec.FilterGroup(0);
+        end;
         Rec.SetFilter(Estado, '<>%1', Rec.Estado::Finalizado);
         Rec.SetRange(Fecha, Today);
+    end;
+
+    trigger OnClosePage()
+    var
+        cEntradas: Codeunit "Gestion Entradas SGA";
+    begin
+        // El palé que queda en pantalla no se ha ubicado: su hueco deja de estar reservado.
+        cEntradas.LiberarReservasFilas(TempPaleActual);
     end;
 
     trigger OnAfterGetCurrRecord()

@@ -27,6 +27,16 @@ codeunit 51100 "Gestion Contenido SGA"
         cStock: Codeunit "Consulta Stock SGA";
         cUM: Codeunit "Unidades Producto SGA";
         ModoSilencioso: Boolean;
+        ParaReserva: Text;
+
+    /// <summary>
+    /// Entrada para la que se registra a partir de ahora: puede usar los huecos reservados para
+    /// ella (Cod. "Gestion Ubicaciones SGA".ReservarHueco). En blanco, ningún hueco reservado.
+    /// </summary>
+    procedure FijarReserva(prm_Para: Text)
+    begin
+        ParaReserva := prm_Para;
+    end;
 
     /// <summary>
     /// Desactiva los diálogos de confirmación. Se usa en procesos por lotes
@@ -419,9 +429,10 @@ codeunit 51100 "Gestion Contenido SGA"
             Error(LineaReservadaErr, prm_Contenido."No. Producto", prm_Contenido."Cod. Bin", prm_Contenido."Cantidad Reservada");
     end;
 
-    local procedure AplicarMovimiento(prm_Tipo: Enum "Tipo Mov. Ubicacion SGA"; prm_Origen: Enum "Origen Mov. SGA"; prm_Almacen: Code[10]; prm_UbicacionOrigen: Code[20]; prm_UbicacionDestino: Code[20]; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50]; prm_UM: Code[10]; prm_Cantidad: Decimal; prm_NoDocumento: Code[20]; prm_NoLinea: Integer; prm_Descripcion: Text): Integer
+    local procedure AplicarMovimiento(prm_Tipo: Enum "Tipo Mov. Ubicacion SGA"; prm_Origen: Enum "Origen Mov. SGA"; prm_Almacen: Code[10]; prm_UbicacionOrigen: Code[20]; prm_UbicacionDestino: Code[20]; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50]; prm_UM: Code[10]; prm_Cantidad: Decimal; prm_NoDocumento: Code[20]; prm_NoLinea: Integer; prm_Descripcion: Text) noMovimiento: Integer
     var
         rItem: Record Item;
+        cReubicaciones: Codeunit "Reubicaciones SGA";
         umUsada: Code[10];
         umBase: Code[10];
         factor: Decimal;
@@ -460,9 +471,14 @@ codeunit 51100 "Gestion Contenido SGA"
                          cantidadBase, caducidad,
                          prm_Tipo <> "Tipo Mov. Ubicacion SGA"::"Carga Inicial");
 
-        exit(InsertarMovimiento(prm_Tipo, prm_Origen, prm_Almacen, prm_UbicacionOrigen, prm_UbicacionDestino,
-                                prm_Producto, prm_Variante, prm_Lote, caducidad, umUsada, factor,
-                                prm_Cantidad, cantidadBase, prm_NoDocumento, prm_NoLinea, prm_Descripcion));
+        noMovimiento := InsertarMovimiento(prm_Tipo, prm_Origen, prm_Almacen, prm_UbicacionOrigen, prm_UbicacionDestino,
+                                           prm_Producto, prm_Variante, prm_Lote, caducidad, umUsada, factor,
+                                           prm_Cantidad, cantidadBase, prm_NoDocumento, prm_NoLinea, prm_Descripcion);
+
+        // Una ubicación de picking que se queda a cero de un producto pide reposición, sea cual
+        // sea el movimiento que la vacía: picking, traslado, vaciado o ajuste.
+        if prm_UbicacionOrigen <> '' then
+            cReubicaciones.ReubicarSiSeVacia(prm_Almacen, prm_UbicacionOrigen, prm_Producto, prm_Variante);
     end;
 
     local procedure AplicarDelta(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50]; prm_UMBase: Code[10]; prm_DeltaBase: Decimal; prm_Caducidad: Date; prm_ValidarEntrada: Boolean)
@@ -595,9 +611,13 @@ codeunit 51100 "Gestion Contenido SGA"
         MezclaLoteErr: Label 'La ubicación %1 no permite mezclar lotes y ya contiene el lote %2.', Comment = '%1 = ubicación, %2 = lote que ya contiene';
         SinCapacidadErr: Label 'La ubicación %1 no tiene hueco: capacidad %2, ocupado %3, se intenta añadir %4.', Comment = '%1 = ubicación, %2 = capacidad, %3 = ocupado, %4 = cantidad que se intenta añadir';
         SuperaCapacidadQst: Label 'La ubicación %1 se queda por encima de su capacidad (%2 de %3). ¿Desea continuar?', Comment = '%1 = ubicación, %2 = ocupación resultante, %3 = capacidad';
+        UbicacionReservadaErr: Label 'La ubicación %1 está reservada para %2 (%3).', Comment = '%1 = ubicación, %2 = entrada, %3 = usuario';
     begin
         if not rUbicacionSGA.EsUtilizable() then
             Error(UbicacionBloqueadaErr, rUbicacionSGA."Cod. Bin", rUbicacionSGA."Motivo Bloqueo");
+
+        if rUbicacionSGA.ReservadaParaOtro(ParaReserva) then
+            Error(UbicacionReservadaErr, rUbicacionSGA."Cod. Bin", rUbicacionSGA."Reservada Para", rUbicacionSGA."Reservada Por");
 
         if (rUbicacionSGA."Producto Fijo" <> '') and (rUbicacionSGA."Producto Fijo" <> prm_Producto) then
             Error(UbicacionProductoFijoErr, rUbicacionSGA."Cod. Bin", rUbicacionSGA."Producto Fijo");

@@ -350,8 +350,8 @@ codeunit 51103 "Consulta Stock SGA"
 
     /// <summary>
     /// Lo que queda por ubicar de un lote (producto, variante y lote de prm_Lote), en unidad
-    /// base, en las pantallas de entradas de ese origen (recepciones o ensamblados), sin límite
-    /// de fechas.
+    /// base, en las pantallas de entradas de ese origen (recepciones o ensamblados), desde la
+    /// fecha de inicio de SGA. Lo de documentos anteriores queda en "A Ubicar": ya es stock de BC.
     /// </summary>
     local procedure PendienteEnDocumentos(var prm_Entradas: Codeunit "Gestion Entradas SGA"; var prm_Buffer: Record "Linea Ubicacion SGA" temporary; prm_Origen: Enum "Origen Mov. SGA"; prm_Almacen: Code[10]; var prm_Lote: Record "Buffer Conciliacion SGA" temporary): Decimal
     var

@@ -7,7 +7,7 @@ namespace AntonioNadal.SGA;
 /// confirmar. Funciona igual en el navegador.
 ///
 /// No decide nada: AL le manda la parada con Mostrar y ella devuelve lo que hace el
-/// preparador (lecturas, dígito, cantidad y botones). Toda la lógica sigue en la página
+/// preparador (lecturas, cantidad y botones). Toda la lógica sigue en la página
 /// "Preparar Picking SGA" y en Cod. "Gestion Picking SGA".
 /// </summary>
 controladdin "Picking PDA SGA"
@@ -42,11 +42,6 @@ controladdin "Picking PDA SGA"
     /// Código escaneado o tecleado en el campo de lectura: una ubicación o un producto.
     /// </summary>
     event Lectura(prm_Texto: Text);
-
-    /// <summary>
-    /// Dígito de control tecleado.
-    /// </summary>
-    event Digito(prm_Texto: Text);
 
     /// <summary>
     /// Cantidad recogida, en la unidad del pedido y con punto decimal.

@@ -217,19 +217,6 @@ table 51101 "Ubicacion SGA"
                 TestVacia();
             end;
         }
-        field(114; "Digito Control"; Code[2])
-        {
-            Caption = 'Dígito de control';
-            DataClassification = ToBeClassified;
-            Editable = false;
-            ToolTip = 'Número de dos cifras, distinto en cada hueco, que va impreso en su etiqueta. Al recoger se escanea o se teclea para certificar que el preparador está delante del hueco: no se puede saber sin verlo. Se asigna solo al crear la ubicación; si se regenera, hay que reimprimir la etiqueta.';
-        }
-        field(115; "Digito Colocado"; Boolean)
-        {
-            Caption = 'Dígito colocado';
-            DataClassification = ToBeClassified;
-            ToolTip = 'El hueco ya tiene puesto su dígito de control (la etiqueta SGA). Se marca después de colocarlo, con la acción Dígito colocado de la lista, y se desmarca solo al regenerar el dígito. Solo en los huecos marcados se pide el dígito al recoger; en los demás basta con escanear el producto. Así el almacén funciona mientras se van poniendo los dígitos.';
-        }
         field(120; "Estado SGA"; Enum "Estado Ubicacion SGA")
         {
             Caption = 'Estado';
@@ -288,6 +275,34 @@ table 51101 "Ubicacion SGA"
             CalcFormula = count("Contenido Ubicacion SGA" where("Cod. Almacen" = field("Cod. Almacen"),
                                                                 "Cod. Bin" = field("Cod. Bin")));
         }
+        field(160; "Reservada Para"; Text[100])
+        {
+            Caption = 'Reservada para';
+            DataClassification = ToBeClassified;
+            Editable = false;
+            ToolTip = 'Entrada para la que se ha propuesto este hueco y que aún no se ha ubicado: palé de producción, ensamblado o recepción de compra. Mientras tanto no se propone a nadie más. En blanco si no está reservada.';
+        }
+        field(161; "Reservada Por"; Code[50])
+        {
+            Caption = 'Reservada por';
+            DataClassification = EndUserIdentifiableInformation;
+            Editable = false;
+            ToolTip = 'Usuario que tiene la pantalla en la que se ha propuesto el hueco.';
+        }
+        field(162; "Fecha Reserva"; DateTime)
+        {
+            Caption = 'Fecha reserva';
+            DataClassification = ToBeClassified;
+            Editable = false;
+            ToolTip = 'Cuándo se ha propuesto el hueco.';
+        }
+        field(163; "Sesion Reserva"; Integer)
+        {
+            Caption = 'Sesión reserva';
+            DataClassification = SystemMetadata;
+            Editable = false;
+            ToolTip = 'Sesión de BC en la que se ha propuesto el hueco: la reserva es de esa pantalla.';
+        }
     }
 
     keys
@@ -312,6 +327,9 @@ table 51101 "Ubicacion SGA"
         key(ProductoFijo; "Cod. Almacen", "Producto Fijo")
         {
         }
+        key(Reservas; "Reservada Por", "Sesion Reserva", "Reservada Para")
+        {
+        }
     }
 
     fieldgroups
@@ -333,67 +351,63 @@ table 51101 "Ubicacion SGA"
         // topología estándar, y es de Bin de donde SincronizarTopologia lee las ubicaciones.
         if not rBin.Get("Cod. Almacen", "Cod. Bin") then
             Error(BinNoExisteErr, "Cod. Bin", "Cod. Almacen");
-        if "Digito Control" = '' then
-            GenerarDigitoControl();
         RecalcularOcupacion();
     end;
 
     /// <summary>
-    /// Asigna un dígito de control nuevo, de 10 a 99. Al azar a propósito: si siguiera el
-    /// código del hueco, se podría deducir sin estar delante, que es lo que se quiere evitar.
-    /// No hace Modify: decide el llamante. Cambiarlo obliga a reimprimir la etiqueta.
+    /// Si la ubicación está reservada para otra entrada: de otro usuario, de otra sesión o para
+    /// otra fila de la misma pantalla. Con prm_Para en blanco, cualquier reserva es de otro.
     /// </summary>
-    procedure GenerarDigitoControl()
-    var
-        guid: Text;
-        i: Integer;
-        acumulado: Integer;
+    procedure ReservadaParaOtro(prm_Para: Text): Boolean
     begin
-        // Se saca de un GUID y no de Random: Random repite la misma serie en cada sesión si no
-        // se siembra, y sembrarlo por hora daría el mismo número a los huecos de una tirada.
-        guid := UpperCase(Format(CreateGuid()));
-        for i := 1 to StrLen(guid) do
-            acumulado := (acumulado * 31 + StrPos('0123456789ABCDEF', CopyStr(guid, i, 1))) mod 100000;
-
-        "Digito Control" := Format(acumulado mod 90 + 10);
-        // La etiqueta que tenga puesta lleva el dígito anterior: deja de valer.
-        "Digito Colocado" := false;
+        if "Reservada Por" = '' then
+            exit(false);
+        exit(("Reservada Por" <> UserId()) or ("Sesion Reserva" <> SessionId()) or ("Reservada Para" <> prm_Para));
     end;
 
     /// <summary>
-    /// Comprueba el dígito de control tecleado o escaneado contra el de la ubicación.
+    /// Reserva la ubicación para prm_Para en esta sesión. False, sin tocarla, si ya está
+    /// reservada para otro.
     /// </summary>
-    procedure DigitoControlCorrecto(prm_Digito: Text): Boolean
+    procedure Reservar(prm_Para: Text): Boolean
     begin
-        if "Digito Control" = '' then
+        if ReservadaParaOtro(prm_Para) then
             exit(false);
 
-        exit(DelChr(prm_Digito, '<>', ' ') = "Digito Control");
+        "Reservada Para" := CopyStr(prm_Para, 1, MaxStrLen("Reservada Para"));
+        "Reservada Por" := CopyStr(UserId(), 1, MaxStrLen("Reservada Por"));
+        "Fecha Reserva" := CurrentDateTime();
+        "Sesion Reserva" := SessionId();
+        Modify();
+        exit(true);
     end;
 
     /// <summary>
-    /// Error si el dígito de control tecleado no es el de la ubicación prm_Bin del almacén
-    /// prm_Almacen, que lee en Rec. Certifica que quien confirma está delante del hueco: el
-    /// dígito solo está en su etiqueta. Una ubicación sin datos SGA da el mismo error que un
-    /// dígito incorrecto, para que la comprobación no se pueda saltar.
+    /// Quita la reserva, sea de quien sea.
     /// </summary>
-    procedure TestDigitoControl(prm_Almacen: Code[10]; prm_Bin: Code[20]; prm_Digito: Text)
-    var
-        DigitoNoIndicadoErr: Label 'Teclee el dígito de control de la etiqueta de la ubicación %1.', Comment = '%1 = ubicación';
-        DigitoIncorrectoErr: Label 'El dígito de control no corresponde a la ubicación %1. Compruebe que está recogiendo del hueco correcto.', Comment = '%1 = ubicación';
-        UbicacionSinDigitoErr: Label 'La ubicación %1 no tiene dígito de control. Genérelo e imprima su etiqueta desde la lista de ubicaciones.', Comment = '%1 = ubicación';
+    procedure LiberarReserva()
     begin
-        if DelChr(prm_Digito, '<>', ' ') = '' then
-            Error(DigitoNoIndicadoErr, prm_Bin);
+        if "Reservada Por" = '' then
+            exit;
 
+        Clear("Reservada Para");
+        Clear("Reservada Por");
+        Clear("Fecha Reserva");
+        Clear("Sesion Reserva");
+        Modify();
+    end;
+
+    /// <summary>
+    /// Error si la ubicación leída en la etiqueta del hueco no es una ubicación SGA del almacén.
+    /// Es lo que certifica que el preparador lee el hueco al que va: la etiqueta trae el código
+    /// de la ubicación y se compara con la propuesta en el picking.
+    /// </summary>
+    procedure ComprobarUbicacionLeida(prm_Almacen: Code[10]; prm_Bin: Code[20])
+    var
+        UbicacionNoExisteErr: Label 'La ubicación %1 no existe en SGA para el almacén %2.', Comment = '%1 = ubicación, %2 = almacén';
+    begin
         if not Get(prm_Almacen, prm_Bin) then
-            Error(DigitoIncorrectoErr, prm_Bin);
-
-        if "Digito Control" = '' then
-            Error(UbicacionSinDigitoErr, prm_Bin);
-
-        if not DigitoControlCorrecto(prm_Digito) then
-            Error(DigitoIncorrectoErr, prm_Bin);
+            Error(UbicacionNoExisteErr, prm_Bin, prm_Almacen);
     end;
 
     trigger OnDelete()

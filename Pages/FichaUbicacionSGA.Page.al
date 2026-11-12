@@ -51,10 +51,6 @@ page 51101 "Ficha Ubicacion SGA"
                     ToolTip = 'Orden de recorrido físico. Los motores de picking y de ubicación recorren las ubicaciones por este valor.';
                     ApplicationArea = All;
                 }
-                field("Digito Colocado"; Rec."Digito Colocado")
-                {
-                    ApplicationArea = All;
-                }
             }
             group(Ocupacion)
             {
@@ -130,6 +126,19 @@ page 51101 "Ficha Ubicacion SGA"
                     ToolTip = 'Razón del bloqueo.';
                     ApplicationArea = All;
                     Enabled = Rec.Bloqueada;
+                }
+                field("Reservada Para"; Rec."Reservada Para")
+                {
+                    ApplicationArea = All;
+                    Style = Attention;
+                }
+                field("Reservada Por"; Rec."Reservada Por")
+                {
+                    ApplicationArea = All;
+                }
+                field("Fecha Reserva"; Rec."Fecha Reserva")
+                {
+                    ApplicationArea = All;
                 }
                 field("Permite Mezcla Producto"; Rec."Permite Mezcla Producto")
                 {

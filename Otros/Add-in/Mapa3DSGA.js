@@ -124,12 +124,16 @@ var SGA3D = (function () {
     // un tono propio, para no confundirlo con el gris de vacía.
     var COLOR_SIN_DATO = '#a78bfa';
 
+    // Reservada para una entrada que aún no se ha ubicado (u.v, lo manda AL): en el color por
+    // estado manda sobre todo menos bloqueada.
+    var COLOR_RESERVADA = '#14b8a6';
+
     // Criterios de color. Cada uno da, para una ubicación, el color base y la entrada de su
     // leyenda. Las vacías van siempre en el gris de vacía.
     var CRITERIOS = {
         estado: {
             nombre: 'Estado',
-            leyenda: [['#d9dde3', 'vacía'], ['#7cc47f', 'con hueco'], ['#e8a33d', 'llena'], ['#9a3412', 'sobrepasada'], ['#d9534f', 'bloqueada'], ['#a5b4fc', 'sin medir']]
+            leyenda: [['#d9dde3', 'vacía'], ['#7cc47f', 'con hueco'], ['#e8a33d', 'llena'], ['#9a3412', 'sobrepasada'], ['#d9534f', 'bloqueada'], [COLOR_RESERVADA, 'reservada'], ['#a5b4fc', 'sin medir']]
         },
         abc: {
             nombre: 'Rotación ABC',
@@ -609,7 +613,9 @@ var SGA3D = (function () {
     // Colores de una ubicación según el criterio elegido.
     function colorDe(u) {
         if (colorear === 'estado') {
-            // Bloqueada y sin medir mandan; si no, por encima del 100 % es sobrepasada.
+            // Bloqueada manda; después, reservada; si no, sin medir, y por encima del 100 %
+            // sobrepasada.
+            if (u.s !== 3 && u.v) { return paleta(COLOR_RESERVADA); }
             if (u.s !== 3 && u.s !== 4 && u.l && u.o > 100) { return PALETA[5]; }
             return PALETA[u.s] || PALETA[0];
         }
@@ -1380,6 +1386,9 @@ var SGA3D = (function () {
         var u = cu.u;
         var html = '<div class="sga3d-tip-cab">' + esc(u.b) +
             '<span>' + esc(textoOcupacion(u)) + '</span></div>';
+        if (u.v) {
+            html += '<div class="sga3d-tip-aviso">' + esc(u.v) + '</div>';
+        }
         if (u.m) {
             html += '<div class="sga3d-tip-aviso">' + esc(u.m) + '</div>';
         }

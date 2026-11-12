@@ -51,7 +51,7 @@ codeunit 51105 "Gestion Entradas SGA"
 
     /// <summary>
     /// Lo pendiente de ubicar de un solo lote (producto, variante y lote) por el origen indicado,
-    /// sin fechas ni clase. Es lo que usa "Pendiente de ubicar" para saber cuánto de un lote
+    /// sin clase y sin más límite de fechas que el inicio de SGA. Es lo que usa "Pendiente de ubicar" para saber cuánto de un lote
     /// espera en estas pantallas: filtrar por el lote evita repasar toda la historia del producto.
     /// </summary>
     procedure CargarEntradasLote(var prm_Buffer: Record "Linea Ubicacion SGA" temporary; prm_Origen: Enum "Origen Mov. SGA"; prm_Almacen: Code[10]; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50]): Integer
@@ -62,20 +62,34 @@ codeunit 51105 "Gestion Entradas SGA"
         exit(Cargar(prm_Buffer, prm_Origen, 0D, 0D, prm_Almacen, true, -1, prm_Producto));
     end;
 
+    /// <summary>
+    /// Las entradas anteriores a "Fecha Inicio SGA" no se cargan nunca, se pidan las fechas que
+    /// se pidan: lo que trajeron ya es stock de BC y lo coloca la carga inicial.
+    /// </summary>
     local procedure Cargar(var prm_Buffer: Record "Linea Ubicacion SGA" temporary; prm_Origen: Enum "Origen Mov. SGA"; prm_FechaDesde: Date; prm_FechaHasta: Date; prm_Almacen: Code[10]; prm_SoloPendientes: Boolean; prm_Clase: Integer; prm_Producto: Code[20]): Integer
     var
+        rConfig: Record "Config. SGA";
         OrigenNoUbicableErr: Label 'Solo se pueden ubicar entradas de compra o de producción.';
     begin
+        rConfig.ObtenerConfig();
         FechaDesde := prm_FechaDesde;
+        if FechaDesde < rConfig."Fecha Inicio SGA" then
+            FechaDesde := rConfig."Fecha Inicio SGA";
         FechaHasta := prm_FechaHasta;
         ClaseFiltro := prm_Clase;
         ProductoFiltro := prm_Producto;
 
+        // Las filas que había se descartan: sus huecos dejan de estar reservados.
+        LiberarReservasFilas(prm_Buffer);
         prm_Buffer.Reset();
         prm_Buffer.DeleteAll();
         // El orden de la pantalla, por documento. Se fija aquí porque el Reset quita el que
         // traiga la página.
         prm_Buffer.SetCurrentKey(Origen, "No. Documento", "No. Producto", "Cod. Variante", "No. Lote", "Cod. Unidad Medida");
+
+        // Hasta una fecha anterior al inicio de SGA no hay nada que ubicar.
+        if (FechaHasta <> 0D) and (FechaHasta < FechaDesde) then
+            exit(0);
 
         case prm_Origen of
             prm_Origen::Produccion:
@@ -499,10 +513,13 @@ codeunit 51105 "Gestion Entradas SGA"
         else
             descripcion := StrSubstNo(EnsambladoLbl, prm_Fila."No. Documento");
 
+        // Puede entrar en el hueco reservado para la fila; ya ocupado, la reserva sobra.
+        cContenido.FijarReserva(prm_Fila.ReservaFila());
         cContenido.RegistrarEntrada(prm_Fila."Cod. Almacen", prm_Fila."Ubicacion Confirmada",
                                     prm_Fila."No. Producto", prm_Fila."Cod. Variante", prm_Fila."No. Lote",
                                     prm_Fila."Cod. Unidad Medida", prm_Fila.Cantidad,
                                     prm_Fila.Origen, prm_Fila."No. Documento", 0, descripcion);
+        cUbicaciones.LiberarReservas(prm_Fila.ReservaFila(), '');
 
         CalcularPendiente(prm_Fila);
         prm_Fila.Modify();
@@ -555,8 +572,9 @@ codeunit 51105 "Gestion Entradas SGA"
     ///
     /// Sin hueco libre, la ubicación queda en blanco y prm_Aviso dice por qué no lo hay.
     ///
-    /// Devuelve false, con el porqué en prm_Aviso, si no hay palé que ubicar. Con true, en
-    /// prm_Aviso puede venir un aviso que no impide ubicar.
+    /// Devuelve false, con el porqué en prm_Aviso, si no hay palé que ubicar (también si la tarea
+    /// es anterior a "Fecha Inicio SGA": lo que sacó ya es stock de BC y lo coloca la carga
+    /// inicial). Con true, en prm_Aviso puede venir un aviso que no impide ubicar.
     /// </summary>
     procedure PrepararPaleTarea(prm_Tarea: Record "Tareas Produccion"; var prm_Fila: Record "Linea Ubicacion SGA" temporary; var prm_Aviso: Text): Boolean
     var
@@ -583,10 +601,20 @@ codeunit 51105 "Gestion Entradas SGA"
         SinUnidadPaleLbl: Label 'El producto %1 no tiene la unidad de palé %2 definida.', Comment = '%1 = producto, %2 = unidad de palé';
         EnsambladoYaUbicadoLbl: Label 'Ya está ubicado todo lo del ensamblado %1.', Comment = '%1 = nº pedido de ensamblado';
         SinAlmacenLbl: Label 'No hay almacén: ni el ensamblado lo lleva ni hay uno por defecto en la configuración SGA.';
-        SinUbicacionLibreLbl: Label 'No hay ninguna ubicación libre que admita este palé: %1', Comment = '%1 = motivo';    begin
+        SinUbicacionLibreLbl: Label 'No hay ninguna ubicación libre que admita este palé: %1', Comment = '%1 = motivo';
+        TareaAntesInicioLbl: Label 'La tarea %1 es del %2, anterior al inicio de SGA (%3): sus palés no se ubican desde aquí.', Comment = '%1 = nº tarea, %2 = fecha de la tarea, %3 = fecha de inicio de SGA';
+    begin
+        // El palé que había en pantalla se descarta: su hueco deja de estar reservado.
+        LiberarReservasFilas(prm_Fila);
         prm_Fila.Reset();
         prm_Fila.DeleteAll();
         prm_Aviso := '';
+
+        rConfig.ObtenerConfig();
+        if prm_Tarea.Fecha < rConfig."Fecha Inicio SGA" then begin
+            prm_Aviso := StrSubstNo(TareaAntesInicioLbl, prm_Tarea.Linea, prm_Tarea.Fecha, rConfig."Fecha Inicio SGA");
+            exit(false);
+        end;
 
         prm_Fila.Init();
         prm_Fila.Linea := 1;
@@ -636,10 +664,8 @@ codeunit 51105 "Gestion Entradas SGA"
         prm_Fila."Cantidad Entrada" := Round(lotes.Get(lote) / qtyPorUM, 0.00001);
 
         // Mismo criterio que CargarEnsamblados: el almacén suele ir en blanco en el ensamblado.
-        if prm_Fila."Cod. Almacen" = '' then begin
-            rConfig.ObtenerConfig();
+        if prm_Fila."Cod. Almacen" = '' then
             prm_Fila."Cod. Almacen" := rConfig."Almacen por Defecto";
-        end;
         if prm_Fila."Cod. Almacen" = '' then begin
             prm_Aviso := SinAlmacenLbl;
             exit(false);
@@ -948,13 +974,16 @@ codeunit 51105 "Gestion Entradas SGA"
 
     /// <summary>
     /// Propuesta para una fila concreta, con la estrategia que diga la configuración para
-    /// su origen.
+    /// su origen. El hueco propuesto queda reservado para la fila (ReservarHueco) y el que tenía
+    /// antes se suelta. Si otra sesión lo ha reservado entre que se propone y se reserva, se
+    /// busca otro.
     /// </summary>
-    local procedure ProponerParaFila(var prm_Fila: Record "Linea Ubicacion SGA" temporary; prm_Excluidas: Text; var prm_Motivo: Text): Code[20]
+    local procedure ProponerParaFila(var prm_Fila: Record "Linea Ubicacion SGA" temporary; prm_Excluidas: Text; var prm_Motivo: Text) codigo: Code[20]
     var
         rConfig: Record "Config. SGA";
         estrategia: Enum "Estrategia Ubicacion SGA";
         cantidad: Decimal;
+        intento: Integer;
     begin
         rConfig.ObtenerConfig();
 
@@ -967,11 +996,36 @@ codeunit 51105 "Gestion Entradas SGA"
         if cantidad <= 0 then
             cantidad := prm_Fila.Pendiente();
 
-        // Sin hueco, el motivo dice por qué: sin ubicaciones con tipo, sin espacio, etc.
-        exit(cUbicaciones.ProponerUbicacionCon(estrategia, prm_Excluidas,
-                                               prm_Fila."Cod. Almacen", prm_Fila."No. Producto",
-                                               prm_Fila."Cod. Variante", prm_Fila."No. Lote",
-                                               prm_Fila."Cod. Unidad Medida", cantidad, prm_Motivo));
+        cUbicaciones.FijarReserva(prm_Fila.ReservaFila());
+        for intento := 1 to 5 do begin
+            // Sin hueco, el motivo dice por qué: sin ubicaciones con tipo, sin espacio, etc.
+            codigo := cUbicaciones.ProponerUbicacionCon(estrategia, prm_Excluidas,
+                                                        prm_Fila."Cod. Almacen", prm_Fila."No. Producto",
+                                                        prm_Fila."Cod. Variante", prm_Fila."No. Lote",
+                                                        prm_Fila."Cod. Unidad Medida", cantidad, prm_Motivo);
+            if (codigo = '') or (prm_Fila.ReservaFila() = '') then
+                exit(codigo);
+            if cUbicaciones.ReservarHueco(prm_Fila."Cod. Almacen", codigo, prm_Fila.ReservaFila()) then
+                exit(codigo);
+            prm_Excluidas := cUbicaciones.AnadirExclusion(prm_Excluidas, codigo);
+        end;
+        exit('');
+    end;
+
+    /// <summary>
+    /// Suelta los huecos reservados para las filas que no se han llegado a ubicar. Lo llaman
+    /// las pantallas al cerrarse.
+    /// </summary>
+    procedure LiberarReservasFilas(var prm_Buffer: Record "Linea Ubicacion SGA" temporary)
+    var
+        TempFila: Record "Linea Ubicacion SGA" temporary;
+    begin
+        TempFila.Copy(prm_Buffer, true);
+        TempFila.Reset();
+        if TempFila.FindSet() then
+            repeat
+                cUbicaciones.LiberarReservas(TempFila.ReservaFila(), '');
+            until TempFila.Next() = 0;
     end;
 
     /// <summary>

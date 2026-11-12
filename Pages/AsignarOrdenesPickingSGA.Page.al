@@ -9,7 +9,7 @@ using System.Security.User;
 /// Pantalla del responsable de almacén: las órdenes de picking vivas, para repartirlas entre
 /// los preparadores y fijar en qué orden se hacen.
 ///
-/// Es el paso intermedio entre "Enviar a picking" y la preparación. Con "Exigir asignación de
+/// Es el paso intermedio entre "Enviar a SGA" y la preparación. Con "Exigir asignación de
 /// picking" en la configuración es obligatorio: una orden no se puede preparar hasta que se
 /// asigna aquí. Sin ella sirve igual para repartir, pero los preparadores también pueden
 /// coger las que estén sin asignar.

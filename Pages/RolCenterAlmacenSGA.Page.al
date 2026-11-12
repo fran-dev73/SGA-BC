@@ -26,12 +26,11 @@ page 51112 "Rol Center Almacen SGA"
     {
         area(RoleCenter)
         {
-            group(Indicadores)
+            // Directamente en el área, sin grupo: dentro de un grupo las pilas no se reparten
+            // a lo ancho de la pantalla y obligan a desplazarse.
+            part(Cues; "Cue SGA")
             {
-                part(Cues; "Cue SGA")
-                {
-                    ApplicationArea = All;
-                }
+                ApplicationArea = All;
             }
         }
     }
@@ -141,6 +140,15 @@ page 51112 "Rol Center Almacen SGA"
                     ApplicationArea = All;
                     Image = Warehouse;
                     RunObject = page "Asignar Ordenes Picking SGA";
+                }
+                action(ParadasRetenidas)
+                {
+                    Caption = 'Paradas retenidas';
+                    ToolTip = 'Paradas de picking que el preparador ha saltado dos veces: qué impide recogerlas y buscar el producto en otra ubicación.';
+                    ApplicationArea = All;
+                    Image = Warehouse;
+                    RunObject = page "Paradas Picking SGA";
+                    RunPageView = where(Retenida = const(true), Estado = filter(Pendiente | Parcial));
                 }
                 action(Reubicaciones)
                 {

@@ -96,6 +96,20 @@ page 51100 "Ubicaciones SGA"
                     ToolTip = 'Razón del bloqueo.';
                     ApplicationArea = All;
                 }
+                field("Reservada Para"; Rec."Reservada Para")
+                {
+                    ApplicationArea = All;
+                    Style = Attention;
+                }
+                field("Reservada Por"; Rec."Reservada Por")
+                {
+                    ApplicationArea = All;
+                }
+                field("Fecha Reserva"; Rec."Fecha Reserva")
+                {
+                    ApplicationArea = All;
+                    Visible = false;
+                }
                 field("Producto Fijo"; Rec."Producto Fijo")
                 {
                     ToolTip = 'Producto que tiene esta ubicación como casa. Solo se admite este producto.';
@@ -111,10 +125,6 @@ page 51100 "Ubicaciones SGA"
                     ToolTip = 'Si se desactiva, la ubicación solo puede contener un lote a la vez.';
                     ApplicationArea = All;
                     Visible = false;
-                }
-                field("Digito Colocado"; Rec."Digito Colocado")
-                {
-                    ApplicationArea = All;
                 }
                 field("Fecha Ultimo Movimiento"; Rec."Fecha Ultimo Movimiento")
                 {
@@ -198,7 +208,7 @@ page 51100 "Ubicaciones SGA"
             action(ImprimirEtiquetas)
             {
                 Caption = 'Imprimir etiquetas';
-                ToolTip = 'Imprime la etiqueta (70 × 35 mm) de las ubicaciones seleccionadas: código, código de barras y dígito de control.';
+                ToolTip = 'Imprime la etiqueta de puntal de las ubicaciones seleccionadas: el código de la ubicación con su código de barras.';
                 ApplicationArea = All;
                 Image = PrintReport;
 
@@ -208,55 +218,6 @@ page 51100 "Ubicaciones SGA"
                 begin
                     CurrPage.SetSelectionFilter(rSeleccion);
                     Report.RunModal(Report::"Etiquetas Ubicaciones SGA", true, false, rSeleccion);
-                end;
-            }
-            action(RegenerarDigitos)
-            {
-                Caption = 'Regenerar dígitos de control';
-                ToolTip = 'Da un dígito de control nuevo a las ubicaciones seleccionadas. Hay que reimprimir sus etiquetas: las viejas dejarán de valer.';
-                ApplicationArea = All;
-                Image = Refresh;
-
-                trigger OnAction()
-                var
-                    rSeleccion: Record "Ubicacion SGA";
-                    cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
-                    hechas: Integer;
-                    RegenerarDigitosQst: Label 'Se va a cambiar el dígito de control de %1 ubicaciones. Sus etiquetas actuales dejarán de valer y habrá que reimprimirlas. ¿Continuar?', Comment = '%1 = número';
-                    DigitosRegeneradosMsg: Label 'Se han regenerado %1 dígitos de control. Reimprima sus etiquetas.', Comment = '%1 = número';
-                begin
-                    CurrPage.SetSelectionFilter(rSeleccion);
-                    if not Confirm(RegenerarDigitosQst, false, rSeleccion.Count()) then
-                        exit;
-
-                    hechas := cUbicaciones.RegenerarDigitos(rSeleccion);
-                    CurrPage.Update(false);
-                    Message(DigitosRegeneradosMsg, hechas);
-                end;
-            }
-            action(DigitoColocado)
-            {
-                Caption = 'Dígito colocado';
-                ToolTip = 'Marca o desmarca las ubicaciones seleccionadas como que ya tienen puesto su dígito de control. Desde que se marcan, al recoger de ellas se pide el dígito (si la configuración lo exige). Márquelas después de pegar las etiquetas.';
-                ApplicationArea = All;
-                Image = Approve;
-
-                trigger OnAction()
-                var
-                    rSeleccion: Record "Ubicacion SGA";
-                    cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
-                    opcion: Integer;
-                    OpcionesTxt: Label 'Ya tienen el dígito puesto,Todavía no lo tienen';
-                    PreguntaTxt: Label '%1 ubicaciones seleccionadas:', Comment = '%1 = número';
-                    MarcadasMsg: Label 'Se han actualizado %1 ubicaciones.', Comment = '%1 = número';
-                begin
-                    CurrPage.SetSelectionFilter(rSeleccion);
-                    opcion := StrMenu(OpcionesTxt, 1, StrSubstNo(PreguntaTxt, rSeleccion.Count()));
-                    if opcion = 0 then
-                        exit;
-
-                    Message(MarcadasMsg, cUbicaciones.MarcarDigitoColocado(rSeleccion, opcion = 1));
-                    CurrPage.Update(false);
                 end;
             }
             action(CambiarEnBloque)
@@ -288,6 +249,28 @@ page 51100 "Ubicaciones SGA"
                         Message(UbicacionesCambiadasMsg, hechas)
                     else
                         Message(UbicacionesCambiadasOmitidasMsg, hechas, omitidas, ejemplo);
+                end;
+            }
+            action(LiberarReserva)
+            {
+                Caption = 'Liberar reserva';
+                ToolTip = 'Quita la reserva de las ubicaciones seleccionadas, para que se puedan volver a proponer. Úselo si una pantalla de ubicar se ha cerrado mal y el hueco se ha quedado reservado sin usarse.';
+                ApplicationArea = All;
+                Image = ReleaseDoc;
+
+                trigger OnAction()
+                var
+                    rSeleccion: Record "Ubicacion SGA";
+                    cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
+                    LiberarReservaQst: Label 'Se quitará la reserva de las ubicaciones seleccionadas. Si alguien está ubicando en ellas, se le podrán proponer a otro.\¿Desea continuar?';
+                    ReservasLiberadasMsg: Label 'Se ha quitado la reserva de %1 ubicaciones.', Comment = '%1 = número de ubicaciones';
+                begin
+                    if not Confirm(LiberarReservaQst, false) then
+                        exit;
+
+                    CurrPage.SetSelectionFilter(rSeleccion);
+                    Message(ReservasLiberadasMsg, cUbicaciones.LiberarReservasSeleccion(rSeleccion));
+                    CurrPage.Update(false);
                 end;
             }
             action(AlternarBloqueo)
@@ -357,7 +340,7 @@ page 51100 "Ubicaciones SGA"
                 {
                 }
                 actionref(ImprimirEtiquetas_Promoted; ImprimirEtiquetas) { }
-                actionref(DigitoColocado_Promoted; DigitoColocado) { }
+                actionref(LiberarReserva_Promoted; LiberarReserva) { }
                 actionref(AlternarBloqueo_Promoted; AlternarBloqueo)
                 {
                 }
@@ -416,6 +399,11 @@ page 51100 "Ubicaciones SGA"
             Caption = 'Bloqueadas';
             Filters = where("Estado SGA" = const(Bloqueada));
         }
+        view(Reservadas)
+        {
+            Caption = 'Reservadas';
+            Filters = where("Reservada Por" = filter(<> ''));
+        }
         view(Picking)
         {
             Caption = 'Picking';
@@ -430,11 +418,6 @@ page 51100 "Ubicaciones SGA"
         {
             Caption = 'Sin tipo';
             Filters = where("Tipo Ubicacion" = const(" "));
-        }
-        view(SinDigitoColocado)
-        {
-            Caption = 'Sin dígito colocado';
-            Filters = where("Digito Colocado" = const(false), "Tipo Ubicacion" = filter(<> " "));
         }
     }
 

@@ -58,6 +58,14 @@ page 51105 "Zonas SGA"
                     ToolTip = 'Impide proponer las ubicaciones de esta zona para ubicar o recoger.';
                     ApplicationArea = All;
                 }
+                field(Playa; Rec.Playa)
+                {
+                    ApplicationArea = All;
+                }
+                field("Ubicacion por Defecto"; Rec."Ubicacion por Defecto")
+                {
+                    ApplicationArea = All;
+                }
                 field("No. Ubicaciones"; Rec."No. Ubicaciones")
                 {
                     ToolTip = 'Número de ubicaciones asignadas a la zona.';

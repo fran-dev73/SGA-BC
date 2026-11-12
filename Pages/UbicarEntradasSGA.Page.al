@@ -44,7 +44,7 @@ page 51123 "Ubicar Entradas SGA"
                 field(FiltroFechaDesde; FiltroFechaDesde)
                 {
                     Caption = 'Registrado desde';
-                    ToolTip = 'Primera fecha de registro que se mira. En blanco, sin límite: en recepciones salen todas las que aún tienen stock.';
+                    ToolTip = 'Primera fecha de registro que se mira. Nunca antes de la fecha de inicio de SGA de la configuración. En blanco, desde esa fecha; si tampoco la hay, sin límite y en recepciones salen todas las que aún tienen stock.';
                     ApplicationArea = All;
 
                     trigger OnValidate()
@@ -416,6 +416,14 @@ page 51123 "Ubicar Entradas SGA"
         EstiloFila: Text;
         LineaUbicada: Boolean;
         Preparada: Boolean;
+
+    trigger OnClosePage()
+    var
+        cEntradas: Codeunit "Gestion Entradas SGA";
+    begin
+        // Lo que no se ha llegado a ubicar suelta sus huecos reservados.
+        cEntradas.LiberarReservasFilas(Rec);
+    end;
 
     trigger OnOpenPage()
     var

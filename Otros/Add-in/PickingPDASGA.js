@@ -1,13 +1,15 @@
 // Pantalla de picking para PDA (control add-in "Picking PDA SGA").
 //
 // Solo pinta y recoge: AL manda la parada con Mostrar y aquí se devuelve lo que hace el
-// preparador con los eventos Lectura, Digito, Cantidad y Accion. Nada se valida aquí.
+// preparador con los eventos Lectura, Cantidad y Accion. Nada se valida aquí.
 //
-// El foco vuelve siempre al campo de lectura, donde se escanea la etiqueta del hueco (que trae
-// la ubicación y su dígito) y el producto: así un lector que escribe como un teclado deja ahí
-// lo leído. Con el escáner de la app de BC (datos.escaner) las lecturas llegan a AL por su
-// cuenta; el campo tiene el foco igualmente, pero con inputmode none para que Android no abra
-// el teclado hasta que el preparador toque el campo.
+// Cada parada se confirma en un orden fijo, con una casilla por paso: ubicación y, si se
+// exige, producto. El foco va solo a la primera casilla pendiente, así que un
+// lector que escribe como un teclado deja cada lectura en su sitio. Si el preparador toca una
+// casilla para teclear, el foco se queda en ella hasta que la manda. Lo que se manda lo
+// clasifica AL por su contenido, no por la casilla. Con el escáner de la app de BC
+// (datos.escaner) las lecturas llegan a AL por su cuenta; las casillas tienen el foco igualmente,
+// pero con inputmode none para que Android no abra el teclado hasta que se toquen.
 
 (function () {
     'use strict';
@@ -17,6 +19,8 @@
     var cantidadSinEnviar = null;
     var temporizadorCantidad = null;
     var audio = null;
+    // Casilla que el preparador ha tocado para teclear: el foco se queda en ella.
+    var campoManual = null;
 
     function invocar(evento, argumentos) {
         Microsoft.Dynamics.NAV.InvokeExtensibilityMethod(evento, argumentos || []);
@@ -83,6 +87,45 @@
         return nodo('span', 'pk-paso' + (hecho ? ' pk-hecho' : ''), (hecho ? '✔ ' : '○ ') + texto);
     }
 
+    // Primera casilla pendiente, en el orden ubicación, producto. Con todo leído, la
+    // ubicación: una lectura nueva empieza otra vez por ahí.
+    function campoPendiente() {
+        if (!datos.ubicacionLeida) { return 'ubicacion'; }
+        if (datos.exigeProducto && !datos.productoLeido) { return 'producto'; }
+        return 'ubicacion';
+    }
+
+    // Casilla de lectura. Muestra lo ya leído; Intro manda lo tecleado como una lectura, salvo
+    // que la casilla traiga su propio Intro (alIntro).
+    function campoLectura(nombre, clase, marcador, valor, alIntro) {
+        var c = nodo('input', 'pk-campo ' + clase + (valor ? ' pk-leido' : ''));
+        c.type = 'text';
+        c.setAttribute('data-campo', nombre);
+        c.setAttribute('autocomplete', 'off');
+        c.setAttribute('autocapitalize', 'characters');
+        c.placeholder = marcador;
+        c.value = valor || '';
+        // Con el escáner de la app tiene el foco sin abrir el teclado; al tocarla, se abre.
+        if (datos.escaner) { c.setAttribute('inputmode', 'none'); }
+        c.addEventListener('pointerdown', function () {
+            campoManual = nombre;
+            c.setAttribute('inputmode', 'text');
+            // Lo ya leído se borra al tocarla, para teclear encima.
+            if (c.value === (valor || '') && valor) { c.value = ''; }
+        });
+        c.addEventListener('keydown', function (e) {
+            if (e.key !== 'Enter') { return; }
+            if (alIntro) { alIntro(); return; }
+            if (c.value.trim() !== '' && c.value !== (valor || '')) {
+                var texto = c.value;
+                c.value = '';
+                campoManual = null;
+                enviar('Lectura', [texto]);
+            }
+        });
+        return c;
+    }
+
     function pintar() {
         var activo = document.activeElement ? document.activeElement.getAttribute('data-campo') : null;
         raiz.innerHTML = '';
@@ -100,12 +143,13 @@
         cab.appendChild(nodo('span', 'pk-progreso', datos.progreso));
         raiz.appendChild(cab);
 
-        // Adónde ir, y en una reubicación también dónde dejarlo, en la misma línea.
+        // Adónde ir y dónde dejarlo, en la misma línea: el destino de una reubicación o la
+        // playa de un pedido.
         var ir = bloque(datos.destino ? 'DE' : 'VAYA A', datos.destino ? 'pk-reubicacion' : '');
         ir.linea.appendChild(nodo('span', 'pk-ubicacion', datos.ubicacion));
-        if (datos.destino) {
-            ir.linea.appendChild(nodo('span', 'pk-titulo pk-a', '→ A'));
-            ir.linea.appendChild(nodo('span', 'pk-ubicacion', datos.destino));
+        if (datos.destino || datos.playa) {
+            ir.linea.appendChild(nodo('span', 'pk-titulo pk-a', datos.destino ? '→ A' : '→ PLAYA'));
+            ir.linea.appendChild(nodo('span', 'pk-ubicacion', datos.destino || datos.playa));
         }
         raiz.appendChild(ir);
 
@@ -127,52 +171,19 @@
 
         // Lo que falta para confirmar, al lado del título.
         var confirmar = bloque('CONFIRME', 'pk-confirmar');
-        if (datos.exigeUbicacion) { confirmar.linea.appendChild(paso('Ubicación' + (datos.ubicacionLeida ? ' ' + datos.ubicacionLeida : ''), datos.ubicacionLeida !== '')); }
-        if (datos.exigeDigito) { confirmar.linea.appendChild(paso('Dígito', datos.digito !== '')); }
-        if (datos.exigeProducto) { confirmar.linea.appendChild(paso('Producto', datos.productoLeido)); }
+        confirmar.linea.appendChild(paso('Ubicación', datos.ubicacionLeida !== ''));
+        if (datos.exigeProducto) { confirmar.linea.appendChild(paso('Producto', datos.productoLeido !== '')); }
 
-        // Lectura y dígito, en la misma fila.
+        // La ubicación es la que trae la etiqueta del hueco; se escanea o se teclea.
         var filaLectura = nodo('div', 'pk-fila');
-        var lectura = nodo('input', 'pk-campo pk-lectura');
-        lectura.type = 'text';
-        lectura.setAttribute('data-campo', 'lectura');
-        lectura.setAttribute('autocomplete', 'off');
-        lectura.setAttribute('autocapitalize', 'characters');
-        lectura.placeholder = 'Escanee etiqueta y producto';
-        // Con el escáner de la app el campo tiene el foco sin abrir el teclado; al tocarlo, se
-        // abre para teclear.
-        if (datos.escaner) {
-            lectura.setAttribute('inputmode', 'none');
-            lectura.addEventListener('pointerdown', function () { lectura.setAttribute('inputmode', 'text'); });
-        }
-        lectura.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter' && lectura.value.trim() !== '') {
-                var texto = lectura.value;
-                lectura.value = '';
-                enviar('Lectura', [texto]);
-            }
-        });
-        filaLectura.appendChild(lectura);
-
-        if (datos.exigeDigito) {
-            var digito = nodo('input', 'pk-campo pk-digito');
-            digito.type = 'text';
-            digito.setAttribute('data-campo', 'digito');
-            digito.setAttribute('inputmode', 'numeric');
-            digito.setAttribute('autocomplete', 'off');
-            digito.maxLength = 2;
-            digito.placeholder = 'Dígito';
-            digito.value = datos.digito || '';
-            // El dígito tiene siempre dos cifras: con la segunda se manda solo.
-            digito.addEventListener('input', function () {
-                if (digito.value.length >= 2) { enviar('Digito', [digito.value]); }
-            });
-            digito.addEventListener('keydown', function (e) {
-                if (e.key === 'Enter') { enviar('Digito', [digito.value]); }
-            });
-            filaLectura.appendChild(digito);
-        }
+        filaLectura.appendChild(campoLectura('ubicacion', 'pk-lectura', 'Ubicación', datos.ubicacionLeida));
         confirmar.appendChild(filaLectura);
+
+        if (datos.exigeProducto) {
+            var filaProducto = nodo('div', 'pk-fila');
+            filaProducto.appendChild(campoLectura('producto', 'pk-lectura', 'Producto', datos.productoLeido));
+            confirmar.appendChild(filaProducto);
+        }
 
         // Cantidad con − y + y su unidad; Confirmar va debajo, a lo ancho.
         var filaCantidad = nodo('div', 'pk-fila');
@@ -222,17 +233,23 @@
         otros.appendChild(boton('Sin stock', 'pk-peligro', 'sinstock'));
         raiz.appendChild(otros);
 
-        // El foco está siempre en la lectura, donde se escanea la etiqueta. Solo se queda donde
-        // está mientras se teclea la cantidad, o en el dígito si se está tecleando a mano.
-        var foco = lectura;
-        if (activo === 'cantidad' && temporizadorCantidad) { foco = raiz.querySelector('[data-campo="cantidad"]'); }
-        if (activo === 'digito' && !datos.digito) { foco = raiz.querySelector('[data-campo="digito"]'); }
-        (foco || lectura).focus();
+        // El foco va a la primera casilla pendiente. Solo se queda donde está mientras se teclea
+        // la cantidad, o en la casilla que el preparador ha tocado para teclear.
+        if (activo === 'cantidad' && temporizadorCantidad) {
+            raiz.querySelector('[data-campo="cantidad"]').focus();
+            return;
+        }
+        enfocarLectura();
     }
 
     function enfocarLectura() {
-        var lectura = raiz.querySelector('[data-campo="lectura"]');
-        if (lectura) { lectura.focus(); }
+        // La casilla tocada a mano deja de mandar en cuanto ya tiene su lectura (p. ej. llegó
+        // por el escáner de la app).
+        var leido = { ubicacion: datos.ubicacionLeida, producto: datos.productoLeido };
+        if (campoManual && leido[campoManual]) { campoManual = null; }
+        var nombre = campoManual || campoPendiente();
+        var campo = raiz.querySelector('[data-campo="' + nombre + '"]');
+        if (campo) { campo.focus(); }
     }
 
     function senal(tipo) {

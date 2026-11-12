@@ -18,6 +18,10 @@ page 51133 "Rol Center Preparador SGA"
     {
         area(RoleCenter)
         {
+            part(Cues; "Cue Preparador SGA")
+            {
+                ApplicationArea = All;
+            }
         }
     }
 

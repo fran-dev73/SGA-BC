@@ -15,30 +15,17 @@ using Microsoft.Inventory.Item.Catalog;
 /// </summary>
 codeunit 51114 "Lectura Codigos SGA"
 {
-    var
-        // Separa el código de la ubicación de su dígito en el código de barras de la etiqueta.
-        // '+' no aparece en los códigos pasillo-estantería-altura y existe en Code 128.
-        SeparadorDigitoTok: Label '+', Locked = true;
-
     /// <summary>
-    /// Devuelve true si la lectura es una ubicación SGA del almacén, y su código en prm_Bin.
-    /// Si es el código de barras de su etiqueta (CodigoEtiqueta), trae también el dígito de
-    /// control, que queda en prm_Digito; si es solo el código, prm_Digito queda en blanco.
+    /// Devuelve true si la lectura es el código de una ubicación SGA del almacén, y su código
+    /// en prm_Bin.
     /// </summary>
-    procedure EsUbicacion(prm_Almacen: Code[10]; prm_Lectura: Text; var prm_Bin: Code[20]; var prm_Digito: Text): Boolean
+    procedure EsUbicacion(prm_Almacen: Code[10]; prm_Lectura: Text; var prm_Bin: Code[20]): Boolean
     var
         rUbicacion: Record "Ubicacion SGA";
         lectura: Text;
-        separador: Integer;
     begin
         Clear(prm_Bin);
-        prm_Digito := '';
         lectura := Normalizar(prm_Lectura);
-        separador := StrPos(lectura, SeparadorDigitoTok);
-        if separador > 0 then begin
-            prm_Digito := CopyStr(lectura, separador + 1);
-            lectura := CopyStr(lectura, 1, separador - 1);
-        end;
         if (lectura = '') or (StrLen(lectura) > MaxStrLen(prm_Bin)) then
             exit(false);
 
@@ -49,18 +36,6 @@ codeunit 51114 "Lectura Codigos SGA"
 
         prm_Bin := CopyStr(lectura, 1, MaxStrLen(prm_Bin));
         exit(true);
-    end;
-
-    /// <summary>
-    /// Lo que va en el código de barras de la etiqueta de una ubicación: el código y su dígito
-    /// de control (101-03-10+47), para que un solo escaneo dé la ubicación y el dígito. Sin
-    /// dígito, solo el código. EsUbicacion lo lee.
-    /// </summary>
-    procedure CodigoEtiqueta(prm_Bin: Code[20]; prm_Digito: Code[2]): Text
-    begin
-        if prm_Digito = '' then
-            exit(prm_Bin);
-        exit(prm_Bin + SeparadorDigitoTok + prm_Digito);
     end;
 
     /// <summary>

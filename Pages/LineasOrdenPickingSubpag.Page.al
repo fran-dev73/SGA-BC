@@ -99,6 +99,15 @@ page 51120 "Lineas Orden Picking Subpag"
                     ApplicationArea = All;
                     StyleExpr = EstiloFila;
                 }
+                field(Retenida; Rec.Retenida)
+                {
+                    ApplicationArea = All;
+                }
+                field("Veces Saltada"; Rec."Veces Saltada")
+                {
+                    ApplicationArea = All;
+                    Visible = false;
+                }
                 field("Cod. Bin Confirmado"; Rec."Cod. Bin Confirmado")
                 {
                     ToolTip = 'Ubicación de la que se ha recogido realmente.';

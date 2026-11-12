@@ -17,9 +17,10 @@ codeunit 51108 "Unidades Producto SGA"
     Access = Public;
 
     /// <summary>
-    /// Unidades base que lleva una unidad de medida del producto. Uno si el producto o la unidad
-    /// van en blanco, si el producto no tiene esa unidad o si su factor no es positivo: un dato
-    /// incompleto cuenta como unidad base y no descarta nada por sorpresa.
+    /// Cuántas unidades base contiene una unidad de medida del producto (su "Qty. per Unit of Measure").
+    /// Devuelve 1 cuando no hay un factor válido: producto o unidad en blanco, unidad que el producto
+    /// no tiene dada de alta, o factor cero o negativo. Así, quien llama trata la cantidad como si ya
+    /// estuviera en unidades base y nunca multiplica ni divide por cero.
     /// </summary>
     procedure FactorUM(prm_Producto: Code[20]; prm_UM: Code[10]): Decimal
     var

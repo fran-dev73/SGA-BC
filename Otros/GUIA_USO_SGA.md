@@ -22,23 +22,30 @@ lee solo su apartado. Cómo se configura todo está en el [manual de implantaci�
 
 **Toda venta sale por picking.** No uses las acciones de almacén estándar de BC.
 
-### Enviar un pedido a picking
+### Enviar un pedido a SGA
 
 1. Lanza el pedido.
-2. En el pedido, pestaña **Almacén SGA**, pulsa **Enviar a picking**.
-3. SGA busca de qué ubicación y lote coger cada línea y lo **reserva**: otro pedido ya no lo ve disponible.
-4. Si el pedido ya se preparó en parte, solo manda lo que falta.
+2. En el pedido, pestaña **Almacén SGA**, pulsa **Enviar a SGA**.
+3. SGA reparte el pedido en **órdenes de picking de un palé como mucho**, porque solo se prepara un palé a la vez:
+   - cada palé completo de una línea es una orden;
+   - las cajas y unidades sueltas de todas las líneas se juntan en órdenes que no pasan de un palé (½ palé de un producto y ¼ de otro van en la misma orden).
 
-No deja enviarlo si el pedido no está lanzado o si ya tiene otra orden de picking abierta.
+   Por ejemplo, 4 palés y 2 cajas son 5 órdenes.
+4. Busca de qué ubicación y lote coger cada cosa y lo **reserva**: otro pedido ya no lo ve disponible.
+5. Si el pedido ya se preparó en parte, solo manda lo que falta.
+
+No deja enviarlo si el pedido no está lanzado, si tiene alguna orden de picking sin terminar o si algún producto no tiene palé en su ficha (*Cód. palé por defecto*).
+
+**Un pedido enviado a SGA ya no se puede volver a abrir.**
 
 ### Si falta stock: dos rondas
 
 Si no hay stock ubicado para todo:
 
-- **Primera ronda.** La orden se crea con lo que hay. El aviso dice, producto a producto, qué falta y cuánto, en la unidad del pedido. Solo da error si no hay nada ubicado de ningún producto del pedido.
-- **Segunda ronda.** Cuando ya haya stock ubicado (porque ha llegado una compra o se ha ubicado lo pendiente):
-  - **Un pedido:** vuelve a pulsar **Enviar a picking**. Solo manda lo que falta.
-  - **Todos a la vez:** en **Órdenes de picking SGA**, pulsa **Segunda ronda de picking**. Crea una orden para cada pedido que aún tenga algo pendiente y ya tenga stock. Dice cuántas ha creado y cuántos pedidos siguen esperando.
+- **Primera ronda.** Las órdenes se crean con lo que hay. El aviso dice, producto a producto, qué falta y cuánto, en la unidad del pedido. Solo da error si no hay nada ubicado de ningún producto del pedido.
+- **Segunda ronda.** Cuando ya haya stock ubicado (porque ha llegado una compra o se ha ubicado lo pendiente) y estén terminadas todas las órdenes del pedido:
+  - **Un pedido:** vuelve a pulsar **Enviar a SGA**. Solo manda lo que falta.
+  - **Todos a la vez:** en **Órdenes de picking SGA**, pulsa **Segunda ronda de picking**. Crea las órdenes de cada pedido que aún tenga algo pendiente, ya tenga stock y no tenga órdenes sin terminar. Dice cuántas ha creado y cuántos pedidos siguen esperando.
 
 Mientras tanto el pedido sale como **Parcial** en la lista de pedidos. Si se decide servirlo así, se registra el envío de lo preparado como siempre.
 
@@ -78,6 +85,35 @@ Si está activada *Exigir asignación de picking* (en la configuración):
 | *Asignármela* | disponible | no: reparte el responsable |
 | Quién reparte y cambia prioridades | cualquiera | solo los responsables de picking |
 
+### Paradas retenidas
+
+Una parada que el preparador **salta dos veces** queda **retenida**: algo impide recogerla. El preparador ya no la ve, pero sigue pendiente, conserva su reserva y su orden no se termina.
+
+- Se ven en la pila **Paradas retenidas** del rol center (grupo *Picking*), en la acción **Paradas retenidas** (lista *Paradas de picking SGA*, vista *Retenidas*) y en la columna y la vista *Con paradas retenidas* de **Órdenes de picking SGA**. En las paradas de la orden salen marcadas como *Retenida*, en rojo.
+- La lista dice qué preparador la retuvo y cuándo. **Contenido de la ubicación** enseña qué hay en el hueco según SGA.
+- **Buscar en otra ubicación** la resuelve: cancela la parada y crea paradas nuevas en otros huecos con stock del producto, igual que *Sin stock* en la PDA. Las nuevas vuelven al preparador de la orden, que la termina al recogerlas. Si no hay stock en ningún otro hueco, la parada queda cancelada.
+- Lo recogido del resto de la orden ya está en el pedido: al terminar las paradas nuevas se vuelve a pasar sin duplicar nada.
+
+### Pilas de picking
+
+En el rol center de almacén, el grupo **Picking** cuenta, en el almacén por defecto de la configuración:
+
+| Pila | Qué cuenta | Al pulsarla |
+|---|---|---|
+| Pendientes de asignar | Órdenes que esperan preparador | *Asignar órdenes de picking* |
+| Sin empezar | Órdenes abiertas que nadie ha empezado | *Órdenes de picking* |
+| En proceso | Órdenes que se están recogiendo | *Órdenes de picking* |
+| Envío vencido (rojo) | Órdenes sin terminar con fecha de envío hoy o antes | *Órdenes de picking* |
+| Paradas retenidas (rojo) | Paradas saltadas dos veces | *Paradas de picking*, con *Buscar en otra ubicación* |
+| Terminadas sin pasar al pedido (rojo) | Órdenes de venta terminadas que no están en el pedido | *Órdenes de picking*, con *Pasar al pedido* |
+| Reubicaciones pendientes | Movimientos de almacenamiento a picking por hacer | *Reubicaciones* |
+| Terminadas hoy (verde) | Órdenes terminadas en la fecha de trabajo | *Órdenes de picking* |
+| Desvíos de ubicación hoy | Paradas recogidas hoy en un hueco distinto del propuesto | *Paradas de picking* |
+
+Las de órdenes no cuentan las reubicaciones, que tienen su propia pila.
+
+En el rol center del preparador, **Mi picking** cuenta sus órdenes y sus reubicaciones sin terminar y, si la configuración no exige asignación, las órdenes sin asignar que puede coger.
+
 Para cancelar una orden: *Órdenes de picking* > **Cancelar orden**. Libera lo reservado.
 
 ### Quién es quién
@@ -87,15 +123,12 @@ En **Configuración de usuarios**, en la línea de cada usuario:
 - **Responsable picking SGA**: puede repartir órdenes y cambiar prioridades cuando se exige asignación. Es la casilla la que manda, no el conjunto de permisos.
 - **Carretillero SGA**: con *Siguiente orden* recibe las reubicaciones y no los pedidos (ver apartado 4).
 
-### Poner los dígitos de control
+### Etiquetas de ubicación
 
-Cada hueco necesita su etiqueta con dígito para que el preparador certifique que está delante. Se hace por pasillos, sin prisa:
+Cada hueco tiene su etiqueta, y el picking lee en ella la ubicación de la que recoge. Las etiquetas deben estar pegadas antes de empezar a recoger. Se hace por pasillos:
 
-1. En **Ubicaciones SGA**, vista **Sin dígito colocado**, filtra el pasillo y selecciona.
-2. **Imprimir etiquetas** y pégalas.
-3. Con las mismas seleccionadas, pulsa **Dígito colocado** y elige *Ya tienen el dígito puesto*.
-
-Desde ese momento la PDA pide el dígito en esos huecos. Mientras tanto, en los demás basta con escanear el producto. Si una se despega o se marcó por error, la misma acción tiene *Todavía no lo tienen*. Si se **regenera** un dígito, la marca se quita sola hasta que se pegue la etiqueta nueva.
+1. En **Ubicaciones SGA**, filtra el pasillo y selecciona sus huecos.
+2. **Imprimir etiquetas** y pega cada una en su hueco.
 
 ---
 
@@ -106,21 +139,21 @@ Desde ese momento la PDA pide el dígito en esos huecos. Mientras tanto, en los 
 1. Abre **Órdenes de picking SGA** y pulsa **Siguiente orden**. Abre la pantalla de preparación con la orden que te toca, por prioridad, primero las tuyas. Al terminarla pasa sola a la siguiente.
 2. También puedes ver **Mis órdenes**, las vistas *Pendientes* y *Sin asignar*, **Preparar** (una orden concreta) y **Asignármela**.
 3. En la pantalla **Preparar picking SGA** cada parada muestra:
-   - **VAYA A**: la ubicación, en grande. En una reubicación: **DE** origen **→ A** destino.
+   - **VAYA A**: la ubicación, en grande. En un pedido, al lado, **→ PLAYA** y la playa donde dejar lo recogido (la ubicación por defecto de la zona de playas). En una reubicación: **DE** origen **→ A** destino.
    - **COJA**: la cantidad, en la unidad del pedido. Debajo, la descripción del producto y, en pequeño, su código, el lote, la caducidad y la cantidad en unidades base.
-   - **CONFIRME**: las marcas de lo que falta (*Ubicación*, *Dígito*, *Producto*). Rojo es pendiente; verde, hecho.
-4. Escanea la **etiqueta del hueco** y el **producto** que coges, en cualquier orden. Si la etiqueta no se lee, teclea el **dígito** en su casilla.
+   - **CONFIRME**: las marcas de lo que falta (*Ubicación*, *Producto*). Rojo es pendiente; verde, hecho.
+4. Lee, en este orden, la **ubicación** de la etiqueta del hueco y, si se pide, el **producto** que coges. El cursor pasa solo a la casilla siguiente cuando la anterior está bien leída (se pone en verde). Cada lectura puede ser un escaneo o teclearse: toca la casilla que toca y escribe.
 5. Si coges otra cantidad, cámbiala con **−** y **+** o tecleándola.
-6. Cuando está completo, la parada **se confirma sola** y pasa a la siguiente. Si no se exige nada, pulsa **CONFIRMAR**.
+6. Cuando está completo, la parada **se confirma sola** y pasa a la siguiente.
 
-Si una lectura o el dígito no son correctos, la pantalla lo dice en rojo, con un pitido grave. Vuelve a escanear o a teclear.
+Si una lectura no es correcta, la pantalla lo dice en rojo, con un pitido grave. Vuelve a escanear o a teclear.
 
 **Otros botones:**
 
-- **Saltar**: deja la parada para el final.
+- **Saltar**: deja la parada para el final. Al acabar el recorrido vuelven a salir las saltadas. Si saltas una por segunda vez queda **retenida** para el jefe de almacén y ya no vuelve a salir. Cuando solo quedan retenidas, la orden se da por recorrida: lo recogido pasa al pedido y pasas a la siguiente orden.
 - **Sin stock**: si el producto no está en el hueco. Pregunta si buscar en otra ubicación. Si sí, la parada se cancela y lo que faltaba se busca en otro hueco del mismo producto. La pantalla dice de dónde («*No estaba en 101-03-10. Se recoge de otra ubicación: 102-01-00*»). Si no hay en ninguna, el aviso sale en rojo. El hueco vacío no se corrige: hay que recontarlo.
 
-Si recoges de otro hueco, avisa: que lo admita depende de la configuración de desvíos. Al terminar sale *Orden terminada* y lo recogido ya está en el pedido. Si dice que no se ha podido pasar al pedido, avisa a oficina: no se pierde nada.
+Si recoges de otro hueco, avisa: que lo admita depende de la configuración de desvíos. Al terminar sale *Orden terminada*, la playa en la que dejarla y que lo recogido ya está en el pedido. Si dice que no se ha podido pasar al pedido, avisa a oficina: no se pierde nada.
 
 **El producto se reconoce** por su código de barras, su GTIN o su nº de producto, y también por una etiqueta GS1-128 con (01) o (02). Si la etiqueta trae el lote (10), tiene que ser el de la parada.
 
@@ -153,11 +186,11 @@ En Zebra las claves ya son esas. Desactiva la salida por teclado del mismo perfi
 
 1. Entra con el rol **Preparador SGA (PDA)** y pulsa **Preparar pedidos SGA**. Se abre la orden que te toca. Al terminarla carga la siguiente; si no hay más, ofrece **BUSCAR SIGUIENTE ORDEN**.
 2. Ve a la ubicación, coge el producto y **escanéalo**. Si no es el de la parada, lo dice al momento.
-3. Escanea la **etiqueta del hueco**. Da la ubicación y el dígito de una vez.
+3. Escanea el **código de la ubicación** de la etiqueta del hueco. Si no se lee, tecléalo.
 4. Si coges otra cantidad, cámbiala antes.
 5. La parada se confirma sola y pasa a la siguiente.
 
-El cursor está siempre en el campo de lectura, pero la pantalla no abre el teclado del terminal hasta que tocas un campo.
+El cursor está siempre en la casilla que toca leer (ubicación, producto), pero la pantalla no abre el teclado del terminal hasta que tocas una casilla.
 
 ---
 
@@ -175,10 +208,10 @@ Una **reubicación** lleva mercancía de almacenamiento a picking. Se prepara ig
 
 **Cuándo se crean:**
 
-- **Al vaciarse un picking:** cuando una recogida de venta deja una ubicación de picking sin ese producto.
-- Con **Planificar reubicaciones**, en la página *Reubicaciones SGA*: repasa el almacén, también los productos que nunca han tenido picking.
+- **Automáticamente, en cuanto una ubicación de picking se queda a cero de un producto**, sea por lo que sea: una recogida de venta, un traslado, *Vaciar ubicación*, *Quitar de la ubicación* o un ajuste. Se repone aunque el producto quede en otra ubicación de picking, salvo que ya haya una reubicación pendiente hacia ese hueco.
+- Con **Planificar reubicaciones**, en la página *Reubicaciones SGA*: repasa el almacén y repone los productos que no tienen nada en picking, también los que nunca han tenido picking.
 
-Se planifica si el producto tiene stock en almacenamiento, nada en picking y ninguna reubicación pendiente. Trae como mucho un palé. Esa ubicación espera a su producto: no se propone a otro.
+Hace falta stock disponible en almacenamiento; si no hay, no se crea. Trae como mucho un palé. Esa ubicación espera a su producto: no se propone a otro.
 
 **Dónde se ven:** página **Reubicaciones SGA** (menú *Almacén SGA*): vistas **Por hacer** y **Hechas**, y las acciones **Planificar reubicaciones**, **Preparar**, **Cancelar** (libera la reserva) y **Orden**.
 
@@ -217,6 +250,18 @@ Qué estrategia usa cada pantalla:
 | Reubicaciones | Fija, no se configura | El mismo hueco que se vació |
 
 Si el almacén está casi lleno, todas acaban en el primer hueco libre: cambiar de estrategia no gana sitio.
+
+### Huecos reservados
+
+En *Ubicar recepciones*, *Ubicar ensamblados* e *Imprimir y ubicar palés*, el hueco que se propone queda **reservado** para esa línea: no se propone a nadie más ni se puede usar para otra cosa hasta que se ubica.
+
+- **Se usa**: al confirmar, la reserva se quita y el hueco queda ocupado.
+- **No se usa**: se suelta solo al pedir **Otra ubicación**, al escribir otro hueco, al pasar a otra tarea o al volver a cargar la lista, y al cerrar la pantalla.
+- **Se queda reservado** (por ejemplo, si se cierra el navegador sin salir de la pantalla): en **Ubicaciones SGA**, vista **Reservadas**, selecciona el hueco y pulsa **Liberar reserva**. Las columnas *Reservada para* y *Reservada por* dicen de qué entrada y de quién es.
+
+Un hueco reservado para otra entrada no se puede escribir a mano: avisa de para quién está.
+
+En estas tres pantallas no sale nunca nada anterior a la **Fecha inicio SGA** de la configuración, aunque se pida una fecha anterior: lo que entró antes ya es stock de BC y lo colocó la carga inicial.
 
 ### Ubicar recepciones
 
@@ -262,8 +307,8 @@ Escribe el *Producto* (y, si quieres, *Almacén* y *Lote*). Salen todas las ubic
 
 La lista de huecos con su estado y su ocupación, coloreada: gris vacía, verde con hueco, amarillo llena y rojo bloqueada.
 
-- Vistas: **Vacías**, **Con hueco**, **Llenas**, **Bloqueadas**, **Picking**, **Almacenamiento**, **Sin tipo** y **Sin dígito colocado**.
-- Acciones: **Cambiar en bloque**, **Imprimir etiquetas**, **Dígito colocado**, **Bloquear / desbloquear**, **Recalcular ocupación**.
+- Vistas: **Vacías**, **Con hueco**, **Llenas**, **Bloqueadas**, **Reservadas**, **Picking**, **Almacenamiento** y **Sin tipo**.
+- Acciones: **Cambiar en bloque**, **Imprimir etiquetas**, **Liberar reserva**, **Bloquear / desbloquear**, **Recalcular ocupación**.
 - En la ficha: **Recalcular ocupación**, **Vaciar ubicación** (todo queda sin ubicar; el stock de BC no cambia), **Movimientos de entrada** y **Movimientos de salida**.
 
 ### Contenido de ubicaciones
@@ -277,12 +322,12 @@ Qué producto y lote hay en cada hueco. Vistas **Bloqueado** y **Con reserva**.
 
 ### Mapa de almacén
 
-Una rejilla por *Almacén* y *Pasillo*: una fila por altura y una columna por estantería. Gris vacía, verde con hueco, naranja llena, rojo bloqueada. Filtrando un pasillo se ve de frente. Pulsar una celda abre su contenido.
+Una rejilla por *Almacén* y *Pasillo*: una fila por altura y una columna por estantería. Gris vacía, verde con hueco, naranja llena, rojo bloqueada y azul (*RESERV*) reservada para una entrada que se está ubicando. Filtrando un pasillo se ve de frente. Pulsar una celda abre su contenido.
 
 ### Mapa 3D de almacén
 
 - Arriba, *Almacén*, *Zona* y *Pasillo*. En el lienzo, tres vistas: **3D**, **Planta** y **Frente** (un pasillo de frente, la de trabajo).
-- **Colorear por**: *Estado*, *Rotación ABC* o *Caducidad*. **Buscar**: un producto o una ubicación; las que coinciden se marcan en naranja.
+- **Colorear por**: *Estado*, *Rotación ABC* o *Caducidad*. Por estado, las reservadas para una entrada salen en turquesa, y al pasar por encima dice para qué entrada y de quién. **Buscar**: un producto o una ubicación; las que coinciden se marcan en naranja.
 - Ratón: pasar por encima enseña lo que hay; clic abre el contenido; doble clic aísla el pasillo; **clic derecho vacía** la ubicación; **arrastrar** una ubicación con contenido sobre otra la traslada, solo dentro de la misma zona.
 
 ### Movimientos de ubicación
@@ -334,4 +379,4 @@ Lo más frecuente está aquí. Los casos con más detalle, con su causa y su sol
 | Un responsable no puede asignar | En *Configuración de usuarios*, marca *Responsable picking SGA*. |
 | Un picking vacío no tiene reubicación | Revisa que haya stock disponible en almacenamiento, una ubicación de picking con sitio y la serie de órdenes. Luego *Planificar reubicaciones*. |
 | El mapa 3D sale en blanco | Elige el almacén y vacía zona y pasillo. Los códigos deben seguir `101-15-03`. |
-| Un hueco pide dígito y el preparador no lo tiene delante | Se marcó *Dígito colocado* sin pegar la etiqueta. Quita la marca desde la misma acción con *Todavía no lo tienen*. |
+| La ubicación leída no existe en SGA | La etiqueta que se ha leído no es de una ubicación SGA del almacén. Lee la etiqueta del hueco que tienes delante. |

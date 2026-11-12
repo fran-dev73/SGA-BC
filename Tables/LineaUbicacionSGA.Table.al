@@ -116,6 +116,15 @@ table 51114 "Linea Ubicacion SGA"
                 cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
             begin
                 cUbicaciones.ComprobarUbicacionExiste("Cod. Almacen", "Ubicacion Confirmada");
+
+                // En las entradas, el hueco elegido a mano queda reservado para la fila y el que
+                // tenía se suelta. Uno reservado para otra entrada no se puede elegir.
+                if ReservaFila() = '' then
+                    exit;
+                if "Ubicacion Confirmada" = '' then
+                    cUbicaciones.LiberarReservas(ReservaFila(), '')
+                else
+                    cUbicaciones.TestReservarHueco("Cod. Almacen", "Ubicacion Confirmada", ReservaFila());
             end;
         }
         field(40; Estado; Option)
@@ -195,6 +204,20 @@ table 51114 "Linea Ubicacion SGA"
         {
         }
     }
+
+    /// <summary>
+    /// A nombre de quién se reservan los huecos de esta fila (Cod. "Gestion Ubicaciones
+    /// SGA".ReservarHueco): la entrada y su línea, que es lo que ve quien mira la ubicación.
+    /// Solo las entradas (compra y producción) reservan; el resto, en blanco.
+    /// </summary>
+    procedure ReservaFila(): Text
+    var
+        ReservaFilaLbl: Label '%1 %2, línea %3', Comment = '%1 = origen, %2 = nº documento, %3 = línea';
+    begin
+        if not (Origen in [Origen::Compra, Origen::Produccion]) then
+            exit('');
+        exit(StrSubstNo(ReservaFilaLbl, Origen, "No. Documento", Linea));
+    end;
 
     /// <summary>
     /// Cantidad de una entrada que todavía falta por colocar.

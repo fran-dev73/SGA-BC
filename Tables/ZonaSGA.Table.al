@@ -64,6 +64,34 @@ table 51100 "Zona SGA"
             DataClassification = ToBeClassified;
             ToolTip = 'Impide proponer las ubicaciones de esta zona para ubicar o recoger.';
         }
+        field(95; Playa; Boolean)
+        {
+            Caption = 'Playa';
+            DataClassification = ToBeClassified;
+            ToolTip = 'Zona de playas: cada ubicación es una playa donde se dejan los pedidos preparados. Sus ubicaciones van sin tipo, así que nunca se proponen para ubicar ni reponer.';
+
+            trigger OnValidate()
+            begin
+                if Playa then
+                    TestField("Tipo Ubicacion", "Tipo Ubicacion"::" ")
+                else
+                    "Ubicacion por Defecto" := '';
+            end;
+        }
+        field(96; "Ubicacion por Defecto"; Code[20])
+        {
+            Caption = 'Ubicación por defecto';
+            DataClassification = ToBeClassified;
+            TableRelation = "Ubicacion SGA"."Cod. Bin" where("Cod. Almacen" = field("Cod. Almacen"),
+                                                             "Cod. Zona SGA" = field(Code));
+            ToolTip = 'Playa en la que el preparador deja lo que recoge en el picking de venta. Se le indica en cada parada y al terminar la orden.';
+
+            trigger OnValidate()
+            begin
+                if "Ubicacion por Defecto" <> '' then
+                    TestField(Playa, true);
+            end;
+        }
         field(100; "No. Ubicaciones"; Integer)
         {
             Caption = 'Nº ubicaciones';
@@ -104,5 +132,22 @@ table 51100 "Zona SGA"
         rUbicacionSGA.SetRange("Cod. Zona SGA", Code);
         if not rUbicacionSGA.IsEmpty() then
             Error(ZonaConUbicacionesErr, Code);
+    end;
+
+    /// <summary>
+    /// Playa en la que se deja lo preparado en el almacén: la ubicación por defecto de su zona
+    /// de playas. En blanco si no tiene.
+    /// </summary>
+    procedure PlayaPorDefecto(prm_Almacen: Code[10]): Code[20]
+    var
+        rZona: Record "Zona SGA";
+    begin
+        rZona.SetRange("Cod. Almacen", prm_Almacen);
+        rZona.SetRange(Playa, true);
+        rZona.SetFilter("Ubicacion por Defecto", '<>%1', '');
+        rZona.SetLoadFields("Ubicacion por Defecto");
+        if rZona.FindFirst() then
+            exit(rZona."Ubicacion por Defecto");
+        exit('');
     end;
 }

@@ -68,6 +68,12 @@ page 51118 "Ordenes Picking SGA"
                     ToolTip = 'Paradas que quedan por recoger.';
                     ApplicationArea = All;
                 }
+                field("Paradas Retenidas"; Rec."Paradas Retenidas")
+                {
+                    ApplicationArea = All;
+                    Style = Unfavorable;
+                    DrillDownPageId = "Paradas Picking SGA";
+                }
                 field("Fecha Creacion"; Rec."Fecha Creacion")
                 {
                     ToolTip = 'Momento en que se creó la orden.';
@@ -249,6 +255,11 @@ page 51118 "Ordenes Picking SGA"
         {
             Caption = 'Sin asignar';
             Filters = where(Estado = filter("Pendiente Asignar" | Abierta | "En Proceso"), "Cod. Usuario Asignado" = const(''));
+        }
+        view(ConRetenidas)
+        {
+            Caption = 'Con paradas retenidas';
+            Filters = where("Paradas Retenidas" = filter(> 0));
         }
         view(SinPasarAlPedido)
         {

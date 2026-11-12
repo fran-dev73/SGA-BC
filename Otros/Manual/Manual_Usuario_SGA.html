@@ -99,14 +99,16 @@
              padding: 4mm 5mm; margin: 3mm 0; white-space: pre; line-height: 1.55; break-inside: avoid; }
   .dialogo .hl { color: #93c5fd; } .dialogo .ok { color: #86efac; } .dialogo .ko { color: #fca5a5; }
 
-  .etiq { width: 70mm; height: 35mm; border: 1.5px solid #0f172a; border-radius: 1.5mm; position: relative; background: #fff; margin: 3mm 0; font-family: "Segoe UI", sans-serif; }
-  .etiq .cod { position: absolute; left: 2mm; top: 2.5mm; font-size: 11pt; font-weight: 700; white-space: nowrap; }
-  .etiq .ctl { position: absolute; right: 2mm; top: 1.3mm; width: 19mm; text-align: center; font-size: 5.5pt; font-weight: 700; letter-spacing: .1em; }
-  .etiq .dig { position: absolute; right: 2mm; top: 4mm; width: 19mm; height: 12mm; border: 1.5px solid #0f172a; text-align: center; font-size: 22pt; font-weight: 700; line-height: 12mm; }
-  .etiq .bar { position: absolute; left: 2mm; right: 2mm; top: 18mm; height: 10mm; display: flex; align-items: stretch; overflow: hidden; }
+  .etiq { width: 40mm; height: 80mm; border: 1.5px solid #0f172a; border-radius: 1.5mm; position: relative; background: #fff; margin: 3mm 0; font-family: "Segoe UI", sans-serif; flex-shrink: 0; }
+  .etiq .tit { position: absolute; left: 0; right: 0; text-align: center; font-size: 6pt; font-weight: 700; letter-spacing: .1em; }
+  .etiq .t1 { top: 1.5mm; } .etiq .t2 { top: 38.5mm; }
+  .etiq .bar { position: absolute; height: 14mm; display: flex; justify-content: center; align-items: stretch; overflow: hidden; }
+  .etiq .b1 { left: 3mm; right: 3mm; top: 5mm; } .etiq .b2 { left: 7mm; right: 7mm; top: 43mm; }
   .etiq .bar i { display: block; background: #0f172a; margin-right: .45mm; }
   .etiq .bar i.f { width: .3mm; } .etiq .bar i.m { width: .6mm; } .etiq .bar i.g { width: 1mm; }
-  .etiq .pie { position: absolute; left: 2mm; bottom: 1mm; font-size: 6pt; color: #334155; }
+  .etiq .cod { position: absolute; left: 0; right: 0; top: 21mm; text-align: center; font-size: 14pt; font-weight: 700; white-space: nowrap; }
+  .etiq .sep { position: absolute; left: 2mm; right: 2mm; top: 36mm; border-top: 1px solid #0f172a; }
+  .etiq .dig { position: absolute; left: 7mm; right: 7mm; top: 62mm; height: 12mm; border: 1.5px solid #0f172a; text-align: center; font-size: 22pt; font-weight: 700; line-height: 12mm; font-family: Consolas, monospace; }
   .fila-etiq { display: flex; gap: 8mm; align-items: center; }
   .fila-etiq ul { margin: 0; }
 
@@ -170,7 +172,7 @@
     <li><a href="#c3">Ubicar la mercancía que entra</a>
       <ul><li><a href="#c3-prod">Ubicar producto</a></li><li><a href="#c3-dia">Recepciones y ensamblados del día</a></li><li><a href="#c3-estr">Cómo elige el hueco</a></li></ul></li>
     <li><a href="#c4">Preparar pedidos (picking)</a>
-      <ul><li><a href="#c4-enviar">Enviar a picking</a></li><li><a href="#c4-asignar">Asignar órdenes</a></li><li><a href="#c4-preparar">Preparar</a></li><li><a href="#c4-pedido">Vuelta al pedido</a></li></ul></li>
+      <ul><li><a href="#c4-enviar">Enviar a SGA</a></li><li><a href="#c4-asignar">Asignar órdenes</a></li><li><a href="#c4-preparar">Preparar</a></li><li><a href="#c4-pedido">Vuelta al pedido</a></li></ul></li>
     <li><a href="#c5">Trabajar con el contenido</a>
       <ul><li><a href="#c5-donde">¿Dónde está el producto?</a></li><li><a href="#c5-trasl">Trasladar</a></li><li><a href="#c5-bloq">Bloquear</a></li><li><a href="#c5-quitar">Quitar y vaciar</a></li><li><a href="#c5-recuento">Recontar</a></li></ul></li>
     <li><a href="#c6">Ver el almacén</a>
@@ -226,7 +228,7 @@
     <tr><td><b>General</b></td><td>El <b>almacén por defecto</b> de todos los procesos.</td></tr>
     <tr><td><b>Ubicaciones por flujo</b></td><td>Ubicaciones especiales: <i>Expedición</i>, <i>Desbordamiento</i> y <i>Ajustes</i> (a donde van las diferencias de la conciliación).</td></tr>
     <tr><td><b>Estrategias</b></td><td>Cómo se elige el hueco al ubicar (en general, para compras y para ensamblados) y de dónde se coge al preparar (FEFO, FIFO…). Ver capítulos 3 y 4.</td></tr>
-    <tr><td><b>Controles</b></td><td>Si avisar o bloquear al llenarse un hueco, si permitir desviarse del hueco propuesto, si exigir el <b>dígito de control</b> al recoger y si exigir que un responsable <b>asigne</b> las órdenes de picking.</td></tr>
+    <tr><td><b>Controles</b></td><td>Si avisar o bloquear al llenarse un hueco, si permitir desviarse del hueco propuesto, si exigir que un responsable <b>asigne</b> las órdenes de picking.</td></tr>
     <tr><td><b>Numeración</b></td><td>La serie de números de las órdenes de picking. Es obligatoria para enviar pedidos a picking.</td></tr>
   </table>
   <p>Las <b>zonas</b> (<span class="ui">Zonas</span>, en la misma sección) agrupan ubicaciones: "Nave A", "Cuarentena", "Producción"… Crea al menos una antes de generar ubicaciones.</p>
@@ -282,16 +284,19 @@
   <div class="donde"><span class="k">Dónde</span><span>Lista <span class="ui">Ubicaciones</span> · selecciona los huecos · <b>Imprimir etiquetas</b>. También <span class="ui">Etiquetas de ubicación</span> en el buscador.</span></div>
   <div class="fila-etiq evitar">
     <div class="etiq">
-      <div class="cod">101-15-03</div><div class="ctl">CONTROL</div><div class="dig">47</div>
-      <div class="bar"><i class="g"></i><i class="f"></i><i class="m"></i><i class="f"></i><i class="g"></i><i class="f"></i><i class="f"></i><i class="m"></i><i class="g"></i><i class="f"></i><i class="m"></i><i class="m"></i><i class="f"></i><i class="g"></i><i class="f"></i><i class="m"></i><i class="f"></i><i class="g"></i><i class="m"></i><i class="f"></i><i class="f"></i><i class="g"></i><i class="m"></i><i class="f"></i><i class="m"></i><i class="g"></i><i class="f"></i><i class="f"></i><i class="m"></i><i class="g"></i><i class="f"></i><i class="m"></i><i class="f"></i><i class="g"></i><i class="f"></i><i class="m"></i><i class="g"></i><i class="f"></i><i class="m"></i><i class="f"></i><i class="g"></i><i class="f"></i><i class="m"></i><i class="g"></i><i class="f"></i><i class="g"></i></div><div class="pie">PRINCIPAL · Palé</div>
+      <div class="tit t1">UBICACIÓN</div>
+      <div class="bar b1"><i class="g"></i><i class="f"></i><i class="m"></i><i class="f"></i><i class="g"></i><i class="f"></i><i class="f"></i><i class="m"></i><i class="g"></i><i class="f"></i><i class="m"></i><i class="m"></i><i class="f"></i><i class="g"></i><i class="f"></i><i class="m"></i><i class="f"></i><i class="g"></i><i class="m"></i><i class="f"></i><i class="f"></i><i class="g"></i><i class="m"></i><i class="f"></i><i class="m"></i><i class="g"></i><i class="f"></i><i class="g"></i></div>
+      <div class="cod">101-15-03</div>
+      <div class="sep"></div>
+      <div class="tit t2">DÍGITO DE CONTROL</div>
+      <div class="bar b2"><i class="g"></i><i class="f"></i><i class="m"></i><i class="g"></i><i class="f"></i><i class="f"></i><i class="m"></i><i class="g"></i><i class="m"></i><i class="f"></i><i class="g"></i><i class="f"></i><i class="m"></i><i class="f"></i><i class="g"></i><i class="f"></i><i class="g"></i></div>
+      <div class="dig">K7P</div>
     </div>
     <ul>
-      <li>Etiqueta de <b>70 × 35 mm</b>, una por hueco, para impresora de etiquetas.</li>
-      <li>El <b>código de barras</b> es el del hueco: se escanea al ubicar y al recoger.</li>
-      <li>El <b>dígito de control</b> (el número del recuadro) es distinto en cada hueco y se teclea al recoger si la configuración lo exige.</li>
+      <li>Etiqueta de <b>4 × 3 cm</b>, una por hueco, para impresora de etiquetas. Se pega en el puntal de la estantería, a la altura del hueco.</li>
+      <li>Arriba, el <b>código de barras de la ubicación</b> con su código debajo: se escanea al ubicar y al recoger.</li>
     </ul>
   </div>
-  <p><b>Regenerar dígitos de control</b> da números nuevos a los huecos seleccionados (por ejemplo, si una etiqueta se ha fotografiado o copiado). Después hay que reimprimir sus etiquetas: las viejas dejan de valer.</p>
 
   <h3 id="c2-carga">Carga inicial del stock</h3>
   <div class="donde"><span class="k">Dónde</span><span><span class="ui">Carga inicial de contenido</span> · Almacén SGA › Puesta en marcha.</span></div>
@@ -303,6 +308,7 @@
     <tr><td><b>Ubicación indicada</b></td><td>Todo a una ubicación de paso, para repartirlo después con Trasladar.</td></tr>
   </table>
   <div class="consejo"><span class="t">Consejo</span>Lánzala primero con <b>Solo simular</b>: hace el reparto completo, enseña el resultado hueco a hueco y no guarda nada. Al terminar, la vista <b>No cargado</b> dice qué se ha quedado fuera y por qué. Para volver a lanzarla sin duplicar, marca <b>Omitir productos que ya están ubicados</b>.</div>
+  <div class="aviso"><span class="t">Fecha inicio SGA</span>En <span class="ui">Configuración SGA</span> va el primer día en que las entradas se ubican desde su documento. Lo recibido, embotellado o producido antes no sale nunca en las pantallas de ubicar entradas: ya es stock de BC y lo coloca esta carga. Lánzala <b>antes de registrar ninguna entrada de ese día</b>; si no, lo de ese día se ubicaría dos veces.</div>
 </section>
 
 <!-- ================= 3 ================= -->
@@ -335,7 +341,7 @@ Lo demás quedará pendiente para volver a proponer.</div>
   <div class="donde"><span class="k">Dónde</span><span><span class="ui">Ubicar recepciones</span> y <span class="ui">Ubicar ensamblados</span> · barra de navegación.</span></div>
   <p>Para colocar de golpe <b>todo lo que ha entrado en un día</b>: las recepciones de compra registradas o los embotellados registrados.</p>
   <ol class="pasos">
-    <li>Ajusta los <b>filtros de arriba</b>: <b>Registrado desde / hasta</b> (en blanco, sin límite), <b>Clase de artículo</b>, almacén y <i>Solo lo que falta por ubicar</i>. <span class="ui">Ubicar recepciones</span> se abre sin fechas y con <b>Prod. externo</b>: salen todas las recepciones pendientes de ubicar de productos externos.</li>
+    <li>Ajusta los <b>filtros de arriba</b>: <b>Registrado desde / hasta</b> (en blanco, sin límite; nunca antes de la <i>Fecha inicio SGA</i>), <b>Clase de artículo</b>, almacén y <i>Solo lo que falta por ubicar</i>. <span class="ui">Ubicar recepciones</span> se abre sin fechas y con <b>Prod. externo</b>: salen todas las recepciones pendientes de ubicar de productos externos.</li>
     <li>Pulsa <b>Proponer ubicaciones</b>: reparte las líneas entre huecos sin dar el mismo hueco a dos líneas. Si una propuesta no te convence, <b>Otra ubicación</b>.</li>
     <li>Deja la mercancía, corrige la <i>Ubicación confirmada</i> si la has dejado en otro sitio y pulsa <b>Confirmar esta línea</b> o <b>Confirmar todo</b>.</li>
   </ol>
@@ -366,13 +372,14 @@ Lo demás quedará pendiente para volver a proponer.</div>
     <div><span class="n">4</span><b>Automático</b>Cantidad y lotes vuelven al pedido.</div>
   </div>
 
-  <h3 id="c4-enviar">1 · Enviar a picking</h3>
-  <div class="donde"><span class="k">Dónde</span><span><span class="ui">Pedido de venta</span> · Almacén SGA › <b>Enviar a picking</b>.</span></div>
+  <h3 id="c4-enviar">1 · Enviar a SGA</h3>
+  <div class="donde"><span class="k">Dónde</span><span><span class="ui">Pedido de venta</span> · Almacén SGA › <b>Enviar a SGA</b>.</span></div>
   <ul>
-    <li>El pedido tiene que estar <b>lanzado</b> y no tener otra orden de picking abierta.</li>
-    <li>Por cada línea, SGA busca dónde está el producto y crea una <b>parada</b> por cada hueco y lote que hay que coger.</li>
+    <li>El pedido tiene que estar <b>lanzado</b>, no tener órdenes de picking sin terminar y todos sus productos deben tener palé en la ficha. Una vez enviado, <b>no se puede volver a abrir</b>.</li>
+    <li>El pedido se reparte en <b>órdenes de un palé como mucho</b>: una por cada palé completo, y las cajas y unidades sueltas juntas hasta llenar un palé. 4 palés y 2 cajas son 5 órdenes.</li>
+    <li>En cada orden, SGA busca dónde está el producto y crea una <b>parada</b> por cada hueco y lote que hay que coger.</li>
     <li>Lo que va a coger cada parada queda <b>reservado</b>: otro pedido ya no lo ve como disponible.</li>
-    <li>Si el pedido ya se preparó en parte, solo manda a recoger lo que falta. Si no hay stock ubicado suficiente, la orden se crea con lo que hay y avisa de lo que falta.</li>
+    <li>Si el pedido ya se preparó en parte, solo manda a recoger lo que falta. Si no hay stock ubicado suficiente, las órdenes se crean con lo que hay y avisa de lo que falta.</li>
   </ul>
   <table>
     <tr><th style="width:30%">Estrategia de picking</th><th>De dónde coge primero</th></tr>
@@ -403,11 +410,10 @@ Lo demás quedará pendiente para volver a proponer.</div>
   </ul>
   <ol class="pasos">
     <li>Escanea la etiqueta del hueco del que recoges.</li>
-    <li>Si la configuración lo exige, teclea el <b>dígito de control</b> de la etiqueta.</li>
-    <li>Ajusta la cantidad si has cogido menos y pulsa <b>Confirmar recogida</b>. Pasa sola a la siguiente parada.</li>
+        <li>Ajusta la cantidad si has cogido menos y pulsa <b>Confirmar recogida</b>. Pasa sola a la siguiente parada.</li>
   </ol>
-  <p>También se puede <b>Saltar parada</b> (la deja para el final) o marcar <b>No hay stock aquí</b> (la cancela y queda constancia para revisar el hueco).</p>
-  <div class="nota"><span class="t">El dígito de control</span>Solo está impreso en la etiqueta del hueco, así que teclearlo certifica que el preparador está delante de ese hueco. Si no coincide, no deja confirmar.</div>
+  <p>También se puede <b>Saltar</b> la parada o marcar <b>Sin stock</b> (la cancela y busca el producto en otra ubicación).</p>
+  <p><b>Saltar</b> deja la parada para el final: al acabar el recorrido vuelve a salir. Si se salta por segunda vez queda <b>retenida</b>: el preparador ya no la ve y la resuelve el jefe de almacén desde <b>Paradas retenidas</b> (pila del rol center), con <b>Buscar en otra ubicación</b>. Mientras tanto, la orden no se termina, pero lo recogido ya pasa al pedido.</p>
 
   <h3 id="c4-pedido">4 · Vuelta al pedido</h3>
   <p>Al terminar la última parada, SGA rellena en el pedido de venta la <b>cantidad a enviar</b> y los <b>lotes recogidos</b>. Después, oficina registra el envío como siempre. Las líneas sin recoger quedan con cantidad a enviar cero: lo que no ha pasado por picking no sale.</p>
@@ -527,7 +533,7 @@ Lo demás quedará pendiente para volver a proponer.</div>
   <ol class="pasos">
     <li><b>Llega una compra.</b> Se registra la recepción en BC como siempre. En <span class="ui">Ubicar recepciones</span>, <b>Proponer ubicaciones</b>.</li>
     <li><b>Se coloca la mercancía</b> donde dice SGA (o se corrige el hueco) y se confirma.</li>
-    <li><b>Entra un pedido de venta.</b> Se lanza y se envía con <b>Enviar a picking</b>.</li>
+    <li><b>Entra un pedido de venta.</b> Se lanza y se envía con <b>Enviar a SGA</b>.</li>
     <li><b>El responsable</b> reparte las órdenes en <span class="ui">Asignar órdenes de picking</span>, si se exige asignación.</li>
     <li><b>El preparador</b> pulsa <b>Siguiente orden</b> y recoge parada a parada, escaneando cada hueco.</li>
     <li><b>Al terminar</b>, el pedido ya tiene la cantidad a enviar y los lotes. Oficina registra el envío.</li>
@@ -577,7 +583,7 @@ Lo demás quedará pendiente para volver a proponer.</div>
     <tr><td>Saber dónde dejar lo que entra</td><td>Ubicar producto</td></tr>
     <tr><td>Colocar lo recibido o embotellado en el día</td><td>Ubicar recepciones / Ubicar ensamblados</td></tr>
     <tr><td>Ver dónde está un producto</td><td>¿Dónde está el producto?</td></tr>
-    <tr><td>Preparar un pedido de venta</td><td>Pedido de venta (lanzado) › Enviar a picking</td></tr>
+    <tr><td>Preparar un pedido de venta</td><td>Pedido de venta (lanzado) › Enviar a SGA</td></tr>
     <tr><td>Repartir el picking entre preparadores</td><td>Asignar órdenes de picking › Asignar a</td></tr>
     <tr><td>Coger la siguiente orden a preparar</td><td>Órdenes de picking › Siguiente orden</td></tr>
     <tr><td>Volver a pasar un picking al pedido</td><td>Orden de picking › Pasar al pedido</td></tr>

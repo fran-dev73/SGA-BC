@@ -4,8 +4,8 @@ using Microsoft.Sales.Document;
 
 /// <summary>
 /// PageExtension Sales Order SGA (ID 51104) extends Page "Sales Order".
-/// Permite lanzar el picking de un pedido de venta, ver en la cabecera cuánto está preparado
-/// (Estado preparación SGA) y consultar lo que ya se ha recogido.
+/// Permite enviar un pedido de venta a SGA (sus órdenes de picking), ver en la cabecera cuánto
+/// está preparado (Estado preparación SGA) y consultar lo que ya se ha recogido.
 ///
 /// Se hace en una extensión propia dentro de SGA, en lugar de tocar Pag-Ext50012
 /// "Sales Order", para que el módulo siga siendo autocontenido.
@@ -36,10 +36,10 @@ pageextension 51104 "Sales Order SGA" extends "Sales Order"
                 Caption = 'Almacén SGA';
                 Image = Warehouse;
 
-                action(CrearOrdenPickingSGA)
+                action(EnviarASGA)
                 {
-                    Caption = 'Enviar a picking';
-                    ToolTip = 'Genera la orden de picking del pedido: de qué ubicación y qué lote hay que coger cada producto, y lo reserva en las ubicaciones. El pedido debe estar lanzado y no tener otra orden abierta.';
+                    Caption = 'Enviar a SGA';
+                    ToolTip = 'Genera las órdenes de picking del pedido, de un palé como mucho cada una: una por palé completo y las cajas y unidades sueltas juntas hasta llenar un palé. Dice de qué ubicación y qué lote coger cada producto y lo reserva. El pedido debe estar lanzado y, una vez enviado, ya no se puede volver a abrir.';
                     ApplicationArea = All;
                     Image = CreateWarehousePick;
 
@@ -47,21 +47,22 @@ pageextension 51104 "Sales Order SGA" extends "Sales Order"
                     var
                         rOrden: Record "Orden Picking SGA";
                         cPicking: Codeunit "Gestion Picking SGA";
-                        noOrden: Code[20];
+                        creadas: Integer;
                         faltas: Text;
-                        OrdenPickingCreadaMsg: Label 'Se ha creado la orden de picking %1.', Comment = '%1 = nº orden';
-                        OrdenConFaltasMsg: Label 'Se ha creado la orden de picking %1 con lo que hay ubicado. Falta:\%2\\Lo que falta se prepara en una segunda ronda, cuando haya stock ubicado: vuelva a pulsar Enviar a picking al terminar esta orden, o use Segunda ronda de picking en Órdenes de picking SGA.', Comment = '%1 = nº orden, %2 = lista de faltas';
+                        OrdenesCreadasMsg: Label 'Se han creado %1 órdenes de picking.', Comment = '%1 = número de órdenes';
+                        OrdenesConFaltasMsg: Label 'Se han creado %1 órdenes de picking con lo que hay ubicado. Falta:\%2\\Lo que falta se prepara en una segunda ronda, cuando haya stock ubicado y estén terminadas estas órdenes: vuelva a pulsar Enviar a SGA, o use Segunda ronda de picking en Órdenes de picking SGA.', Comment = '%1 = número de órdenes, %2 = lista de faltas';
                     begin
                         CurrPage.SaveRecord();
-                        noOrden := cPicking.CrearOrdenDesdeVenta(Rec."No.", faltas);
+                        creadas := cPicking.EnviarPedidoASGA(Rec."No.", faltas);
 
                         if faltas = '' then
-                            Message(OrdenPickingCreadaMsg, noOrden)
+                            Message(OrdenesCreadasMsg, creadas)
                         else
-                            Message(OrdenConFaltasMsg, noOrden, faltas);
+                            Message(OrdenesConFaltasMsg, creadas, faltas);
 
-                        if rOrden.Get(noOrden) then
-                            Page.Run(Page::"Ficha Orden Picking SGA", rOrden);
+                        rOrden.SetRange("No. Documento Origen", Rec."No.");
+                        rOrden.SetRange(Origen, rOrden.Origen::Venta);
+                        Page.Run(Page::"Ordenes Picking SGA", rOrden);
                     end;
                 }
                 action(PasarPickingAPedidoSGA)
@@ -104,14 +105,14 @@ pageextension 51104 "Sales Order SGA" extends "Sales Order"
         }
         // Pestaña propia en la barra de acciones, junto a "Proceso". Sin promocionar, el grupo
         // quedaba escondido en "Más opciones" y el usuario solo veía las acciones de almacén
-        // estándar, que en SGA no se usan: la salida siempre va por "Enviar a picking".
+        // estándar, que en SGA no se usan: la salida siempre va por "Enviar a SGA".
         addafter(Category_Process)
         {
             group(Category_SGA)
             {
                 Caption = 'Almacén SGA';
 
-                actionref(CrearOrdenPickingSGA_Promoted; CrearOrdenPickingSGA)
+                actionref(EnviarASGA_Promoted; EnviarASGA)
                 {
                 }
                 actionref(VerOrdenesPickingSGA_Promoted; VerOrdenesPickingSGA)

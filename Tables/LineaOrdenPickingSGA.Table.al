@@ -172,6 +172,41 @@ table 51109 "Linea Orden Picking SGA"
             DataClassification = EndUserIdentifiableInformation;
             Editable = false;
         }
+        field(110; "Veces Saltada"; Integer)
+        {
+            Caption = 'Veces saltada';
+            DataClassification = ToBeClassified;
+            Editable = false;
+            ToolTip = 'Cuántas veces el preparador ha pulsado Saltar en esta parada. A la segunda queda retenida.';
+        }
+        field(111; Retenida; Boolean)
+        {
+            Caption = 'Retenida';
+            DataClassification = ToBeClassified;
+            Editable = false;
+            ToolTip = 'La parada se ha saltado dos veces: algo impide recogerla. El preparador ya no la ve y sigue pendiente hasta que el jefe de almacén la resuelva desde Paradas retenidas.';
+        }
+        field(112; "Fecha Retencion"; DateTime)
+        {
+            Caption = 'Fecha retención';
+            DataClassification = ToBeClassified;
+            Editable = false;
+            ToolTip = 'Momento en que la parada quedó retenida.';
+        }
+        field(113; "Retenida por"; Code[50])
+        {
+            Caption = 'Retenida por';
+            DataClassification = EndUserIdentifiableInformation;
+            Editable = false;
+            ToolTip = 'Preparador que saltó la parada por segunda vez.';
+        }
+        field(114; Desvio; Boolean)
+        {
+            Caption = 'Desvío';
+            DataClassification = ToBeClassified;
+            Editable = false;
+            ToolTip = 'La parada se ha recogido de una ubicación distinta de la propuesta. Se guarda al confirmarla para poder contar los desvíos.';
+        }
     }
 
     keys
@@ -193,6 +228,14 @@ table 51109 "Linea Orden Picking SGA"
         }
         // Reubicaciones pendientes hacia una ubicación (la propuesta no la da a otro producto).
         key(Destino; "Cod. Almacen", "Cod. Bin Destino", Estado)
+        {
+        }
+        // Las retenidas pendientes del jefe de almacén (pila del rol center y lista).
+        key(Retenidas; Retenida, "Cod. Almacen", Estado)
+        {
+        }
+        // Desvíos de ubicación por día (pila del rol center).
+        key(Desvios; Desvio, "Cod. Almacen", "Fecha Confirmacion")
         {
         }
     }
@@ -244,6 +287,9 @@ table 51109 "Linea Orden Picking SGA"
     /// </summary>
     procedure EstiloEstado(): Text
     begin
+        if Retenida and (Estado in [Estado::Pendiente, Estado::Parcial]) then
+            exit('Unfavorable');
+
         case Estado of
             Estado::Pendiente:
                 exit('Standard');
@@ -300,6 +346,16 @@ table 51109 "Linea Orden Picking SGA"
     procedure FiltrarPendientes()
     begin
         SetFilter(Estado, '%1|%2', Estado::Pendiente, Estado::Parcial);
+    end;
+
+    /// <summary>
+    /// Deja solo las paradas que le tocan al preparador: las pendientes que no están retenidas.
+    /// Las retenidas siguen pendientes, pero las resuelve el jefe de almacén.
+    /// </summary>
+    procedure FiltrarParaPreparar()
+    begin
+        FiltrarPendientes();
+        SetRange(Retenida, false);
     end;
 
     /// <summary>

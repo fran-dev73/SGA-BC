@@ -147,6 +147,16 @@ table 51108 "Orden Picking SGA"
             CalcFormula = sum("Linea Orden Picking SGA"."Cantidad Pendiente" where("No. Orden" = field("No. Orden")));
             ToolTip = 'Suma de lo que queda por recoger, en unidades base. Da idea del trabajo que queda en la orden.';
         }
+        field(103; "Paradas Retenidas"; Integer)
+        {
+            Caption = 'Paradas retenidas';
+            Editable = false;
+            FieldClass = FlowField;
+            CalcFormula = count("Linea Orden Picking SGA" where("No. Orden" = field("No. Orden"),
+                                                                Retenida = const(true),
+                                                                Estado = filter(Pendiente | Parcial)));
+            ToolTip = 'Paradas que el preparador ha saltado dos veces y esperan al jefe de almacén. Mientras haya alguna, la orden no se termina.';
+        }
     }
 
     keys
@@ -253,6 +263,18 @@ table 51108 "Orden Picking SGA"
 
         rLinea.SetRange(Estado, rLinea.Estado::Recogida);
         prm_Hechas := rLinea.Count();
+    end;
+
+    /// <summary>
+    /// Indica si a la orden le quedan paradas para el preparador: pendientes y no retenidas.
+    /// </summary>
+    procedure TieneParadasParaPreparar(): Boolean
+    var
+        rLinea: Record "Linea Orden Picking SGA";
+    begin
+        rLinea.SetRange("No. Orden", "No. Orden");
+        rLinea.FiltrarParaPreparar();
+        exit(not rLinea.IsEmpty());
     end;
 
     /// <summary>

@@ -11,7 +11,7 @@ por dentro, en la [documentación técnica](DOCUMENTACION_TECNICA_SGA.md).
 3. [Zonas](#3-zonas)
 4. [Crear las ubicaciones](#4-crear-las-ubicaciones)
 5. [Tipo y capacidad](#5-tipo-y-capacidad)
-6. [Etiquetas y dígitos de control](#6-etiquetas-y-dígitos-de-control)
+6. [Etiquetas de ubicación](#6-etiquetas-de-ubicación)
 7. [Carga inicial](#7-carga-inicial)
 8. [Empezar de cero](#8-empezar-de-cero)
 9. [Tareas programadas](#9-tareas-programadas)
@@ -32,7 +32,7 @@ Menú **Almacén SGA - Configuración** > **Configuración SGA**.
 
 | Pestaña | Qué se pone |
 |---|---|
-| General | *Almacén por defecto* y *Zona por defecto* |
+| General | *Almacén por defecto*, *Zona por defecto* y *Fecha inicio SGA* (ver apartado 7) |
 | Ubicaciones por flujo | *Ubic. ajustes*: donde van las faltas que se regularizan. Mejor una ubicación sin tipo |
 | Estrategias | Estrategia de ubicación, de compras y de ensamblados, estrategia de picking (FEFO, FIFO…) y días de aviso de caducidad. Ver la tabla de estrategias en la guía de uso |
 | Estrategias > grupo IIEE | *Campo del grupo IIEE en el producto*: el campo de la ficha del producto que guarda su grupo IIEE. Se elige de la lista y al lado sale su nombre. En blanco, no se agrupa |
@@ -46,8 +46,7 @@ Menú **Almacén SGA - Configuración** > **Configuración SGA**.
 |---|---|
 | *Control capacidad* | *Avisar* o *Bloquear* cuando una ubicación se pasa de su capacidad |
 | *Permitir desvío ubicación* | Admite recoger de un hueco distinto del propuesto |
-| *Exigir confirmar ubicación* | Obliga a escanear la ubicación. Con *Exigir dígito de control* no se pide: la certifica el dígito |
-| *Exigir dígito de control al recoger* | Pide el dígito en los huecos con *Dígito colocado* (ver apartado 6) |
+| *Exigir confirmar ubicación* | Obliga a escanear la ubicación al ubicar mercancía. No afecta al picking, que siempre lee la ubicación de la etiqueta del hueco (ver apartado 6) |
 | *Exigir escanear producto al recoger* | Pide el producto escaneado en cada parada |
 | *Exigir asignación de picking* | Las órdenes nacen pendientes de asignar y las reparte un responsable |
 | *Permitir cantidad negativa* | Solo para arranques |
@@ -57,6 +56,8 @@ Menú **Almacén SGA - Configuración** > **Configuración SGA**.
 **Zonas SGA** agrupa ubicaciones (por ejemplo RESERVA o CÁMARA). Su *Tipo ubicación* es el que heredan las ubicaciones que se crean en ella.
 
 Su **Grupo IIEE** reúne en ella los productos de ese grupo: al ubicar, se busca primero en las zonas de su grupo y, si están llenas, en el resto del almacén. La zona admite igualmente productos de otros grupos, y un grupo puede tener varias zonas. Necesita el campo del grupo IIEE configurado en el apartado 2.
+
+**Playas.** Donde se dejan los pedidos preparados. Se crea una zona sin tipo con la casilla **Playa** y una ubicación por playa (por ejemplo PLAYA con PLAYA-1 a PLAYA-4), también sin tipo, así que nunca se proponen para ubicar ni reponer. En **Ubicación por defecto** va la playa a la que el preparador lleva el picking de venta: la PDA se la indica en cada parada y al terminar la orden.
 
 ## 4. Crear las ubicaciones
 
@@ -77,28 +78,17 @@ La configuración de una ubicación **solo se cambia si está vacía**. Bloquear
 
 **Capacidad en palés.** Cada producto se cuenta con su *Cód. palé por defecto*: medio palé ocupa 0,5. Un producto sin palé en su ficha no cabe en una ubicación con capacidad. Con 0 no hay capacidad declarada: no limita, pero con cualquier cosa dentro sale como llena.
 
-## 6. Etiquetas y dígitos de control
+## 6. Etiquetas de ubicación
 
 ### Imprimir etiquetas
 
-En **Ubicaciones SGA**, selecciona los huecos y pulsa **Imprimir etiquetas**. Cada etiqueta, de 70 × 35 mm, lleva el código, el **dígito de control** (dos cifras en un recuadro) y un código de barras con los dos: escaneándolo, la PDA toma la ubicación y el dígito de una vez. El dígito solo está en la etiqueta, y certifica que el preparador está delante del hueco.
+En **Ubicaciones SGA**, selecciona los huecos y pulsa **Imprimir etiquetas**. Cada etiqueta lleva el código de la ubicación con su código de barras Code 128 y el código legible debajo. La PDA lee ese código para comprobar que el preparador está delante del hueco correcto.
 
-Si una etiqueta se ha copiado, **Regenerar dígitos de control** y reimprime.
+### Pegar las etiquetas
 
-### Poner los dígitos poco a poco
+Las etiquetas deben estar pegadas antes de empezar a recoger. Se imprimen y pegan por pasillos, filtrando por código.
 
-El almacén funciona mientras se van colocando. Cada ubicación tiene la marca **Dígito colocado**:
-
-- Se pone a mano después de pegar su etiqueta: acción **Dígito colocado** de *Ubicaciones SGA*, sobre las seleccionadas.
-- Imprimir **no** la pone, para no pedir un dígito que aún no está en el hueco.
-- Se quita sola al regenerar el dígito de la ubicación.
-
-| Hueco | Qué escanea el preparador |
-|---|---|
-| Con **Dígito colocado** | La etiqueta (ubicación y dígito de una vez, o teclea el dígito) y el producto |
-| Sin él | Solo el producto |
-
-Para organizarlo, la vista **Sin dígito colocado** enseña lo que falta. Se puede ir por pasillos.
+En cada parada, el preparador lee la ubicación de la etiqueta del hueco (o la teclea), y el producto si la configuración lo exige.
 
 ## 7. Carga inicial
 
@@ -109,6 +99,10 @@ Reparte entre las ubicaciones el stock que ya tiene BC. Menú *Configuración* >
 3. Lánzalo primero con **Solo simular**: hace el reparto completo, lo enseña y lo deshace.
 4. Al terminar sale **Resultado de la carga inicial**. La vista *No cargado* dice qué se ha quedado fuera y por qué.
 5. Para relanzarlo, marca **Omitir productos que ya están ubicados**. Lo que no cabe se ubica desde *Pendiente de ubicar*.
+
+**Fecha inicio SGA.** En *Configuración SGA* > *General* va el primer día en que las entradas se ubican desde su documento. Las recepciones, los ensamblados y las tareas de producción anteriores no salen nunca en *Ubicar recepciones*, *Ubicar ensamblados* ni *Imprimir y ubicar palés*: lo que trajeron ya es stock de BC y lo coloca la carga inicial. En *Pendiente de ubicar* esas cantidades salen en *A ubicar*, no en *En recepciones o ensamblados*.
+
+La carga inicial se lanza **antes de registrar ninguna entrada del día de inicio** (el día anterior o a primera hora). Una recepción o un ensamblado de ese día que entrara en la carga se volvería a pedir desde su pantalla y se ubicaría dos veces.
 
 ## 8. Empezar de cero
 
@@ -134,7 +128,7 @@ Antes de dar el almacén por operativo:
 - [ ] Campo del grupo IIEE elegido, si se usan grupos (apartado 2).
 - [ ] Zonas creadas, con su tipo y su grupo IIEE si procede (apartado 3).
 - [ ] Ubicaciones generadas con su tipo y capacidad (apartados 4 y 5).
-- [ ] Carga inicial simulada, revisada y lanzada (apartado 7).
-- [ ] Etiquetas impresas y pegadas por pasillos; marca *Dígito colocado* puesta (apartado 6).
+- [ ] *Fecha inicio SGA* puesta y carga inicial simulada, revisada y lanzada antes de registrar entradas de ese día (apartado 7).
+- [ ] Etiquetas impresas y pegadas en cada hueco, por pasillos, antes de empezar a recoger (apartado 6).
 - [ ] Un pedido de prueba de principio a fin, con la PDA y con el navegador.
 - [ ] Tareas programadas dadas de alta (apartado 9).

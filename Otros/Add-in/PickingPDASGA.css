@@ -125,7 +125,7 @@ body {
     color: #166534;
 }
 
-/* Fila de controles: lectura y dígito; −, cantidad, + y Confirmar. */
+/* Fila de controles: lectura; −, cantidad, + y Confirmar. */
 .pk-fila {
     display: flex;
     align-items: center;
@@ -153,12 +153,16 @@ body {
     flex: 1;
 }
 
-.pk-digito {
-    flex: 0 0 84px;
-    font-size: 26px;
-    font-weight: 700;
-    text-align: center;
+/* Casilla con su lectura ya hecha y comprobada. */
+.pk-campo.pk-leido {
+    background: #dcfce7;
+    color: #166534;
 }
+
+.pk-campo.pk-leido:focus {
+    border-color: #16a34a;
+}
+
 
 .pk-campo-cantidad {
     flex: 0 0 84px;

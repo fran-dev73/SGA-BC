@@ -105,7 +105,7 @@ table 51104 "Config. SGA"
             Caption = 'Exigir confirmar ubicación';
             DataClassification = ToBeClassified;
             InitValue = true;
-            ToolTip = 'Obliga al operario a escanear la ubicación para cerrar la tarea. En el picking no se pide si se exige el dígito de control: el dígito certifica el hueco, y mientras no esté colocado no hay etiqueta que escanear.';
+            ToolTip = 'Obliga al operario a escanear la ubicación para cerrar la tarea de ubicar mercancía. El picking pide siempre la ubicación de la que recoge, leída de la etiqueta del hueco.';
         }
         field(43; "Permitir Desvio Ubicacion"; Boolean)
         {
@@ -119,12 +119,6 @@ table 51104 "Config. SGA"
             Caption = 'Exigir asignación de picking';
             DataClassification = ToBeClassified;
             ToolTip = 'Si está activo, las órdenes de picking nacen pendientes de asignar y solo las puede preparar el preparador al que un responsable se las asigne en "Asignar órdenes de picking". Si no, cada preparador coge la siguiente sin asignar.';
-        }
-        field(46; "Exigir Digito Control"; Boolean)
-        {
-            Caption = 'Exigir dígito de control al recoger';
-            DataClassification = ToBeClassified;
-            ToolTip = 'Si está activo, al confirmar cada parada de picking el preparador tiene que escanear o teclear el dígito de control de la etiqueta del hueco del que recoge. Certifica que está delante del hueco. Solo se pide en los huecos marcados con "Dígito colocado"; en los demás basta con escanear el producto. Así el almacén funciona mientras se van poniendo los dígitos.';
         }
         field(47; "Exigir Escanear Producto"; Boolean)
         {
@@ -152,6 +146,12 @@ table 51104 "Config. SGA"
             DataClassification = ToBeClassified;
             InitValue = true;
             ToolTip = 'Crea la fila de datos SGA la primera vez que se usa una ubicación de la topología. Si se desactiva, la ubicación debe estar dada de alta previamente.';
+        }
+        field(70; "Fecha Inicio SGA"; Date)
+        {
+            Caption = 'Fecha inicio SGA';
+            DataClassification = ToBeClassified;
+            ToolTip = 'Primer día en que las entradas se ubican desde su documento. Las recepciones, los ensamblados y las tareas de producción anteriores no salen para ubicar: lo que trajeron ya es stock de BC y lo coloca la carga inicial, que se lanza antes de registrar ninguna entrada de este día. En blanco, se miran todos.';
         }
         field(80; "Dias Analisis ABC"; Integer)
         {

@@ -400,7 +400,7 @@ Si el error persiste: hay un bloqueo de base de datos. En ese caso, el administr
 **Causas comunes**:
 
 1. **No hay orden de picking creada**: El pedido de venta está ahí pero **no se ha enviado** a picking. El operario no ve nada porque no hay paradas.
-   - **Solución**: Lanza el pedido y pulsa *Almacén SGA > Enviar a picking*.
+   - **Solución**: Lanza el pedido y pulsa *Almacén SGA > Enviar a SGA*.
 
 2. **Hay stock en BC pero no está ubicado**: El sistema genera la orden pero sin paradas: significa que no hay contenido ubicado del producto.
    - **Solución**: Lanza *Ubicar producto* para las cantidades que tienes, o *Carga inicial* si es la primera vez.
@@ -467,8 +467,9 @@ Si el error persiste: hay un bloqueo de base de datos. En ese caso, el administr
 3. **Ya está ubicada**: con *Solo lo que falta por ubicar* marcado, lo ya colocado se oculta. Desmárcalo.
 4. **Se deshizo la recepción**: si la cantidad neta del albarán es cero, la línea no sale.
 5. **No se registró como albarán de compra**: la pantalla lee los movimientos de producto de tipo *Compra* con documento *Albarán compra*. Lo que entre por otra vía (un diario de producto, un ajuste positivo) no aparece. Eso se ubica con *Ubicar producto* > *Ubicar todo lo pendiente*.
+6. **Es anterior a la *Fecha inicio SGA***: lo registrado antes de esa fecha no sale nunca. Ya es stock de BC; si no está en ningún hueco, sale en *Pendiente de ubicar* como *A ubicar*.
 
-**Solución**: revisa 1 a 4. Si es el 5, ubícalo con *Ubicar producto*.
+**Solución**: revisa 1 a 4. Si es el 5, ubícalo con *Ubicar producto*. Si es el 6, desde *Pendiente de ubicar*.
 
 ---
 

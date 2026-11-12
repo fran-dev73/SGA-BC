@@ -2,14 +2,15 @@ namespace AntonioNadal.SGA;
 
 /// <summary>
 /// Codeunit Reubicaciones SGA (ID 51113).
-/// Decide qué hay que llevar de almacenamiento a picking y adónde. Un producto necesita una
-/// reubicación cuando tiene stock disponible en almacenamiento y nada en ninguna ubicación de
-/// picking, y no tiene ya una reubicación pendiente. Se planifica:
-///   - al vaciar un picking (ReubicarSiSeVacia, desde la confirmación de cada parada): a la
-///     misma ubicación si la sigue admitiendo;
+/// Decide qué hay que llevar de almacenamiento a picking y adónde, siempre que haya stock
+/// disponible en almacenamiento. Se planifica:
+///   - en cuanto una ubicación de picking se queda a cero de un producto (ReubicarSiSeVacia, que
+///     lanza Cod. "Gestion Contenido SGA" con cualquier movimiento que saque de ella): a la
+///     misma ubicación si la sigue admitiendo, aunque el producto quede en otra de picking, y
+///     salvo que ya tenga una reubicación pendiente hacia ella;
 ///   - en el proceso periódico (PlanificarAlmacen; OnRun lo lanza desde la cola de proyectos):
-///     para todos los productos que estén en esa situación, también los que nunca han tenido
-///     ubicación de picking.
+///     para los productos que no tienen nada en ninguna ubicación de picking ni reubicación
+///     pendiente, también los que nunca han tenido ubicación de picking.
 /// Se trae de almacenamiento el primer contenido en el orden de la estrategia de picking (FEFO,
 /// FIFO…), un palé como mucho. El destino lo elige la propuesta de siempre limitada a picking
 /// (Cod. "Gestion Ubicaciones SGA".ProponerEnTipo, estrategia Estándar): la ubicación fija del
@@ -74,8 +75,9 @@ codeunit 51113 "Reubicaciones SGA"
     end;
 
     /// <summary>
-    /// Después de recoger de prm_Ubicacion: si es de picking y se ha quedado sin el producto,
-    /// planifica traerlo de almacenamiento, a la misma ubicación si la sigue admitiendo.
+    /// Después de sacar de prm_Ubicacion: si es de picking y se ha quedado a cero del producto,
+    /// planifica traerlo de almacenamiento, a la misma ubicación si la sigue admitiendo. Una
+    /// línea a cero que sigue existiendo (porque aún tenía reserva) cuenta como vacía.
     /// </summary>
     procedure ReubicarSiSeVacia(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]; prm_Producto: Code[20]; prm_Variante: Code[10])
     var
@@ -92,6 +94,7 @@ codeunit 51113 "Reubicaciones SGA"
         rContenido.SetRange("Cod. Bin", prm_Ubicacion);
         rContenido.SetRange("No. Producto", prm_Producto);
         rContenido.SetRange("Cod. Variante", prm_Variante);
+        rContenido.SetFilter(Cantidad, '>%1', 0);
         if not rContenido.IsEmpty() then
             exit;
 
@@ -100,8 +103,11 @@ codeunit 51113 "Reubicaciones SGA"
 
     /// <summary>
     /// Planifica la reubicación de un producto si la necesita (ver el resumen del codeunit) y
-    /// hay adónde llevarla. prm_Preferida es la ubicación de picking que se acaba de vaciar: se
-    /// usa si la admite. Devuelve true si la ha planificado.
+    /// hay adónde llevarla. prm_Preferida es la ubicación de picking que se acaba de quedar a
+    /// cero: se repone aunque el producto siga en otra de picking, se usa como destino si la
+    /// admite y solo se descarta si ya hay una reubicación pendiente hacia ella. Sin
+    /// prm_Preferida (proceso periódico), solo si el producto no tiene nada en picking ni
+    /// reubicación pendiente. Devuelve true si la ha planificado.
     /// </summary>
     local procedure Planificar(prm_Almacen: Code[10]; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Preferida: Code[20]): Boolean
     var
@@ -112,10 +118,11 @@ codeunit 51113 "Reubicaciones SGA"
         cantidad: Decimal;
         motivo: Text;
     begin
-        if ReubicacionPendiente(prm_Almacen, prm_Producto, prm_Variante) then
+        if ReubicacionPendiente(prm_Almacen, prm_Producto, prm_Variante, prm_Preferida) then
             exit(false);
-        if HayEnPicking(prm_Almacen, prm_Producto, prm_Variante) then
-            exit(false);
+        if prm_Preferida = '' then
+            if HayEnPicking(prm_Almacen, prm_Producto, prm_Variante) then
+                exit(false);
         if not BuscarOrigen(prm_Almacen, prm_Producto, prm_Variante, rContenido) then
             exit(false);
 
@@ -133,6 +140,10 @@ codeunit 51113 "Reubicaciones SGA"
                                                    prm_Producto, prm_Variante, rContenido."No. Lote", rContenido."Cod. Unidad Medida", cantidad, motivo);
         if destino = '' then
             exit(false);
+        // Si va a otra ubicación que la vaciada, tampoco se duplica la que ya va hacia allí.
+        if (destino <> prm_Preferida) and (prm_Preferida <> '') then
+            if ReubicacionPendiente(prm_Almacen, prm_Producto, prm_Variante, destino) then
+                exit(false);
 
         cPicking.AnadirReubicacion(rContenido, cantidad, destino);
         exit(true);
@@ -175,9 +186,10 @@ codeunit 51113 "Reubicaciones SGA"
     end;
 
     /// <summary>
-    /// Si el producto ya tiene una reubicación sin terminar en el almacén.
+    /// Si el producto ya tiene una reubicación sin terminar en el almacén: hacia prm_Destino o,
+    /// con prm_Destino en blanco, hacia cualquier ubicación.
     /// </summary>
-    local procedure ReubicacionPendiente(prm_Almacen: Code[10]; prm_Producto: Code[20]; prm_Variante: Code[10]): Boolean
+    local procedure ReubicacionPendiente(prm_Almacen: Code[10]; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Destino: Code[20]): Boolean
     var
         rLinea: Record "Linea Orden Picking SGA";
     begin
@@ -185,7 +197,10 @@ codeunit 51113 "Reubicaciones SGA"
         rLinea.SetRange("No. Producto", prm_Producto);
         rLinea.SetRange("Cod. Variante", prm_Variante);
         rLinea.SetRange("Cod. Almacen", prm_Almacen);
-        rLinea.SetFilter("Cod. Bin Destino", '<>%1', '');
+        if prm_Destino <> '' then
+            rLinea.SetRange("Cod. Bin Destino", prm_Destino)
+        else
+            rLinea.SetFilter("Cod. Bin Destino", '<>%1', '');
         rLinea.FiltrarPendientes();
         exit(not rLinea.IsEmpty());
     end;

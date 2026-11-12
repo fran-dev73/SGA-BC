@@ -88,6 +88,8 @@ codeunit 51102 "Gestion Mapa SGA"
     ///   b = código de ubicación, d = descripción, z = zona,
     ///   e = pasillo, c = estantería, a = altura (los tres como número),
     ///   s = estado (0 vacía, 1 parcial, 2 llena, 3 bloqueada, 4 con contenido sin medir),
+    ///   v = para quién está reservada (solo si lo está: propuesta a una entrada que aún no se
+    ///   ha ubicado),
     ///   o = % de ocupación, redondeado hacia abajo (-1 si no se puede medir),
     ///   m = por qué no se puede medir (solo si no se puede),
     ///   l = líneas de contenido, k = contenido (solo si tiene; ver ContenidoParaMapa),
@@ -118,6 +120,7 @@ codeunit 51102 "Gestion Mapa SGA"
         estanteria: Integer;
         altura: Integer;
         SinCapacidadLbl: Label 'Sin capacidad declarada: no se puede medir cuánto ocupa. Indique la capacidad en la ficha de la ubicación.';
+        ReservadaLbl: Label 'Reservada para %1 (%2).', Comment = '%1 = entrada, %2 = usuario';
     begin
         if prm_Almacen = '' then
             exit('[]');
@@ -160,6 +163,8 @@ codeunit 51102 "Gestion Mapa SGA"
                             motivoSinMedir := SinCapacidadLbl;
                     end;
                     elemento.Add('s', EstadoNumerico(rUbicacionSGA, motivoSinMedir <> ''));
+                    if rUbicacionSGA."Reservada Por" <> '' then
+                        elemento.Add('v', StrSubstNo(ReservadaLbl, rUbicacionSGA."Reservada Para", rUbicacionSGA."Reservada Por"));
                     if motivoSinMedir <> '' then begin
                         elemento.Add('o', -1);
                         elemento.Add('m', motivoSinMedir);
@@ -394,6 +399,13 @@ codeunit 51102 "Gestion Mapa SGA"
                 end;
             else
                 prm_Resumen := Format(lineas) + ' prod';
+        end;
+
+        // Reservada para una entrada que aún no se ha ubicado: su propio color.
+        if prm_Ubicacion."Reservada Por" <> '' then begin
+            prm_Estilo := 'StrongAccent';
+            if lineas = 0 then
+                prm_Resumen := 'RESERV';
         end;
     end;
 
