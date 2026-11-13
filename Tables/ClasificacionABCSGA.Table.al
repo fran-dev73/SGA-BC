@@ -154,30 +154,10 @@ table 51113 "Clasificacion ABC SGA"
     end;
 
     /// <summary>
-    /// Estilo de la clase anterior: en rojo si el producto cambia de clase.
+    /// Estilo de una columna de aviso: en rojo si el aviso está activo (cambia de clase, palés
+    /// fuera de su clase, sin unidad de palé).
     /// </summary>
-    procedure EstiloClaseAnterior(): Text
-    begin
-        exit(EstiloAviso("Cambia Clase"));
-    end;
-
-    /// <summary>
-    /// Estilo de los palés en hueco de su clase: en rojo si tiene palés fuera de su clase.
-    /// </summary>
-    procedure EstiloHuecoSuClase(): Text
-    begin
-        exit(EstiloAviso("Mal Ubicado"));
-    end;
-
-    /// <summary>
-    /// Estilo de la unidad de palé: en rojo si el producto no la tiene.
-    /// </summary>
-    procedure EstiloUnidadPale(): Text
-    begin
-        exit(EstiloAviso("Sin Unidad Pale"));
-    end;
-
-    local procedure EstiloAviso(prm_Aviso: Boolean): Text
+    procedure EstiloAviso(prm_Aviso: Boolean): Text
     begin
         if prm_Aviso then
             exit('Unfavorable');

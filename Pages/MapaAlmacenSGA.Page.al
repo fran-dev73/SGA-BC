@@ -564,7 +564,7 @@ page 51107 "Mapa Almacen SGA"
     trigger OnOpenPage()
     var
         rConfig: Record "Config. SGA";
-        LeyendaLbl: Label 'Gris: vacía  |  Verde: con hueco  |  Naranja: llena  |  Rojo: bloqueada  |  Azul (RESERV): reservada para una entrada  |  "?": sin dar de alta en SGA';
+        LeyendaLbl: Label 'Gris: vacía  |  Verde: con hueco  |  Naranja: llena  |  Rojo: bloqueada  |  Azul (RESERV): reservada para una entrada';
     begin
         rConfig.ObtenerConfig();
         FiltroAlmacen := rConfig."Almacen por Defecto";

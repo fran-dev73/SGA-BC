@@ -15,7 +15,8 @@
 //     cada hueco se parte en franjas, una por altura (la de abajo es la más baja).
 //   - Frente: un pasillo de frente, estanterías por alturas, con casillas grandes en las que
 //     se lee el producto. Es la vista de trabajo.
-// En las tres se colorea por el criterio elegido (estado, rotación ABC o caducidad),
+// En las tres se colorea por el criterio elegido (estado, posición ABC del hueco, rotación ABC
+// del producto o caducidad),
 // se busca un producto o una ubicación y se traslada arrastrando de una ubicación a otra.
 //
 // Los pasillos de la 3D se dibujan separados entre sí, como en un almacén real.
@@ -28,7 +29,7 @@ var SGA3D = (function () {
     var ctx = null;
     var ubicaciones = [];   // datos crudos que llegan de AL
     var vista = '3d';       // '3d', 'planta' o 'frente'
-    var colorear = 'estado'; // 'estado', 'abc' o 'caducidad'
+    var colorear = 'estado'; // 'estado', 'posicion', 'abc' o 'caducidad'
     var busqueda = '';      // texto buscado, en mayúsculas; vacío = no se busca
 
     // Vista 3D
@@ -134,6 +135,10 @@ var SGA3D = (function () {
         estado: {
             nombre: 'Estado',
             leyenda: [['#d9dde3', 'vacía'], ['#7cc47f', 'con hueco'], ['#e8a33d', 'llena'], ['#9a3412', 'sobrepasada'], ['#d9534f', 'bloqueada'], [COLOR_RESERVADA, 'reservada'], ['#a5b4fc', 'sin medir']]
+        },
+        posicion: {
+            nombre: 'Posición ABC',
+            leyenda: [['#ef4444', 'hueco A'], ['#f59e0b', 'hueco B'], ['#3b82f6', 'hueco C'], ['#d9dde3', 'sin clase']]
         },
         abc: {
             nombre: 'Rotación ABC',
@@ -618,6 +623,13 @@ var SGA3D = (function () {
             if (u.s !== 3 && u.v) { return paleta(COLOR_RESERVADA); }
             if (u.s !== 3 && u.s !== 4 && u.l && u.o > 100) { return PALETA[5]; }
             return PALETA[u.s] || PALETA[0];
+        }
+        // Por posición se pintan todas, vacías también: es la clase del hueco, no de lo que tiene.
+        if (colorear === 'posicion') {
+            if (u.ch === 1) { return paleta('#ef4444'); }
+            if (u.ch === 2) { return paleta('#f59e0b'); }
+            if (u.ch === 3) { return paleta('#3b82f6'); }
+            return PALETA[0];
         }
         if (!u.l) { return PALETA[0]; }
 
@@ -1292,6 +1304,7 @@ var SGA3D = (function () {
 
     // El dato que da el color, para escribirlo en la casilla.
     function datoCriterio(u) {
+        if (colorear === 'posicion') { return u.ch ? 'Hueco ' + 'ABC'.charAt(u.ch - 1) : 'Sin clase'; }
         if (colorear === 'abc') { return u.r ? 'Rotación ' + 'ABC'.charAt(u.r - 1) : 'Sin clase'; }
         if (colorear === 'caducidad') { return u.fc ? 'Cad. ' + fechaCorta(u.fc) : 'Sin caducidad'; }
         return '';
@@ -1547,6 +1560,22 @@ var SGA3D = (function () {
             proyectar();
             pintar();
             mostrarInfo(null);
+        },
+        // La llama AL para abrir el mapa con un criterio de color ('estado', 'abc' o
+        // 'caducidad') y un texto ya buscado (producto o ubicación). Deja los controles de la
+        // barra igual que si el operario los hubiera elegido.
+        preparar: function (criterio, texto) {
+            var combo = document.getElementById('sga3d-color');
+            var caja = document.getElementById('sga3d-buscar');
+            if (CRITERIOS[criterio]) {
+                colorear = criterio;
+                if (combo) { combo.value = criterio; }
+                pintarLeyenda();
+            }
+            busqueda = String(texto || '').trim().toUpperCase();
+            if (caja) { caja.value = texto || ''; }
+            mostrarInfo(null);
+            pintar();
         },
         listo: function () { avisarAL('ControlListo', []); }
     };

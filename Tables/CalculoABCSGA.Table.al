@@ -105,12 +105,6 @@ table 51112 "Calculo ABC SGA"
             DataClassification = ToBeClassified;
             DecimalPlaces = 0 : 1;
         }
-        field(51; "Productos Top 20"; Integer)
-        {
-            ToolTip = 'Cuántos productos son el 20 % que más sale.';
-            Caption = 'Productos del 20 % que más sale';
-            DataClassification = ToBeClassified;
-        }
         field(52; "% Salidas Top 20"; Decimal)
         {
             Caption = '% de salidas del 20 % que más sale';
@@ -217,12 +211,20 @@ table 51112 "Calculo ABC SGA"
         ProductosSinUMPaleLbl: Label '%1 productos con ventas no tienen unidad de palé: quedan como C. Márquelos en la columna "Unidad de palé".', Comment = '%1 = nº productos';
     begin
         prm_Info := StrSubstNo(InfoCalculoLbl, "No.", "Fecha Calculo", Usuario, "Fecha Desde", "Fecha Hasta", "Corte A", "Corte B");
-        prm_Concentracion := StrSubstNo(ResumenConcentracionLbl, "Productos Top 20", Productos, "% Salidas Top 20", "Palets Salidos");
+        prm_Concentracion := StrSubstNo(ResumenConcentracionLbl, ProductosTop20(), Productos, "% Salidas Top 20", "Palets Salidos");
         prm_Clases := StrSubstNo(ResumenClasesLbl, "Productos A", "Palets A", "Productos B", "Productos C");
         prm_Huecos := StrSubstNo(ResumenHuecosLbl, "Palets Hueco Su Clase", "Palets en Almacen",
                                  PorcentajeBienUbicados(), PorcentajeAEnHuecosA(), "Huecos Utiles");
         prm_Avisos := '';
         if "Productos Sin UM Pale" > 0 then
             prm_Avisos := StrSubstNo(ProductosSinUMPaleLbl, "Productos Sin UM Pale");
+    end;
+
+    /// <summary>
+    /// Cuántos productos son el 20 % que más sale, redondeando hacia arriba: con 7 productos, 2.
+    /// </summary>
+    procedure ProductosTop20(): Integer
+    begin
+        exit(Round(Productos * 0.2, 1, '>'));
     end;
 }

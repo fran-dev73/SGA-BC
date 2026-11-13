@@ -40,6 +40,13 @@ page 51115 "Recontar Contenido SGA"
                     ApplicationArea = All;
                     Editable = false;
                 }
+                field(SSCC; SSCC)
+                {
+                    Caption = 'SSCC';
+                    ToolTip = 'Palé que se está recontando.';
+                    ApplicationArea = All;
+                    Editable = false;
+                }
                 field(CantidadRegistrada; CantidadRegistrada)
                 {
                     Caption = 'Cantidad registrada';
@@ -89,6 +96,7 @@ page 51115 "Recontar Contenido SGA"
         Ubicacion: Code[20];
         Producto: Code[20];
         Lote: Code[50];
+        SSCC: Code[20];
         CantidadRegistrada: Decimal;
         CantidadContada: Decimal;
         Diferencia: Decimal;
@@ -104,6 +112,7 @@ page 51115 "Recontar Contenido SGA"
         Ubicacion := rContenido."Cod. Bin";
         Producto := rContenido."No. Producto";
         Lote := rContenido."No. Lote";
+        SSCC := rContenido.SSCC;
         CantidadRegistrada := rContenido."Cantidad Base";
         CantidadContada := rContenido."Cantidad Base";
         Motivo := RecuentoManualLbl;

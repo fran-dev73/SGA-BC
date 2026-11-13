@@ -44,6 +44,10 @@ page 51102 "Contenido Ubicacion Subpag"
                     ApplicationArea = All;
                     StyleExpr = EstiloFila;
                 }
+                field(SSCC; Rec.SSCC)
+                {
+                    ApplicationArea = All;
+                }
                 field("Cantidad Base"; Rec."Cantidad Base")
                 {
                     ToolTip = 'Unidades base que hay de este producto y lote en la ubicación.';
@@ -103,8 +107,12 @@ page 51102 "Contenido Ubicacion Subpag"
                 Image = TransferOrder;
 
                 trigger OnAction()
+                var
+                    cContenido: Codeunit "Gestion Contenido SGA";
+                    destino: Code[20];
                 begin
-                    TrasladarContenido();
+                    if cContenido.TrasladarConDialogo(Rec, destino, '', false) <> 0 then
+                        CurrPage.Update(false);
                 end;
             }
             action(AlternarBloqueo)
@@ -115,8 +123,11 @@ page 51102 "Contenido Ubicacion Subpag"
                 Image = Lock;
 
                 trigger OnAction()
+                var
+                    cContenido: Codeunit "Gestion Contenido SGA";
                 begin
-                    AlternarBloqueoContenido();
+                    cContenido.AlternarBloqueo(Rec);
+                    CurrPage.Update(false);
                 end;
             }
         }
@@ -128,22 +139,5 @@ page 51102 "Contenido Ubicacion Subpag"
     trigger OnAfterGetRecord()
     begin
         EstiloFila := Rec.EstiloContenido();
-    end;
-
-    local procedure TrasladarContenido()
-    var
-        cContenido: Codeunit "Gestion Contenido SGA";
-        destino: Code[20];
-    begin
-        if cContenido.TrasladarConDialogo(Rec, destino, '', false) <> 0 then
-            CurrPage.Update(false);
-    end;
-
-    local procedure AlternarBloqueoContenido()
-    var
-        cContenido: Codeunit "Gestion Contenido SGA";
-    begin
-        cContenido.AlternarBloqueo(Rec);
-        CurrPage.Update(false);
     end;
 }

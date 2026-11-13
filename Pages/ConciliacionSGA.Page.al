@@ -54,12 +54,6 @@ page 51113 "Conciliacion SGA"
                     ToolTip = 'Lote al que corresponde la diferencia.';
                     ApplicationArea = All;
                 }
-                field(Estado; Rec.Estado)
-                {
-                    ToolTip = 'Cuadra, hay stock sin ubicar, o sobra contenido en las ubicaciones.';
-                    ApplicationArea = All;
-                    StyleExpr = EstiloFila;
-                }
                 field("Stock BC"; Rec."Stock BC")
                 {
                     ToolTip = 'Existencias según los movimientos de producto, en unidades base.';
@@ -105,8 +99,11 @@ page 51113 "Conciliacion SGA"
                 Image = AdjustEntries;
 
                 trigger OnAction()
+                var
+                    cStock: Codeunit "Consulta Stock SGA";
                 begin
-                    RegularizarLinea();
+                    if cStock.RegularizarConciliacion(Rec) then
+                        CurrPage.Update(false);
                 end;
             }
         }
@@ -125,12 +122,16 @@ page 51113 "Conciliacion SGA"
             action(VerMovsProducto)
             {
                 Caption = 'Movs. producto';
-                ToolTip = 'Abre los movimientos de producto de BC del producto de la línea.';
+                ToolTip = 'Abre los movimientos de producto de BC que forman el stock BC de la línea: abiertos, del mismo producto, variante, lote y almacén.';
                 ApplicationArea = All;
                 Image = Entries;
-                RunObject = page "Item Ledger Entries";
-                RunPageLink = "Item No." = field("No. Producto"),
-                              "Location Code" = field("Cod. Almacen");
+
+                trigger OnAction()
+                var
+                    cStock: Codeunit "Consulta Stock SGA";
+                begin
+                    cStock.MostrarStockBC(Rec);
+                end;
             }
         }
         area(Promoted)
@@ -165,12 +166,12 @@ page 51113 "Conciliacion SGA"
         view(SinUbicar)
         {
             Caption = 'Stock sin ubicar';
-            Filters = where(Estado = const("Sin Ubicar"));
+            Filters = where(Diferencia = filter(> 0));
         }
         view(SobraEnSGA)
         {
             Caption = 'Sobra en ubicaciones';
-            Filters = where(Estado = const("Sobra en SGA"));
+            Filters = where(Diferencia = filter(< 0));
         }
     }
 
@@ -187,13 +188,5 @@ page 51113 "Conciliacion SGA"
     trigger OnAfterGetRecord()
     begin
         EstiloFila := Rec.EstiloConciliacion();
-    end;
-
-    local procedure RegularizarLinea()
-    var
-        cStock: Codeunit "Consulta Stock SGA";
-    begin
-        if cStock.RegularizarConciliacion(Rec) then
-            CurrPage.Update(false);
     end;
 }

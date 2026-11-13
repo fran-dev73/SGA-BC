@@ -84,6 +84,13 @@ table 51103 "Movimiento Ubicacion SGA"
             DataClassification = ToBeClassified;
             Editable = false;
         }
+        field(44; SSCC; Code[20])
+        {
+            Caption = 'SSCC';
+            DataClassification = ToBeClassified;
+            Editable = false;
+            ToolTip = 'Código del palé (SSCC) que se ha movido. En un traslado es el mismo en el origen y en el destino.';
+        }
         field(50; "Cod. Unidad Medida"; Code[10])
         {
             Caption = 'Cód. unidad medida';
@@ -123,22 +130,9 @@ table 51103 "Movimiento Ubicacion SGA"
             DataClassification = ToBeClassified;
             Editable = false;
         }
-        field(72; "No. Orden SGA"; Code[20])
-        {
-            Caption = 'Nº orden SGA';
-            DataClassification = ToBeClassified;
-            Editable = false;
-            ToolTip = 'Orden de trabajo que originó el movimiento. Lo rellena la gestión de órdenes de la Fase 2.';
-        }
         field(80; "Fecha Registro"; Date)
         {
             Caption = 'Fecha registro';
-            DataClassification = ToBeClassified;
-            Editable = false;
-        }
-        field(81; "Hora Registro"; Time)
-        {
-            Caption = 'Hora registro';
             DataClassification = ToBeClassified;
             Editable = false;
         }
@@ -178,15 +172,12 @@ table 51103 "Movimiento Ubicacion SGA"
         }
         key(Producto; "No. Producto", "Cod. Variante", "No. Lote", "Fecha Registro")
         {
-            SumIndexFields = "Cantidad Base";
         }
         key(UbicDestino; "Cod. Almacen", "Cod. Bin Destino", "Fecha Registro")
         {
-            SumIndexFields = "Cantidad Base";
         }
         key(UbicOrigen; "Cod. Almacen", "Cod. Bin Origen", "Fecha Registro")
         {
-            SumIndexFields = "Cantidad Base";
         }
         key(Cronologia; "Fecha-Hora Registro", "No. Movimiento")
         {
@@ -195,6 +186,9 @@ table 51103 "Movimiento Ubicacion SGA"
         {
         }
         key(Usuario; "Cod. Usuario", "Fecha Registro")
+        {
+        }
+        key(Pale; SSCC, "Fecha-Hora Registro")
         {
         }
     }

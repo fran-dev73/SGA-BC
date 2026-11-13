@@ -155,7 +155,7 @@
 
         // Qué coger. Manda lo que se coge (la cantidad), luego la descripción, que es como el
         // preparador reconoce el producto (con miles de referencias nadie se sabe los códigos),
-        // y en pequeño el código, el lote, la caducidad y la cantidad en base.
+        // y en pequeño el código, el lote, la caducidad, el palé (SSCC) y la cantidad en base.
         var coger = bloque('COJA');
         coger.linea.appendChild(nodo('span', 'pk-cantidad', datos.cantidad + ' ' + datos.unidad));
         var descripcion = nodo('div', 'pk-descripcion', datos.descripcion || datos.producto);
@@ -165,6 +165,7 @@
         if (datos.descripcion) { detalle.push(datos.producto); }
         if (datos.lote) { detalle.push('Lote ' + datos.lote); }
         if (datos.lote && datos.caducidad) { detalle.push('Cad. ' + datos.caducidad); }
+        if (datos.sscc) { detalle.push('SSCC ' + datos.sscc); }
         if (datos.cantidadBase) { detalle.push('= ' + datos.cantidadBase); }
         if (detalle.length > 0) { coger.appendChild(corto('div', 'pk-lote', detalle.join('  ·  '))); }
         raiz.appendChild(coger);

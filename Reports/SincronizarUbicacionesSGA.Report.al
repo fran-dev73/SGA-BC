@@ -53,9 +53,8 @@ report 51101 "Sincronizar Ubicaciones SGA"
                     if not Confirm(ConfirmarReconstruirQst, false, textoAlmacen) then
                         exit;
 
-                cContenido.FijarModoSilencioso(true);
+                // ReconstruirContenido ya recalcula los estados de las ubicaciones al terminar.
                 cContenido.ReconstruirContenido(codAlmacen);
-                cUbicaciones.RecalcularEstados(codAlmacen);
 
                 if GuiAllowed() then
                     Message(ProcesoFinalizadoMsg);

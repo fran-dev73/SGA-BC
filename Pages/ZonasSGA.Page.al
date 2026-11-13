@@ -43,14 +43,9 @@ page 51105 "Zonas SGA"
                 {
                     ApplicationArea = All;
                 }
-                field("Prioridad Ubicacion"; Rec."Prioridad Ubicacion")
-                {
-                    ToolTip = 'Orden en que el motor de ubicación considera esta zona. Menor valor, antes.';
-                    ApplicationArea = All;
-                }
                 field("Prioridad Picking"; Rec."Prioridad Picking")
                 {
-                    ToolTip = 'Orden en que el motor de picking considera esta zona. Menor valor, antes.';
+                    ToolTip = 'Secuencia de picking que toma una ubicación al asignarle esta zona, si aún no tiene la suya. Menor valor, antes en el recorrido.';
                     ApplicationArea = All;
                 }
                 field(Bloqueada; Rec.Bloqueada)

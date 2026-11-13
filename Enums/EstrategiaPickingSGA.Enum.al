@@ -18,10 +18,6 @@ enum 51105 "Estrategia Picking SGA"
     {
         Caption = 'FEFO (primera caducidad)';
     }
-    value(2; "Lote Exacto")
-    {
-        Caption = 'Lote exacto';
-    }
     value(3; "Vaciar Ubicacion")
     {
         Caption = 'Vaciar ubicación';

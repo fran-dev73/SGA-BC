@@ -39,6 +39,12 @@ controladdin "Mapa 3D SGA"
     procedure Actualizar(prm_DatosJson: Text);
 
     /// <summary>
+    /// Deja elegido el criterio de color ('estado', 'posicion', 'abc' o 'caducidad') y un texto buscado
+    /// (producto o ubicación), como si el operario los hubiera puesto en la barra.
+    /// </summary>
+    procedure Preparar(prm_Criterio: Text; prm_Busqueda: Text);
+
+    /// <summary>
     /// El lienzo avisa de que ya está montado y puede recibir datos.
     /// </summary>
     event ControlListo();

@@ -72,6 +72,10 @@
         SGA3D.refrescar(datos);
     };
 
+    window.Preparar = function (criterio, texto) {
+        SGA3D.preparar(criterio, texto);
+    };
+
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', arrancar);
     } else {

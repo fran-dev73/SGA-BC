@@ -77,7 +77,8 @@ codeunit 51103 "Consulta Stock SGA"
     end;
 
     /// <summary>
-    /// Deja en el buffer solo las filas con diferencia, y clasifica todas las que quedan.
+    /// Deja el buffer filtrado por el usuario y, con prm_SoloDiferencias, solo las filas con
+    /// diferencia (ya calculada al acumular).
     /// </summary>
     procedure ClasificarYFiltrar(var rStock: Record "Buffer Conciliacion SGA"; prm_SoloDiferencias: Boolean)
     begin
@@ -85,12 +86,6 @@ codeunit 51103 "Consulta Stock SGA"
         // estar conciliando a la vez.
         rStock.Reset();
         rStock.FiltrarUsuarioActual();
-
-        if rStock.FindSet() then
-            repeat
-                rStock.ActualizarEstado();
-                rStock.Modify();
-            until rStock.Next() = 0;
 
         if not prm_SoloDiferencias then
             exit;
@@ -121,7 +116,6 @@ codeunit 51103 "Consulta Stock SGA"
     procedure RegularizarConciliacion(var prm_Fila: Record "Buffer Conciliacion SGA"): Boolean
     var
         rConfig: Record "Config. SGA";
-        rBuffer: Record "Buffer Conciliacion SGA";
         cContenido: Codeunit "Gestion Contenido SGA";
         LineaYaCuadraMsg: Label 'Esta línea ya cuadra.';
         UbicAjustesSinConfigurarErr: Label 'Debe configurar la ubicación de ajustes en la configuración de SGA.';
@@ -150,16 +144,14 @@ codeunit 51103 "Consulta Stock SGA"
         // El stock que BC tiene y SGA no aparece en la ubicación de ajustes hasta que
         // alguien lo coloque físicamente donde le corresponde.
         if cContenido.RegistrarAjuste(prm_Fila."Cod. Almacen", rConfig."Ubic. Ajustes", prm_Fila."No. Producto",
-                                      prm_Fila."Cod. Variante", prm_Fila."No. Lote", prm_Fila."Unidad Medida Base",
+                                      prm_Fila."Cod. Variante", prm_Fila."No. Lote", '', prm_Fila."Unidad Medida Base",
                                       prm_Fila.Diferencia, RegularizacionConciliacionLbl) = 0
         then
             exit(false);
 
-        if rBuffer.Get(prm_Fila."Cod. Usuario", prm_Fila."No. Producto", prm_Fila."Cod. Variante", prm_Fila."Cod. Almacen", prm_Fila."No. Lote") then begin
-            rBuffer."Stock SGA" := rBuffer."Stock BC";
-            rBuffer.ActualizarEstado();
-            rBuffer.Modify();
-        end;
+        prm_Fila."Stock SGA" := prm_Fila."Stock BC";
+        prm_Fila.CalcularDiferencia();
+        prm_Fila.Modify();
 
         exit(true);
     end;
@@ -173,6 +165,7 @@ codeunit 51103 "Consulta Stock SGA"
         if rStock.Get(usuario, prm_Producto, prm_Variante, prm_Almacen, prm_Lote) then begin
             rStock."Stock BC" := rStock."Stock BC" + prm_StockBC;
             rStock."Stock SGA" := rStock."Stock SGA" + prm_StockSGA;
+            rStock.CalcularDiferencia();
             rStock.Modify();
             exit;
         end;
@@ -186,6 +179,7 @@ codeunit 51103 "Consulta Stock SGA"
         rStock."Unidad Medida Base" := prm_UMBase;
         rStock."Stock BC" := prm_StockBC;
         rStock."Stock SGA" := prm_StockSGA;
+        rStock.CalcularDiferencia();
         rStock.Insert();
     end;
 
@@ -267,7 +261,7 @@ codeunit 51103 "Consulta Stock SGA"
 
             if productoCuenta then begin
                 prm_Pendiente := TempStock;
-                prm_Pendiente.ActualizarEstado();
+                prm_Pendiente.CalcularDiferencia();
                 if prm_Pendiente.Diferencia > 0 then begin
                     prm_Pendiente."Fecha Caducidad" := CaducidadLote(producto, TempStock."Cod. Variante", TempStock."No. Lote");
 

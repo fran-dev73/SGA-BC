@@ -94,9 +94,6 @@ report 51103 "Conciliacion SGA vs Stock"
     begin
         cStock.ClasificarYFiltrar(rBuffer, blnSoloDiferencias);
 
-        rBuffer.Reset();
-        rBuffer.FiltrarUsuarioActual();
-
         if rBuffer.IsEmpty() then begin
             if GuiAllowed() then
                 Message(SinDiferenciasMsg, ProductosRevisados);

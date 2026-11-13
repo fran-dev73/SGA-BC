@@ -25,32 +25,32 @@ codeunit 51113 "Reubicaciones SGA"
     Access = Public;
 
     trigger OnRun()
-    var
-        rConfig: Record "Config. SGA";
     begin
-        rConfig.ObtenerConfig();
-        PlanificarAlmacen(rConfig."Almacen por Defecto");
+        PlanificarAlmacen();
     end;
 
     /// <summary>
-    /// Planifica las reubicaciones de un almacén: una por cada producto (y variante) con stock
-    /// disponible en almacenamiento y nada en picking que no tenga ya una pendiente. Devuelve
-    /// cuántas ha planificado.
+    /// Planifica las reubicaciones del almacén por defecto de la configuración: una por cada
+    /// producto (y variante) con stock disponible en almacenamiento y nada en picking que no
+    /// tenga ya una pendiente. Devuelve cuántas ha planificado.
     /// </summary>
-    procedure PlanificarAlmacen(prm_Almacen: Code[10]) planificadas: Integer
+    procedure PlanificarAlmacen() planificadas: Integer
     var
+        rConfig: Record "Config. SGA";
         rContenido: Record "Contenido Ubicacion SGA";
         enPicking: List of [Text];
         vistos: List of [Text];
         clave: Text;
-        AlmacenObligatorioErr: Label 'Indique el almacén, o póngalo como almacén por defecto en la configuración de SGA.';
+        almacen: Code[10];
+        AlmacenObligatorioErr: Label 'Ponga el almacén por defecto en la configuración de SGA.';
     begin
-        if prm_Almacen = '' then
+        almacen := rConfig.AlmacenODefecto('');
+        if almacen = '' then
             Error(AlmacenObligatorioErr);
 
         // Una pasada por el contenido del almacén para saber qué está ya en picking, y otra por
         // lo que hay en almacenamiento: así no se consulta producto a producto.
-        rContenido.SetRange("Cod. Almacen", prm_Almacen);
+        rContenido.SetRange("Cod. Almacen", almacen);
         rContenido.SetRange("Tipo Ubicacion", rContenido."Tipo Ubicacion"::Picking);
         rContenido.SetLoadFields("No. Producto", "Cod. Variante");
         if rContenido.FindSet() then
@@ -68,7 +68,7 @@ codeunit 51113 "Reubicaciones SGA"
                 clave := ClaveProducto(rContenido."No. Producto", rContenido."Cod. Variante");
                 if not enPicking.Contains(clave) and not vistos.Contains(clave) then begin
                     vistos.Add(clave);
-                    if Planificar(prm_Almacen, rContenido."No. Producto", rContenido."Cod. Variante", '') then
+                    if Planificar(almacen, rContenido."No. Producto", rContenido."Cod. Variante", '') then
                         planificadas += 1;
                 end;
             until rContenido.Next() = 0;
@@ -94,7 +94,7 @@ codeunit 51113 "Reubicaciones SGA"
         rContenido.SetRange("Cod. Bin", prm_Ubicacion);
         rContenido.SetRange("No. Producto", prm_Producto);
         rContenido.SetRange("Cod. Variante", prm_Variante);
-        rContenido.SetFilter(Cantidad, '>%1', 0);
+        rContenido.SetFilter("Cantidad Base", '>%1', 0);
         if not rContenido.IsEmpty() then
             exit;
 
@@ -160,11 +160,7 @@ codeunit 51113 "Reubicaciones SGA"
     begin
         rConfig.ObtenerConfig();
         prm_Contenido.Reset();
-        prm_Contenido.SetRange("Cod. Almacen", prm_Almacen);
-        prm_Contenido.SetRange("No. Producto", prm_Producto);
-        prm_Contenido.SetRange("Cod. Variante", prm_Variante);
-        prm_Contenido.SetRange(Bloqueado, false);
-        prm_Contenido.SetFilter("Cantidad Disponible", '>%1', 0);
+        prm_Contenido.FiltrarDisponible(prm_Almacen, prm_Producto, prm_Variante);
         prm_Contenido.SetRange("Tipo Ubicacion", prm_Contenido."Tipo Ubicacion"::Almacenamiento);
         cPicking.OrdenarPorEstrategia(prm_Contenido, rConfig."Estrategia Picking");
         exit(prm_Contenido.FindFirst());

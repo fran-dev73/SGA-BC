@@ -49,6 +49,10 @@ page 51132 "Reubicaciones SGA"
                 {
                     ToolTip = 'Lote que se lleva.';
                 }
+                field(SSCC; Rec.SSCC)
+                {
+                    ToolTip = 'Palé (SSCC) que se lleva.';
+                }
                 field("Cod. Bin Propuesto"; Rec."Cod. Bin Propuesto")
                 {
                     Caption = 'Desde';
@@ -104,12 +108,10 @@ page 51132 "Reubicaciones SGA"
 
                 trigger OnAction()
                 var
-                    rConfig: Record "Config. SGA";
                     cReubicaciones: Codeunit "Reubicaciones SGA";
                     PlanificadasMsg: Label 'Reubicaciones planificadas: %1.', Comment = '%1 = número';
                 begin
-                    rConfig.ObtenerConfig();
-                    Message(PlanificadasMsg, cReubicaciones.PlanificarAlmacen(rConfig."Almacen por Defecto"));
+                    Message(PlanificadasMsg, cReubicaciones.PlanificarAlmacen());
                     CurrPage.Update(false);
                 end;
             }
@@ -124,7 +126,8 @@ page 51132 "Reubicaciones SGA"
                     rOrden: Record "Orden Picking SGA";
                     cPicking: Codeunit "Gestion Picking SGA";
                 begin
-                    rOrden.Get(Rec."No. Orden");
+                    // AbrirPreparacion lee la orden al día: basta con su número.
+                    rOrden."No. Orden" := Rec."No. Orden";
                     cPicking.AbrirPreparacion(rOrden);
                 end;
             }

@@ -79,6 +79,10 @@ page 51104 "Movs. Ubicacion SGA"
                     ToolTip = 'Lote movido.';
                     ApplicationArea = All;
                 }
+                field(SSCC; Rec.SSCC)
+                {
+                    ApplicationArea = All;
+                }
                 field(Cantidad; Rec.Cantidad)
                 {
                     ToolTip = 'Cantidad en la unidad de medida con la que trabajó el operario.';
@@ -98,12 +102,6 @@ page 51104 "Movs. Ubicacion SGA"
                 {
                     ToolTip = 'Documento que originó el movimiento.';
                     ApplicationArea = All;
-                }
-                field("No. Orden SGA"; Rec."No. Orden SGA")
-                {
-                    ToolTip = 'Orden de trabajo de almacén que originó el movimiento.';
-                    ApplicationArea = All;
-                    Visible = false;
                 }
                 field("Cod. Usuario"; Rec."Cod. Usuario")
                 {

@@ -71,13 +71,6 @@ table 51107 "Buffer Conciliacion SGA"
             DecimalPlaces = 0 : 5;
             ToolTip = 'Stock BC menos stock SGA. Positivo: hay stock sin ubicar. Negativo: sobra en ubicaciones.';
         }
-        field(60; Estado; Option)
-        {
-            Caption = 'Estado';
-            DataClassification = ToBeClassified;
-            OptionMembers = Cuadra,"Sin Ubicar","Sobra en SGA";
-            OptionCaption = 'Cuadra,Sin ubicar,Sobra en SGA';
-        }
         field(70; "Unidad Medida Base"; Code[10])
         {
             Caption = 'Unidad medida base';
@@ -127,26 +120,14 @@ table 51107 "Buffer Conciliacion SGA"
         key(Diferencia; "Cod. Usuario", Diferencia)
         {
         }
-        key(Estado; "Cod. Usuario", Estado, "No. Producto")
-        {
-        }
     }
 
     /// <summary>
-    /// Calcula la diferencia y clasifica la fila.
+    /// Calcula la diferencia: positiva, stock sin ubicar; negativa, sobra en ubicaciones.
     /// </summary>
-    procedure ActualizarEstado()
+    procedure CalcularDiferencia()
     begin
         Diferencia := Round("Stock BC" - "Stock SGA", 0.00001);
-
-        case true of
-            Diferencia = 0:
-                Estado := Estado::Cuadra;
-            Diferencia > 0:
-                Estado := Estado::"Sin Ubicar";
-            else
-                Estado := Estado::"Sobra en SGA";
-        end;
     end;
 
     /// <summary>
@@ -159,20 +140,18 @@ table 51107 "Buffer Conciliacion SGA"
     end;
 
     /// <summary>
-    /// Expresión de estilo para la página de conciliación.
+    /// Expresión de estilo para la página de conciliación, según el signo de la diferencia.
     /// </summary>
     procedure EstiloConciliacion(): Text
     begin
-        case Estado of
-            Estado::Cuadra:
+        case true of
+            Diferencia = 0:
                 exit('Favorable');
-            Estado::"Sin Ubicar":
+            Diferencia > 0:
                 exit('Ambiguous');
-            Estado::"Sobra en SGA":
+            else
                 exit('Unfavorable');
         end;
-
-        exit('Standard');
     end;
 
     /// <summary>

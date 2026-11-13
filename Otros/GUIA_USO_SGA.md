@@ -28,7 +28,9 @@ lee solo su apartado. Cómo se configura todo está en el [manual de implantaci�
 2. En el pedido, pestaña **Almacén SGA**, pulsa **Enviar a SGA**.
 3. SGA reparte el pedido en **órdenes de picking de un palé como mucho**, porque solo se prepara un palé a la vez:
    - cada palé completo de una línea es una orden;
-   - las cajas y unidades sueltas de todas las líneas se juntan en órdenes que no pasan de un palé (½ palé de un producto y ¼ de otro van en la misma orden).
+   - las unidades sueltas de todas las líneas se juntan en órdenes que no pasan de un palé (½ palé de un producto y ¼ de otro van en la misma orden);
+   - los productos que se venden en **caja** (su unidad de venta) van aparte: una orden por producto, con como mucho el máximo de cajas de la configuración (*Máximo de cajas por orden*; 0 = sin límite).
+   - dentro de cada pedido se prepara primero lo de palé completo, luego las cajas y por último los sueltos. Entre las cajas, las de más volumen salen antes, para que queden abajo al apilar.
 
    Por ejemplo, 4 palés y 2 cajas son 5 órdenes.
 4. Busca de qué ubicación y lote coger cada cosa y lo **reserva**: otro pedido ya no lo ve disponible.
@@ -73,7 +75,7 @@ En **Asignar órdenes de picking SGA** salen las órdenes vivas con su cliente, 
 - Vistas **Sin asignar** y **Asignadas**.
 - **Asignar a**: da las seleccionadas a un preparador. También se puede teclear en *Asignada a*.
 - **Quitar asignación**: las devuelve a la bolsa. Una orden empezada se puede reasignar, pero no dejar sin nadie.
-- **Subir prioridad** / **Bajar prioridad**: cuanto mayor la *Prioridad*, antes sale.
+- **Subir prioridad** / **Bajar prioridad**: cuanto mayor la *Prioridad*, antes sale. La prioridad es del **pedido**: al cambiarla, cambian a la vez todas sus órdenes (palés, sueltos y cajas). Las de reubicación cambian solas.
 - **Ver orden** y **Ver pedido**.
 
 Si está activada *Exigir asignación de picking* (en la configuración):
@@ -140,7 +142,7 @@ Cada hueco tiene su etiqueta, y el picking lee en ella la ubicación de la que r
 2. También puedes ver **Mis órdenes**, las vistas *Pendientes* y *Sin asignar*, **Preparar** (una orden concreta) y **Asignármela**.
 3. En la pantalla **Preparar picking SGA** cada parada muestra:
    - **VAYA A**: la ubicación, en grande. En un pedido, al lado, **→ PLAYA** y la playa donde dejar lo recogido (la ubicación por defecto de la zona de playas). En una reubicación: **DE** origen **→ A** destino.
-   - **COJA**: la cantidad, en la unidad del pedido. Debajo, la descripción del producto y, en pequeño, su código, el lote, la caducidad y la cantidad en unidades base.
+   - **COJA**: la cantidad, en la unidad del pedido. Debajo, la descripción del producto y, en pequeño, su código, el lote, la caducidad, el palé (SSCC) y la cantidad en unidades base.
    - **CONFIRME**: las marcas de lo que falta (*Ubicación*, *Producto*). Rojo es pendiente; verde, hecho.
 4. Lee, en este orden, la **ubicación** de la etiqueta del hueco y, si se pide, el **producto** que coges. El cursor pasa solo a la casilla siguiente cuando la anterior está bien leída (se pone en verde). Cada lectura puede ser un escaneo o teclearse: toca la casilla que toca y escribe.
 5. Si coges otra cantidad, cámbiala con **−** y **+** o tecleándola.
@@ -157,13 +159,14 @@ Si recoges de otro hueco, avisa: que lo admita depende de la configuración de d
 
 **El producto se reconoce** por su código de barras, su GTIN o su nº de producto, y también por una etiqueta GS1-128 con (01) o (02). Si la etiqueta trae el lote (10), tiene que ser el de la parada.
 
+**El palé no se lee.** Se da por bueno que lo que coges es del palé de la parada; si coges de otro hueco, del palé de ese hueco. El SSCC sirve para saber dónde está cada palé, no para el picking.
+
 **De dónde se recoge.** La orden se arma en tres pasadas: primero **palés completos** de almacenamiento, luego **picking**, y lo que falte del resto de almacenamiento. Dentro de cada pasada manda la estrategia de picking de la configuración:
 
 | Estrategia picking | Qué se coge antes |
 |---|---|
 | **FIFO** (por defecto) | Lo que entró antes |
 | **FEFO** | Lo que caduca antes |
-| **Lote exacto** | Como FEFO; la parada dice el lote concreto |
 | **Vaciar ubicación** | Por orden de código de ubicación, para ir dejando huecos vacíos |
 
 ### Con la PDA (terminal de mano)
@@ -221,6 +224,8 @@ Hace falta stock disponible en almacenamiento; si no hay, no se crea. Trae como 
 
 Lo que entra por compra o por producción se ubica después de registrarlo. En todas las pantallas es igual: **proponer**, dejar la mercancía, corregir la *Ubicación confirmada* si se ha dejado en otro hueco, y **confirmar**. Una cantidad se reparte en palés completos por separado y un resto, en cajas o en botellas.
 
+**Cada palé lleva su SSCC**, el código de su etiqueta. Al ubicar, lee la etiqueta del palé en la columna *SSCC* (vale la lectura entera del código de barras o teclear los 18 dígitos). Si el palé no trae etiqueta, deja *SSCC* en blanco: al confirmar se le da uno nuevo, que queda en la línea. Las cajas sueltas de un palé llevan el SSCC de su palé, también cuando se llevan a otro hueco.
+
 **Dónde busca:** primero en las ubicaciones de almacenamiento y, si ninguna sirve, en las de picking. Las que no tienen tipo, nunca.
 
 ### Cómo se elige el hueco
@@ -269,7 +274,8 @@ Lo que ha entrado en albaranes de compra registrados.
 
 1. Ajusta los filtros: *Registrado desde / hasta*, *Clase de artículo* (por defecto *Prod. externo*; *Todas* para no filtrar), *Producto*, *Almacén* y *Solo lo que falta por ubicar*.
 2. **Proponer ubicaciones**: reparte las líneas sin dar el mismo hueco a dos. **Otra ubicación** si no te convence.
-3. **Confirmar esta línea** o **Confirmar todo**. Se puede ubicar una línea en varias veces bajando *A ubicar*.
+3. Se ubica **de palé en palé**: *A ubicar* es lo que queda, sin pasar de un palé. Lee el *SSCC* del palé y pulsa **Confirmar esta línea** o **Confirmar todo** (un palé de cada línea). Si el palé viene incompleto, baja *A ubicar*.
+4. Si a la línea le quedan más palés, se queda sin hueco: pulsa otra vez **Proponer ubicaciones** para el siguiente.
 
 ### Ubicar ensamblados
 
@@ -282,18 +288,18 @@ Cada etiqueta que se imprime en la línea deja el palé ubicado.
 1. Elige la tarea que está en línea.
 2. En **Siguiente palé** ves la *Ubicación*, *Por qué ahí* y la *Situación* (palé completo o último palé).
 3. **Proponer ubicación** u **Otra ubicación**; si lo dejas en otro hueco, escríbelo en *Ubicación*.
-4. **Imprimir y ubicar**: sale la etiqueta y el palé queda ubicado.
+4. **Imprimir y ubicar**: sale la etiqueta y el palé queda ubicado con el mismo SSCC que lleva la etiqueta. En el entorno de pruebas (Sandbox), la etiqueta A5 lleva un SSCC distinto del ubicado.
 
 ### Ubicar producto
 
-Para una cosa suelta. Indica producto, lote, caducidad y cantidad, o pulsa **Ubicar todo lo pendiente**. **Proponer ubicación** llena la tabla **Dónde dejarlo**: una línea por palé y una por el resto. Luego **Confirmar todo** o **Confirmar esta línea**.
+Para una cosa suelta. Indica producto, lote, caducidad y cantidad, o pulsa **Ubicar todo lo pendiente**. **Proponer ubicación** llena la tabla **Dónde dejarlo**: una línea por palé y una por el resto. Lee en cada línea el *SSCC* de su palé (en blanco, se le da uno nuevo). Luego **Confirmar todo** o **Confirmar esta línea**.
 
 ### Pendiente de ubicar
 
 El stock que no está en ninguna ubicación, lote a lote: *Sin ubicar* = *Stock BC* − *Ubicado*. Lo que sale en *En recepciones o ensamblados* se ubica desde esas pantallas. El resto:
 
 - **Ubicar**: abre *Ubicar producto* con todo puesto.
-- **Ubicar seleccionadas**: busca hueco para varias líneas a la vez, con opción de simular.
+- **Ubicar seleccionadas**: busca hueco para varias líneas a la vez, con opción de simular. Lo ubicado así no lleva SSCC.
 
 ---
 
@@ -302,6 +308,8 @@ El stock que no está en ninguna ubicación, lote a lote: *Sin ubicar* = *Stock 
 ### ¿Dónde está el producto?
 
 Escribe el *Producto* (y, si quieres, *Almacén* y *Lote*). Salen todas las ubicaciones donde está, por caducidad. *Solo con cantidad disponible* oculta lo bloqueado y lo reservado. También desde la ficha o la lista de productos: grupo **SGA** > **¿Dónde está?**
+
+**Un palé concreto:** lee su etiqueta (o teclea los 18 dígitos) en *SSCC*. Salen las ubicaciones en las que está: el palé y, si se ha partido, sus cajas en otros huecos.
 
 ### Ubicaciones SGA
 
@@ -313,7 +321,7 @@ La lista de huecos con su estado y su ocupación, coloreada: gris vacía, verde 
 
 ### Contenido de ubicaciones
 
-Qué producto y lote hay en cada hueco. Vistas **Bloqueado** y **Con reserva**.
+Qué producto, lote y palé (SSCC) hay en cada hueco: una línea por palé. Vistas **Bloqueado** y **Con reserva**. **Movimientos del palé** enseña la historia del SSCC de la línea.
 
 - **Trasladar**: a otra ubicación. Si eliges *Zona destino*, propone un hueco de esa zona y dice por qué.
 - **Bloquear / desbloquear** una línea (por ejemplo, un lote en cuarentena).
@@ -327,7 +335,7 @@ Una rejilla por *Almacén* y *Pasillo*: una fila por altura y una columna por es
 ### Mapa 3D de almacén
 
 - Arriba, *Almacén*, *Zona* y *Pasillo*. En el lienzo, tres vistas: **3D**, **Planta** y **Frente** (un pasillo de frente, la de trabajo).
-- **Colorear por**: *Estado*, *Rotación ABC* o *Caducidad*. Por estado, las reservadas para una entrada salen en turquesa, y al pasar por encima dice para qué entrada y de quién. **Buscar**: un producto o una ubicación; las que coinciden se marcan en naranja.
+- **Colorear por**: *Estado*, *Posición ABC* (la clase de cada hueco por su altura y su sitio en el recorrido, del último análisis ABC; se pintan también los vacíos), *Rotación ABC* (la clase del producto que hay dentro) o *Caducidad*. Desde el análisis ABC, **Ver en el mapa** lo abre por *Posición ABC* con el producto de la línea buscado. Por estado, las reservadas para una entrada salen en turquesa, y al pasar por encima dice para qué entrada y de quién. **Buscar**: un producto o una ubicación; las que coinciden se marcan en naranja.
 - Ratón: pasar por encima enseña lo que hay; clic abre el contenido; doble clic aísla el pasillo; **clic derecho vacía** la ubicación; **arrastrar** una ubicación con contenido sobre otra la traslada, solo dentro de la misma zona.
 
 ### Movimientos de ubicación
@@ -338,7 +346,7 @@ El diario de todo: quién movió qué, cuándo y de dónde a dónde. Vistas **Tr
 
 1. Menú *Informes* > **Conciliar con el stock**: elige *Almacén* y *Mostrar solo diferencias*.
 2. El último resultado se vuelve a abrir en *Consultas* > **Conciliación con el stock**. Vistas **Stock sin ubicar** (BC tiene más que las ubicaciones) y **Sobra en ubicaciones** (las ubicaciones tienen más que BC).
-3. Lo que falta, mejor ubicarlo en su sitio. Si no, **Regularizar en ubicación de ajustes** lo deja en la ubicación de ajustes. Lo que sobra no se regulariza: se recuenta. **Volver a conciliar** para comprobar.
+3. Lo que falta, mejor ubicarlo en su sitio. Si no, **Regularizar en ubicación de ajustes** lo deja en la ubicación de ajustes, sin SSCC: es una diferencia, no un palé. Lo que sobra no se regulariza: se recuenta. **Volver a conciliar** para comprobar.
 
 Lánzala al final del día o cuando alguien no encuentre un producto.
 

@@ -197,14 +197,8 @@ page 51124 "Asignar Ordenes Picking SGA"
                 ToolTip = 'Abre el pedido de venta de la orden.';
                 ApplicationArea = All;
                 Image = Order;
-
-                trigger OnAction()
-                var
-                    rCabVenta: Record "Sales Header";
-                begin
-                    if rCabVenta.Get(rCabVenta."Document Type"::Order, Rec."No. Documento Origen") then
-                        Page.Run(Page::"Sales Order", rCabVenta);
-                end;
+                RunObject = page "Sales Order";
+                RunPageLink = "Document Type" = const(Order), "No." = field("No. Documento Origen");
             }
         }
         area(Promoted)

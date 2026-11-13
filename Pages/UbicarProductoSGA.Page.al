@@ -100,12 +100,6 @@ page 51117 "Ubicar Producto SGA"
                         LimpiarPropuesta();
                     end;
                 }
-                field(Caducidad; Caducidad)
-                {
-                    Caption = 'Fecha caducidad';
-                    ToolTip = 'Fecha de caducidad del lote. Es la que ordena las salidas por FEFO.';
-                    ApplicationArea = All;
-                }
                 field(UM; UM)
                 {
                     Caption = 'Unidad de medida';
@@ -265,14 +259,12 @@ page 51117 "Ubicar Producto SGA"
 
                 trigger OnAction()
                 var
-                    rContenido: Record "Contenido Ubicacion SGA";
+                    cContenido: Codeunit "Gestion Contenido SGA";
                 begin
                     TempPlan.Reset();
                     if not TempPlan.Get(CurrPage.Plan.Page.LineaActual()) then
                         exit;
-                    rContenido.SetRange("Cod. Almacen", Almacen);
-                    rContenido.SetRange("Cod. Bin", TempPlan."Ubicacion Confirmada");
-                    Page.Run(Page::"Contenido Ubicaciones SGA", rContenido);
+                    cContenido.MostrarContenidoUbicacion(Almacen, TempPlan."Ubicacion Confirmada");
                 end;
             }
         }
@@ -307,7 +299,6 @@ page 51117 "Ubicar Producto SGA"
         DescripcionProducto: Text[100];
         Variante: Code[10];
         Lote: Code[50];
-        Caducidad: Date;
         UM: Code[10];
         Cantidad: Decimal;
         PendienteUbicar: Decimal;
@@ -338,13 +329,12 @@ page 51117 "Ubicar Producto SGA"
     /// Abre la página con lo que hay que ubicar ya indicado: almacén, producto, variante, lote,
     /// caducidad y cantidad en unidad base. El operario solo tiene que pulsar "Proponer".
     /// </summary>
-    procedure Preparar(prm_Almacen: Code[10]; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50]; prm_Caducidad: Date; prm_CantidadBase: Decimal)
+    procedure Preparar(prm_Almacen: Code[10]; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50]; prm_CantidadBase: Decimal)
     begin
         Almacen := prm_Almacen;
         Producto := prm_Producto;
         Variante := prm_Variante;
         Lote := prm_Lote;
-        Caducidad := prm_Caducidad;
         CantidadPreparada := prm_CantidadBase;
         Preparada := true;
     end;

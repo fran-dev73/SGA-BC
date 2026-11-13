@@ -130,6 +130,40 @@ codeunit 51108 "Unidades Producto SGA"
     end;
 
     /// <summary>
+    /// Si la unidad de medida es la caja de venta del producto: la de venta de la ficha, con más
+    /// de una unidad base y menos que el palé. Es lo que decide que una línea se prepare por cajas.
+    /// </summary>
+    procedure EsCaja(prm_Producto: Code[20]; prm_UM: Code[10]): Boolean
+    var
+        rItem: Record Item;
+        factorCaja: Decimal;
+    begin
+        if prm_UM = '' then
+            exit(false);
+        rItem.SetLoadFields("Sales Unit of Measure");
+        if not rItem.Get(prm_Producto) then
+            exit(false);
+        if rItem."Sales Unit of Measure" <> prm_UM then
+            exit(false);
+        factorCaja := FactorUM(prm_Producto, prm_UM);
+        exit((factorCaja > 1) and (factorCaja < FactorPale(prm_Producto)));
+    end;
+
+    /// <summary>
+    /// Volumen en litros de una unidad de medida del producto: el volumen de la ficha (por unidad
+    /// base) por las unidades base que lleva.
+    /// </summary>
+    procedure VolumenUM(prm_Producto: Code[20]; prm_UM: Code[10]): Decimal
+    var
+        rItem: Record Item;
+    begin
+        rItem.SetLoadFields("Unit Volume");
+        if not rItem.Get(prm_Producto) then
+            exit(0);
+        exit(rItem."Unit Volume" * FactorUM(prm_Producto, prm_UM));
+    end;
+
+    /// <summary>
     /// Una cantidad base de un producto, en palés de ese producto (medio palé = 0,5). Sin palé,
     /// en unidades base. Sin redondear. Es la medida de la capacidad de una ubicación.
     /// </summary>

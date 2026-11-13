@@ -38,6 +38,11 @@ page 51130 "Plan Ubicacion SGA Subpag"
                     Editable = false;
                     ToolTip = 'Unidad en la que se ubica: palé, unidad de venta o unidad base.';
                 }
+                field(SSCC; Rec.SSCC)
+                {
+                    ApplicationArea = All;
+                    Editable = Rec.Estado <> Rec.Estado::Ubicado;
+                }
                 field("Ubicacion Propuesta"; Rec."Ubicacion Propuesta")
                 {
                     ApplicationArea = All;

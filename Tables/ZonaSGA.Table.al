@@ -46,17 +46,11 @@ table 51100 "Zona SGA"
             DataClassification = ToBeClassified;
             ToolTip = 'Grupo IIEE de los productos que se guardan en esta zona. Al ubicar un producto de ese grupo se buscan primero huecos en sus zonas y, si no queda sitio, en el resto del almacén. La zona sigue admitiendo cualquier producto. Un grupo puede tener varias zonas. Requiere "Campo del grupo IIEE en el producto" en la configuración SGA.';
         }
-        field(60; "Prioridad Ubicacion"; Integer)
-        {
-            Caption = 'Prioridad ubicación';
-            DataClassification = ToBeClassified;
-            ToolTip = 'Orden en que el motor de ubicación considera esta zona. Menor valor, antes.';
-        }
         field(70; "Prioridad Picking"; Integer)
         {
             Caption = 'Prioridad picking';
             DataClassification = ToBeClassified;
-            ToolTip = 'Orden en que el motor de picking considera esta zona. Menor valor, antes.';
+            ToolTip = 'Secuencia de picking que toma una ubicación al asignarle esta zona, si aún no tiene la suya. Menor valor, antes en el recorrido.';
         }
         field(90; Bloqueada; Boolean)
         {
@@ -107,12 +101,6 @@ table 51100 "Zona SGA"
         key(PK; "Cod. Almacen", Code)
         {
             Clustered = true;
-        }
-        key(Ubicar; "Cod. Almacen", Bloqueada, "Prioridad Ubicacion")
-        {
-        }
-        key(Recoger; "Cod. Almacen", Bloqueada, "Prioridad Picking")
-        {
         }
     }
 

@@ -32,20 +32,6 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     end;
 
     /// <summary>
-    /// Obtiene o crea una ubicación SGA para un Bin dado.
-    /// </summary>
-    procedure ObtenerOCrear(prm_Almacen: Code[10]; prm_Bin: Code[20]): Code[20]
-    var
-        rUbicacionSGA: Record "Ubicacion SGA";
-    begin
-        if rUbicacionSGA.Get(prm_Almacen, prm_Bin) then
-            exit(prm_Bin);
-
-        SincronizarTopologia(prm_Almacen);
-        exit(prm_Bin);
-    end;
-
-    /// <summary>
     /// Sincroniza la topología estándar (tabla Bin) con SGA, creando filas en
     /// "Ubicacion SGA" para los Bins que aún no las tienen.
     /// </summary>
@@ -139,8 +125,7 @@ codeunit 51101 "Gestion Ubicaciones SGA"
                     rUbicacionSGA.Validate("Tipo Ubicacion", TempPlantilla."Tipo Ubicacion");
                 if prm_CambiarZona then
                     rUbicacionSGA."Cod. Zona SGA" := TempPlantilla."Cod. Zona SGA";
-                // Con capacidad nueva, el % de ocupación y el estado cambian.
-                rUbicacionSGA.RecalcularOcupacion();
+                // La ocupación la recalcula la validación de "Capacidad Uds."; vacía, nada más la cambia.
                 rUbicacionSGA.Modify(true);
                 hechas += 1;
             end else begin
@@ -395,7 +380,7 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     /// Formatea un entero a prm_Digitos cifras con ceros a la izquierda. No se usa PadStr porque
     /// en AL rellena por la derecha: PadStr('5', 2, '0') devuelve '50', no '05'.
     /// </summary>
-    local procedure ConCeros(prm_Valor: Integer; prm_Digitos: Integer): Text
+    procedure ConCeros(prm_Valor: Integer; prm_Digitos: Integer): Text
     var
         texto: Text;
     begin
@@ -449,10 +434,9 @@ codeunit 51101 "Gestion Ubicaciones SGA"
         if ZonaDestino = '' then
             ZonasGrupo := ZonasGrupoIIEE(prm_Almacen, prm_Producto, grupo);
 
-        if ZonasGrupo.Count() = 0 then
-            codigo := ProponerPorTipos(prm_Estrategia, prm_Excluidas, prm_Almacen, prm_Producto, prm_Variante, prm_Lote, entrada, prm_Motivo)
-        else begin
-            codigo := ProponerPorTipos(prm_Estrategia, prm_Excluidas, prm_Almacen, prm_Producto, prm_Variante, prm_Lote, entrada, prm_Motivo);
+        // Con zonas de su grupo IIEE, primero en ellas; si no cabe, en el resto del almacén.
+        codigo := ProponerPorTipos(prm_Estrategia, prm_Excluidas, prm_Almacen, prm_Producto, prm_Variante, prm_Lote, entrada, prm_Motivo);
+        if ZonasGrupo.Count() > 0 then begin
             Clear(ZonasGrupo);
             if codigo <> '' then
                 prm_Motivo := StrSubstNo(ZonaGrupoTxt, grupo, prm_Motivo)
@@ -724,6 +708,7 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     /// confirmada y no estén ya ubicadas (prm_Linea = 0), o solo esa línea. Primero comprueba
     /// todas y luego registra, para no dejar el reparto a medias por un error en una línea.
     /// Aplica "Exigir confirmar ubicación" y "Permitir desvío ubicación" de la configuración.
+    /// Cada línea entra con el SSCC leído de su palé o, si no se ha leído, con uno nuevo.
     /// Devuelve lo que queda sin ubicar del reparto, en unidad base.
     /// </summary>
     procedure ConfirmarReparto(var TempLinea: Record "Linea Ubicacion SGA" temporary; prm_Linea: Integer; prm_Almacen: Code[10]; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50]): Decimal
@@ -768,8 +753,9 @@ codeunit 51101 "Gestion Ubicaciones SGA"
         TempLinea.Reset();
         foreach n in lineas do begin
             TempLinea.Get(n);
+            // El palé sin etiqueta recibe un SSCC nuevo, que queda en la línea para verlo.
             cContenido.RegistrarEntrada(prm_Almacen, TempLinea."Ubicacion Confirmada", prm_Producto, prm_Variante, prm_Lote,
-                                        TempLinea."Cod. Unidad Medida", TempLinea.Cantidad, "Origen Mov. SGA"::Manual, '', 0, UbicadoGuiadoLbl);
+                                        TempLinea.SSCCPale(), TempLinea."Cod. Unidad Medida", TempLinea.Cantidad, "Origen Mov. SGA"::Manual, '', 0, UbicadoGuiadoLbl);
             TempLinea.Estado := TempLinea.Estado::Ubicado;
             TempLinea.Motivo := '';
             TempLinea.Modify();
@@ -898,7 +884,7 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     local procedure BuscarFija(prm_Almacen: Code[10]; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_Tipo: Enum "Tipo Ubicacion SGA"; prm_Entrada: Decimal; prm_Excluidas: Text): Code[20]
     var
         rUbicacionSGA: Record "Ubicacion SGA";
-        rItem: Record Item;
+        estanteria: Code[20];
     begin
         FiltrarCandidatas(rUbicacionSGA, prm_Almacen, prm_Tipo, prm_Excluidas);
         rUbicacionSGA.SetRange("Producto Fijo", prm_Producto);
@@ -908,13 +894,10 @@ codeunit 51101 "Gestion Ubicaciones SGA"
                     exit(rUbicacionSGA."Cod. Bin");
             until rUbicacionSGA.Next() = 0;
 
-        rItem.SetLoadFields("Shelf No.");
-        if not rItem.Get(prm_Producto) then
+        estanteria := EstanteriaProducto(prm_Almacen, prm_Producto);
+        if estanteria = '' then
             exit('');
-        if rItem."Shelf No." = '' then
-            exit('');
-        if not rUbicacionSGA.Get(prm_Almacen, rItem."Shelf No.") then
-            exit('');
+        rUbicacionSGA.Get(prm_Almacen, estanteria);
         if EstaExcluida(prm_Almacen, rUbicacionSGA."Cod. Bin", prm_Excluidas) then
             exit('');
         if not UbicacionAdmite(rUbicacionSGA, prm_Producto, prm_Lote, prm_Tipo, prm_Entrada) then
@@ -1116,6 +1099,7 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     var
         rContenido: Record "Contenido Ubicacion SGA";
         rUbicacionSGA: Record "Ubicacion SGA";
+        vistas: List of [Code[20]];
         mejorSecuencia: Integer;
         mejorCodigo: Code[20];
     begin
@@ -1129,7 +1113,10 @@ codeunit 51101 "Gestion Ubicaciones SGA"
         mejorCodigo := '';
         mejorSecuencia := 0;
         repeat
-            if not EstaExcluida(prm_Almacen, rContenido."Cod. Bin", prm_Excluidas) then
+            // Hay una línea por lote y palé: cada ubicación se evalúa una sola vez.
+            if not vistas.Contains(rContenido."Cod. Bin") then begin
+                vistas.Add(rContenido."Cod. Bin");
+                if not EstaExcluida(prm_Almacen, rContenido."Cod. Bin", prm_Excluidas) then
                 if rUbicacionSGA.Get(prm_Almacen, rContenido."Cod. Bin") then
                     // MotivoRechazo descarta las de otro tipo.
                     if UbicacionAdmite(rUbicacionSGA, prm_Producto, prm_Lote, prm_Tipo, prm_Entrada) then
@@ -1137,6 +1124,7 @@ codeunit 51101 "Gestion Ubicaciones SGA"
                             mejorSecuencia := rUbicacionSGA."Secuencia Picking";
                             mejorCodigo := rUbicacionSGA."Cod. Bin";
                         end;
+            end;
         until rContenido.Next() = 0;
 
         exit(mejorCodigo);
@@ -1289,23 +1277,37 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     end;
 
     /// <summary>
-    /// Ubicación fija de un producto: primero comprueba el campo "Producto Fijo" en UbicacionSGA,
-    /// luego el "Shelf No." en la ficha de Item.
+    /// Casa declarada de un producto en un almacén, sin mirar si cabe: la primera ubicación con
+    /// él como "Producto Fijo" y, si no hay, la "Shelf No." de su ficha si existe en SGA.
     /// </summary>
-    procedure UbicacionFijaProducto(prm_Producto: Code[20]): Code[20]
+    procedure UbicacionFijaProducto(prm_Almacen: Code[10]; prm_Producto: Code[20]): Code[20]
+    var
+        rUbicacionSGA: Record "Ubicacion SGA";
+    begin
+        rUbicacionSGA.SetRange("Cod. Almacen", prm_Almacen);
+        rUbicacionSGA.SetRange("Producto Fijo", prm_Producto);
+        rUbicacionSGA.SetLoadFields("Cod. Bin");
+        if rUbicacionSGA.FindFirst() then
+            exit(rUbicacionSGA."Cod. Bin");
+        exit(EstanteriaProducto(prm_Almacen, prm_Producto));
+    end;
+
+    /// <summary>
+    /// La "Shelf No." de la ficha del producto, si es una ubicación de SGA de ese almacén.
+    /// </summary>
+    local procedure EstanteriaProducto(prm_Almacen: Code[10]; prm_Producto: Code[20]): Code[20]
     var
         rItem: Record Item;
         rUbicacionSGA: Record "Ubicacion SGA";
     begin
-        rUbicacionSGA.SetRange("Producto Fijo", prm_Producto);
-        if rUbicacionSGA.FindFirst() then
-            exit(rUbicacionSGA."Cod. Bin");
-
-        if rItem.Get(prm_Producto) then
-            if rItem."Shelf No." <> '' then
-                exit(rItem."Shelf No.");
-
-        exit('');
+        rItem.SetLoadFields("Shelf No.");
+        if not rItem.Get(prm_Producto) then
+            exit('');
+        if rItem."Shelf No." = '' then
+            exit('');
+        if not rUbicacionSGA.Get(prm_Almacen, rItem."Shelf No.") then
+            exit('');
+        exit(rItem."Shelf No.");
     end;
 
     /// <summary>

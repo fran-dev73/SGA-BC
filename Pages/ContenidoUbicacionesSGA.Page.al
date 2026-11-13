@@ -65,9 +65,13 @@ page 51103 "Contenido Ubicaciones SGA"
                     ToolTip = 'Lote al que corresponde la cantidad.';
                     ApplicationArea = All;
                 }
+                field(SSCC; Rec.SSCC)
+                {
+                    ApplicationArea = All;
+                }
                 field("Cantidad Base"; Rec."Cantidad Base")
                 {
-                    ToolTip = 'Unidades base que hay de este producto y lote en la ubicación.';
+                    ToolTip = 'Unidades base que hay de este producto, lote y palé en la ubicación.';
                     ApplicationArea = All;
                 }
                 field("Cantidad Reservada"; Rec."Cantidad Reservada")
@@ -138,8 +142,12 @@ page 51103 "Contenido Ubicaciones SGA"
                 Image = TransferOrder;
 
                 trigger OnAction()
+                var
+                    cContenido: Codeunit "Gestion Contenido SGA";
+                    destino: Code[20];
                 begin
-                    TrasladarContenido();
+                    if cContenido.TrasladarConDialogo(Rec, destino, '', false) <> 0 then
+                        CurrPage.Update(false);
                 end;
             }
             action(AlternarBloqueo)
@@ -150,8 +158,11 @@ page 51103 "Contenido Ubicaciones SGA"
                 Image = Lock;
 
                 trigger OnAction()
+                var
+                    cContenido: Codeunit "Gestion Contenido SGA";
                 begin
-                    AlternarBloqueoContenido();
+                    cContenido.AlternarBloqueo(Rec);
+                    CurrPage.Update(false);
                 end;
             }
             action(Recontar)
@@ -201,6 +212,15 @@ page 51103 "Contenido Ubicaciones SGA"
                 RunPageLink = "No. Producto" = field("No. Producto"),
                               "No. Lote" = field("No. Lote");
             }
+            action(VerMovimientosPale)
+            {
+                Caption = 'Movimientos del palé';
+                ToolTip = 'Muestra la historia del palé (SSCC) de esta línea: dónde entró y por dónde se ha movido.';
+                ApplicationArea = All;
+                Image = ItemTrackingLedger;
+                RunObject = page "Movs. Ubicacion SGA";
+                RunPageLink = SSCC = field(SSCC);
+            }
         }
         area(Promoted)
         {
@@ -229,6 +249,9 @@ page 51103 "Contenido Ubicaciones SGA"
                 {
                 }
                 actionref(VerMovimientos_Promoted; VerMovimientos)
+                {
+                }
+                actionref(VerMovimientosPale_Promoted; VerMovimientosPale)
                 {
                 }
             }
@@ -294,27 +317,10 @@ page 51103 "Contenido Ubicaciones SGA"
         lineas := cContenido.DesubicarLineas(rContenido);
 
         if lineas = 1 then
-            Message(LineaDesubicadaMsg, rLinea.Cantidad, rLinea."Cod. Unidad Medida", rLinea."No. Producto", rLinea."Cod. Bin")
+            Message(LineaDesubicadaMsg, rLinea."Cantidad Base", rLinea."Cod. Unidad Medida", rLinea."No. Producto", rLinea."Cod. Bin")
         else
             Message(LineasDesubicadasMsg, lineas);
 
-        CurrPage.Update(false);
-    end;
-
-    local procedure TrasladarContenido()
-    var
-        cContenido: Codeunit "Gestion Contenido SGA";
-        destino: Code[20];
-    begin
-        if cContenido.TrasladarConDialogo(Rec, destino, '', false) <> 0 then
-            CurrPage.Update(false);
-    end;
-
-    local procedure AlternarBloqueoContenido()
-    var
-        cContenido: Codeunit "Gestion Contenido SGA";
-    begin
-        cContenido.AlternarBloqueo(Rec);
         CurrPage.Update(false);
     end;
 
@@ -330,7 +336,7 @@ page 51103 "Contenido Ubicaciones SGA"
             exit;
 
         noMovimiento := cContenido.RegistrarRecuento(Rec."Cod. Almacen", Rec."Cod. Bin", Rec."No. Producto",
-                                                     Rec."Cod. Variante", Rec."No. Lote",
+                                                     Rec."Cod. Variante", Rec."No. Lote", Rec.SSCC,
                                                      pagRecontar.ObtenerCantidadContada(),
                                                      pagRecontar.ObtenerMotivo());
         if noMovimiento = 0 then

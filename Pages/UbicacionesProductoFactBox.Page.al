@@ -39,6 +39,10 @@ page 51109 "Ubicaciones Producto FactBox"
                     ToolTip = 'Lote que hay en esta ubicación.';
                     ApplicationArea = All;
                 }
+                field(SSCC; Rec.SSCC)
+                {
+                    ApplicationArea = All;
+                }
                 field("Fecha Caducidad"; Rec."Fecha Caducidad")
                 {
                     ToolTip = 'Caducidad del lote.';
@@ -68,7 +72,17 @@ page 51109 "Ubicaciones Producto FactBox"
                 ToolTip = 'Abre la consulta completa de ubicaciones del producto.';
                 ApplicationArea = All;
                 Image = BinContent;
-                RunObject = page "Contenido Ubicaciones SGA";
+
+                trigger OnAction()
+                var
+                    rContenido: Record "Contenido Ubicacion SGA";
+                begin
+                    // Los filtros del enlace con la página que contiene el FactBox van en el grupo 4.
+                    Rec.FilterGroup(4);
+                    rContenido.CopyFilters(Rec);
+                    Rec.FilterGroup(0);
+                    Page.Run(Page::"Contenido Ubicaciones SGA", rContenido);
+                end;
             }
         }
     }

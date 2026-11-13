@@ -60,6 +60,13 @@ page 51114 "Mover Contenido SGA"
                     ApplicationArea = All;
                     Editable = false;
                 }
+                field(SSCC; SSCC)
+                {
+                    Caption = 'SSCC';
+                    ToolTip = 'Palé que se traslada. Lo que se lleva sigue siendo de este palé también en el destino.';
+                    ApplicationArea = All;
+                    Editable = false;
+                }
                 field(CantidadDisponible; CantidadDisponible)
                 {
                     Caption = 'Cantidad disponible';
@@ -176,6 +183,7 @@ page 51114 "Mover Contenido SGA"
         UbicacionDestino: Code[20];
         Producto: Code[20];
         Lote: Code[50];
+        SSCC: Code[20];
         CantidadDisponible: Decimal;
         Cantidad: Decimal;
         Motivo: Text[100];
@@ -246,6 +254,7 @@ page 51114 "Mover Contenido SGA"
         Producto := rContenido."No. Producto";
         Variante := rContenido."Cod. Variante";
         Lote := rContenido."No. Lote";
+        SSCC := rContenido.SSCC;
         UM := rContenido."Cod. Unidad Medida";
         CantidadDisponible := rContenido."Cantidad Disponible";
         Cantidad := rContenido."Cantidad Disponible";
@@ -260,34 +269,22 @@ page 51114 "Mover Contenido SGA"
     /// arrastrando; el operario solo confirma la cantidad.
     /// </summary>
     procedure FijarDestino(prm_Destino: Code[20])
-    var
-        MismaUbicacionErr: Label 'La ubicación de destino no puede ser la misma que la de origen.';
     begin
-        if prm_Destino = UbicacionOrigen then
-            Error(MismaUbicacionErr);
-
         UbicacionDestino := prm_Destino;
-        ComprobarZona();
     end;
 
+    /// <summary>
+    /// El destino elegido, comprobada la zona. Que no esté en blanco ni sea el origen, y que la
+    /// cantidad sea positiva, lo comprueba RegistrarTraslado al registrar.
+    /// </summary>
     procedure ObtenerDestino(): Code[20]
-    var
-        DestinoObligatorioErr: Label 'Debe indicar la ubicación de destino.';
     begin
-        if UbicacionDestino = '' then
-            Error(DestinoObligatorioErr);
         ComprobarZona();
-
         exit(UbicacionDestino);
     end;
 
     procedure ObtenerCantidad(): Decimal
-    var
-        CantidadNoPositivaErr: Label 'Debe indicar una cantidad mayor que cero.';
     begin
-        if Cantidad <= 0 then
-            Error(CantidadNoPositivaErr);
-
         exit(Cantidad);
     end;
 

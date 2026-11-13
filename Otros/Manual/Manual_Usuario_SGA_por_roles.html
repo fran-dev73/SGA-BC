@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Manual de usuario de SGA</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm 18mm 16mm; }
+  body { font-family: "Segoe UI", Arial, sans-serif; font-size: 10.5pt; line-height: 1.45; color: #222; max-width: 180mm; margin: 0 auto; }
+  h1 { font-size: 24pt; color: #0b3d6e; margin: 0 0 6mm 0; }
+  h2.seccion { font-size: 16pt; color: #0b3d6e; border-bottom: 2px solid #0b3d6e; padding-bottom: 2mm; margin-top: 8mm; page-break-before: always; }
+  h2.seccion:first-of-type { page-break-before: auto; }
+  h3 { font-size: 12.5pt; color: #174f86; margin: 6mm 0 2mm 0; page-break-after: avoid; }
+  h4 { font-size: 11pt; color: #174f86; margin: 4mm 0 1mm 0; page-break-after: avoid; }
+  p { margin: 2mm 0; }
+  table { border-collapse: collapse; width: 100%; margin: 3mm 0; font-size: 9.5pt; page-break-inside: auto; }
+  tr { page-break-inside: avoid; }
+  th, td { border: 1px solid #b8c4d0; padding: 1.5mm 2mm; vertical-align: top; text-align: left; }
+  th { background: #e7eef6; color: #0b3d6e; }
+  code { font-family: Consolas, monospace; font-size: 9pt; background: #f1f3f5; padding: 0 1mm; border-radius: 2px; }
+  ul, ol { margin: 1.5mm 0 2.5mm 6mm; padding: 0; }
+  li { margin: 0.8mm 0; }
+  hr { border: 0; border-top: 1px solid #ccc; margin: 5mm 0; }
+  .captura { border: 2px dashed #7a8ea3; background: #f5f8fb; padding: 4mm; margin: 4mm 0; min-height: 40mm; page-break-inside: avoid; }
+  .captura p:first-child { color: #0b3d6e; }
+  .captura p:last-child { color: #555; font-size: 9.5pt; }
+  .aviso { border-left: 4px solid #d98c00; background: #fff8e8; padding: 2mm 4mm; margin: 3mm 0; page-break-inside: avoid; }
+  .indice { page-break-after: always; }
+  .indice h2 { font-size: 16pt; color: #0b3d6e; }
+  .indice ol { list-style: none; margin-left: 0; }
+  .indice li { margin: 1mm 0; }
+  .indice li.i2 { font-weight: bold; margin-top: 2mm; }
+  .indice li.i3 { margin-left: 6mm; font-size: 9.5pt; }
+  .indice a { color: #174f86; text-decoration: none; }
+</style>
+</head>
+<body>
+<h1>Manual de usuario de SGA</h1>
+<p>Gestión de almacén en Business Central: ubicaciones, entradas, picking, reubicaciones y control del contenido. Este manual está organizado <strong>por rol</strong>: cada persona lee el capítulo de su rol.</p>
+<p>Documento de trabajo. Los huecos marcados como <strong>[CAPTURA nn]</strong> se completan con las imágenes de las pantallas; la lista de todas está en el anexo A.</p>
+<nav class="indice"><h2>Índice</h2><ol>
+<li class="i2"><a href="#s1">1. Cómo usar este manual</a></li>
+<li class="i2"><a href="#s2">2. Roles y perfiles</a></li>
+<li class="i2"><a href="#s3">3. Rol Almacén SGA</a></li>
+<li class="i3"><a href="#s4">3.1 El rol center</a></li>
+<li class="i3"><a href="#s5">3.2 Antes de ubicar: tipos de ubicación y cómo se elige el hueco</a></li>
+<li class="i3"><a href="#s6">3.3 Ubicar lo que llega</a></li>
+<li class="i3"><a href="#s7">3.4 Picking y responsable de almacén</a></li>
+<li class="i3"><a href="#s8">3.5 Consultas</a></li>
+<li class="i3"><a href="#s9">3.6 Ventas y compras (solo consulta)</a></li>
+<li class="i3"><a href="#s10">3.7 Informes y configuración</a></li>
+<li class="i2"><a href="#s11">4. Rol Preparador SGA (PDA)</a></li>
+<li class="i3"><a href="#s12">4.1 Preparar el terminal (una vez)</a></li>
+<li class="i3"><a href="#s13">4.2 Preparar pedidos</a></li>
+<li class="i3"><a href="#s14">4.3 Órdenes y reubicaciones (carretillero)</a></li>
+<li class="i3"><a href="#s15">4.4 Consulta desde la PDA</a></li>
+<li class="i2"><a href="#s16">5. Oficina: Procesador de pedidos</a></li>
+<li class="i3"><a href="#s17">5.1 Enviar un pedido a SGA</a></li>
+<li class="i3"><a href="#s18">5.2 Si falta stock: dos rondas</a></li>
+<li class="i3"><a href="#s19">5.3 Ver cuánto está preparado</a></li>
+<li class="i3"><a href="#s20">5.4 Pasar al pedido</a></li>
+<li class="i2"><a href="#s21">6. Administración</a></li>
+<li class="i2"><a href="#s22">7. Si algo falla</a></li>
+<li class="i2"><a href="#s23">Anexo A. Lista de capturas</a></li>
+</ol></nav>
+<h2 class="seccion" id="s1">1. Cómo usar este manual</h2>
+<ul>
+<li>Busca tu rol en el capítulo 2 y lee su capítulo (3, 4 o 5).</li>
+<li>Las pantallas de SGA llevan <strong>SGA</strong> en el título (<em>Órdenes de picking SGA</em>, <em>Preparar picking SGA</em>…). Lo que no lo lleva es de Business Central.</li>
+<li>Puedes abrir cualquier pantalla desde el <strong>buscador</strong> (Alt+Q) escribiendo su nombre, o desde la barra de navegación del rol.</li>
+<li>Los nombres de botones van en <strong>negrita</strong>, y los de campos y vistas, en <em>cursiva</em>.</li>
+<li>Todo movimiento queda registrado en <strong>Movimientos de ubicación</strong>, que no se edita ni se borra. Un error se corrige con otro movimiento.</li>
+</ul>
+<div class="captura">
+<p><strong>[CAPTURA 01]</strong> Buscador de Business Central (Alt+Q) escribiendo "Ubicar" y mostrando las pantallas de SGA. Datos de ejemplo: texto "Ubicar".</p>
+</div>
+<h2 class="seccion" id="s2">2. Roles y perfiles</h2>
+<p>Hay tres roles de trabajo y un rol de administración. Cada uno ve su propio <strong>rol center</strong> (la página de inicio), con sus menús.</p>
+<table><thead><tr><th>Rol</th><th>Perfil de Business Central</th><th>Quién lo usa</th><th>Dónde trabaja</th><th>Capítulo</th></tr>
+</thead><tbody>
+<tr><td><strong>Almacén SGA</strong></td><td>ALMACEN SGA</td><td>Almacenero y responsable de almacén</td><td>Ordenador, Business Central web</td><td>3</td></tr>
+<tr><td><strong>Preparador SGA (PDA)</strong></td><td>PREPARADOR SGA (PDA)</td><td>Preparador y carretillero</td><td>Terminal Android con la app de Business Central</td><td>4</td></tr>
+<tr><td><strong>Procesador de pedidos</strong></td><td>Procesador de pedidos</td><td>Oficina de ventas</td><td>Ordenador</td><td>5</td></tr>
+<tr><td><strong>Administración</strong></td><td>(el que configure la implantación)</td><td>Quien pone en marcha SGA</td><td>Ordenador</td><td>6</td></tr>
+</tbody></table>
+<p>Para asignar un perfil, en la configuración del usuario de Business Central, o desde <em>Mi configuración</em> si el usuario puede elegirlo.</p>
+<div class="captura">
+<p><strong>[CAPTURA 02]</strong> <em>Mi configuración</em> con el perfil "Almacén SGA" seleccionado. Datos de ejemplo: usuario de prueba "ALMACEN01".</p>
+</div>
+<h2 class="seccion" id="s3">3. Rol Almacén SGA</h2>
+<p>Es el rol del día a día del almacén: ubicar lo que llega, controlar dónde está cada cosa y, si eres responsable, repartir el picking.</p>
+<h3 id="s4">3.1 El rol center</h3>
+<p>Al entrar ves los indicadores del almacén (pilas) y, en la barra de navegación, los menús agrupados así:</p>
+<table><thead><tr><th>Grupo</th><th>Qué contiene</th></tr>
+</thead><tbody>
+<tr><td><strong>Almacén SGA</strong></td><td>El trabajo diario: ubicar, picking, reubicaciones y dónde está el producto</td></tr>
+<tr><td><strong>Almacén SGA - Ventas y compras</strong></td><td>Productos, pedidos y albaranes de venta y de compra</td></tr>
+<tr><td><strong>Almacén SGA - Consultas</strong></td><td>Ubicaciones, contenido, mapas, movimientos, conciliación y análisis ABC</td></tr>
+<tr><td><strong>Almacén SGA - Informes</strong></td><td>Conciliación con el stock</td></tr>
+<tr><td><strong>Almacén SGA - Configuración</strong></td><td>Zonas, ubicaciones, carga inicial y configuración de SGA</td></tr>
+</tbody></table>
+<div class="captura">
+<p><strong>[CAPTURA 03]</strong> Rol center Almacén SGA completo, con los cinco grupos desplegados. Datos de ejemplo: el usuario ALMACEN01 con alguna pila con cifras.</p>
+</div>
+<p>En el grupo <strong>Picking</strong> del rol center hay pilas con el número de órdenes en cada situación. Al pulsar una, se abre la pantalla que la resuelve:</p>
+<table><thead><tr><th>Pila</th><th>Qué cuenta</th><th>Al pulsarla</th></tr>
+</thead><tbody>
+<tr><td>Pendientes de asignar</td><td>Órdenes que esperan preparador</td><td><em>Asignar órdenes de picking</em></td></tr>
+<tr><td>Sin empezar</td><td>Órdenes abiertas que nadie ha empezado</td><td><em>Órdenes de picking</em></td></tr>
+<tr><td>En proceso</td><td>Órdenes que se están recogiendo</td><td><em>Órdenes de picking</em></td></tr>
+<tr><td>Envío vencido (rojo)</td><td>Órdenes sin terminar con fecha de envío hoy o antes</td><td><em>Órdenes de picking</em></td></tr>
+<tr><td>Paradas retenidas (rojo)</td><td>Paradas saltadas dos veces</td><td><em>Paradas de picking</em>, con <em>Buscar en otra ubicación</em></td></tr>
+<tr><td>Terminadas sin pasar al pedido (rojo)</td><td>Órdenes de venta terminadas que no están en el pedido</td><td><em>Órdenes de picking</em>, con <em>Pasar al pedido</em></td></tr>
+<tr><td>Reubicaciones pendientes</td><td>Movimientos de almacenamiento a picking por hacer</td><td><em>Reubicaciones</em></td></tr>
+<tr><td>Terminadas hoy (verde)</td><td>Órdenes terminadas en la fecha de trabajo</td><td><em>Órdenes de picking</em></td></tr>
+<tr><td>Desvíos de ubicación hoy</td><td>Paradas recogidas hoy en un hueco distinto del propuesto</td><td><em>Paradas de picking</em></td></tr>
+</tbody></table>
+<p>Las pilas de órdenes no cuentan las reubicaciones, que tienen la suya.</p>
+<div class="captura">
+<p><strong>[CAPTURA 04]</strong> Grupo <em>Picking</em> del rol center con sus pilas. Datos de ejemplo: al menos una pila en rojo (envío vencido) y una verde (terminadas hoy).</p>
+</div>
+<h3 id="s5">3.2 Antes de ubicar: tipos de ubicación y cómo se elige el hueco</h3>
+<p><strong>Tipo de ubicación.</strong> Cada ubicación tiene un tipo que decide para qué se usa:</p>
+<table><thead><tr><th>Tipo</th><th>Para qué es</th><th>Al ubicar</th></tr>
+</thead><tbody>
+<tr><td><strong>Almacenamiento</strong></td><td>La reserva; de aquí salen las reubicaciones</td><td>Es lo primero que se propone</td></tr>
+<tr><td><strong>Picking</strong></td><td>De donde se preparan los pedidos</td><td>Solo si no queda sitio en almacenamiento</td></tr>
+<tr><td><em>(en blanco)</em></td><td>Muelles, ajustes…</td><td>Nunca se propone</td></tr>
+</tbody></table>
+<p><strong>Estrategia.</strong> Dentro de almacenamiento (y luego de picking), el hueco concreto lo decide la estrategia de ubicación de la configuración. Solo se proponen huecos que admiten la mercancía: no bloqueados, con sitio, y sin otro producto o lote si no aceptan mezcla. Junto a cada propuesta sale el <strong>porqué</strong> (<em>Ubicación fija del producto</em>, <em>Ya hay este producto ahí</em>, <em>Primer hueco con sitio</em>…).</p>
+<table><thead><tr><th>Estrategia</th><th>Qué hueco propone</th><th>Cuándo conviene</th></tr>
+</thead><tbody>
+<tr><td><strong>Estándar</strong></td><td>Su casa (ubicación fija o el nº de estante de la ficha); si no, donde ya está el producto y cabe más; si no, el primer hueco con sitio</td><td>La de uso general</td></tr>
+<tr><td><strong>Priorizar consolidación</strong></td><td>Donde ya está el producto y cabe más; si no, el primer hueco con sitio</td><td>Huecos de varios palés, para no repartir un producto</td></tr>
+<tr><td><strong>Solo ubicación fija</strong></td><td>Solo su casa. Si no tiene o no cabe, <em>No se puede ubicar</em></td><td>Cada producto tiene su sitio y no hay excepciones</td></tr>
+<tr><td><strong>Primera libre por ruta</strong></td><td>El primer hueco con sitio del recorrido</td><td>Llenar siempre desde los mejores huecos</td></tr>
+<tr><td><strong>Solo hueco vacío</strong></td><td>El primer hueco totalmente vacío del recorrido</td><td>Palés de producción: cada palé a un hueco limpio</td></tr>
+</tbody></table>
+<p>El <strong>recorrido</strong> es la <em>secuencia de picking</em> de cada ubicación: cuanto menor, antes se propone.</p>
+<p>Si el producto tiene grupo IIEE con zonas asignadas, se busca primero en esas zonas. Si no queda sitio, se busca en todo el almacén y el porqué lo avisa. Mover o ubicar a mano fuera de las zonas de su grupo pide confirmación.</p>
+<table><thead><tr><th>Pantalla</th><th>Estrategia que usa</th><th>Por defecto</th></tr>
+</thead><tbody>
+<tr><td>Ubicar recepciones</td><td>Estrategia de ubicación de compras</td><td>Estándar</td></tr>
+<tr><td>Ubicar ensamblados e Imprimir y ubicar palés</td><td>Estrategia de ubicación de ensamblados</td><td>Solo hueco vacío</td></tr>
+<tr><td>Ubicar producto y Mover contenido</td><td>Estrategia de ubicación</td><td>Estándar</td></tr>
+<tr><td>Carga inicial y Ubicar seleccionadas</td><td>Fija, no se configura</td><td>Ver el capítulo 6</td></tr>
+<tr><td>Reubicaciones</td><td>Fija, no se configura</td><td>El mismo hueco que se vació</td></tr>
+</tbody></table>
+<p>Si el almacén está casi lleno, todas las estrategias acaban en el primer hueco libre: cambiar de estrategia no gana sitio.</p>
+<p><strong>Huecos reservados.</strong> En <em>Ubicar recepciones</em>, <em>Ubicar ensamblados</em>, <em>Imprimir y ubicar palés</em> y <em>Ubicar producto</em>, el hueco que se propone queda <strong>reservado</strong> para esa línea: no se propone a nadie más hasta que se ubica.</p>
+<ul>
+<li><strong>Se usa:</strong> al confirmar, la reserva se quita y el hueco queda ocupado.</li>
+<li><strong>No se usa:</strong> se suelta al pedir <strong>Otra ubicación</strong>, al escribir otro hueco, al pasar a otra tarea, al recargar la lista y al cerrar la pantalla.</li>
+<li><strong>Se queda reservado</strong> (por ejemplo, si se cierra el navegador sin salir de la pantalla): en <strong>Ubicaciones SGA</strong>, vista <em>Reservadas</em>, selecciona el hueco y pulsa <strong>Liberar reserva</strong>.</li>
+</ul>
+<p>Un hueco reservado para otra entrada no se puede escribir a mano: avisa de para quién está.</p>
+<p><strong>SSCC del palé.</strong> Cada palé lleva su código SSCC, el de su etiqueta. Al ubicar, lee la etiqueta del palé en la columna <em>SSCC</em> (vale la lectura entera del código de barras o teclear los 18 dígitos). Si el palé no trae etiqueta, deja <em>SSCC</em> en blanco: al confirmar se le da uno nuevo. El SSCC sirve para saber <strong>dónde está</strong> un palé concreto (ver 3.4), no para el picking.</p>
+<h3 id="s6">3.3 Ubicar lo que llega</h3>
+<p>Lo que entra por compra o por producción se ubica después de registrarlo. Son tres pantallas, y en todas el proceso es el mismo: <strong>proponer</strong>, dejar la mercancía, corregir la <em>Ubicación confirmada</em> si la has dejado en otro hueco, y <strong>confirmar</strong>. Una cantidad se reparte en palés completos, cada uno a su hueco, y un resto en cajas o en unidades.</p>
+<h4>Ubicar recepciones</h4>
+<p>Lo que ha entrado en albaranes de compra registrados. Se abre con <em>Prod. externo</em> en la clase de artículo.</p>
+<ol>
+<li>Ajusta los filtros: <em>Registrado desde / hasta</em>, <em>Clase de artículo</em> (por defecto <em>Prod. externo</em>; <em>Todas</em> para no filtrar), <em>Producto</em>, <em>Almacén</em> y <em>Solo lo que falta por ubicar</em>.</li>
+<li>Pulsa <strong>Proponer ubicaciones</strong>: reparte las líneas sin dar el mismo hueco a dos. <strong>Otra ubicación</strong> si una propuesta no te convence.</li>
+<li>Lee el <em>SSCC</em> del palé, deja la mercancía y pulsa <strong>Confirmar esta línea</strong> o <strong>Confirmar todo</strong>. Se ubica de palé en palé: <em>A ubicar</em> es lo que queda, sin pasar de un palé. Si el palé viene incompleto, baja <em>A ubicar</em>.</li>
+<li>Si a la línea le quedan más palés, se queda sin hueco: pulsa otra vez <strong>Proponer ubicaciones</strong>.</li>
+</ol>
+<p>En estas pantallas no sale nada anterior a la <strong>fecha inicio SGA</strong> de la configuración, aunque se pida una fecha anterior: lo que entró antes ya es stock de BC y lo colocó la carga inicial.</p>
+<div class="captura">
+<p><strong>[CAPTURA 05]</strong> Ubicar recepciones: filtros arriba y líneas con <em>SSCC</em>, <em>A ubicar</em> y <em>Ubicación propuesta</em>. Datos de ejemplo: un albarán de compra con dos líneas, una con SSCC leído y otra en blanco.</p>
+</div>
+<h4>Ubicar ensamblados</h4>
+<p>Igual que las recepciones, con los embotellados registrados. Se abre con el día de trabajo.</p>
+<div class="captura">
+<p><strong>[CAPTURA 06]</strong> Ubicar ensamblados con un embotellado propuesto. Datos de ejemplo: un ensamblado del día con su palé pendiente.</p>
+</div>
+<h4>Imprimir y ubicar palés</h4>
+<p>Pantalla de producción: cada etiqueta que se imprime en la línea deja el palé ubicado. Imprimir y ubicar es un solo paso, así no hay palés con etiqueta y sin ubicación.</p>
+<ol>
+<li>Elige la tarea que está en línea.</li>
+<li>En <strong>Siguiente palé</strong> ves la <em>Ubicación</em>, el <em>Por qué ahí</em> y la <em>Situación</em> (palé completo o último palé).</li>
+<li>Pulsa <strong>Proponer ubicación</strong> u <strong>Otra ubicación</strong>; si lo dejas en otro hueco, escríbelo en <em>Ubicación</em>.</li>
+<li>Pulsa <strong>Imprimir y ubicar</strong>: sale la etiqueta y el palé queda ubicado con el mismo SSCC que lleva la etiqueta.</li>
+</ol>
+<div class="aviso">
+<p>En el entorno de pruebas (Sandbox) la etiqueta sale en formato A5 y lleva un SSCC distinto del que queda ubicado. En producción, con BarTender, coinciden.</p>
+</div>
+<div class="captura">
+<p><strong>[CAPTURA 07]</strong> Imprimir y ubicar palés: tarea en línea, <em>Siguiente palé</em> con la ubicación propuesta y el <em>Por qué ahí</em>. Datos de ejemplo: tarea de producción en curso.</p>
+</div>
+<h4>Ubicar producto</h4>
+<p>Para una cosa suelta, o para ubicar lo que no viene de un documento. Indica producto, lote, caducidad y cantidad, o pulsa <strong>Ubicar todo lo pendiente</strong> para traer lo que falta de ese producto.</p>
+<ol>
+<li>Pulsa <strong>Proponer ubicación</strong>: la tabla <strong>Dónde dejarlo</strong> tiene una línea por palé y una por el resto.</li>
+<li>Lee en cada línea el <em>SSCC</em> de su palé (en blanco, se le da uno nuevo).</li>
+<li>Pulsa <strong>Confirmar todo</strong> o <strong>Confirmar esta línea</strong>.</li>
+</ol>
+<p>Si la propuesta trae un trozo que no cabe, sale como <strong>SIN SITIO</strong> y dice por qué (no hay ubicación de esa clase, las que hay son de muelle, están llenas o bloqueadas, o la unidad no está marcada como palé o caja).</p>
+<div class="captura">
+<p><strong>[CAPTURA 08]</strong> Ubicar producto con la tabla <em>Dónde dejarlo</em>: una línea por palé con su SSCC y otra con el resto. Datos de ejemplo: producto de prueba con dos palés y una caja suelta.</p>
+</div>
+<div class="captura">
+<p><strong>[CAPTURA 09]</strong> Diálogo de confirmación de Ubicar producto: "¿Ubicar ahora palé 1 de 2 en 101-03-01?". Datos de ejemplo: ubicación de almacenamiento de prueba.</p>
+</div>
+<h4>Pendiente de ubicar</h4>
+<p>Muestra el stock de Business Central que no está en ninguna ubicación, lote a lote: <em>Sin ubicar</em> = <em>Stock BC</em> − <em>Ubicado</em>. Lo que sale en <em>En recepciones o ensamblados</em> se ubica desde esas pantallas. El resto se ubica desde aquí:</p>
+<ul>
+<li><strong>Ubicar</strong>: abre <em>Ubicar producto</em> con la línea ya puesta.</li>
+<li><strong>Ubicar seleccionadas</strong>: busca hueco para varias líneas a la vez, como la carga inicial: cada palé a un hueco vacío y el resto junto. Se puede <strong>simular</strong> antes (no guarda nada). Al terminar enseña lo ubicado y, de lo que no cabe, el motivo.</li>
+</ul>
+<div class="captura">
+<p><strong>[CAPTURA 10]</strong> Pendiente de ubicar con las columnas <em>Stock BC</em>, <em>Ubicado</em>, <em>Sin ubicar</em> y <em>En recepciones o ensamblados</em>. Datos de ejemplo: dos lotes, uno con cifras en <em>Sin ubicar</em> y otro en <em>En recepciones</em>.</p>
+</div>
+<div class="captura">
+<p><strong>[CAPTURA 11]</strong> Diálogo de <em>Ubicar seleccionadas</em> con las opciones "Ubicar ahora" y "Solo simular". Datos de ejemplo: tres líneas seleccionadas.</p>
+</div>
+<div class="captura">
+<p><strong>[CAPTURA 12]</strong> Resultado de <em>Ubicar seleccionadas</em>: lo ubicado y lo que no cabe, con su motivo. Datos de ejemplo: una línea sin sitio.</p>
+</div>
+<h3 id="s7">3.4 Picking y responsable de almacén</h3>
+<h4>Órdenes de picking</h4>
+<p>Lista de las órdenes de picking, de venta y de reubicación. Desde aquí:</p>
+<ul>
+<li><strong>Siguiente orden</strong>: abre la pantalla de preparación con la orden que te toca, por prioridad, primero las tuyas. Al terminarla, pasa sola a la siguiente.</li>
+<li><strong>Preparar</strong>: una orden concreta.</li>
+<li><strong>Asignármela</strong>: si la configuración no exige asignación.</li>
+<li><strong>Cancelar orden</strong>: cancela la orden y libera lo reservado.</li>
+<li><strong>Pasar al pedido</strong> (si la orden está terminada y no ha pasado): repite el paso de la cantidad a enviar y los lotes.</li>
+<li><strong>Segunda ronda de picking</strong>: crea las órdenes de los pedidos que aún tienen algo pendiente (ver capítulo 5).</li>
+</ul>
+<p>Vistas: <em>Terminadas sin pasar al pedido</em>, <em>Con paradas retenidas</em> y las de estado.</p>
+<div class="captura">
+<p><strong>[CAPTURA 13]</strong> Órdenes de picking SGA con varias órdenes en distintos estados. Datos de ejemplo: una sin empezar, una en proceso y una terminada sin pasar al pedido.</p>
+</div>
+<h4>Asignar órdenes de picking</h4>
+<p>En esta pantalla salen las órdenes vivas con su cliente, fecha de envío y paradas pendientes. Solo la usa el responsable.</p>
+<ul>
+<li>Vistas <strong>Sin asignar</strong> y <strong>Asignadas</strong>.</li>
+<li><strong>Asignar a</strong>: da las seleccionadas a un preparador (también se puede teclear en <em>Asignada a</em>).</li>
+<li><strong>Quitar asignación</strong>: las devuelve a la bolsa. Una orden empezada se puede reasignar, pero no dejar sin nadie.</li>
+<li><strong>Subir prioridad</strong> y <strong>Bajar prioridad</strong>: cuanto mayor la <em>Prioridad</em>, antes sale.</li>
+<li><strong>Ver orden</strong> y <strong>Ver pedido</strong>.</li>
+</ul>
+<p>Si la configuración exige asignación de picking:</p>
+<table><thead><tr><th></th><th>Desactivada</th><th>Activada</th></tr>
+</thead><tbody>
+<tr><td>La orden nace…</td><td><em>Abierta</em></td><td><em>Pendiente de asignar</em></td></tr>
+<tr><td><em>Siguiente orden</em> da…</td><td>Las suyas y, si no tiene, la siguiente sin asignar</td><td>Solo las suyas</td></tr>
+<tr><td><em>Asignármela</em></td><td>Disponible</td><td>No: reparte el responsable</td></tr>
+<tr><td>Quién reparte y cambia prioridades</td><td>Cualquiera</td><td>Solo los responsables de picking</td></tr>
+</tbody></table>
+<div class="captura">
+<p><strong>[CAPTURA 14]</strong> Asignar órdenes de picking con las vistas <em>Sin asignar</em> y <em>Asignadas</em>. Datos de ejemplo: tres órdenes sin asignar y una asignada a PREP01.</p>
+</div>
+<h4>Paradas retenidas</h4>
+<p>Una parada que el preparador <strong>salta dos veces</strong> queda <strong>retenida</strong>: algo impide recogerla. El preparador ya no la ve, pero sigue pendiente, conserva su reserva y su orden no se termina.</p>
+<ul>
+<li>Se ven en la pila <strong>Paradas retenidas</strong> del rol center, en la acción <strong>Paradas retenidas</strong> y en la columna <em>Con paradas retenidas</em> de las órdenes.</li>
+<li>La lista dice qué preparador la retuvo y cuándo.</li>
+<li><strong>Contenido de la ubicación</strong> enseña qué hay en el hueco según SGA.</li>
+<li><strong>Buscar en otra ubicación</strong> la resuelve: cancela la parada y crea paradas nuevas en otros huecos con stock del producto. Las nuevas vuelven al preparador de la orden. Si no hay stock en ningún otro hueco, la parada queda cancelada.</li>
+<li>Lo recogido del resto de la orden ya está en el pedido: no se duplica nada.</li>
+</ul>
+<div class="captura">
+<p><strong>[CAPTURA 15]</strong> Paradas de picking SGA, vista <em>Retenidas</em>, con la acción <em>Buscar en otra ubicación</em>. Datos de ejemplo: una parada retenida por PREP01.</p>
+</div>
+<h4>Reubicaciones</h4>
+<p>Una reubicación lleva mercancía de almacenamiento a picking. Se crea sola cuando una ubicación de picking se queda a cero de un producto (por una recogida, un traslado, <em>Vaciar ubicación</em>, <em>Quitar de la ubicación</em> o un ajuste). También puedes planificarlas: <strong>Planificar reubicaciones</strong> repasa el almacén y repone los productos que no tienen nada en picking.</p>
+<p>Hace falta stock disponible en almacenamiento; si no hay, no se crea. Trae como mucho un palé.</p>
+<ul>
+<li>Vistas <strong>Por hacer</strong> y <strong>Hechas</strong>.</li>
+<li>Acciones: <strong>Planificar reubicaciones</strong>, <strong>Preparar</strong>, <strong>Cancelar</strong> (libera la reserva) y <strong>Orden</strong>.</li>
+</ul>
+<div class="captura">
+<p><strong>[CAPTURA 16]</strong> Reubicaciones SGA, vista <em>Por hacer</em>, con una planificación recién hecha. Datos de ejemplo: dos reubicaciones de productos sin picking.</p>
+</div>
+<h4>Etiquetas de ubicación</h4>
+<p>Cada hueco tiene su etiqueta, y el preparador lee en ella la ubicación de la que recoge. Deben estar pegadas antes de empezar a recoger. Se hace por pasillos:</p>
+<ol>
+<li>En <strong>Ubicaciones SGA</strong>, filtra el pasillo y selecciona sus huecos.</li>
+<li>Pulsa <strong>Imprimir etiquetas</strong> y pega cada una en su hueco.</li>
+</ol>
+<div class="captura">
+<p><strong>[CAPTURA 17]</strong> Ubicaciones SGA filtradas por un pasillo, con los huecos seleccionados y la acción <em>Imprimir etiquetas</em>. Datos de ejemplo: pasillo 101.</p>
+</div>
+<h4>Quién es quién: responsable y carretillero</h4>
+<p>En <strong>Configuración de usuarios</strong>, en la línea de cada usuario:</p>
+<ul>
+<li><strong>Responsable picking SGA</strong>: puede repartir órdenes y cambiar prioridades cuando se exige asignación. Es esta casilla la que manda, no el conjunto de permisos.</li>
+<li><strong>Carretillero SGA</strong>: con <em>Siguiente orden</em> recibe las reubicaciones y no los pedidos (ver capítulo 4).</li>
+</ul>
+<div class="captura">
+<p><strong>[CAPTURA 18]</strong> Configuración de usuarios con las casillas <em>Responsable picking SGA</em> y <em>Carretillero SGA</em>. Datos de ejemplo: usuarios RESP01 y CARR01.</p>
+</div>
+<h3 id="s8">3.5 Consultas</h3>
+<h4>¿Dónde está el producto?</h4>
+<p>Escribe el <em>Producto</em> (y, si quieres, <em>Almacén</em> y <em>Lote</em>). Salen todas las ubicaciones donde está, por caducidad. <em>Solo con cantidad disponible</em> oculta lo bloqueado y lo reservado. Se abre también desde la ficha o la lista de productos: grupo <strong>SGA</strong> &gt; <strong>¿Dónde está?</strong></p>
+<p><strong>Un palé concreto:</strong> lee su etiqueta (o teclea los 18 dígitos) en <em>SSCC</em>. Salen las ubicaciones en las que está: el palé y, si se ha partido, sus cajas en otros huecos.</p>
+<div class="captura">
+<p><strong>[CAPTURA 19]</strong> ¿Dónde está el producto? con un producto buscado y varias ubicaciones. Datos de ejemplo: un producto con tres huecos.</p>
+</div>
+<div class="captura">
+<p><strong>[CAPTURA 20]</strong> ¿Dónde está el producto? buscando por SSCC. Datos de ejemplo: un SSCC real de la base de pruebas.</p>
+</div>
+<h4>Ubicaciones SGA</h4>
+<p>La lista de huecos con su estado y su ocupación, coloreada: gris vacía, verde con hueco, amarillo llena y rojo bloqueada.</p>
+<ul>
+<li>Vistas: <strong>Vacías</strong>, <strong>Con hueco</strong>, <strong>Llenas</strong>, <strong>Bloqueadas</strong>, <strong>Reservadas</strong>, <strong>Picking</strong>, <strong>Almacenamiento</strong> y <strong>Sin tipo</strong>.</li>
+<li>Acciones: <strong>Cambiar en bloque</strong>, <strong>Imprimir etiquetas</strong>, <strong>Liberar reserva</strong>, <strong>Bloquear / desbloquear</strong>, <strong>Recalcular ocupación</strong>.</li>
+<li>En la ficha de la ubicación: <strong>Vaciar ubicación</strong> (todo queda sin ubicar; el stock de BC no cambia), <strong>Movimientos de entrada</strong> y <strong>Movimientos de salida</strong>.</li>
+</ul>
+<div class="captura">
+<p><strong>[CAPTURA 21]</strong> Ubicaciones SGA con sus colores de estado. Datos de ejemplo: huecos vacíos, con hueco, llenos y uno bloqueado.</p>
+</div>
+<h4>Contenido de ubicaciones</h4>
+<p>Qué producto, lote y palé (SSCC) hay en cada hueco: una línea por palé. Vistas <strong>Bloqueado</strong> y <strong>Con reserva</strong>.</p>
+<ul>
+<li><strong>Trasladar</strong>: a otra ubicación. Si eliges <em>Zona destino</em>, propone un hueco de esa zona y dice por qué.</li>
+<li><strong>Bloquear / desbloquear</strong> una línea (por ejemplo, un lote en cuarentena).</li>
+<li><strong>Recontar</strong>: tecleas la <em>Cantidad contada</em> y la diferencia queda registrada, sea de más o de menos.</li>
+<li><strong>Quitar de la ubicación</strong>: la línea sale entera y queda pendiente de ubicar. No deja hacerlo si está reservada.</li>
+<li><strong>Movimientos del palé</strong>: la historia del SSCC de la línea.</li>
+</ul>
+<div class="captura">
+<p><strong>[CAPTURA 22]</strong> Contenido de ubicaciones con SSCC visible y la acción <em>Movimientos del palé</em>. Datos de ejemplo: un palé trasladado de un hueco a otro.</p>
+</div>
+<h4>Mapa de almacén</h4>
+<p>Una rejilla por <em>Almacén</em> y <em>Pasillo</em>: una fila por altura y una columna por estantería. Gris vacía, verde con hueco, naranja llena, rojo bloqueada y azul (<em>RESERV</em>) reservada para una entrada que se está ubicando. Pulsar una celda abre su contenido.</p>
+<div class="captura">
+<p><strong>[CAPTURA 23]</strong> Mapa de almacén de un pasillo con los cinco estados. Datos de ejemplo: pasillo 101.</p>
+</div>
+<h4>Mapa 3D de almacén</h4>
+<ul>
+<li>Arriba, <em>Almacén</em>, <em>Zona</em> y <em>Pasillo</em>. En el lienzo hay tres vistas: <strong>3D</strong>, <strong>Planta</strong> y <strong>Frente</strong> (un pasillo de frente, la de trabajo).</li>
+<li><strong>Colorear por</strong>: <em>Estado</em>, <em>Rotación ABC</em> o <em>Caducidad</em>. Por estado, las reservadas para una entrada salen en turquesa.</li>
+<li><strong>Buscar</strong>: un producto o una ubicación; las coincidencias se marcan en naranja.</li>
+<li>Con el ratón: pasar por encima enseña lo que hay; clic abre el contenido; doble clic aísla el pasillo; clic derecho vacía la ubicación; arrastrar una ubicación con contenido sobre otra la traslada, solo dentro de la misma zona.</li>
+</ul>
+<div class="captura">
+<p><strong>[CAPTURA 24]</strong> Mapa 3D de almacén en vista <em>Frente</em>, con <em>Colorear por Estado</em>. Datos de ejemplo: pasillo 101.</p>
+</div>
+<h4>Movimientos de ubicación</h4>
+<p>El diario de todo: quién movió qué, cuándo y de dónde a dónde. Vistas <strong>Traslados</strong> y <strong>Ajustes y recuentos</strong>.</p>
+<div class="captura">
+<p><strong>[CAPTURA 25]</strong> Movimientos de ubicación, vista <em>Traslados</em>. Datos de ejemplo: un traslado y un recuento del mismo día.</p>
+</div>
+<h4>Conciliación con el stock</h4>
+<p>Compara lo que dice Business Central con lo que hay en las ubicaciones.</p>
+<ol>
+<li>En el informe <strong>Conciliar con el stock</strong> (grupo <em>Informes</em>), elige <em>Almacén</em> y <em>Mostrar solo diferencias</em>.</li>
+<li>El último resultado se vuelve a abrir en <strong>Conciliación con el stock</strong> (grupo <em>Consultas</em>). Vistas <strong>Stock sin ubicar</strong> (Business Central tiene más que las ubicaciones) y <strong>Sobra en ubicaciones</strong> (las ubicaciones tienen más que Business Central).</li>
+<li>Lo que falta, mejor ubicarlo en su sitio. Si no, <strong>Regularizar en ubicación de ajustes</strong> lo deja en la ubicación de ajustes, sin SSCC: es una diferencia, no un palé. Lo que sobra no se regulariza: se recuenta.</li>
+<li><strong>Volver a conciliar</strong> para comprobar.</li>
+</ol>
+<p>Conviene lanzarla al final del día o cuando alguien no encuentre un producto.</p>
+<div class="captura">
+<p><strong>[CAPTURA 26]</strong> Conciliación con el stock, vista <em>Stock sin ubicar</em>, con la acción <em>Regularizar en ubicación de ajustes</em>. Datos de ejemplo: una diferencia de cinco unidades.</p>
+</div>
+<h4>Análisis ABC (solo observa)</h4>
+<p>Clasifica los productos por los palés que salen: <strong>A</strong> los que más, <strong>C</strong> los que menos. <strong>No cambia nada</strong>: sirve para decidir si conviene ubicar por rotación.</p>
+<ul>
+<li><strong>Calcular ahora</strong> hace un cálculo nuevo; <strong>Cálculos anteriores</strong> guarda los de antes.</li>
+<li>El <em>Resumen</em> da la concentración, las clases, los huecos y los avisos.</li>
+<li><strong>Mostrar</strong> filtra la lista: una clase, los que cambian de clase o los que están fuera de su clase.</li>
+</ul>
+<div class="captura">
+<p><strong>[CAPTURA 27]</strong> Análisis ABC SGA con el resumen y una clase filtrada. Datos de ejemplo: un cálculo de los últimos 90 días.</p>
+</div>
+<h3 id="s9">3.6 Ventas y compras (solo consulta)</h3>
+<p>Desde el grupo <em>Ventas y compras</em> se abren las listas estándar de Business Central, ya dentro de SGA: <strong>Productos</strong>, <strong>Pedidos de venta</strong>, <strong>Histórico de albaranes de venta</strong>, <strong>Pedidos de compra</strong> e <strong>Histórico de albaranes de compra</strong>. Desde ellas se llega al pedido y a su pestaña <strong>Almacén SGA</strong> (ver capítulo 5).</p>
+<h3 id="s10">3.7 Informes y configuración</h3>
+<ul>
+<li><strong>Informes</strong>: <em>Conciliar con el stock</em> (ver 3.5).</li>
+<li><strong>Configuración</strong>: <em>Configuración SGA</em> (solo consulta para el almacén; los cambios los hace el administrador, capítulo 6), <em>Zonas</em>, <em>Ubicaciones del almacén</em>, <em>Generar ubicaciones</em>, <em>Sincronizar ubicaciones</em>, <em>Carga inicial de contenido</em> e <em>Inicializar contenido</em>.</li>
+</ul>
+<div class="aviso">
+<p><strong>Atención:</strong> <strong>Inicializar contenido</strong> borra todo el contenido ubicado, los movimientos de ubicación y las órdenes de picking sin terminar del almacén. Las ubicaciones se conservan. Úsalo solo para repetir la carga inicial desde cero.</p>
+</div>
+<div class="captura">
+<p><strong>[CAPTURA 28]</strong> Grupo <em>Almacén SGA - Configuración</em> del rol center. Datos de ejemplo: ninguno.</p>
+</div>
+<h2 class="seccion" id="s11">4. Rol Preparador SGA (PDA)</h2>
+<p>El rol del preparador y del carretillero, en un terminal de mano. Lo justo para preparar: la primera opción abre la pantalla de preparación, que busca sola la orden que te toca y encadena una tras otra.</p>
+<div class="captura">
+<p><strong>[CAPTURA 29]</strong> Rol center del preparador en la PDA, con <em>Preparar pedidos SGA</em> arriba. Datos de ejemplo: usuario PREP01.</p>
+</div>
+<h3 id="s12">4.1 Preparar el terminal (una vez)</h3>
+<p>Terminal Android con lector integrado y la app de <strong>Business Central</strong> instalada desde Google Play. En el programa del lector (en Zebra, <em>DataWedge</em>), crea un perfil para la app de Business Central con la salida por <em>Intent</em>:</p>
+<table><thead><tr><th>Ajuste</th><th>Valor</th></tr>
+</thead><tbody>
+<tr><td>Intent delivery</td><td>Broadcast intent</td></tr>
+<tr><td>Intent action</td><td><code>com.businesscentral.barcode.receive_barcode</code></td></tr>
+<tr><td>Intent category</td><td><code>com.businesscentral.barcode.receive_category</code></td></tr>
+<tr><td>Clave del dato (Honeywell, Datalogic)</td><td><code>com.symbol.datawedge.data_string</code></td></tr>
+<tr><td>Clave del tipo (Honeywell, Datalogic)</td><td><code>com.symbol.datawedge.label_type</code></td></tr>
+</tbody></table>
+<p>En Zebra las claves ya son esas. Desactiva la salida por teclado del mismo perfil. Un lector que escribe como un teclado (de anillo, Bluetooth) también vale sin configurar nada.</p>
+<h3 id="s13">4.2 Preparar pedidos</h3>
+<ol>
+<li>Entra con el rol <strong>Preparador SGA (PDA)</strong> y pulsa <strong>Preparar pedidos SGA</strong>. Se abre la orden que te toca. Al terminarla carga la siguiente; si no hay más, ofrece <strong>BUSCAR SIGUIENTE ORDEN</strong>.</li>
+<li>Ve a la ubicación, coge el producto y <strong>escanéalo</strong>. Si no es el de la parada, lo dice al momento.</li>
+<li>Escanea el <strong>código de la ubicación</strong> de la etiqueta del hueco. Si no se lee, tecléalo.</li>
+<li>Si coges otra cantidad, cámbiala antes.</li>
+<li>La parada se confirma sola y pasa a la siguiente.</li>
+</ol>
+<p>El cursor está siempre en la casilla que toca leer (ubicación o producto). La pantalla no abre el teclado del terminal hasta que tocas una casilla.</p>
+<div class="captura">
+<p><strong>[CAPTURA 30]</strong> Preparar picking SGA en la PDA: bloques <em>VAYA A</em>, <em>COJA</em> y <em>CONFIRME</em>. Datos de ejemplo: una parada de un pedido con playa.</p>
+</div>
+<div class="captura">
+<p><strong>[CAPTURA 31]</strong> Preparar picking SGA con una lectura incorrecta en rojo. Datos de ejemplo: escanear un producto que no es el de la parada.</p>
+</div>
+<p><strong>Cómo se lee cada parada:</strong></p>
+<ul>
+<li><strong>VAYA A</strong>: la ubicación, en grande. En un pedido, al lado, <strong>→ PLAYA</strong> y la playa donde dejar lo recogido. En una reubicación: <strong>DE</strong> origen <strong>→ A</strong> destino.</li>
+<li><strong>COJA</strong>: la cantidad, en la unidad del pedido. Debajo, la descripción del producto y, en pequeño, su código, el lote, la caducidad, el palé (SSCC) y la cantidad en unidades base.</li>
+<li><strong>CONFIRME</strong>: lo que falta para confirmar (<em>Ubicación</em>, <em>Producto</em>). En rojo, pendiente; en verde, hecho.</li>
+</ul>
+<p><strong>Lecturas.</strong> Lee, en este orden, la <strong>ubicación</strong> de la etiqueta del hueco y, si se pide, el <strong>producto</strong> que coges. Cada lectura puede ser un escaneo o teclearse. Si una lectura no es correcta, la pantalla lo dice en rojo, con un pitido grave: vuelve a escanear o a teclear.</p>
+<ul>
+<li>El producto se reconoce por su código de barras, su GTIN o su número de producto, y también por una etiqueta GS1-128 con (01) o (02). Si la etiqueta trae el lote (10), tiene que ser el de la parada.</li>
+<li>El palé <strong>no se lee</strong>: se da por bueno que lo que coges es del palé de la parada (o del palé de ese hueco, si coges de otro).</li>
+</ul>
+<p><strong>Otros botones:</strong></p>
+<ul>
+<li><strong>Saltar</strong>: deja la parada para el final. Al acabar el recorrido vuelven a salir las saltadas. Si la saltas por segunda vez queda <strong>retenida</strong> para el responsable y ya no vuelve a salir. Cuando solo quedan retenidas, la orden se da por recorrida y pasas a la siguiente.</li>
+<li><strong>Sin stock</strong>: si el producto no está en el hueco. Pregunta si buscar en otra ubicación. La pantalla dice de dónde se recoge en su lugar. Si no hay en ninguna, el aviso sale en rojo.</li>
+</ul>
+<p>Si recoges de otro hueco, avisa: que lo admita depende de la configuración de desvíos. Al terminar sale <em>Orden terminada</em>, la playa en la que dejarla y que lo recogido ya está en el pedido. Si dice que no se ha podido pasar al pedido, avisa a oficina: no se pierde nada.</p>
+<p><strong>De dónde se recoge.</strong> La orden se arma en tres pasadas: primero <strong>palés completos</strong> de almacenamiento, luego <strong>picking</strong>, y lo que falte del resto de almacenamiento. Dentro de cada pasada manda la estrategia de picking de la configuración:</p>
+<table><thead><tr><th>Estrategia de picking</th><th>Qué se coge antes</th></tr>
+</thead><tbody>
+<tr><td><strong>FIFO</strong> (por defecto)</td><td>Lo que entró antes</td></tr>
+<tr><td><strong>FEFO</strong></td><td>Lo que caduca antes</td></tr>
+<tr><td><strong>Lote exacto</strong></td><td>Como FEFO; la parada dice el lote concreto</td></tr>
+<tr><td><strong>Vaciar ubicación</strong></td><td>Por orden de código de ubicación, para ir dejando huecos vacíos</td></tr>
+</tbody></table>
+<h3 id="s14">4.3 Órdenes y reubicaciones (carretillero)</h3>
+<p><strong>Mi picking</strong> cuenta las órdenes y las reubicaciones sin terminar que te tocan y, si la configuración no exige asignación, las órdenes sin asignar que puedes coger.</p>
+<ul>
+<li>Con <strong>Carretillero SGA</strong> marcado, <strong>Siguiente orden</strong> te da primero lo tuyo y, si no tienes, la siguiente <strong>reubicación</strong> sin asignar. Nunca un pedido.</li>
+<li>Sin marcar, al revés: pedidos y nunca reubicaciones.</li>
+<li>Lo que el responsable te asigna siempre te llega, sea pedido o reubicación.</li>
+</ul>
+<p><strong>Cómo se hace una reubicación:</strong> en <em>Preparar picking SGA</em>, la primera línea dice <strong>DE</strong> origen <strong>→ A</strong> ubicación de picking. Recoge en el origen y confirma como cualquier parada: la mercancía pasa al destino. Si es un palé justo, la cantidad sale en palés.</p>
+<div class="captura">
+<p><strong>[CAPTURA 32]</strong> Preparar picking SGA en una reubicación, con la línea <em>DE → A</em>. Datos de ejemplo: origen 201-01-01 y destino 101-03-01.</p>
+</div>
+<h3 id="s15">4.4 Consulta desde la PDA</h3>
+<ul>
+<li><strong>¿Dónde está el producto?</strong>: busca un producto (o un SSCC) y dice a qué ubicación ir a recogerlo.</li>
+<li><strong>Contenido de ubicaciones</strong>: qué hay en cada hueco.</li>
+</ul>
+<p>Son las mismas pantallas que en el ordenador, pero con la lista pensada para leer en el terminal (ver capítulo 3.5).</p>
+<h2 class="seccion" id="s16">5. Oficina: Procesador de pedidos</h2>
+<p>Toda venta sale por picking. <strong>No uses las acciones de almacén estándar de Business Central</strong> para servir un pedido: se hace desde SGA.</p>
+<p>El rol <strong>Procesador de pedidos</strong> tiene los mismos menús de SGA que el rol de almacén, así que todo lo del capítulo 3 se encuentra igual desde aquí.</p>
+<h3 id="s17">5.1 Enviar un pedido a SGA</h3>
+<ol>
+<li>Lanza el pedido.</li>
+<li>En el pedido, pestaña <strong>Almacén SGA</strong>, pulsa <strong>Enviar a SGA</strong>.</li>
+<li>SGA reparte el pedido en <strong>órdenes de picking de un palé como mucho</strong>, porque solo se prepara un palé a la vez:</li>
+</ol>
+<p>   - cada palé completo de una línea es una orden;    - las cajas y unidades sueltas de todas las líneas se juntan en órdenes que no pasan de un palé. Por ejemplo, medio palé de un producto y un cuarto de otro van en la misma orden.</p>
+<p>   Por ejemplo, 4 palés y 2 cajas son 5 órdenes.</p>
+<ol>
+<li>Busca de qué ubicación y lote coger cada cosa y lo <strong>reserva</strong>: otro pedido ya no lo ve disponible.</li>
+<li>Si el pedido ya se preparó en parte, solo manda lo que falta.</li>
+</ol>
+<p>No deja enviarlo si el pedido no está lanzado, si tiene alguna orden de picking sin terminar o si algún producto no tiene palé en su ficha (<em>Cód. palé por defecto</em>).</p>
+<p><strong>Un pedido enviado a SGA ya no se puede volver a abrir.</strong></p>
+<div class="captura">
+<p><strong>[CAPTURA 33]</strong> Pedido de venta, pestaña <em>Almacén SGA</em>, con la acción <em>Enviar a SGA</em>. Datos de ejemplo: un pedido lanzado con tres líneas.</p>
+</div>
+<h3 id="s18">5.2 Si falta stock: dos rondas</h3>
+<ul>
+<li><strong>Primera ronda.</strong> Las órdenes se crean con lo que hay. El aviso dice, producto a producto, qué falta y cuánto, en la unidad del pedido. Solo da error si no hay nada ubicado de ningún producto del pedido.</li>
+<li><strong>Segunda ronda.</strong> Cuando ya haya stock ubicado (porque ha llegado una compra o se ha ubicado lo pendiente) y estén terminadas todas las órdenes del pedido:</li>
+</ul>
+<p>  - <strong>Un pedido:</strong> vuelve a pulsar <strong>Enviar a SGA</strong>. Solo manda lo que falta.   - <strong>Todos a la vez:</strong> en <strong>Órdenes de picking SGA</strong>, pulsa <strong>Segunda ronda de picking</strong>. Crea las órdenes de cada pedido que aún tenga algo pendiente, ya tenga stock y no tenga órdenes sin terminar. Dice cuántas ha creado y cuántos pedidos siguen esperando.</p>
+<p>Mientras tanto el pedido sale como <strong>Parcial</strong> en la lista de pedidos. Si se decide servirlo así, se registra el envío de lo preparado como siempre.</p>
+<h3 id="s19">5.3 Ver cuánto está preparado</h3>
+<ul>
+<li><strong>Estado preparación SGA</strong>, en la cabecera del pedido y en la lista: <em>Sin preparar</em>, <em>Parcial</em> o <em>Preparado</em>. En blanco si no queda nada por enviar.</li>
+<li>En la lista de pedidos, pestaña <strong>Almacén SGA</strong>: <strong>Ver preparados</strong>, <strong>Ver preparados en parte</strong> y <strong>Ver todos</strong>.</li>
+<li>En las líneas, la columna <strong>Cantidad preparada</strong> (si no se ve, añádela con <em>Personalizar</em>).</li>
+<li>Una orden <em>Finalizada</em> no siempre es un pedido <em>Preparado</em>: si faltaba stock o se marcó <em>Sin stock</em>, queda <em>Parcial</em>.</li>
+</ul>
+<div class="captura">
+<p><strong>[CAPTURA 34]</strong> Lista de pedidos de venta con la columna <em>Estado preparación SGA</em> y la vista <em>Ver preparados en parte</em>. Datos de ejemplo: un pedido <em>Parcial</em> y uno <em>Preparado</em>.</p>
+</div>
+<h3 id="s20">5.4 Pasar al pedido</h3>
+<p>Al terminar la orden, SGA rellena solo la <strong>cantidad a enviar</strong> y los <strong>lotes</strong> de cada línea. Lo que no se ha recogido queda con cantidad a enviar cero. Después se registra el envío como siempre.</p>
+<p>Si el paso falla, repítelo con <strong>Pasar picking al pedido</strong> (desde el pedido) o <strong>Pasar al pedido</strong> (desde la orden). La vista <em>Terminadas sin pasar al pedido</em> de <em>Órdenes de picking</em> enseña las que faltan.</p>
+<div class="aviso">
+<p><strong>No cambies a mano la cantidad a enviar ni los lotes del pedido</strong>: SGA no se entera.</p>
+</div>
+<h2 class="seccion" id="s21">6. Administración</h2>
+<p>Quien pone en marcha SGA configura las ubicaciones, las estrategias y los controles. Esa parte tiene su propio documento: <strong>MANUAL_IMPLANTACION_SGA.md</strong>, en la carpeta <em>Otros</em>.</p>
+<p>Las páginas de configuración son:</p>
+<table><thead><tr><th>Página</th><th>Qué se configura</th></tr>
+</thead><tbody>
+<tr><td><strong>Configuración SGA</strong></td><td>Almacén y zona por defecto, fecha inicio SGA, ubicación de ajustes, estrategias de ubicación y de picking, análisis ABC, controles (capacidad, desvíos, escaneo, asignación de picking) y numeración</td></tr>
+<tr><td><strong>Zonas</strong></td><td>Agrupar ubicaciones por zona, grupo IIEE y prioridades de ubicación y de picking</td></tr>
+<tr><td><strong>Ubicaciones del almacén</strong></td><td>Ubicaciones estándar sobre las que SGA añade sus datos (tipo, capacidad, mezclas, producto fijo)</td></tr>
+<tr><td><strong>Generar ubicaciones</strong></td><td>Crea la estructura del almacén a partir de los rangos de pasillo, estantería y altura</td></tr>
+<tr><td><strong>Sincronizar ubicaciones</strong></td><td>Da de alta en SGA las ubicaciones que todavía no tienen datos</td></tr>
+<tr><td><strong>Carga inicial de contenido</strong></td><td>Reparte el stock que ya tiene Business Central entre las ubicaciones. Conviene lanzarla primero en simulación</td></tr>
+<tr><td><strong>Inicializar contenido</strong></td><td>Deja el almacén sin nada ubicado para repetir la carga inicial desde cero</td></tr>
+</tbody></table>
+<div class="captura">
+<p><strong>[CAPTURA 35]</strong> Configuración SGA, grupo <em>General</em> y grupo <em>Estrategias</em>. Datos de ejemplo: almacén 1, fecha inicio SGA de la puesta en marcha.</p>
+</div>
+<div class="captura">
+<p><strong>[CAPTURA 36]</strong> Carga inicial de contenido en modo <em>Solo simular</em>, con el resultado de lo que se ha quedado fuera y por qué. Datos de ejemplo: un producto sin palé en su ficha.</p>
+</div>
+<h2 class="seccion" id="s22">7. Si algo falla</h2>
+<p>Lo más frecuente está aquí. Los casos con más detalle, con su causa y su solución paso a paso, están en <strong>TROUBLESHOOTING.md</strong>, en la carpeta <em>Otros</em>.</p>
+<table><thead><tr><th>Síntoma</th><th>Qué hacer</th></tr>
+</thead><tbody>
+<tr><td><em>¿Dónde está el producto?</em> no lo encuentra</td><td>Quita los filtros de <em>Lote</em> y <em>Almacén</em>. Si sigue sin salir, no está ubicado: búscalo en <em>Pendiente de ubicar</em>.</td></tr>
+<tr><td>No propone una ubicación que existe</td><td>Casi siempre no tiene tipo (vista <em>Sin tipo</em>). Si no, está bloqueada, es de otro producto fijo, no tiene sitio o espera una reubicación.</td></tr>
+<tr><td><em>No se puede ubicar</em>: no queda espacio</td><td>Libera ubicaciones, amplía su capacidad en palés o crea más.</td></tr>
+<tr><td><em>No se puede ubicar</em>: el producto no tiene palé</td><td>Rellena el <em>Cód. palé por defecto</em> del producto y vuelve a proponer.</td></tr>
+<tr><td>Ha metido más de un palé en un hueco</td><td>El hueco tiene capacidad 0. Quita el contenido, pon capacidad = 1 y vuelve a ubicar.</td></tr>
+<tr><td>La ocupación de una ubicación no cuadra</td><td>Ficha de la ubicación &gt; <em>Recalcular ocupación</em>.</td></tr>
+<tr><td>No me deja cambiar la configuración de una ubicación</td><td>Tiene contenido. Trasládalo o vacíalo; si solo quieres que no se use, bloquéala.</td></tr>
+<tr><td>Una recepción no sale en <em>Ubicar recepciones</em></td><td>Vacía las fechas y el producto, pon <em>Clase de artículo</em> = <em>Todas</em> y desmarca <em>Solo lo que falta por ubicar</em>. Si no entró por albarán de compra, usa <em>Ubicar producto</em>.</td></tr>
+<tr><td>Deshice una recepción que ya estaba ubicada</td><td><em>Contenido de ubicaciones</em> &gt; <em>Recontar</em> con la cantidad real.</td></tr>
+<tr><td>No deja enviar el pedido a picking</td><td>Lánzalo. Si ya tiene una orden abierta, termínala o cancélala.</td></tr>
+<tr><td>La orden terminó pero el pedido no tiene cantidad a enviar ni lotes</td><td>Pulsa <em>Pasar al pedido</em> en la orden.</td></tr>
+<tr><td><em>Siguiente orden</em>: no tiene órdenes asignadas</td><td>Se exige asignación: el responsable reparte en <em>Asignar órdenes de picking</em>.</td></tr>
+<tr><td>En la PDA no pasa nada al escanear</td><td>Revisa el perfil del lector (capítulo 4.1) y que la salida por teclado esté desactivada. Solo funciona en la app de Business Central.</td></tr>
+<tr><td><em>El código … no corresponde a ningún producto</em></td><td>Da de alta el código como referencia de tipo <em>Código de barras</em> del producto o en su GTIN.</td></tr>
+<tr><td>Un responsable no puede asignar</td><td>En <em>Configuración de usuarios</em>, marca <em>Responsable picking SGA</em>.</td></tr>
+<tr><td>Un picking vacío no tiene reubicación</td><td>Revisa que haya stock disponible en almacenamiento, una ubicación de picking con sitio y la serie de órdenes. Luego <em>Planificar reubicaciones</em>.</td></tr>
+<tr><td>El mapa 3D sale en blanco</td><td>Elige el almacén y vacía zona y pasillo. Los códigos deben seguir el formato <code>101-15-03</code>.</td></tr>
+<tr><td>La ubicación leída no existe en SGA</td><td>La etiqueta que se ha leído no es de una ubicación SGA del almacén. Lee la etiqueta del hueco que tienes delante.</td></tr>
+</tbody></table>
+<h2 class="seccion" id="s23">Anexo A. Lista de capturas</h2>
+<p>Cada captura se pega en el hueco de su número. Usa datos de la base de pruebas, nunca de clientes reales. Para los SSCC, usa uno que exista en la base de pruebas.</p>
+<table><thead><tr><th>Nº</th><th>Capítulo</th><th>Pantalla</th><th>Qué debe mostrar</th></tr>
+</thead><tbody>
+<tr><td>01</td><td>1</td><td>Buscador (Alt+Q)</td><td>Búsqueda "Ubicar" con las pantallas de SGA</td></tr>
+<tr><td>02</td><td>2</td><td>Mi configuración</td><td>Perfil "Almacén SGA" seleccionado</td></tr>
+<tr><td>03</td><td>3.1</td><td>Rol center Almacén SGA</td><td>Los cinco grupos desplegados</td></tr>
+<tr><td>04</td><td>3.1</td><td>Grupo Picking</td><td>Pilas con alguna en rojo y alguna en verde</td></tr>
+<tr><td>05</td><td>3.3</td><td>Ubicar recepciones</td><td>Filtros, líneas con SSCC, A ubicar y propuesta</td></tr>
+<tr><td>06</td><td>3.3</td><td>Ubicar ensamblados</td><td>Embotellado propuesto</td></tr>
+<tr><td>07</td><td>3.3</td><td>Imprimir y ubicar palés</td><td>Tarea en línea y Siguiente palé</td></tr>
+<tr><td>08</td><td>3.3</td><td>Ubicar producto: Dónde dejarlo</td><td>Una línea por palé con SSCC y otra con el resto</td></tr>
+<tr><td>09</td><td>3.3</td><td>Ubicar producto: diálogo</td><td>"¿Ubicar ahora palé…?"</td></tr>
+<tr><td>10</td><td>3.3</td><td>Pendiente de ubicar</td><td>Stock BC, Ubicado, Sin ubicar, En recepciones</td></tr>
+<tr><td>11</td><td>3.3</td><td>Ubicar seleccionadas: opciones</td><td>Ubicar ahora / Solo simular</td></tr>
+<tr><td>12</td><td>3.3</td><td>Ubicar seleccionadas: resultado</td><td>Lo ubicado y lo que no cabe con su motivo</td></tr>
+<tr><td>13</td><td>3.4</td><td>Órdenes de picking</td><td>Órdenes en distintos estados</td></tr>
+<tr><td>14</td><td>3.4</td><td>Asignar órdenes de picking</td><td>Vistas Sin asignar y Asignadas</td></tr>
+<tr><td>15</td><td>3.4</td><td>Paradas retenidas</td><td>Parada retenida con Buscar en otra ubicación</td></tr>
+<tr><td>16</td><td>3.4</td><td>Reubicaciones</td><td>Vista Por hacer tras planificar</td></tr>
+<tr><td>17</td><td>3.4</td><td>Ubicaciones SGA filtradas por pasillo</td><td>Huecos seleccionados e Imprimir etiquetas</td></tr>
+<tr><td>18</td><td>3.4</td><td>Configuración de usuarios</td><td>Casillas Responsable y Carretillero</td></tr>
+<tr><td>19</td><td>3.5</td><td>¿Dónde está el producto?</td><td>Producto con varias ubicaciones</td></tr>
+<tr><td>20</td><td>3.5</td><td>¿Dónde está el producto?: por SSCC</td><td>Búsqueda de un palé</td></tr>
+<tr><td>21</td><td>3.5</td><td>Ubicaciones SGA</td><td>Colores de estado</td></tr>
+<tr><td>22</td><td>3.5</td><td>Contenido de ubicaciones</td><td>SSCC visible y Movimientos del palé</td></tr>
+<tr><td>23</td><td>3.5</td><td>Mapa de almacén</td><td>Pasillo con los cinco estados</td></tr>
+<tr><td>24</td><td>3.5</td><td>Mapa 3D de almacén</td><td>Vista Frente, colorear por Estado</td></tr>
+<tr><td>25</td><td>3.5</td><td>Movimientos de ubicación</td><td>Vista Traslados</td></tr>
+<tr><td>26</td><td>3.5</td><td>Conciliación con el stock</td><td>Stock sin ubicar y Regularizar</td></tr>
+<tr><td>27</td><td>3.5</td><td>Análisis ABC</td><td>Resumen y una clase filtrada</td></tr>
+<tr><td>28</td><td>3.7</td><td>Configuración del rol center</td><td>Grupo Almacén SGA - Configuración</td></tr>
+<tr><td>29</td><td>4</td><td>Rol center del preparador (PDA)</td><td>Preparar pedidos SGA arriba</td></tr>
+<tr><td>30</td><td>4.2</td><td>Preparar picking en la PDA</td><td>VAYA A, COJA y CONFIRME</td></tr>
+<tr><td>31</td><td>4.2</td><td>Preparar picking: lectura incorrecta</td><td>Mensaje en rojo</td></tr>
+<tr><td>32</td><td>4.3</td><td>Reubicación en la PDA</td><td>Línea DE → A</td></tr>
+<tr><td>33</td><td>5.1</td><td>Pedido de venta, pestaña Almacén SGA</td><td>Acción Enviar a SGA</td></tr>
+<tr><td>34</td><td>5.3</td><td>Lista de pedidos con estado de preparación</td><td>Pedidos Parcial y Preparado</td></tr>
+<tr><td>35</td><td>6</td><td>Configuración SGA</td><td>Grupos General y Estrategias</td></tr>
+<tr><td>36</td><td>6</td><td>Carga inicial en simulación</td><td>Resultado con lo que queda fuera</td></tr>
+</tbody></table>
+</body>
+</html>

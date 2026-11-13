@@ -216,8 +216,8 @@ table 51108 "Orden Picking SGA"
     procedure RecalcularEstado()
     var
         rLinea: Record "Linea Orden Picking SGA";
-        pendientes: Integer;
-        recogidas: Integer;
+        hayPendientes: Boolean;
+        hayRecogidas: Boolean;
     begin
         if Estado = Estado::Cancelada then
             exit;
@@ -230,19 +230,19 @@ table 51108 "Orden Picking SGA"
         end;
 
         rLinea.FiltrarPendientes();
-        pendientes := rLinea.Count();
+        hayPendientes := not rLinea.IsEmpty();
 
         rLinea.SetRange(Estado, rLinea.Estado::Recogida);
-        recogidas := rLinea.Count();
+        hayRecogidas := not rLinea.IsEmpty();
 
         case true of
-            pendientes = 0:
+            not hayPendientes:
                 begin
                     Estado := Estado::Finalizada;
                     if "Fecha Finalizacion" = 0DT then
                         "Fecha Finalizacion" := CurrentDateTime();
                 end;
-            recogidas > 0:
+            hayRecogidas:
                 Estado := Estado::"En Proceso";
             else
                 Estado := EstadoSinEmpezar();
@@ -298,6 +298,24 @@ table 51108 "Orden Picking SGA"
     procedure EstaViva(): Boolean
     begin
         exit(Estado in [Estado::"Pendiente Asignar", Estado::Abierta, Estado::"En Proceso"]);
+    end;
+
+    /// <summary>
+    /// Deja solo las órdenes vivas (las de EstaViva).
+    /// </summary>
+    procedure FiltrarVivas()
+    begin
+        SetFilter(Estado, '%1|%2|%3', Estado::"Pendiente Asignar", Estado::Abierta, Estado::"En Proceso");
+    end;
+
+    /// <summary>
+    /// Deja solo las órdenes de venta de un pedido.
+    /// </summary>
+    procedure FiltrarPedido(prm_NoPedido: Code[20])
+    begin
+        SetCurrentKey("No. Documento Origen");
+        SetRange("No. Documento Origen", prm_NoPedido);
+        SetRange(Origen, Origen::Venta);
     end;
 
     /// <summary>

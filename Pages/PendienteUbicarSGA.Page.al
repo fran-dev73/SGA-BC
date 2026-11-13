@@ -179,8 +179,7 @@ page 51131 "Pendiente Ubicar SGA"
                 begin
                     if Rec."A Ubicar" <= 0 then
                         Error(SoloEnDocumentosErr);
-                    pUbicar.Preparar(Rec."Cod. Almacen", Rec."No. Producto", Rec."Cod. Variante", Rec."No. Lote",
-                                     Rec."Fecha Caducidad", Rec."A Ubicar");
+                    pUbicar.Preparar(Rec."Cod. Almacen", Rec."No. Producto", Rec."Cod. Variante", Rec."No. Lote", Rec."A Ubicar");
                     pUbicar.RunModal();
                     Recalcular();
                 end;
@@ -327,7 +326,6 @@ page 51131 "Pendiente Ubicar SGA"
         pResultado: Page "Resultado Carga Inicial SGA";
         opcion: Integer;
         simular: Boolean;
-        productos: Integer;
         cargadas: Decimal;
         noCargadas: Decimal;
         textoError: Text;
@@ -363,7 +361,7 @@ page 51131 "Pendiente Ubicar SGA"
                 Error(textoError);
         end;
 
-        cCarga.ObtenerTotales(productos, cargadas, noCargadas);
+        cCarga.ObtenerTotales(cargadas, noCargadas);
         cCarga.ObtenerResultado(TempResultado);
         if simular then
             Message(SimuladoMsg, cargadas, noCargadas)

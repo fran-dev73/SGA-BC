@@ -29,14 +29,6 @@ enum 51103 "Origen Mov. SGA"
     {
         Caption = 'Venta';
     }
-    value(5; "Doc. Almacen")
-    {
-        Caption = 'Doc. almacén';
-    }
-    value(6; "Diario Producto")
-    {
-        Caption = 'Diario producto';
-    }
     value(7; Recuento)
     {
         Caption = 'Recuento';

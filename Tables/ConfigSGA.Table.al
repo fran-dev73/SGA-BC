@@ -120,18 +120,18 @@ table 51104 "Config. SGA"
             DataClassification = ToBeClassified;
             ToolTip = 'Si está activo, las órdenes de picking nacen pendientes de asignar y solo las puede preparar el preparador al que un responsable se las asigne en "Asignar órdenes de picking". Si no, cada preparador coge la siguiente sin asignar.';
         }
+        field(46; "Max. Cajas por Orden"; Integer)
+        {
+            Caption = 'Máximo de cajas por orden';
+            DataClassification = ToBeClassified;
+            MinValue = 0;
+            ToolTip = 'Número máximo de cajas que puede llevar una orden de picking de productos que se preparan por cajas. Al pasarlo, se abre otra orden del mismo producto. 0 = sin límite: todas las cajas del producto van en una orden.';
+        }
         field(47; "Exigir Escanear Producto"; Boolean)
         {
             Caption = 'Exigir escanear producto al recoger';
             DataClassification = ToBeClassified;
             ToolTip = 'Si está activo, al confirmar cada parada de picking el preparador tiene que escanear el código de barras del producto que recoge (GTIN, referencia de código de barras o GS1-128). Si el GS1-128 trae lote, se comprueba contra el lote de la parada.';
-        }
-        field(44; "Dias Aviso Caducidad"; Integer)
-        {
-            Caption = 'Días aviso caducidad';
-            DataClassification = ToBeClassified;
-            MinValue = 0;
-            ToolTip = 'Días de antelación con los que se avisa de un lote próximo a caducar.';
         }
         field(50; "Nos. Orden SGA"; Code[20])
         {
@@ -139,13 +139,6 @@ table 51104 "Config. SGA"
             DataClassification = ToBeClassified;
             TableRelation = "No. Series";
             ToolTip = 'Serie numérica de las órdenes de trabajo de almacén. La consume la gestión de órdenes de la Fase 2.';
-        }
-        field(60; "Crear Ubicacion SGA Auto"; Boolean)
-        {
-            Caption = 'Crear datos SGA automáticamente';
-            DataClassification = ToBeClassified;
-            InitValue = true;
-            ToolTip = 'Crea la fila de datos SGA la primera vez que se usa una ubicación de la topología. Si se desactiva, la ubicación debe estar dada de alta previamente.';
         }
         field(70; "Fecha Inicio SGA"; Date)
         {
@@ -203,6 +196,17 @@ table 51104 "Config. SGA"
     end;
 
     /// <summary>
+    /// El almacén indicado o, si viene en blanco, el almacén por defecto de la configuración.
+    /// </summary>
+    procedure AlmacenODefecto(prm_Almacen: Code[10]): Code[10]
+    begin
+        if prm_Almacen <> '' then
+            exit(prm_Almacen);
+        ObtenerConfig();
+        exit("Almacen por Defecto");
+    end;
+
+    /// <summary>
     /// Regla de desvío: dejar o coger en una ubicación distinta de la propuesta solo se admite
     /// con "Permitir Desvio Ubicacion". Ir a la propuesta siempre está permitido. Cada llamador
     /// decide qué hace si no se permite (error o aviso). Trabaja sobre la configuración ya
@@ -245,16 +249,5 @@ table 51104 "Config. SGA"
         if "Corte ABC Clase B" < "Corte ABC Clase A" then
             exit(CortesABCMalLbl);
         exit(StrSubstNo(RepartoABCLbl, "Corte ABC Clase A", "Corte ABC Clase B" - "Corte ABC Clase A", 100 - "Corte ABC Clase B"));
-    end;
-
-    /// <summary>
-    /// Comprueba que la ubicación indicada está configurada; si no, lanza error indicando el campo.
-    /// </summary>
-    procedure TestUbicacionConfigurada(prm_Ubicacion: Code[20]; prm_NombreCampo: Text)
-    var
-        CampoSinConfigurarErr: Label 'Debe configurar %1 en la configuración de SGA.', Comment = '%1 = nombre del campo';
-    begin
-        if prm_Ubicacion = '' then
-            Error(CampoSinConfigurarErr, prm_NombreCampo);
     end;
 }

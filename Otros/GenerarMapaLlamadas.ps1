@@ -1,8 +1,8 @@
-﻿# Genera MAPA_LLAMADAS.md: qué objetos de SGA usa cada objeto de SGA y quién lo usa a él.
+﻿# Genera MAPA_LLAMADAS.md: qué codeunit de SGA usa a cuál y quién lo llama.
 # Lee los .al de SGA y busca las referencias a otros objetos de SGA (variables Record,
 # Codeunit, Page..., RunObject, CardPageId, partes, extends, SourceTable, TableRelation,
-# usercontrol). Es un mapa estático: dice qué objeto depende de cuál, no cuántas veces ni en
-# qué orden. Los objetos de la base de BC y del resto del proyecto no salen. Uso:
+# usercontrol). Es un mapa estático: no cuenta cuántas veces ni en qué orden. Solo se
+# muestran codeunits. Los objetos de la base de BC y del resto del proyecto no salen. Uso:
 #   powershell -ExecutionPolicy Bypass -File SGA\Otros\GenerarMapaLlamadas.ps1
 $ErrorActionPreference = 'Stop'
 
@@ -75,84 +75,57 @@ foreach ($clave in @($objetos.Keys)) {
     }
 }
 
-# 3. Diagramas Mermaid. Los nodos llevan un id corto; el nombre va en la etiqueta.
-# Los menús apuntan a casi todo: en el diagrama de navegación solo harían ruido.
-$menus = @('page|Rol Center Almacen SGA', 'pageextension|Order Processor SGA')
+# 3. Salida: solo codeunits. Diagrama de flechas entre ellos, tabla y lista de los que nadie nombra.
 $ids = @{}
 $n = 0
 foreach ($clave in $objetos.Keys) { $n++; $ids[$clave] = "n$n" }
 
-function Nodo([string]$clave) {
-    $obj = $objetos[$clave]
-    $forma = switch ($obj.Tipo) {
-        'codeunit' { '[["{0}"]]' }
-        'table' { '[("{0}")]' }
-        'tableextension' { '[("{0}")]' }
-        'report' { '[/"{0}"/]' }
-        default { '["{0}"]' }
-    }
-    return "$($ids[$clave])$([string]::Format($forma, $obj.Nombre))"
-}
-
-function Diagrama([string]$titulo, [string]$explicacion, [scriptblock]$filtroArista) {
+function Diagrama([string]$titulo, [string]$explicacion) {
     $sb = [System.Text.StringBuilder]::new()
     [void]$sb.AppendLine("## $titulo").AppendLine().AppendLine($explicacion).AppendLine()
     [void]$sb.AppendLine('```mermaid').AppendLine('flowchart LR')
     $nodos = [ordered]@{}
     $aristas = [System.Collections.Generic.List[string]]::new()
     foreach ($origen in $objetos.Keys) {
+        if ($objetos[$origen].Tipo -ne 'codeunit') { continue }
         foreach ($destino in ($objetos[$origen].Usa.Keys | Sort-Object)) {
-            if (& $filtroArista $objetos[$origen].Tipo $objetos[$destino].Tipo $origen) {
-                $nodos[$origen] = $true; $nodos[$destino] = $true
-                $aristas.Add("    $($ids[$origen]) --> $($ids[$destino])")
-            }
+            if ($objetos[$destino].Tipo -ne 'codeunit') { continue }
+            $nodos[$origen] = $true; $nodos[$destino] = $true
+            $aristas.Add("    $($ids[$origen]) --> $($ids[$destino])")
         }
     }
-    foreach ($clave in $nodos.Keys) { [void]$sb.AppendLine("    $(Nodo $clave)") }
+    foreach ($clave in $nodos.Keys) { [void]$sb.AppendLine("    $($ids[$clave])[[`"$($objetos[$clave].Nombre)`"]]") }
     foreach ($a in $aristas) { [void]$sb.AppendLine($a) }
     [void]$sb.AppendLine('```').AppendLine()
     return $sb.ToString()
 }
 
-# Nombre legible de una lista de objetos; el tipo solo se añade si el nombre se repite.
-function Etiqueta([string]$clave) {
-    $obj = $objetos[$clave]
-    $repetido = @($objetos.Values | Where-Object { $_.Nombre -eq $obj.Nombre }).Count -gt 1
-    if ($repetido) { return "$($obj.Nombre) ($($nombreTipo[$obj.Tipo].ToLower()))" }
-    return $obj.Nombre
-}
-
+# Nombres de los codeunits de un conjunto de relaciones.
 function Lista([hashtable]$conjunto) {
-    if ($conjunto.Count -eq 0) { return '—' }
-    return ((@($conjunto.Keys | ForEach-Object { Etiqueta $_ }) | Sort-Object) -join ', ')
+    $nombres = @($conjunto.Keys | Where-Object { $objetos[$_].Tipo -eq 'codeunit' } | ForEach-Object { $objetos[$_].Nombre })
+    if ($nombres.Count -eq 0) { return '—' }
+    return (($nombres | Sort-Object) -join ', ')
 }
 
 $md = [System.Text.StringBuilder]::new()
 [void]$md.AppendLine('# Mapa de llamadas de SGA').AppendLine()
-[void]$md.AppendLine('Qué objeto de SGA usa a cuál. Lo genera `GenerarMapaLlamadas.ps1` leyendo el código: no se edita a mano, se vuelve a generar.').AppendLine()
-[void]$md.AppendLine('Es un mapa de dependencias, no de ejecución: una flecha dice que el objeto nombra al otro (variable, `RunObject`, parte, `SourceTable`...), no cuántas veces ni en qué orden lo llama. No salen los objetos de BC ni los del resto del proyecto, ni los conjuntos de permisos.').AppendLine()
-[void]$md.AppendLine('Formas: `[[codeunit]]`, `[(tabla)]`, `[/informe/]`, `[página u otro]`.').AppendLine()
+[void]$md.AppendLine('Qué codeunit de SGA llama a cuál. Lo genera `GenerarMapaLlamadas.ps1`: no se edita a mano, se vuelve a generar.').AppendLine()
+[void]$md.AppendLine('Una flecha `A --> B` significa que el código de A nombra a B; no dice cuántas veces ni en qué orden. Páginas, informes y tablas no salen.').AppendLine()
+[void]$md.Append((Diagrama 'Codeunits entre sí' 'La puerta de escritura es *Gestion Contenido SGA*; el motor de propuesta, *Gestion Ubicaciones SGA*.'))
 
-[void]$md.Append((Diagrama 'Núcleo: codeunits entre sí' 'Cómo se apoyan los codeunits unos en otros. La puerta de escritura es *Gestion Contenido SGA*; el motor de propuesta, *Gestion Ubicaciones SGA*.' { param($o, $d) $o -eq 'codeunit' -and $d -eq 'codeunit' }))
-[void]$md.Append((Diagrama 'Quién llama a la lógica' 'Páginas, informes, extensiones y tablas que usan algún codeunit. La lógica vive en los codeunits; las páginas llaman.' { param($o, $d) $o -ne 'codeunit' -and $d -eq 'codeunit' }))
-[void]$md.Append((Diagrama 'Navegación entre pantallas' 'Qué página, informe o extensión abre o incrusta a cuál (partes, fichas, informes). Los dos menús, *Rol Center Almacen SGA* y *Order Processor SGA*, abren casi todo y no salen aquí: su lista está en la tabla.' { param($o, $d, $clave) ($o -in 'page', 'pageextension', 'report', 'codeunit') -and ($d -in 'page', 'report', 'controladdin') -and ($clave -notin $menus) }))
-
-[void]$md.AppendLine('## Tabla completa').AppendLine()
-[void]$md.AppendLine('| Objeto | Tipo | Usa | Lo usan |').AppendLine('|---|---|---|---|')
-foreach ($clave in ($objetos.Keys | Sort-Object { $objetos[$_].Tipo }, { $objetos[$_].Nombre })) {
+[void]$md.AppendLine('## Codeunits: qué usan y quién los llama').AppendLine()
+[void]$md.AppendLine('| Codeunit | Usa | Lo llaman |').AppendLine('|---|---|---|')
+foreach ($clave in ($objetos.Keys | Where-Object { $objetos[$_].Tipo -eq 'codeunit' } | Sort-Object { $objetos[$_].Nombre })) {
     $obj = $objetos[$clave]
-    if ($obj.Tipo -eq 'permissionset') { continue }
-    [void]$md.AppendLine("| **$($obj.Nombre)** | $($nombreTipo[$obj.Tipo]) | $(Lista $obj.Usa) | $(Lista $obj.UsadoPor) |")
+    [void]$md.AppendLine("| **$($obj.Nombre)** | $(Lista $obj.Usa) | $(Lista $obj.UsadoPor) |")
 }
 [void]$md.AppendLine()
 
-$sinUso = @($objetos.Keys | Where-Object {
-        $objetos[$_].UsadoPor.Count -eq 0 -and $objetos[$_].Tipo -notin 'pageextension', 'tableextension', 'permissionset', 'profile', 'enumextension'
-    } | Sort-Object { $objetos[$_].Nombre })
-[void]$md.AppendLine('## Objetos que ningún otro objeto de SGA nombra').AppendLine()
-[void]$md.AppendLine('No quiere decir que sobren: pueden abrirse desde el buscador, la cola de proyectos o una URL. Es la lista que hay que mirar al buscar código muerto.').AppendLine()
+$sinUso = @($objetos.Keys | Where-Object { $objetos[$_].Tipo -eq 'codeunit' -and $objetos[$_].UsadoPor.Count -eq 0 } | Sort-Object { $objetos[$_].Nombre })
+[void]$md.AppendLine('## Codeunits que ningún objeto de SGA nombra').AppendLine()
+[void]$md.AppendLine('No quiere decir que sobren: pueden ejecutarse desde el buscador, la cola de proyectos o una URL. Es la lista que hay que mirar al buscar código muerto.').AppendLine()
 if ($sinUso.Count -eq 0) { [void]$md.AppendLine('Ninguno.') }
-foreach ($clave in $sinUso) { [void]$md.AppendLine("- **$($objetos[$clave].Nombre)** ($($nombreTipo[$objetos[$clave].Tipo]))") }
+foreach ($clave in $sinUso) { [void]$md.AppendLine("- **$($objetos[$clave].Nombre)**") }
 
 Set-Content -LiteralPath $salida -Value $md.ToString() -Encoding UTF8
 Write-Host "Generado $salida con $($objetos.Count) objetos."

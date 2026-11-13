@@ -7,7 +7,8 @@ using Microsoft.Warehouse.Structure;
 /// <summary>
 /// Table Contenido Ubicacion SGA (ID 51102).
 /// Estado actual del almacén: qué producto, variante, lote y unidad de medida hay
-/// ahora mismo en cada ubicación, y en qué cantidad.
+/// ahora mismo en cada ubicación, de qué palé (SSCC) y en qué cantidad. Dos palés del mismo
+/// lote en un hueco son dos líneas.
 ///
 /// Es una capa de detalle sobre el stock de BC, no un stock paralelo: la cantidad total
 /// la siguen gobernando los movimientos de producto. Un traslado entre ubicaciones
@@ -54,27 +55,17 @@ table 51102 "Contenido Ubicacion SGA"
             Caption = 'Nº lote';
             DataClassification = ToBeClassified;
         }
+        field(55; SSCC; Code[20])
+        {
+            Caption = 'SSCC';
+            DataClassification = ToBeClassified;
+            ToolTip = 'Código del palé (SSCC) al que pertenece la mercancía. Las cajas sueltas de un palé llevan el SSCC de su palé, así que un mismo SSCC puede estar repartido en varias ubicaciones.';
+        }
         field(60; "Cod. Unidad Medida"; Code[10])
         {
             Caption = 'Cód. unidad medida';
             DataClassification = ToBeClassified;
             TableRelation = "Item Unit of Measure".Code where("Item No." = field("No. Producto"));
-        }
-        field(70; Cantidad; Decimal)
-        {
-            Caption = 'Cantidad';
-            DataClassification = ToBeClassified;
-            DecimalPlaces = 0 : 5;
-            Editable = false;
-            ToolTip = 'Cantidad en la unidad de medida de la línea.';
-        }
-        field(71; "Ctdad. por Unidad Medida"; Decimal)
-        {
-            Caption = 'Ctdad. por unidad medida';
-            DataClassification = ToBeClassified;
-            DecimalPlaces = 0 : 5;
-            Editable = false;
-            InitValue = 1;
         }
         field(72; "Cantidad Base"; Decimal)
         {
@@ -165,21 +156,23 @@ table 51102 "Contenido Ubicacion SGA"
 
     keys
     {
-        key(PK; "Cod. Almacen", "Cod. Bin", "No. Producto", "Cod. Variante", "No. Lote", "Cod. Unidad Medida")
+        key(PK; "Cod. Almacen", "Cod. Bin", "No. Producto", "Cod. Variante", "No. Lote", "Cod. Unidad Medida", SSCC)
         {
             Clustered = true;
         }
+        key(Pale; SSCC, "Cod. Almacen")
+        {
+        }
         key(Ubicacion; "Cod. Almacen", "Cod. Bin")
         {
-            SumIndexFields = Cantidad, "Cantidad Base", "Cantidad Reservada", "Cantidad Disponible";
+            SumIndexFields = "Cantidad Base";
         }
         key(Producto; "No. Producto", "Cod. Variante", "Cod. Almacen", "No. Lote")
         {
-            SumIndexFields = "Cantidad Base", "Cantidad Reservada", "Cantidad Disponible";
+            SumIndexFields = "Cantidad Base";
         }
         key(FEFO; "Cod. Almacen", "No. Producto", "Cod. Variante", Bloqueado, "Fecha Caducidad", "Cod. Bin")
         {
-            SumIndexFields = "Cantidad Base", "Cantidad Disponible";
         }
         key(Lote; "No. Lote", "No. Producto", "Cod. Almacen")
         {
@@ -192,10 +185,10 @@ table 51102 "Contenido Ubicacion SGA"
 
     fieldgroups
     {
-        fieldgroup(DropDown; "Cod. Bin", "No. Producto", "No. Lote", Cantidad)
+        fieldgroup(DropDown; "Cod. Bin", "No. Producto", "No. Lote", SSCC, "Cantidad Base")
         {
         }
-        fieldgroup(Brick; "Cod. Bin", "No. Producto", Descripcion, "No. Lote", Cantidad)
+        fieldgroup(Brick; "Cod. Bin", "No. Producto", Descripcion, "No. Lote", SSCC, "Cantidad Base")
         {
         }
     }
@@ -243,14 +236,10 @@ table 51102 "Contenido Ubicacion SGA"
     end;
 
     /// <summary>
-    /// Recalcula la cantidad base y la disponible a partir de la cantidad y del factor de conversión.
+    /// Recalcula la cantidad disponible: la base menos la reservada.
     /// </summary>
     procedure ActualizarCantidades()
     begin
-        if "Ctdad. por Unidad Medida" <= 0 then
-            "Ctdad. por Unidad Medida" := 1;
-
-        "Cantidad Base" := Round(Cantidad * "Ctdad. por Unidad Medida", 0.00001);
         "Cantidad Disponible" := "Cantidad Base" - "Cantidad Reservada";
     end;
 
@@ -280,5 +269,18 @@ table 51102 "Contenido Ubicacion SGA"
             exit('Ambiguous');
 
         exit('Standard');
+    end;
+
+    /// <summary>
+    /// Deja solo el contenido que se puede coger de un producto en un almacén: sin bloquear y
+    /// con algo disponible. Es el filtro de partida del picking y de las reubicaciones.
+    /// </summary>
+    procedure FiltrarDisponible(prm_Almacen: Code[10]; prm_Producto: Code[20]; prm_Variante: Code[10])
+    begin
+        SetRange("Cod. Almacen", prm_Almacen);
+        SetRange("No. Producto", prm_Producto);
+        SetRange("Cod. Variante", prm_Variante);
+        SetRange(Bloqueado, false);
+        SetFilter("Cantidad Disponible", '>%1', 0);
     end;
 }

@@ -96,6 +96,21 @@ table 51114 "Linea Ubicacion SGA"
             ToolTip = 'Lote de la mercancía.';
             DataClassification = ToBeClassified;
         }
+        // Largo para que quepa la lectura entera de la etiqueta (GS1-128 con más datos que el SSCC);
+        // al validar se queda solo el SSCC (SSCCPale).
+        field(28; SSCC; Code[100])
+        {
+            Caption = 'SSCC';
+            ToolTip = 'Código del palé (SSCC). Escanee la etiqueta del palé; si no la tiene, se genera uno al ubicar.';
+            DataClassification = ToBeClassified;
+
+            trigger OnValidate()
+            var
+                cLectura: Codeunit "Lectura Codigos SGA";
+            begin
+                SSCC := cLectura.SSCCLeido(SSCC);
+            end;
+        }
         field(30; "Ubicacion Propuesta"; Code[20])
         {
             Caption = 'Ubicación propuesta';
@@ -193,9 +208,6 @@ table 51114 "Linea Ubicacion SGA"
         key(Documento; Origen, "No. Documento", "No. Producto", "Cod. Variante", "No. Lote", "Cod. Unidad Medida")
         {
         }
-        key(Pendientes; Estado, "Ubicacion Propuesta")
-        {
-        }
     }
 
     fieldgroups
@@ -217,6 +229,19 @@ table 51114 "Linea Ubicacion SGA"
         if not (Origen in [Origen::Compra, Origen::Produccion]) then
             exit('');
         exit(StrSubstNo(ReservaFilaLbl, Origen, "No. Documento", Linea));
+    end;
+
+    /// <summary>
+    /// SSCC de la línea, ya validado. Si no se ha leído ninguno, da uno nuevo y lo deja en la
+    /// línea: todo palé que se ubica lleva su SSCC.
+    /// </summary>
+    procedure SSCCPale(): Code[20]
+    var
+        cLectura: Codeunit "Lectura Codigos SGA";
+    begin
+        if SSCC = '' then
+            SSCC := cLectura.NuevoSSCC();
+        exit(CopyStr(SSCC, 1, 20));
     end;
 
     /// <summary>

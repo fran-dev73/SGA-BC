@@ -296,11 +296,9 @@ page 51127 "Ubicar Palets Linea SGA"
 
                 trigger OnAction()
                 var
-                    rContenido: Record "Contenido Ubicacion SGA";
+                    cContenido: Codeunit "Gestion Contenido SGA";
                 begin
-                    rContenido.SetRange("Cod. Almacen", TempPaleActual."Cod. Almacen");
-                    rContenido.SetRange("Cod. Bin", TempPaleActual."Ubicacion Confirmada");
-                    Page.Run(Page::"Contenido Ubicaciones SGA", rContenido);
+                    cContenido.MostrarContenidoUbicacion(TempPaleActual."Cod. Almacen", TempPaleActual."Ubicacion Confirmada");
                 end;
             }
             action(ActualizarUnitario)

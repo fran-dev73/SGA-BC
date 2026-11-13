@@ -33,11 +33,6 @@ page 51106 "Config. SGA"
                     ToolTip = 'Zona que se propone en las consultas y el mapa, y sobre la que se resuelven las ubicaciones por defecto de esta configuración.';
                     ApplicationArea = All;
                 }
-                field("Crear Ubicacion SGA Auto"; Rec."Crear Ubicacion SGA Auto")
-                {
-                    ToolTip = 'Crea la fila de datos SGA la primera vez que se usa una ubicación de la topología. Si se desactiva, la ubicación debe estar dada de alta previamente.';
-                    ApplicationArea = All;
-                }
                 field("Fecha Inicio SGA"; Rec."Fecha Inicio SGA")
                 {
                     ApplicationArea = All;
@@ -85,11 +80,6 @@ page 51106 "Config. SGA"
                     ToolTip = 'Orden en que se coge el stock (FEFO, FIFO…), dentro de cada paso del picking: palés completos de almacenamiento, picking y lo que falte de almacenamiento. Es también el orden con que las reubicaciones eligen qué traer de almacenamiento.';
                     ApplicationArea = All;
                 }
-                field("Dias Aviso Caducidad"; Rec."Dias Aviso Caducidad")
-                {
-                    ToolTip = 'Días de antelación con los que se avisa de un lote próximo a caducar.';
-                    ApplicationArea = All;
-                }
             }
             group(AnalisisABC)
             {
@@ -124,7 +114,6 @@ page 51106 "Config. SGA"
                 {
                     ToolTip = 'Qué hacer cuando una entrada supera la capacidad de una ubicación que tiene "Control capacidad" = Según configuración: bloquearla, o avisar y dejar seguir si se confirma. Cada ubicación puede llevar el suyo. La capacidad se controla siempre.';
                     ApplicationArea = All;
-                    ValuesAllowed = Avisar, Bloquear;
                 }
                 field("Permitir Cantidad Negativa"; Rec."Permitir Cantidad Negativa")
                 {
@@ -148,6 +137,11 @@ page 51106 "Config. SGA"
                 field("Exigir Asignacion Picking"; Rec."Exigir Asignacion Picking")
                 {
                     ToolTip = 'Si está activo, las órdenes de picking nacen pendientes de asignar y solo las puede preparar el preparador al que un responsable se las asigne en "Asignar órdenes de picking". Si no, cada preparador coge la siguiente sin asignar.';
+                    ApplicationArea = All;
+                }
+                field("Max. Cajas por Orden"; Rec."Max. Cajas por Orden")
+                {
+                    ToolTip = 'Número máximo de cajas que puede llevar una orden de picking de productos que se preparan por cajas. Al pasarlo, se abre otra orden del mismo producto. 0 = sin límite.';
                     ApplicationArea = All;
                 }
             }

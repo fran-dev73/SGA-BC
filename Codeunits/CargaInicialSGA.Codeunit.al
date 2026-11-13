@@ -40,7 +40,6 @@ codeunit 51106 "Carga Inicial SGA"
         // Modo "solo pendientes" (página Pendiente Ubicar SGA): en vez de todo el stock, se reparte
         // la cantidad indicada de cada lote.
         TempPendientes: Record "Buffer Conciliacion SGA" temporary;
-        rConfig: Record "Config. SGA";
         cContenido: Codeunit "Gestion Contenido SGA";
         cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
         cStock: Codeunit "Consulta Stock SGA";
@@ -56,7 +55,6 @@ codeunit 51106 "Carga Inicial SGA"
         SoloPendientes: Boolean;
         MaxPickingProducto: Integer;
         DescripcionMovimiento: Text;
-        ProductosConStock: Integer;
         UnidadesCargadas: Decimal;
         UnidadesNoCargadas: Decimal;
         MarcaSimulacionTxt: Label 'SGA_SIMULACION_CARGA_INICIAL', Locked = true;
@@ -117,9 +115,8 @@ codeunit 51106 "Carga Inicial SGA"
         prm_Resultado.Copy(TempResultado, true);
     end;
 
-    procedure ObtenerTotales(var prm_Productos: Integer; var prm_UnidadesCargadas: Decimal; var prm_UnidadesNoCargadas: Decimal)
+    procedure ObtenerTotales(var prm_UnidadesCargadas: Decimal; var prm_UnidadesNoCargadas: Decimal)
     begin
-        prm_Productos := ProductosConStock;
         prm_UnidadesCargadas := UnidadesCargadas;
         prm_UnidadesNoCargadas := UnidadesNoCargadas;
     end;
@@ -135,15 +132,12 @@ codeunit 51106 "Carga Inicial SGA"
         if (Destino = Destino::"Ubicacion Indicada") and (UbicacionIndicada = '') then
             Error(UbicacionDestinoObligatoriaErr);
 
-        rConfig.ObtenerConfig();
-
         TempResultado.Reset();
         TempResultado.DeleteAll();
         // Instancia nueva: los cursores de huecos vacíos (ProponerHuecoPaleRuta) empiezan de cero.
         Clear(cUbicaciones);
         cUbicaciones.FijarPickingPrimero(not SoloPendientes, MaxPickingProducto);
         MotivoSinHuecoPale := '';
-        cContenido.FijarModoSilencioso(true);
 
         if SoloPendientes then begin
             ProcesarPendientes();
@@ -247,8 +241,6 @@ codeunit 51106 "Carga Inicial SGA"
         if OmitirConContenido and YaTieneContenido(prm_Producto."No.") then
             exit;
 
-        ProductosConStock += 1;
-
         repeat
             // La puerta de escritura rechaza los productos bloqueados y pararía toda la carga.
             if prm_Producto.Blocked then
@@ -275,7 +267,7 @@ codeunit 51106 "Carga Inicial SGA"
         MotivoSinUbicacionLbl: Label 'Sin ubicación fija ni ubicación indicada.';
     begin
         if Destino = Destino::"Ubicacion Fija del Producto" then begin
-            destinoLinea := cUbicaciones.UbicacionFijaProducto(prm_Producto."No.");
+            destinoLinea := cUbicaciones.UbicacionFijaProducto(Almacen, prm_Producto."No.");
             motivo := MotivoUbicacionFijaLbl;
         end;
         if destinoLinea = '' then begin

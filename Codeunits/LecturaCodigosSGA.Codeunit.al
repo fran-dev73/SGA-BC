@@ -5,13 +5,15 @@ using Microsoft.Inventory.Item.Catalog;
 
 /// <summary>
 /// Codeunit Lectura Codigos SGA (ID 51114).
-/// Interpreta lo que lee el escáner: si es una ubicación o un producto y, para un producto,
-/// cuál es, con su variante y su lote si el código los trae.
+/// Interpreta lo que lee el escáner: si es una ubicación, un palé (SSCC) o un producto y, para
+/// un producto, cuál es, con su variante y su lote si el código los trae.
 ///
 /// Un producto se reconoce por, en este orden: referencia de tipo código de barras, GTIN de
-/// la ficha y nº de producto. Una lectura GS1-128 aporta el GTIN de (01) o (02) y el lote de
-/// (10); un GTIN-14 que empieza por 0 se busca también como EAN-13. Lo que SGA no conoce
-/// (campos propios de la ficha) lo puede resolver otra extensión con OnBuscarProducto.
+/// la ficha y nº de producto. Una lectura GS1-128 aporta el SSCC de (00), el GTIN de (01) o
+/// (02) y el lote de (10); un GTIN-14 que empieza por 0 se busca también como EAN-13.
+///
+/// También da los SSCC nuevos, con el mismo generador que el resto del sistema (Cod. "Gestion
+/// Codigos Barras".generaSSCC).
 /// </summary>
 codeunit 51114 "Lectura Codigos SGA"
 {
@@ -46,13 +48,14 @@ codeunit 51114 "Lectura Codigos SGA"
     var
         codigo: Text;
         gtin: Text;
+        sscc: Text;
     begin
         Clear(prm_Producto);
         Clear(prm_Variante);
         Clear(prm_Lote);
 
         codigo := Normalizar(prm_Lectura);
-        if LeerGS1(codigo, gtin, prm_Lote) then
+        if LeerGS1(codigo, gtin, prm_Lote, sscc) then
             codigo := gtin;
 
         if BuscarProducto(codigo, prm_Producto, prm_Variante) then
@@ -65,11 +68,91 @@ codeunit 51114 "Lectura Codigos SGA"
         exit(false);
     end;
 
+    /// <summary>
+    /// Devuelve true si la lectura trae un SSCC: el (00) de un GS1-128 o los 18 dígitos solos,
+    /// con su dígito de control bien. El SSCC queda en prm_SSCC.
+    /// </summary>
+    procedure LeerSSCC(prm_Lectura: Text; var prm_SSCC: Code[20]): Boolean
+    var
+        codigo: Text;
+        gtin: Text;
+        lote: Code[50];
+        sscc: Text;
+    begin
+        Clear(prm_SSCC);
+        codigo := Normalizar(prm_Lectura);
+        if (StrLen(codigo) = 18) and SoloDigitos(codigo) then
+            sscc := codigo
+        else
+            if not LeerGS1(codigo, gtin, lote, sscc) then
+                exit(false);
+
+        if not SSCCValido(sscc) then
+            exit(false);
+        prm_SSCC := CopyStr(sscc, 1, MaxStrLen(prm_SSCC));
+        exit(true);
+    end;
+
+    /// <summary>
+    /// El SSCC de una lectura o de lo tecleado, para guardarlo en un campo. En blanco si la lectura
+    /// va en blanco; error si no es un SSCC válido.
+    /// </summary>
+    procedure SSCCLeido(prm_Lectura: Text): Code[20]
+    var
+        sscc: Code[20];
+        SSCCNoValidoErr: Label '%1 no es un SSCC válido: tienen que ser los 18 dígitos del palé, o la lectura de su etiqueta.', Comment = '%1 = lo leído';
+    begin
+        if Normalizar(prm_Lectura) = '' then
+            exit('');
+        if not LeerSSCC(prm_Lectura, sscc) then
+            Error(SSCCNoValidoErr, prm_Lectura);
+        exit(sscc);
+    end;
+
+    /// <summary>
+    /// Un SSCC nuevo para un palé que no lo trae, del mismo generador que las etiquetas de palé
+    /// del resto del sistema.
+    /// </summary>
+    procedure NuevoSSCC(): Code[20]
+    var
+        cduCodBarras: Codeunit "Gestion Codigos Barras";
+    begin
+        exit(cduCodBarras.generaSSCC());
+    end;
+
+    /// <summary>
+    /// 18 dígitos con el dígito de control GS1 correcto: los 17 primeros por 3 y 1 alternos,
+    /// empezando por 3, y el último completa la decena.
+    /// </summary>
+    local procedure SSCCValido(prm_SSCC: Text): Boolean
+    var
+        digito: Integer;
+        suma: Integer;
+        i: Integer;
+    begin
+        if (StrLen(prm_SSCC) <> 18) or not SoloDigitos(prm_SSCC) then
+            exit(false);
+
+        for i := 1 to 17 do begin
+            Evaluate(digito, CopyStr(prm_SSCC, i, 1));
+            if i mod 2 = 1 then
+                suma += digito * 3
+            else
+                suma += digito;
+        end;
+        Evaluate(digito, CopyStr(prm_SSCC, 18, 1));
+        exit((10 - suma mod 10) mod 10 = digito);
+    end;
+
+    local procedure SoloDigitos(prm_Texto: Text): Boolean
+    begin
+        exit((prm_Texto <> '') and (DelChr(prm_Texto, '=', '0123456789') = ''));
+    end;
+
     local procedure BuscarProducto(prm_Codigo: Text; var prm_Producto: Code[20]; var prm_Variante: Code[10]): Boolean
     var
         rItemReference: Record "Item Reference";
         rItem: Record Item;
-        encontrado: Boolean;
     begin
         if (prm_Codigo = '') or (StrLen(prm_Codigo) > MaxStrLen(rItemReference."Reference No.")) then
             exit(false);
@@ -101,16 +184,15 @@ codeunit 51114 "Lectura Codigos SGA"
             end;
         end;
 
-        OnBuscarProducto(prm_Codigo, prm_Producto, prm_Variante, encontrado);
-        exit(encontrado);
+        exit(false);
     end;
 
     /// <summary>
-    /// Saca el GTIN de (01) o (02) y el lote de (10) de una lectura GS1-128, tal como la manda
-    /// el escáner (separador GS) o con los AI entre paréntesis. Devuelve false si no lo es.
-    /// Se deja de leer en el primer AI que no se conoce: lo que interesa suele ir delante.
+    /// Saca el SSCC de (00), el GTIN de (01) o (02) y el lote de (10) de una lectura GS1-128, tal
+    /// como la manda el escáner (separador GS) o con los AI entre paréntesis. Devuelve false si
+    /// no lo es. Se deja de leer en el primer AI que no se conoce: lo que interesa suele ir delante.
     /// </summary>
-    local procedure LeerGS1(prm_Codigo: Text; var prm_Gtin: Text; var prm_Lote: Code[50]): Boolean
+    local procedure LeerGS1(prm_Codigo: Text; var prm_Gtin: Text; var prm_Lote: Code[50]; var prm_SSCC: Text): Boolean
     var
         texto: Text;
         ai: Text;
@@ -122,6 +204,7 @@ codeunit 51114 "Lectura Codigos SGA"
         finValor: Integer;
     begin
         Clear(prm_Gtin);
+        Clear(prm_SSCC);
         separador[1] := 29;
         texto := prm_Codigo;
         if CopyStr(texto, 1, 1) = '(' then
@@ -170,6 +253,8 @@ codeunit 51114 "Lectura Codigos SGA"
                 pos += largoValor;
 
                 case ai of
+                    '00':
+                        prm_SSCC := valor;
                     '01', '02':
                         prm_Gtin := valor;
                     '10':
@@ -177,7 +262,7 @@ codeunit 51114 "Lectura Codigos SGA"
                 end;
             end;
 
-        exit((prm_Gtin <> '') or (prm_Lote <> ''));
+        exit((prm_Gtin <> '') or (prm_Lote <> '') or (prm_SSCC <> ''));
     end;
 
     /// <summary>
@@ -195,14 +280,5 @@ codeunit 51114 "Lectura Codigos SGA"
         if CopyStr(lectura, 1, 1) = ']' then
             lectura := CopyStr(lectura, 4);
         exit(lectura);
-    end;
-
-    /// <summary>
-    /// Para que otra extensión reconozca códigos que SGA no conoce, como campos propios de la
-    /// ficha del producto. Se lanza solo si SGA no lo ha encontrado.
-    /// </summary>
-    [IntegrationEvent(false, false)]
-    local procedure OnBuscarProducto(prm_Codigo: Text; var prm_Producto: Code[20]; var prm_Variante: Code[10]; var prm_Encontrado: Boolean)
-    begin
     end;
 }

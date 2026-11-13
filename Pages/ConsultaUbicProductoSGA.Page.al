@@ -7,6 +7,8 @@ using Microsoft.Inventory.Location;
 /// Page Consulta Ubic. Producto SGA (ID 51108).
 /// Responde a "¿dónde está este producto?": lista las ubicaciones que lo contienen,
 /// ordenadas por caducidad y por recorrido, para decir al operario a dónde ir a recogerlo.
+/// También "¿dónde está este palé?": con un SSCC leído o tecleado salen las ubicaciones en las
+/// que está (el palé y, si se ha partido, sus cajas).
 /// </summary>
 page 51108 "Consulta Ubic. Producto SGA"
 {
@@ -61,6 +63,26 @@ page 51108 "Consulta Ubic. Producto SGA"
 
                     trigger OnValidate()
                     begin
+                        AplicarFiltros();
+                    end;
+                }
+                field(FiltroSSCC; FiltroSSCC)
+                {
+                    Caption = 'SSCC';
+                    ToolTip = 'Palé que se quiere localizar: escanee su etiqueta o teclee los 18 dígitos. Busca en todos los productos y almacenes.';
+                    ApplicationArea = All;
+
+                    trigger OnValidate()
+                    var
+                        cLectura: Codeunit "Lectura Codigos SGA";
+                    begin
+                        FiltroSSCC := cLectura.SSCCLeido(FiltroSSCC);
+                        if FiltroSSCC <> '' then begin
+                            FiltroProducto := '';
+                            FiltroAlmacen := '';
+                            FiltroLote := '';
+                            SoloDisponible := false;
+                        end;
                         AplicarFiltros();
                     end;
                 }
@@ -125,6 +147,10 @@ page 51108 "Consulta Ubic. Producto SGA"
                 field("No. Lote"; Rec."No. Lote")
                 {
                     ToolTip = 'Lote que hay en esta ubicación.';
+                    ApplicationArea = All;
+                }
+                field(SSCC; Rec.SSCC)
+                {
                     ApplicationArea = All;
                 }
                 field("Fecha Caducidad"; Rec."Fecha Caducidad")
@@ -197,6 +223,8 @@ page 51108 "Consulta Ubic. Producto SGA"
         FiltroProducto: Code[20];
         FiltroAlmacen: Code[10];
         FiltroLote: Code[50];
+        // Largo para que quepa la lectura entera de la etiqueta; al validar queda solo el SSCC.
+        FiltroSSCC: Text[100];
         SoloDisponible: Boolean;
         TotalUbicado: Decimal;
         EstiloFila: Text;
@@ -209,13 +237,14 @@ page 51108 "Consulta Ubic. Producto SGA"
         FiltroProducto := CopyStr(Rec.GetFilter("No. Producto"), 1, MaxStrLen(FiltroProducto));
         FiltroAlmacen := CopyStr(Rec.GetFilter("Cod. Almacen"), 1, MaxStrLen(FiltroAlmacen));
         FiltroLote := CopyStr(Rec.GetFilter("No. Lote"), 1, MaxStrLen(FiltroLote));
+        FiltroSSCC := CopyStr(Rec.GetFilter(SSCC), 1, MaxStrLen(FiltroSSCC));
 
-        if FiltroAlmacen = '' then begin
+        if (FiltroAlmacen = '') and (FiltroSSCC = '') then begin
             rConfig.ObtenerConfig();
             FiltroAlmacen := rConfig."Almacen por Defecto";
         end;
 
-        SoloDisponible := true;
+        SoloDisponible := FiltroSSCC = '';
         AplicarFiltros();
     end;
 
@@ -242,6 +271,11 @@ page 51108 "Consulta Ubic. Producto SGA"
             Rec.SetRange("No. Lote", FiltroLote)
         else
             Rec.SetRange("No. Lote");
+
+        if FiltroSSCC <> '' then
+            Rec.SetRange(SSCC, FiltroSSCC)
+        else
+            Rec.SetRange(SSCC);
 
         if SoloDisponible then begin
             Rec.SetRange(Bloqueado, false);

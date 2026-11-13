@@ -293,7 +293,9 @@ report 51100 "Generar Ubicaciones SGA"
     end;
 
     local procedure DosDigitos(prm_Valor: Integer): Text
+    var
+        cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
     begin
-        exit(PadStr('', 2 - StrLen(Format(prm_Valor)), '0') + Format(prm_Valor));
+        exit(cUbicaciones.ConCeros(prm_Valor, 2));
     end;
 }

@@ -44,9 +44,11 @@ codeunit 51104 "Gestion Picking SGA"
     /// <summary>
     /// Envía a SGA un pedido de venta lanzado: lo reparte en órdenes de picking de un palé como
     /// mucho, porque el preparador no puede llevar más de uno a la vez. Cada palé completo de
-    /// una línea es una orden; lo que sobra de cada línea (cajas y unidades sueltas) se junta
-    /// con lo suelto de otras líneas en órdenes que no pasan de un palé, contado en fracción del
-    /// palé de cada producto. Devuelve cuántas órdenes ha creado.
+    /// una línea es una orden; lo que sobra de cada línea (unidades sueltas) se junta con lo
+    /// suelto de otras líneas en órdenes que no pasan de un palé, contado en fracción del palé de
+    /// cada producto. Las líneas de caja (la unidad de venta de la ficha) van aparte: una orden
+    /// por producto, con como mucho Max. Cajas por Orden (ver EnviarCajas). Devuelve cuántas
+    /// órdenes ha creado.
     ///
     /// Todos los productos deben tener palé en su ficha: sin él no se sabe qué es un palé. Si
     /// alguna línea no se puede cubrir entera con el contenido ubicado, se crean igual las
@@ -73,14 +75,13 @@ codeunit 51104 "Gestion Picking SGA"
         ocupadoSueltos: Decimal;
         FaltaLineaTxt: Label '%1 %2: faltan %3 %4', Comment = '%1 = producto, %2 = descripción, %3 = cantidad, %4 = unidad';
         PedidoSinPendienteErr: Label 'El pedido %1 no tiene nada pendiente de preparar: lo que queda por servir ya está recogido.', Comment = '%1 = nº pedido';
+        DescripcionSueltosLbl: Label 'Pedido %1 · sueltos', Comment = '%1 = nº pedido';
         SinParadasErr: Label 'No se ha podido generar ninguna parada: no hay contenido ubicado disponible de los productos del pedido.';
     begin
         ComprobarPedidoParaEnviar(prm_NoPedido, rCabVenta);
 
         rConfig.ObtenerConfig();
-        almacen := rCabVenta."Location Code";
-        if almacen = '' then
-            almacen := rConfig."Almacen por Defecto";
+        almacen := rConfig.AlmacenODefecto(rCabVenta."Location Code");
 
         FiltrarLineasPendientes(rCabVenta, rLinVenta);
         if not HayNecesidad(rLinVenta) then
@@ -91,7 +92,8 @@ codeunit 51104 "Gestion Picking SGA"
         rLinVenta.FindSet();
         repeat
             necesidad := NecesidadLinea(rLinVenta);
-            if necesidad > 0 then begin
+            // Lo que se prepara por cajas va aparte, por producto (EnviarCajas).
+            if (necesidad > 0) and not cUM.EsCaja(rLinVenta."No.", rLinVenta."Unit of Measure Code") then begin
                 factorPale := cUM.FactorPale(rLinVenta."No.");
                 palesCompletos := Round(necesidad / factorPale, 1, '<');
                 resto := necesidad - palesCompletos * factorPale;
@@ -104,7 +106,7 @@ codeunit 51104 "Gestion Picking SGA"
                     // Lo suelto cabe en la orden de sueltos abierta si con él no pasa de un palé.
                     if (rOrdenSueltos."No. Orden" = '') or (ocupadoSueltos + resto / factorPale > 1) then begin
                         CerrarOrdenNueva(rOrdenSueltos, creadas);
-                        NuevaOrden(rCabVenta, almacen, false, rOrdenSueltos);
+                        NuevaOrden(rCabVenta, almacen, StrSubstNo(DescripcionSueltosLbl, rCabVenta."No."), rOrdenSueltos);
                         ocupadoSueltos := 0;
                     end;
                     sinCubrir += AnadirParadasLinea(rOrdenSueltos, rLinVenta, resto);
@@ -120,6 +122,7 @@ codeunit 51104 "Gestion Picking SGA"
             end;
         until rLinVenta.Next() = 0;
         CerrarOrdenNueva(rOrdenSueltos, creadas);
+        EnviarCajas(rCabVenta, almacen, rLinVenta, prm_Faltas, creadas);
 
         if creadas = 0 then
             Error(SinParadasErr);
@@ -132,11 +135,9 @@ codeunit 51104 "Gestion Picking SGA"
     local procedure ComprobarPedidoParaEnviar(prm_NoPedido: Code[20]; var prm_CabVenta: Record "Sales Header")
     var
         rOrdenAbierta: Record "Orden Picking SGA";
-        rConfig: Record "Config. SGA";
         PedidoNoExisteErr: Label 'No existe el pedido de venta %1.', Comment = '%1 = nº pedido';
         PedidoNoLanzadoErr: Label 'El pedido %1 debe estar lanzado para enviarlo a SGA.', Comment = '%1 = nº pedido';
         OrdenYaAbiertaErr: Label 'El pedido %1 tiene sin terminar la orden de picking %2. Lo que falte se envía cuando estén terminadas todas sus órdenes.', Comment = '%1 = nº pedido, %2 = nº orden';
-        SerieOrdenSinConfigurarErr: Label 'Configure la serie "Nos. orden SGA" en la configuración de SGA antes de enviar pedidos.';
     begin
         if not prm_CabVenta.Get(prm_CabVenta."Document Type"::Order, prm_NoPedido) then
             Error(PedidoNoExisteErr, prm_NoPedido);
@@ -145,18 +146,12 @@ codeunit 51104 "Gestion Picking SGA"
         if prm_CabVenta.Status <> prm_CabVenta.Status::Released then
             Error(PedidoNoLanzadoErr, prm_NoPedido);
 
-        rOrdenAbierta.SetCurrentKey("No. Documento Origen");
-        rOrdenAbierta.SetRange("No. Documento Origen", prm_NoPedido);
-        rOrdenAbierta.SetRange(Origen, rOrdenAbierta.Origen::Venta);
-        rOrdenAbierta.SetFilter(Estado, '%1|%2|%3', rOrdenAbierta.Estado::"Pendiente Asignar",
-                                rOrdenAbierta.Estado::Abierta, rOrdenAbierta.Estado::"En Proceso");
+        rOrdenAbierta.FiltrarPedido(prm_NoPedido);
+        rOrdenAbierta.FiltrarVivas();
         rOrdenAbierta.SetLoadFields("No. Orden");
         if rOrdenAbierta.FindFirst() then
             Error(OrdenYaAbiertaErr, prm_NoPedido, rOrdenAbierta."No. Orden");
-
-        rConfig.ObtenerConfig();
-        if rConfig."Nos. Orden SGA" = '' then
-            Error(SerieOrdenSinConfigurarErr);
+        // La serie de órdenes la comprueba CrearOrden antes de crear la primera.
     end;
 
     /// <summary>
@@ -189,8 +184,9 @@ codeunit 51104 "Gestion Picking SGA"
     local procedure AnadirOrdenPale(var prm_CabVenta: Record "Sales Header"; prm_Almacen: Code[10]; var prm_LinVenta: Record "Sales Line"; prm_CantidadBase: Decimal; var prm_Creadas: Integer) sinCubrir: Decimal
     var
         rOrden: Record "Orden Picking SGA";
+        DescripcionPaleLbl: Label 'Pedido %1 · palé completo', Comment = '%1 = nº pedido';
     begin
-        NuevaOrden(prm_CabVenta, prm_Almacen, true, rOrden);
+        NuevaOrden(prm_CabVenta, prm_Almacen, StrSubstNo(DescripcionPaleLbl, prm_CabVenta."No."), rOrden);
         sinCubrir := AnadirParadasLinea(rOrden, prm_LinVenta, prm_CantidadBase);
         CerrarOrdenNueva(rOrden, prm_Creadas);
     end;
@@ -202,11 +198,13 @@ codeunit 51104 "Gestion Picking SGA"
     /// </summary>
     local procedure AnadirParadasLinea(var prm_Orden: Record "Orden Picking SGA"; var prm_LinVenta: Record "Sales Line"; prm_CantidadBase: Decimal) sinCubrir: Decimal
     var
+        ultimaAnterior: Integer;
         noLinea: Integer;
     begin
-        noLinea := UltimaLineaOrden(prm_Orden."No. Orden");
+        ultimaAnterior := UltimaLineaOrden(prm_Orden."No. Orden");
+        noLinea := ultimaAnterior;
         sinCubrir := GenerarParadas(prm_Orden, prm_LinVenta, prm_CantidadBase, noLinea);
-        RecalcularReservasOrden(prm_Orden);
+        RecalcularReservasDesde(prm_Orden, ultimaAnterior);
     end;
 
     local procedure UltimaLineaOrden(prm_NoOrden: Code[20]): Integer
@@ -221,31 +219,107 @@ codeunit 51104 "Gestion Picking SGA"
     end;
 
     /// <summary>
-    /// Cabecera de una orden de picking del pedido. prm_Pale dice si es de un palé completo o de
-    /// sueltos, para que se vea en la descripción.
+    /// Cabecera de una orden de picking del pedido. prm_Descripcion la pone quien la crea (palé,
+    /// sueltos o cajas).
     /// </summary>
-    local procedure NuevaOrden(var prm_CabVenta: Record "Sales Header"; prm_Almacen: Code[10]; prm_Pale: Boolean; var prm_Orden: Record "Orden Picking SGA")
+    local procedure NuevaOrden(var prm_CabVenta: Record "Sales Header"; prm_Almacen: Code[10]; prm_Descripcion: Text[100]; var prm_Orden: Record "Orden Picking SGA")
+    begin
+        InicializarOrden(prm_Almacen, prm_Orden.Origen::Venta, prm_Descripcion, prm_Orden);
+        prm_Orden."No. Documento Origen" := prm_CabVenta."No.";
+        prm_Orden."Nombre Cliente" := prm_CabVenta."Sell-to Customer Name";
+        prm_Orden."Fecha Envio" := prm_CabVenta."Shipment Date";
+        prm_Orden.Insert(true);
+    end;
+
+    /// <summary>
+    /// Prepara la cabecera de una orden nueva (sin insertar): número de la serie de la
+    /// configuración, almacén, origen, descripción y estado sin empezar. Es el único sitio que
+    /// numera órdenes, de venta o de reubicaciones.
+    /// </summary>
+    local procedure InicializarOrden(prm_Almacen: Code[10]; prm_Origen: Enum "Origen Mov. SGA"; prm_Descripcion: Text[100]; var prm_Orden: Record "Orden Picking SGA")
     var
         rConfig: Record "Config. SGA";
-        DescripcionPaleLbl: Label 'Pedido %1 · palé completo', Comment = '%1 = nº pedido';
-        DescripcionSueltosLbl: Label 'Pedido %1 · sueltos', Comment = '%1 = nº pedido';
+        SerieOrdenSinConfigurarErr: Label 'Configure la serie "Nos. orden SGA" en la configuración de SGA: sin ella no se pueden crear órdenes de picking ni de reubicación.';
     begin
         rConfig.ObtenerConfig();
+        if rConfig."Nos. Orden SGA" = '' then
+            Error(SerieOrdenSinConfigurarErr);
         Clear(prm_Orden);
         prm_Orden.Init();
         prm_Orden."No. Orden" := SiguienteNoOrden(rConfig."Nos. Orden SGA");
         prm_Orden."Cod. Almacen" := prm_Almacen;
-        prm_Orden.Origen := prm_Orden.Origen::Venta;
-        prm_Orden."No. Documento Origen" := prm_CabVenta."No.";
-        prm_Orden."Nombre Cliente" := prm_CabVenta."Sell-to Customer Name";
-        prm_Orden."Fecha Envio" := prm_CabVenta."Shipment Date";
+        prm_Orden.Origen := prm_Origen;
+        prm_Orden.Descripcion := prm_Descripcion;
         // Con "Exigir asignación" nace pendiente de asignar; si no, abierta para cualquiera.
         prm_Orden.Estado := prm_Orden.EstadoSinEmpezar();
-        if prm_Pale then
-            prm_Orden.Descripcion := CopyStr(StrSubstNo(DescripcionPaleLbl, prm_CabVenta."No."), 1, MaxStrLen(prm_Orden.Descripcion))
-        else
-            prm_Orden.Descripcion := CopyStr(StrSubstNo(DescripcionSueltosLbl, prm_CabVenta."No."), 1, MaxStrLen(prm_Orden.Descripcion));
-        prm_Orden.Insert(true);
+    end;
+
+    /// <summary>
+    /// Pedido de productos que se preparan por cajas (la unidad de venta de la ficha). Una orden
+    /// por producto, con como mucho Max. Cajas por Orden (0 = sin tope); las líneas del mismo
+    /// producto van en sus órdenes. La prioridad de cada orden es el volumen de su caja (en ml),
+    /// así que las de más volumen salen antes y quedan abajo al apilar. Lo que no se cubre va en
+    /// prm_Faltas.
+    /// </summary>
+    local procedure EnviarCajas(var prm_CabVenta: Record "Sales Header"; prm_Almacen: Code[10]; var prm_LinVenta: Record "Sales Line"; var prm_Faltas: Text; var prm_Creadas: Integer)
+    var
+        rLinea: Record "Sales Line";
+        rProducto: Record "Sales Line";
+        rOrden: Record "Orden Picking SGA";
+        rConfig: Record "Config. SGA";
+        cUM: Codeunit "Unidades Producto SGA";
+        productosHechos: Dictionary of [Code[20], Boolean];
+        necesidad: Decimal;
+        cantidad: Decimal;
+        cajasOrden: Decimal;
+        factorCaja: Decimal;
+        sinCubrirProducto: Decimal;
+        DescripcionCajasLbl: Label 'Pedido %1 · cajas', Comment = '%1 = nº pedido';
+        FaltaLineaTxt: Label '%1 %2: faltan %3 %4', Comment = '%1 = producto, %2 = descripción, %3 = cantidad, %4 = unidad';
+    begin
+        rConfig.ObtenerConfig();
+        rLinea.CopyFilters(prm_LinVenta);
+        if not rLinea.FindSet() then
+            exit;
+
+        repeat
+            if cUM.EsCaja(rLinea."No.", rLinea."Unit of Measure Code") and not productosHechos.ContainsKey(rLinea."No.") then begin
+                productosHechos.Add(rLinea."No.", true);
+                rProducto.CopyFilters(prm_LinVenta);
+                rProducto.SetRange("No.", rLinea."No.");
+                rProducto.FindSet();
+                cajasOrden := 0;
+                sinCubrirProducto := 0;
+                repeat
+                    if cUM.EsCaja(rProducto."No.", rProducto."Unit of Measure Code") then begin
+                        necesidad := NecesidadLinea(rProducto);
+                        factorCaja := rProducto."Qty. per Unit of Measure";
+                        while necesidad > 0 do begin
+                            if (rOrden."No. Orden" = '') or ((rConfig."Max. Cajas por Orden" > 0) and (cajasOrden >= rConfig."Max. Cajas por Orden")) then begin
+                                CerrarOrdenNueva(rOrden, prm_Creadas);
+                                NuevaOrden(prm_CabVenta, prm_Almacen, StrSubstNo(DescripcionCajasLbl, prm_CabVenta."No."), rOrden);
+                                cajasOrden := 0;
+                            end;
+
+                            cantidad := necesidad;
+                            if (rConfig."Max. Cajas por Orden" > 0) and (cantidad > (rConfig."Max. Cajas por Orden" - cajasOrden) * factorCaja) then
+                                cantidad := (rConfig."Max. Cajas por Orden" - cajasOrden) * factorCaja;
+                            sinCubrirProducto += AnadirParadasLinea(rOrden, rProducto, cantidad);
+                            cajasOrden += cantidad / factorCaja;
+                            necesidad -= cantidad;
+                        end;
+                    end;
+                until rProducto.Next() = 0;
+                CerrarOrdenNueva(rOrden, prm_Creadas);
+
+                if sinCubrirProducto > 0 then begin
+                    if prm_Faltas <> '' then
+                        prm_Faltas += '\';
+                    prm_Faltas += StrSubstNo(FaltaLineaTxt, rLinea."No.", rLinea.Description,
+                                             Round(sinCubrirProducto / factorCaja, 0.00001), rLinea."Unit of Measure Code");
+                end;
+            end;
+        until rLinea.Next() = 0;
     end;
 
     /// <summary>
@@ -253,12 +327,14 @@ codeunit 51104 "Gestion Picking SGA"
     /// ubicado), se borra; si tiene, se cuenta. Deja prm_Orden vacía.
     /// </summary>
     local procedure CerrarOrdenNueva(var prm_Orden: Record "Orden Picking SGA"; var prm_Creadas: Integer)
+    var
+        rLinea: Record "Linea Orden Picking SGA";
     begin
         if prm_Orden."No. Orden" = '' then
             exit;
 
-        prm_Orden.CalcFields("No. Lineas");
-        if prm_Orden."No. Lineas" = 0 then
+        rLinea.SetRange("No. Orden", prm_Orden."No. Orden");
+        if rLinea.IsEmpty() then
             prm_Orden.Delete(true)
         else
             prm_Creadas += 1;
@@ -272,9 +348,7 @@ codeunit 51104 "Gestion Picking SGA"
     var
         rOrden: Record "Orden Picking SGA";
     begin
-        rOrden.SetCurrentKey("No. Documento Origen");
-        rOrden.SetRange("No. Documento Origen", prm_NoPedido);
-        rOrden.SetRange(Origen, rOrden.Origen::Venta);
+        rOrden.FiltrarPedido(prm_NoPedido);
         exit(not rOrden.IsEmpty());
     end;
 
@@ -338,12 +412,10 @@ codeunit 51104 "Gestion Picking SGA"
         rOrden: Record "Orden Picking SGA";
         rLinVenta: Record "Sales Line";
     begin
-        rOrden.SetCurrentKey("No. Documento Origen");
-        rOrden.SetRange("No. Documento Origen", prm_CabVenta."No.");
-        rOrden.SetRange(Origen, rOrden.Origen::Venta);
+        rOrden.FiltrarPedido(prm_CabVenta."No.");
         if rOrden.IsEmpty() then
             exit(false);
-        rOrden.SetFilter(Estado, '%1|%2|%3', rOrden.Estado::"Pendiente Asignar", rOrden.Estado::Abierta, rOrden.Estado::"En Proceso");
+        rOrden.FiltrarVivas();
         if not rOrden.IsEmpty() then
             exit(false);
 
@@ -361,21 +433,13 @@ codeunit 51104 "Gestion Picking SGA"
         rConfig: Record "Config. SGA";
         almacen: Code[10];
     begin
-        almacen := prm_CabVenta."Location Code";
-        if almacen = '' then begin
-            rConfig.ObtenerConfig();
-            almacen := rConfig."Almacen por Defecto";
-        end;
+        almacen := rConfig.AlmacenODefecto(prm_CabVenta."Location Code");
 
         FiltrarLineasPendientes(prm_CabVenta, rLinVenta);
         if rLinVenta.FindSet() then
             repeat
                 if NecesidadLinea(rLinVenta) > 0 then begin
-                    rContenido.SetRange("Cod. Almacen", almacen);
-                    rContenido.SetRange("No. Producto", rLinVenta."No.");
-                    rContenido.SetRange("Cod. Variante", rLinVenta."Variant Code");
-                    rContenido.SetRange(Bloqueado, false);
-                    rContenido.SetFilter("Cantidad Disponible", '>%1', 0);
+                    rContenido.FiltrarDisponible(almacen, rLinVenta."No.", rLinVenta."Variant Code");
                     if not rContenido.IsEmpty() then
                         exit(true);
                 end;
@@ -386,7 +450,7 @@ codeunit 51104 "Gestion Picking SGA"
     /// <summary>
     /// Las líneas de producto del pedido con algo pendiente de servir.
     /// </summary>
-    local procedure FiltrarLineasPendientes(var prm_CabVenta: Record "Sales Header"; var prm_LinVenta: Record "Sales Line")
+    local procedure FiltrarLineasPendientes(prm_CabVenta: Record "Sales Header"; var prm_LinVenta: Record "Sales Line")
     begin
         prm_LinVenta.SetRange("Document Type", prm_LinVenta."Document Type"::Order);
         prm_LinVenta.SetRange("Document No.", prm_CabVenta."No.");
@@ -401,11 +465,12 @@ codeunit 51104 "Gestion Picking SGA"
     /// </summary>
     local procedure NecesidadLinea(var prm_LinVenta: Record "Sales Line"): Decimal
     var
-        recogido: Dictionary of [Code[50], Decimal];
-        caducidades: Dictionary of [Code[50], Date];
+        rLinea: Record "Linea Orden Picking SGA";
         necesidad: Decimal;
     begin
-        necesidad := prm_LinVenta."Quantity (Base)" - RecogidoPorLote(prm_LinVenta."Document No.", prm_LinVenta."Line No.", recogido, caducidades);
+        FiltrarRecogidoLinea(prm_LinVenta."Document No.", prm_LinVenta."Line No.", rLinea);
+        rLinea.CalcSums("Cantidad Recogida");
+        necesidad := prm_LinVenta."Quantity (Base)" - rLinea."Cantidad Recogida";
         if necesidad > prm_LinVenta."Outstanding Qty. (Base)" then
             necesidad := prm_LinVenta."Outstanding Qty. (Base)";
         if necesidad < 0 then
@@ -462,6 +527,25 @@ codeunit 51104 "Gestion Picking SGA"
     end;
 
     /// <summary>
+    /// Acota el contenido ya filtrado a las ubicaciones de una pasada (1 almacenamiento, 2
+    /// picking, 3 el resto), lo ordena por la estrategia y se sitúa en el primero.
+    /// </summary>
+    local procedure BuscarEnPasada(var prm_Contenido: Record "Contenido Ubicacion SGA"; prm_Pasada: Integer; prm_Estrategia: Enum "Estrategia Picking SGA"): Boolean
+    begin
+        case prm_Pasada of
+            1:
+                prm_Contenido.SetRange("Tipo Ubicacion", prm_Contenido."Tipo Ubicacion"::Almacenamiento);
+            2:
+                prm_Contenido.SetRange("Tipo Ubicacion", prm_Contenido."Tipo Ubicacion"::Picking);
+            else
+                prm_Contenido.SetFilter("Tipo Ubicacion", '<>%1', prm_Contenido."Tipo Ubicacion"::Picking);
+        end;
+        prm_Contenido.SetAutoCalcFields("Secuencia Picking");
+        OrdenarPorEstrategia(prm_Contenido, prm_Estrategia);
+        exit(prm_Contenido.FindSet());
+    end;
+
+    /// <summary>
     /// Una pasada de GenerarParadas (1 palés de almacenamiento, 2 picking, 3 el resto). Lo que ya
     /// ha cogido una pasada anterior de cada línea de contenido va en prm_Cogido: la reserva no
     /// se recalcula hasta terminar la línea del pedido, así que la disponible aún no lo descuenta.
@@ -475,22 +559,8 @@ codeunit 51104 "Gestion Picking SGA"
         if prm_Pendiente <= 0 then
             exit;
 
-        rContenido.SetRange("Cod. Almacen", prm_Orden."Cod. Almacen");
-        rContenido.SetRange("No. Producto", prm_LinVenta."No.");
-        rContenido.SetRange("Cod. Variante", prm_LinVenta."Variant Code");
-        rContenido.SetRange(Bloqueado, false);
-        rContenido.SetFilter("Cantidad Disponible", '>%1', 0);
-        case prm_Pasada of
-            1:
-                rContenido.SetRange("Tipo Ubicacion", rContenido."Tipo Ubicacion"::Almacenamiento);
-            2:
-                rContenido.SetRange("Tipo Ubicacion", rContenido."Tipo Ubicacion"::Picking);
-            else
-                rContenido.SetFilter("Tipo Ubicacion", '<>%1', rContenido."Tipo Ubicacion"::Picking);
-        end;
-        rContenido.SetAutoCalcFields("Secuencia Picking");
-        OrdenarPorEstrategia(rContenido, prm_Estrategia);
-        if not rContenido.FindSet() then
+        rContenido.FiltrarDisponible(prm_Orden."Cod. Almacen", prm_LinVenta."No.", prm_LinVenta."Variant Code");
+        if not BuscarEnPasada(rContenido, prm_Pasada, prm_Estrategia) then
             exit;
 
         repeat
@@ -535,6 +605,7 @@ codeunit 51104 "Gestion Picking SGA"
         rLinea."Descripcion Producto" := CopyStr(rItem.Description, 1, MaxStrLen(rLinea."Descripcion Producto"));
         rLinea."Cod. Variante" := prm_Contenido."Cod. Variante";
         rLinea."No. Lote" := prm_Contenido."No. Lote";
+        rLinea.SSCC := prm_Contenido.SSCC;
         rLinea."Fecha Caducidad" := prm_Contenido."Fecha Caducidad";
         rLinea."Cod. Unidad Medida" := prm_Contenido."Cod. Unidad Medida";
         rLinea."UM Documento" := prm_UMDocumento;
@@ -558,34 +629,21 @@ codeunit 51104 "Gestion Picking SGA"
     procedure AnadirReubicacion(var prm_Contenido: Record "Contenido Ubicacion SGA"; prm_Cantidad: Decimal; prm_Destino: Code[20])
     var
         rOrden: Record "Orden Picking SGA";
-        rLinea: Record "Linea Orden Picking SGA";
-        rConfig: Record "Config. SGA";
         cUM: Codeunit "Unidades Producto SGA";
         noLinea: Integer;
         umPale: Code[10];
         DescripcionReubicacionesLbl: Label 'Reubicaciones a picking';
-        SerieOrdenSinConfigurarErr: Label 'Configure la serie "Nos. orden SGA" en la configuración de SGA antes de planificar reubicaciones.';
     begin
         rOrden.SetCurrentKey("Cod. Almacen", Estado);
         rOrden.SetRange("Cod. Almacen", prm_Contenido."Cod. Almacen");
         rOrden.SetFilter(Estado, '%1|%2', rOrden.Estado::"Pendiente Asignar", rOrden.Estado::Abierta);
         rOrden.SetRange(Origen, rOrden.Origen::Reposicion);
         if not rOrden.FindFirst() then begin
-            rConfig.ObtenerConfig();
-            if rConfig."Nos. Orden SGA" = '' then
-                Error(SerieOrdenSinConfigurarErr);
-            rOrden.Init();
-            rOrden."No. Orden" := SiguienteNoOrden(rConfig."Nos. Orden SGA");
-            rOrden."Cod. Almacen" := prm_Contenido."Cod. Almacen";
-            rOrden.Origen := rOrden.Origen::Reposicion;
-            rOrden.Estado := rOrden.EstadoSinEmpezar();
-            rOrden.Descripcion := DescripcionReubicacionesLbl;
+            InicializarOrden(prm_Contenido."Cod. Almacen", rOrden.Origen::Reposicion, DescripcionReubicacionesLbl, rOrden);
             rOrden.Insert(true);
         end;
 
-        rLinea.SetRange("No. Orden", rOrden."No. Orden");
-        if rLinea.FindLast() then
-            noLinea := rLinea."No. Linea";
+        noLinea := UltimaLineaOrden(rOrden."No. Orden");
 
         // Al carretillero se le enseña en palés si es un palé justo; si no, en la unidad base.
         prm_Contenido.CalcFields("Secuencia Picking");
@@ -596,14 +654,12 @@ codeunit 51104 "Gestion Picking SGA"
             InsertarParada(rOrden, prm_Contenido, prm_Cantidad, prm_Destino, 0, '', prm_Contenido."Cod. Unidad Medida", 1, noLinea);
 
         RecalcularReserva(prm_Contenido."Cod. Almacen", prm_Contenido."Cod. Bin", prm_Contenido."No. Producto",
-                          prm_Contenido."Cod. Variante", prm_Contenido."No. Lote");
+                          prm_Contenido."Cod. Variante", prm_Contenido."No. Lote", prm_Contenido.SSCC);
     end;
 
     /// <summary>
-    /// Fija el orden en que se recorre el contenido según la estrategia configurada.
-    /// "Lote exacto" no tiene lote de referencia al generar la orden, así que se comporta
-    /// como FEFO: al preparador se le sigue diciendo el lote concreto de cada parada.
-    /// Las reubicaciones eligen con el mismo orden qué traer de almacenamiento.
+    /// Fija el orden en que se recorre el contenido según la estrategia configurada. Al
+    /// preparador se le dice el lote concreto de cada parada. Las reubicaciones eligen con el mismo orden qué traer de almacenamiento.
     /// </summary>
     procedure OrdenarPorEstrategia(var prm_Contenido: Record "Contenido Ubicacion SGA"; prm_Estrategia: Enum "Estrategia Picking SGA")
     begin
@@ -623,6 +679,9 @@ codeunit 51104 "Gestion Picking SGA"
     /// La ubicación de la que se recoge es siempre obligatoria: se lee de la etiqueta del hueco y
     /// se compara con el que tiene la parada. prm_ProductoLeido es lo escaneado del producto;
     /// obligatorio con "Exigir Escanear Producto".
+    ///
+    /// El palé no se lee: se da por bueno que sale del de la parada si se coge de su ubicación y,
+    /// si se coge de otra, del palé de esa ubicación (Gestion Contenido SGA.SSCCEnUbicacion).
     /// </summary>
     procedure ConfirmarLinea(var prm_Linea: Record "Linea Orden Picking SGA"; prm_Bin: Code[20]; prm_Cantidad: Decimal; prm_ProductoLeido: Text)
     var
@@ -630,6 +689,7 @@ codeunit 51104 "Gestion Picking SGA"
         rConfig: Record "Config. SGA";
         rUbicacion: Record "Ubicacion SGA";
         cContenido: Codeunit "Gestion Contenido SGA";
+        sscc: Code[20];
         CantidadNoPositivaErr: Label 'La cantidad recogida debe ser mayor que cero.';
         LineaCanceladaErr: Label 'La línea está cancelada.';
         CantidadExcedePendienteErr: Label 'No puede recoger %1: quedan %2 pendientes en esta parada.', Comment = '%1 = cantidad indicada, %2 = cantidad pendiente';
@@ -667,9 +727,16 @@ codeunit 51104 "Gestion Picking SGA"
         rOrden.Get(prm_Linea."No. Orden");
         ComprobarPreparador(rOrden);
 
+        if prm_Bin = prm_Linea."Cod. Bin Propuesto" then
+            sscc := prm_Linea.SSCC
+        else
+            sscc := cContenido.SSCCEnUbicacion(prm_Linea."Cod. Almacen", prm_Bin, prm_Linea."No. Producto",
+                                               prm_Linea."Cod. Variante", prm_Linea."No. Lote");
+
         // La parada se actualiza antes de la salida para que la reserva del hueco ya esté
         // rebajada cuando la salida lo vacíe.
         prm_Linea."Cod. Bin Confirmado" := prm_Bin;
+        prm_Linea."SSCC Recogido" := sscc;
         prm_Linea.Desvio := prm_Linea.HayDesvio();
         prm_Linea."Cantidad Recogida" += prm_Cantidad;
         prm_Linea."Fecha Confirmacion" := CurrentDateTime();
@@ -681,19 +748,19 @@ codeunit 51104 "Gestion Picking SGA"
         // Una reubicación no sale del almacén: se traslada a su ubicación de picking.
         if prm_Linea."Cod. Bin Destino" <> '' then
             cContenido.RegistrarTraslado(prm_Linea."Cod. Almacen", prm_Bin, prm_Linea."Cod. Bin Destino", prm_Linea."No. Producto",
-                                         prm_Linea."Cod. Variante", prm_Linea."No. Lote", prm_Linea."Cod. Unidad Medida",
+                                         prm_Linea."Cod. Variante", prm_Linea."No. Lote", sscc, prm_Linea."Cod. Unidad Medida",
                                          prm_Cantidad, rOrden.Origen, rOrden."No. Orden", prm_Linea."No. Linea",
                                          StrSubstNo(DescripcionReubicacionLbl, rOrden."No. Orden"))
         else
             cContenido.RegistrarSalida(prm_Linea."Cod. Almacen", prm_Bin, prm_Linea."No. Producto",
-                                       prm_Linea."Cod. Variante", prm_Linea."No. Lote", prm_Linea."Cod. Unidad Medida",
+                                       prm_Linea."Cod. Variante", prm_Linea."No. Lote", sscc, prm_Linea."Cod. Unidad Medida",
                                        prm_Cantidad, rOrden.Origen, rOrden."No. Documento Origen",
                                        prm_Linea."No. Linea Origen",
                                        StrSubstNo(DescripcionSalidaLbl, rOrden."No. Orden", rOrden."No. Documento Origen"));
 
-        RecalcularReserva(prm_Linea."Cod. Almacen", prm_Linea."Cod. Bin Propuesto", prm_Linea."No. Producto", prm_Linea."Cod. Variante", prm_Linea."No. Lote");
-        if prm_Bin <> prm_Linea."Cod. Bin Propuesto" then
-            RecalcularReserva(prm_Linea."Cod. Almacen", prm_Bin, prm_Linea."No. Producto", prm_Linea."Cod. Variante", prm_Linea."No. Lote");
+        RecalcularReserva(prm_Linea."Cod. Almacen", prm_Linea."Cod. Bin Propuesto", prm_Linea."No. Producto", prm_Linea."Cod. Variante", prm_Linea."No. Lote", prm_Linea.SSCC);
+        if (prm_Bin <> prm_Linea."Cod. Bin Propuesto") or (sscc <> prm_Linea.SSCC) then
+            RecalcularReserva(prm_Linea."Cod. Almacen", prm_Bin, prm_Linea."No. Producto", prm_Linea."Cod. Variante", prm_Linea."No. Lote", sscc);
 
         rOrden.RecalcularEstado();
         rOrden.Modify();
@@ -739,7 +806,7 @@ codeunit 51104 "Gestion Picking SGA"
         prm_Linea."Cantidad Pendiente" := 0;
         prm_Linea.Modify();
 
-        RecalcularReserva(prm_Linea."Cod. Almacen", prm_Linea."Cod. Bin Propuesto", prm_Linea."No. Producto", prm_Linea."Cod. Variante", prm_Linea."No. Lote");
+        RecalcularReserva(prm_Linea."Cod. Almacen", prm_Linea."Cod. Bin Propuesto", prm_Linea."No. Producto", prm_Linea."Cod. Variante", prm_Linea."No. Lote", prm_Linea.SSCC);
 
         if rOrden.Get(prm_Linea."No. Orden") then begin
             rOrden.RecalcularEstado();
@@ -762,10 +829,10 @@ codeunit 51104 "Gestion Picking SGA"
     procedure SustituirParadaSinStock(var prm_Linea: Record "Linea Orden Picking SGA"; var prm_Cubierta: Boolean) resultado: Text
     var
         rOrden: Record "Orden Picking SGA";
-        rUltima: Record "Linea Orden Picking SGA";
         rConfig: Record "Config. SGA";
         pendiente: Decimal;
         sinCubrir: Decimal;
+        ultimaAnterior: Integer;
         noLinea: Integer;
         pasada: Integer;
         ubicaciones: Text;
@@ -776,11 +843,8 @@ codeunit 51104 "Gestion Picking SGA"
         pendiente := prm_Linea."Cantidad Pendiente";
         CancelarLinea(prm_Linea);
         rOrden.Get(prm_Linea."No. Orden");
-
-        rUltima.SetRange("No. Orden", prm_Linea."No. Orden");
-        rUltima.SetLoadFields("No. Linea");
-        if rUltima.FindLast() then
-            noLinea := rUltima."No. Linea";
+        ultimaAnterior := UltimaLineaOrden(prm_Linea."No. Orden");
+        noLinea := ultimaAnterior;
 
         rConfig.ObtenerConfig();
         sinCubrir := pendiente;
@@ -792,7 +856,8 @@ codeunit 51104 "Gestion Picking SGA"
                 SustituirEnPasada(rOrden, prm_Linea, rConfig."Estrategia Picking", pasada, sinCubrir, noLinea, ubicaciones);
 
         if sinCubrir < pendiente then begin
-            RecalcularReservasOrden(rOrden);
+            // Solo las paradas nuevas: la cancelada ya liberó su reserva en CancelarLinea.
+            RecalcularReservasDesde(rOrden, ultimaAnterior);
             rOrden.RecalcularEstado();
             // RecalcularEstado cambia el estado de la orden; el analizador no lo ve.
 #pragma warning disable AA0214
@@ -824,23 +889,9 @@ codeunit 51104 "Gestion Picking SGA"
         if prm_Pendiente <= 0 then
             exit;
 
-        rContenido.SetRange("Cod. Almacen", prm_Linea."Cod. Almacen");
-        rContenido.SetRange("No. Producto", prm_Linea."No. Producto");
-        rContenido.SetRange("Cod. Variante", prm_Linea."Cod. Variante");
+        rContenido.FiltrarDisponible(prm_Linea."Cod. Almacen", prm_Linea."No. Producto", prm_Linea."Cod. Variante");
         rContenido.SetFilter("Cod. Bin", '<>%1', prm_Linea."Cod. Bin Propuesto");
-        rContenido.SetRange(Bloqueado, false);
-        rContenido.SetFilter("Cantidad Disponible", '>%1', 0);
-        case prm_Pasada of
-            1:
-                rContenido.SetRange("Tipo Ubicacion", rContenido."Tipo Ubicacion"::Almacenamiento);
-            2:
-                rContenido.SetRange("Tipo Ubicacion", rContenido."Tipo Ubicacion"::Picking);
-            else
-                rContenido.SetFilter("Tipo Ubicacion", '<>%1', rContenido."Tipo Ubicacion"::Picking);
-        end;
-        rContenido.SetAutoCalcFields("Secuencia Picking");
-        OrdenarPorEstrategia(rContenido, prm_Estrategia);
-        if not rContenido.FindSet() then
+        if not BuscarEnPasada(rContenido, prm_Pasada, prm_Estrategia) then
             exit;
 
         repeat
@@ -950,7 +1001,7 @@ codeunit 51104 "Gestion Picking SGA"
     /// siguiente sin asignar y se la queda: una reubicación si el usuario es carretillero
     /// (EsCarretillero) y un pedido si no. Devuelve false si no hay ninguna.
     /// </summary>
-    procedure TomarSiguienteOrden(var prm_Orden: Record "Orden Picking SGA"): Boolean
+    local procedure TomarSiguienteOrden(var prm_Orden: Record "Orden Picking SGA"): Boolean
     var
         rConfig: Record "Config. SGA";
         usuario: Code[50];
@@ -992,25 +1043,80 @@ codeunit 51104 "Gestion Picking SGA"
     local procedure BuscarMasPrioritaria(var prm_Orden: Record "Orden Picking SGA"): Boolean
     var
         rCandidata: Record "Orden Picking SGA";
-        mejor: Code[20];
-        mejorPrioridad: Integer;
+        rMejor: Record "Orden Picking SGA";
+        hayMejor: Boolean;
     begin
-        mejor := '';
-        mejorPrioridad := 0;
         rCandidata.CopyFilters(prm_Orden);
         rCandidata.SetCurrentKey("No. Orden");
         if rCandidata.FindSet() then
             repeat
-                if (mejor = '') or (rCandidata.Prioridad > mejorPrioridad) then
-                    if rCandidata.TieneParadasParaPreparar() then begin
-                        mejor := rCandidata."No. Orden";
-                        mejorPrioridad := rCandidata.Prioridad;
+                if rCandidata.TieneParadasParaPreparar() then
+                    if (not hayMejor) or VaAntesQue(rCandidata, rMejor) then begin
+                        rMejor := rCandidata;
+                        hayMejor := true;
                     end;
             until rCandidata.Next() = 0;
 
-        if mejor = '' then
+        if not hayMejor then
             exit(false);
-        exit(prm_Orden.Get(mejor));
+        exit(prm_Orden.Get(rMejor."No. Orden"));
+    end;
+
+    /// <summary>
+    /// Si la orden A se prepara antes que la B: primero la prioridad manual del pedido, luego el
+    /// pedido (sus órdenes van juntas), dentro del pedido palé, cajas y sueltos, y entre cajas la de
+    /// más volumen.
+    /// </summary>
+    local procedure VaAntesQue(rA: Record "Orden Picking SGA"; rB: Record "Orden Picking SGA"): Boolean
+    var
+        rangoA: Integer;
+        rangoB: Integer;
+        volumenA: Decimal;
+        volumenB: Decimal;
+    begin
+        if rA.Prioridad <> rB.Prioridad then
+            exit(rA.Prioridad > rB.Prioridad);
+        if rA."No. Documento Origen" <> rB."No. Documento Origen" then
+            exit(rA."No. Documento Origen" < rB."No. Documento Origen");
+        ClaseOrden(rA, rangoA, volumenA);
+        ClaseOrden(rB, rangoB, volumenB);
+        if rangoA <> rangoB then
+            exit(rangoA < rangoB);
+        if volumenA <> volumenB then
+            exit(volumenA > volumenB);
+        exit(rA."No. Orden" < rB."No. Orden");
+    end;
+
+    /// <summary>
+    /// Tipo de una orden según la unidad de medida de sus líneas de picking (UM Documento, la del
+    /// pedido de venta): 0 palé completo, 1 cajas (con su volumen en litros), 2 sueltos.
+    /// </summary>
+    local procedure ClaseOrden(prm_Orden: Record "Orden Picking SGA"; var prm_Rango: Integer; var prm_Volumen: Decimal)
+    var
+        rLinea: Record "Linea Orden Picking SGA";
+        cUM: Codeunit "Unidades Producto SGA";
+    begin
+        prm_Rango := 2;
+        prm_Volumen := 0;
+        rLinea.SetLoadFields("No. Producto", "UM Documento", "Cantidad a Recoger");
+        rLinea.SetRange("No. Orden", prm_Orden."No. Orden");
+        if not rLinea.FindFirst() then
+            exit;
+        if cUM.EsCaja(rLinea."No. Producto", rLinea."UM Documento") then begin
+            prm_Rango := 1;
+            prm_Volumen := cUM.VolumenUM(rLinea."No. Producto", rLinea."UM Documento");
+            exit;
+        end;
+        if (rLinea."UM Documento" <> '') and (rLinea."UM Documento" = cUM.UMPale(rLinea."No. Producto")) then
+            prm_Rango := 0
+        else
+            if cUM.FactorPale(rLinea."No. Producto") > 1 then begin
+                // Pedido en unidades que suma exactamente un palé: cuenta como palé completo.
+                rLinea.SetRange("No. Producto", rLinea."No. Producto");
+                rLinea.CalcSums("Cantidad a Recoger");
+                if rLinea."Cantidad a Recoger" = cUM.FactorPale(rLinea."No. Producto") then
+                    prm_Rango := 0;
+            end;
     end;
 
     /// <summary>
@@ -1044,21 +1150,41 @@ codeunit 51104 "Gestion Picking SGA"
     end;
 
     /// <summary>
-    /// Suma prm_Delta a la prioridad de las órdenes del conjunto recibido, sin bajar de cero.
+    /// Suma prm_Delta a la prioridad del pedido de cada orden del conjunto recibido, sin bajar de
+    /// cero: cambia a la vez todas sus órdenes. Las de reubicación no tienen pedido y cambian solas.
     /// </summary>
     procedure CambiarPrioridad(var prm_Orden: Record "Orden Picking SGA"; prm_Delta: Integer)
+    var
+        rOrden: Record "Orden Picking SGA";
+        pedidosHechos: Dictionary of [Code[20], Boolean];
+        clave: Code[20];
     begin
-        // Por la clave primaria: la prioridad forma parte de la clave de la página, y recorrer
-        // por ella mientras se modifica podría visitar dos veces la misma orden.
-        prm_Orden.SetCurrentKey("No. Orden");
-        if prm_Orden.FindSet(true) then
+        clave := prm_Orden."No. Orden";
+        if prm_Orden.FindSet(false) then
             repeat
-                if prm_Orden.Prioridad + prm_Delta < 0 then
-                    prm_Orden.Validate(Prioridad, 0)
-                else
-                    prm_Orden.Validate(Prioridad, prm_Orden.Prioridad + prm_Delta);
-                prm_Orden.Modify(true);
+                if prm_Orden."No. Documento Origen" = '' then begin
+                    rOrden.Get(prm_Orden."No. Orden");
+                    AplicarDelta(rOrden, prm_Delta);
+                end else
+                    if not pedidosHechos.ContainsKey(prm_Orden."No. Documento Origen") then begin
+                        pedidosHechos.Add(prm_Orden."No. Documento Origen", true);
+                        rOrden.SetRange("No. Documento Origen", prm_Orden."No. Documento Origen");
+                        if rOrden.FindSet(true) then
+                            repeat
+                                AplicarDelta(rOrden, prm_Delta);
+                            until rOrden.Next() = 0;
+                    end;
             until prm_Orden.Next() = 0;
+        prm_Orden.Get(clave);
+    end;
+
+    local procedure AplicarDelta(var prm_Orden: Record "Orden Picking SGA"; prm_Delta: Integer)
+    begin
+        if prm_Orden.Prioridad + prm_Delta < 0 then
+            prm_Orden.Validate(Prioridad, 0)
+        else
+            prm_Orden.Validate(Prioridad, prm_Orden.Prioridad + prm_Delta);
+        prm_Orden.Modify(true);
     end;
 
     /// <summary>
@@ -1196,6 +1322,7 @@ codeunit 51104 "Gestion Picking SGA"
     /// </summary>
     procedure PasarAPedido(var prm_Orden: Record "Orden Picking SGA")
     var
+        rOrden: Record "Orden Picking SGA";
         rCabVenta: Record "Sales Header";
         rLinVenta: Record "Sales Line";
         recogido: Dictionary of [Code[50], Decimal];
@@ -1216,10 +1343,7 @@ codeunit 51104 "Gestion Picking SGA"
         if not rCabVenta.Get(rCabVenta."Document Type"::Order, prm_Orden."No. Documento Origen") then
             Error(PedidoNoExisteErr, prm_Orden."No. Documento Origen");
 
-        rLinVenta.SetRange("Document Type", rCabVenta."Document Type");
-        rLinVenta.SetRange("Document No.", rCabVenta."No.");
-        rLinVenta.SetRange(Type, rLinVenta.Type::Item);
-        rLinVenta.SetFilter("Outstanding Qty. (Base)", '>%1', 0);
+        FiltrarLineasPendientes(rCabVenta, rLinVenta);
         if rLinVenta.FindSet(true) then
             repeat
                 Clear(recogido);
@@ -1251,8 +1375,15 @@ codeunit 51104 "Gestion Picking SGA"
                 rLinVenta.Modify(true);
             until rLinVenta.Next() = 0;
 
-        prm_Orden."Fecha Paso a Documento" := CurrentDateTime();
-        prm_Orden.Modify();
+        // El paso es del pedido entero: se sellan todas sus órdenes terminadas.
+        rOrden.FiltrarPedido(prm_Orden."No. Documento Origen");
+        rOrden.SetRange(Estado, rOrden.Estado::Finalizada);
+        rOrden.ModifyAll("Fecha Paso a Documento", CurrentDateTime());
+        prm_Orden.Get(prm_Orden."No. Orden");
+        if prm_Orden."Fecha Paso a Documento" = 0DT then begin
+            prm_Orden."Fecha Paso a Documento" := CurrentDateTime();
+            prm_Orden.Modify();
+        end;
     end;
 
     /// <summary>
@@ -1264,9 +1395,7 @@ codeunit 51104 "Gestion Picking SGA"
         rOrden: Record "Orden Picking SGA";
         PedidoSinOrdenesErr: Label 'El pedido %1 no tiene órdenes de picking.', Comment = '%1 = nº pedido';
     begin
-        rOrden.SetCurrentKey("No. Documento Origen");
-        rOrden.SetRange("No. Documento Origen", prm_NoPedido);
-        rOrden.SetRange(Origen, rOrden.Origen::Venta);
+        rOrden.FiltrarPedido(prm_NoPedido);
         if not rOrden.FindLast() then
             Error(PedidoSinOrdenesErr, prm_NoPedido);
 
@@ -1343,36 +1472,37 @@ codeunit 51104 "Gestion Picking SGA"
     /// </summary>
     local procedure RecogidoPorLote(prm_NoPedido: Code[20]; prm_NoLineaPedido: Integer; var prm_Recogido: Dictionary of [Code[50], Decimal]; var prm_Caducidades: Dictionary of [Code[50], Date]): Decimal
     var
-        rOrden: Record "Orden Picking SGA";
         rLinea: Record "Linea Orden Picking SGA";
         acumulado: Decimal;
         total: Decimal;
     begin
-        rOrden.SetCurrentKey("No. Documento Origen");
-        rOrden.SetRange("No. Documento Origen", prm_NoPedido);
-        rOrden.SetRange(Origen, rOrden.Origen::Venta);
-        if not rOrden.FindSet() then
-            exit(0);
+        FiltrarRecogidoLinea(prm_NoPedido, prm_NoLineaPedido, rLinea);
+        if rLinea.FindSet() then
+            repeat
+                if prm_Recogido.Get(rLinea."No. Lote", acumulado) then
+                    prm_Recogido.Set(rLinea."No. Lote", acumulado + rLinea."Cantidad Recogida")
+                else
+                    prm_Recogido.Add(rLinea."No. Lote", rLinea."Cantidad Recogida");
 
-        repeat
-            rLinea.SetRange("No. Orden", rOrden."No. Orden");
-            rLinea.SetRange("No. Linea Origen", prm_NoLineaPedido);
-            rLinea.SetFilter("Cantidad Recogida", '>%1', 0);
-            if rLinea.FindSet() then
-                repeat
-                    if prm_Recogido.Get(rLinea."No. Lote", acumulado) then
-                        prm_Recogido.Set(rLinea."No. Lote", acumulado + rLinea."Cantidad Recogida")
-                    else
-                        prm_Recogido.Add(rLinea."No. Lote", rLinea."Cantidad Recogida");
+                if (rLinea."Fecha Caducidad" <> 0D) and (not prm_Caducidades.ContainsKey(rLinea."No. Lote")) then
+                    prm_Caducidades.Add(rLinea."No. Lote", rLinea."Fecha Caducidad");
 
-                    if (rLinea."Fecha Caducidad" <> 0D) and (not prm_Caducidades.ContainsKey(rLinea."No. Lote")) then
-                        prm_Caducidades.Add(rLinea."No. Lote", rLinea."Fecha Caducidad");
-
-                    total += rLinea."Cantidad Recogida";
-                until rLinea.Next() = 0;
-        until rOrden.Next() = 0;
+                total += rLinea."Cantidad Recogida";
+            until rLinea.Next() = 0;
 
         exit(total);
+    end;
+
+    /// <summary>
+    /// Las paradas de una línea del pedido con algo recogido, de todas sus órdenes. Solo las
+    /// paradas de venta llevan el pedido como documento de origen.
+    /// </summary>
+    local procedure FiltrarRecogidoLinea(prm_NoPedido: Code[20]; prm_NoLineaPedido: Integer; var prm_Linea: Record "Linea Orden Picking SGA")
+    begin
+        prm_Linea.SetCurrentKey("No. Documento Origen", "No. Linea Origen");
+        prm_Linea.SetRange("No. Documento Origen", prm_NoPedido);
+        prm_Linea.SetRange("No. Linea Origen", prm_NoLineaPedido);
+        prm_Linea.SetFilter("Cantidad Recogida", '>%1', 0);
     end;
 
     /// <summary>
@@ -1407,10 +1537,11 @@ codeunit 51104 "Gestion Picking SGA"
     end;
 
     /// <summary>
-    /// Ajusta la reserva de un hueco a lo que piden sus paradas abiertas. Nunca reserva más de
-    /// lo que hay: si alguien se ha desviado y ha cogido de aquí, la reserva se recorta.
+    /// Ajusta la reserva de una línea de contenido (hueco, lote y palé) a lo que piden sus paradas
+    /// abiertas. Nunca reserva más de lo que hay: si alguien se ha desviado y ha cogido de aquí,
+    /// la reserva se recorta.
     /// </summary>
-    procedure RecalcularReserva(prm_Almacen: Code[10]; prm_Bin: Code[20]; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50])
+    procedure RecalcularReserva(prm_Almacen: Code[10]; prm_Bin: Code[20]; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50]; prm_SSCC: Code[20])
     var
         rLinea: Record "Linea Orden Picking SGA";
         rContenido: Record "Contenido Ubicacion SGA";
@@ -1422,7 +1553,7 @@ codeunit 51104 "Gestion Picking SGA"
             exit;
 
         // El contenido va siempre en la unidad base; sin producto, UMBase da '' y no se encuentra.
-        if not rContenido.Get(prm_Almacen, prm_Bin, prm_Producto, prm_Variante, prm_Lote, cUM.UMBase(prm_Producto)) then
+        if not rContenido.Get(prm_Almacen, prm_Bin, prm_Producto, prm_Variante, prm_Lote, cUM.UMBase(prm_Producto), prm_SSCC) then
             exit;
 
         rLinea.SetCurrentKey("No. Producto", "No. Lote");
@@ -1431,6 +1562,7 @@ codeunit 51104 "Gestion Picking SGA"
         rLinea.SetRange("Cod. Variante", prm_Variante);
         rLinea.SetRange("Cod. Almacen", prm_Almacen);
         rLinea.SetRange("Cod. Bin Propuesto", prm_Bin);
+        rLinea.SetRange(SSCC, prm_SSCC);
         rLinea.FiltrarPendientes();
         rLinea.CalcSums("Cantidad Pendiente");
         reserva := rLinea."Cantidad Pendiente";
@@ -1448,13 +1580,23 @@ codeunit 51104 "Gestion Picking SGA"
     /// Recalcula la reserva de todos los huecos que toca una orden.
     /// </summary>
     procedure RecalcularReservasOrden(var prm_Orden: Record "Orden Picking SGA")
+    begin
+        RecalcularReservasDesde(prm_Orden, 0);
+    end;
+
+    /// <summary>
+    /// Recalcula la reserva de los huecos de las paradas de la orden posteriores a
+    /// prm_DesdeLinea: al añadir paradas, solo las nuevas cambian lo reservado.
+    /// </summary>
+    local procedure RecalcularReservasDesde(var prm_Orden: Record "Orden Picking SGA"; prm_DesdeLinea: Integer)
     var
         rLinea: Record "Linea Orden Picking SGA";
     begin
         rLinea.SetRange("No. Orden", prm_Orden."No. Orden");
+        rLinea.SetFilter("No. Linea", '>%1', prm_DesdeLinea);
         if rLinea.FindSet() then
             repeat
-                RecalcularReserva(rLinea."Cod. Almacen", rLinea."Cod. Bin Propuesto", rLinea."No. Producto", rLinea."Cod. Variante", rLinea."No. Lote");
+                RecalcularReserva(rLinea."Cod. Almacen", rLinea."Cod. Bin Propuesto", rLinea."No. Producto", rLinea."Cod. Variante", rLinea."No. Lote", rLinea.SSCC);
             until rLinea.Next() = 0;
     end;
 
@@ -1476,7 +1618,7 @@ codeunit 51104 "Gestion Picking SGA"
                 // Copia para recalcular: el registro del bucle está filtrado por la reserva
                 // que se va a cambiar.
                 rReservado := rContenido;
-                RecalcularReserva(rReservado."Cod. Almacen", rReservado."Cod. Bin", rReservado."No. Producto", rReservado."Cod. Variante", rReservado."No. Lote");
+                RecalcularReserva(rReservado."Cod. Almacen", rReservado."Cod. Bin", rReservado."No. Producto", rReservado."Cod. Variante", rReservado."No. Lote", rReservado.SSCC);
             until rContenido.Next() = 0;
 
         if prm_Almacen <> '' then
@@ -1484,7 +1626,7 @@ codeunit 51104 "Gestion Picking SGA"
         rLinea.FiltrarPendientes();
         if rLinea.FindSet() then
             repeat
-                RecalcularReserva(rLinea."Cod. Almacen", rLinea."Cod. Bin Propuesto", rLinea."No. Producto", rLinea."Cod. Variante", rLinea."No. Lote");
+                RecalcularReserva(rLinea."Cod. Almacen", rLinea."Cod. Bin Propuesto", rLinea."No. Producto", rLinea."Cod. Variante", rLinea."No. Lote", rLinea.SSCC);
             until rLinea.Next() = 0;
     end;
 
@@ -1504,7 +1646,7 @@ codeunit 51104 "Gestion Picking SGA"
     begin
         rOrden.SetCurrentKey("Cod. Almacen", Estado);
         rOrden.SetRange("Cod. Almacen", prm_Almacen);
-        rOrden.SetFilter(Estado, '%1|%2|%3', rOrden.Estado::Abierta, rOrden.Estado::"En Proceso", rOrden.Estado::"Pendiente Asignar");
+        rOrden.FiltrarVivas();
         rOrden.SetLoadFields("No. Orden");
         if not rOrden.FindSet() then
             exit;
@@ -1548,10 +1690,7 @@ codeunit 51104 "Gestion Picking SGA"
         completas: Integer;
         conAlgo: Integer;
     begin
-        rLinVenta.SetRange("Document Type", prm_Cabecera."Document Type");
-        rLinVenta.SetRange("Document No.", prm_Cabecera."No.");
-        rLinVenta.SetRange(Type, rLinVenta.Type::Item);
-        rLinVenta.SetFilter("Outstanding Quantity", '>0');
+        FiltrarLineasPendientes(prm_Cabecera, rLinVenta);
         rLinVenta.SetAutoCalcFields("Cantidad Preparada SGA");
         if not rLinVenta.FindSet() then
             exit("Estado Preparacion SGA"::" ");

@@ -185,8 +185,13 @@ page 51123 "Ubicar Entradas SGA"
                 field("Cantidad a Ubicar"; Rec.Cantidad)
                 {
                     Caption = 'A ubicar';
-                    ToolTip = 'Cantidad que se va a colocar ahora. Se puede reducir para ubicar en varias veces.';
+                    ToolTip = 'Cantidad que se va a colocar ahora: lo que queda, sin pasar de un palé. Se puede reducir si el palé viene incompleto.';
                     ApplicationArea = All;
+                }
+                field(SSCC; Rec.SSCC)
+                {
+                    ApplicationArea = All;
+                    Editable = Rec.Estado <> Rec.Estado::Ubicado;
                 }
                 field("Cod. Unidad Medida"; Rec."Cod. Unidad Medida")
                 {
@@ -357,11 +362,9 @@ page 51123 "Ubicar Entradas SGA"
 
                 trigger OnAction()
                 var
-                    rContenido: Record "Contenido Ubicacion SGA";
+                    cContenido: Codeunit "Gestion Contenido SGA";
                 begin
-                    rContenido.SetRange("Cod. Almacen", Rec."Cod. Almacen");
-                    rContenido.SetRange("Cod. Bin", Rec."Ubicacion Confirmada");
-                    Page.Run(Page::"Contenido Ubicaciones SGA", rContenido);
+                    cContenido.MostrarContenidoUbicacion(Rec."Cod. Almacen", Rec."Ubicacion Confirmada");
                 end;
             }
             action(VerMovimientos)

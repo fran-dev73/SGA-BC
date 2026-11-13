@@ -53,6 +53,15 @@ page 51120 "Lineas Orden Picking Subpag"
                     ToolTip = 'Lote concreto que hay que recoger.';
                     ApplicationArea = All;
                 }
+                field(SSCC; Rec.SSCC)
+                {
+                    ApplicationArea = All;
+                }
+                field("SSCC Recogido"; Rec."SSCC Recogido")
+                {
+                    ApplicationArea = All;
+                    Visible = false;
+                }
                 field("Fecha Caducidad"; Rec."Fecha Caducidad")
                 {
                     ToolTip = 'Caducidad del lote.';

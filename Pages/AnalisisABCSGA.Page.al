@@ -197,18 +197,17 @@ page 51128 "Analisis ABC SGA"
             }
             action(VerEnMapa)
             {
-                Caption = 'Dónde está el producto';
-                ToolTip = 'Muestra en qué ubicaciones está el producto de la línea.';
+                Caption = 'Ver en el mapa';
+                ToolTip = 'Abre el mapa 3D del almacén con cada ubicación coloreada por su clase según su posición (A, B o C), y el producto de la línea resaltado: se ve si está en huecos de su clase.';
                 ApplicationArea = All;
-                Image = BinContent;
+                Image = Map;
 
                 trigger OnAction()
                 var
-                    rContenido: Record "Contenido Ubicacion SGA";
+                    pMapa: Page "Mapa 3D Almacen SGA";
                 begin
-                    rContenido.SetRange("Cod. Almacen", Rec."Cod. Almacen");
-                    rContenido.SetRange("No. Producto", Rec."No. Producto");
-                    Page.Run(Page::"Contenido Ubicaciones SGA", rContenido);
+                    pMapa.Preparar(Rec."Cod. Almacen", 'posicion', Rec."No. Producto");
+                    pMapa.Run();
                 end;
             }
         }
@@ -262,9 +261,9 @@ page 51128 "Analisis ABC SGA"
     trigger OnAfterGetRecord()
     begin
         EstiloClase := Rec.EstiloClaseABC();
-        EstiloCambio := Rec.EstiloClaseAnterior();
-        EstiloUbicacion := Rec.EstiloHuecoSuClase();
-        EstiloUnidad := Rec.EstiloUnidadPale();
+        EstiloCambio := Rec.EstiloAviso(Rec."Cambia Clase");
+        EstiloUbicacion := Rec.EstiloAviso(Rec."Mal Ubicado");
+        EstiloUnidad := Rec.EstiloAviso(Rec."Sin Unidad Pale");
     end;
 
     /// <summary>

@@ -64,11 +64,9 @@ codeunit 51102 "Gestion Mapa SGA"
     /// </summary>
     procedure AbrirContenidoCelda(var prm_Buffer: Record "Buffer Mapa SGA"; prm_Columna: Integer)
     var
-        rContenido: Record "Contenido Ubicacion SGA";
+        cContenido: Codeunit "Gestion Contenido SGA";
     begin
-        rContenido.SetRange("Cod. Almacen", prm_Buffer."Cod. Almacen");
-        rContenido.SetRange("Cod. Bin", cUbicaciones.ComponerCodigoUbicacion(prm_Buffer.Pasillo, prm_Columna, prm_Buffer.Altura));
-        Page.Run(Page::"Contenido Ubicaciones SGA", rContenido);
+        cContenido.MostrarContenidoUbicacion(prm_Buffer."Cod. Almacen", cUbicaciones.ComponerCodigoUbicacion(prm_Buffer.Pasillo, prm_Columna, prm_Buffer.Altura));
     end;
 
     /// <summary>
@@ -112,10 +110,12 @@ codeunit 51102 "Gestion Mapa SGA"
         productos: JsonArray;
         sinUnidad: Dictionary of [Text, Boolean];
         clasesABC: Dictionary of [Code[20], Integer];
+        clasesHueco: Dictionary of [Code[20], Integer];
         salida: Text;
         motivoSinMedir: Text;
         caducidad: Date;
         claseABC: Integer;
+        claseHueco: Integer;
         pasillo: Integer;
         estanteria: Integer;
         altura: Integer;
@@ -131,14 +131,15 @@ codeunit 51102 "Gestion Mapa SGA"
         if not rUbicacionSGA.FindSet() then
             exit('[]');
 
-        // La clase de cada producto se lee una vez para todo el mapa.
+        // La clase de cada producto y la de cada hueco por su posición se leen una vez para todo el mapa.
         cABC.ClasesUltimoCalculo(prm_Almacen, clasesABC);
+        cABC.ClasesHuecosUltimoCalculo(prm_Almacen, clasesHueco);
 
         repeat
             // Sin pasillo, estantería y altura no hay dónde colocar el cubo.
             if cUbicaciones.TrocearCodigo(rUbicacionSGA."Cod. Bin", pasillo, estanteria, altura) then
                 if (prm_Pasillo = 0) or (pasillo = prm_Pasillo) then begin
-                    rUbicacionSGA.CalcFields("Cantidad Base", "Lineas Contenido");
+                    rUbicacionSGA.CalcFields("Lineas Contenido");
 
                     Clear(elemento);
                     elemento.Add('b', rUbicacionSGA."Cod. Bin");
@@ -150,6 +151,10 @@ codeunit 51102 "Gestion Mapa SGA"
                     // Líneas de contenido: el lienzo solo deja arrastrar un traslado desde
                     // una ubicación que tenga algo, y el color no basta (bloqueada tapa a llena).
                     elemento.Add('l', rUbicacionSGA."Lineas Contenido");
+                    // Clase del hueco por su posición (1 A, 2 B, 3 C; 0 si no es hueco útil).
+                    if not clasesHueco.Get(rUbicacionSGA."Cod. Bin", claseHueco) then
+                        claseHueco := 0;
+                    elemento.Add('ch', claseHueco);
                     motivoSinMedir := '';
                     if rUbicacionSGA."Lineas Contenido" > 0 then begin
                         elemento.Add('k', ContenidoParaMapa(rUbicacionSGA, sinUnidad, clasesABC, motivoSinMedir, productos, caducidad, claseABC));
@@ -258,11 +263,13 @@ codeunit 51102 "Gestion Mapa SGA"
     local procedure LineaMapa(var prm_Contenido: Record "Contenido Ubicacion SGA"): JsonObject
     var
         rItem: Record Item;
-        rItemUM: Record "Item Unit of Measure";
+        cUM: Codeunit "Unidades Producto SGA";
         linea: JsonObject;
         umMostrar: Code[10];
+        umPale: Code[10];
         factorMostrar: Decimal;
     begin
+        rItem.SetLoadFields(Description, "Sales Unit of Measure", "Base Unit of Measure");
         if not rItem.Get(prm_Contenido."No. Producto") then
             Clear(rItem);
         UnidadParaMostrar(rItem, prm_Contenido."Cantidad Base", umMostrar, factorMostrar);
@@ -278,52 +285,47 @@ codeunit 51102 "Gestion Mapa SGA"
             linea.Add('q', Round(prm_Contenido."Cantidad Base" / factorMostrar, 0.01));
             linea.Add('u', umMostrar);
         end else begin
-            linea.Add('q', prm_Contenido.Cantidad);
+            linea.Add('q', prm_Contenido."Cantidad Base");
             linea.Add('u', prm_Contenido."Cod. Unidad Medida");
         end;
         linea.Add('x', prm_Contenido.Bloqueado);
         // Tipo de palé del producto (el de su ficha) y cuánto lleva en la misma unidad
         // que la cantidad, para que la ficha diga "45 CAJA12 · PALE (45 CAJA12/palé)".
-        linea.Add('g', rItem."Cod. Pale por Defecto");
-        if (rItem."Cod. Pale por Defecto" <> '') and (umMostrar <> '') and (umMostrar <> rItem."Cod. Pale por Defecto") and
-           rItemUM.Get(prm_Contenido."No. Producto", rItem."Cod. Pale por Defecto")
-        then
-            linea.Add('gf', Round(rItemUM."Qty. per Unit of Measure" / factorMostrar, 0.01))
+        umPale := cUM.UMPale(prm_Contenido."No. Producto");
+        linea.Add('g', umPale);
+        if (umPale <> '') and (umMostrar <> '') and (umMostrar <> umPale) then
+            linea.Add('gf', Round(cUM.FactorUM(prm_Contenido."No. Producto", umPale) / factorMostrar, 0.01))
         else
             linea.Add('gf', 0);
         exit(linea);
     end;
 
     /// <summary>
-    /// Unidad en la que se enseña una línea de contenido y sus unidades base: el palé si la
-    /// línea llena el palé al 100 %; si no, la unidad de venta (la caja) si es mayor que la base,
-    /// y si no, la base. En blanco si el producto no se reconoce.
+    /// Unidad en la que se enseña una línea de contenido y sus unidades base, con las mismas
+    /// reglas de palé y caja que el resto de SGA (Unidades Producto SGA): el palé si la línea lo
+    /// llena al 100 %; si no, la caja de venta; si no, la base. En blanco si el producto no se
+    /// reconoce.
     /// </summary>
     local procedure UnidadParaMostrar(var prm_Item: Record Item; prm_CantidadBase: Decimal; var prm_UM: Code[10]; var prm_Factor: Decimal)
     var
-        rItemUM: Record "Item Unit of Measure";
+        cUM: Codeunit "Unidades Producto SGA";
     begin
         prm_UM := '';
         prm_Factor := 0;
         if prm_Item."No." = '' then
             exit;
 
-        // El palé completo se enseña como palé. Si no llega, en cajas.
-        if prm_Item."Cod. Pale por Defecto" <> '' then
-            if rItemUM.Get(prm_Item."No.", prm_Item."Cod. Pale por Defecto") then
-                if (rItemUM."Qty. per Unit of Measure" > 0) and (prm_CantidadBase >= rItemUM."Qty. per Unit of Measure") then begin
-                    prm_UM := rItemUM.Code;
-                    prm_Factor := rItemUM."Qty. per Unit of Measure";
-                    exit;
-                end;
+        prm_Factor := cUM.FactorPale(prm_Item."No.");
+        if (prm_Factor > 1) and (prm_CantidadBase >= prm_Factor) then begin
+            prm_UM := cUM.UMPale(prm_Item."No.");
+            exit;
+        end;
 
-        if prm_Item."Sales Unit of Measure" <> '' then
-                if rItemUM.Get(prm_Item."No.", prm_Item."Sales Unit of Measure") then
-                    if rItemUM."Qty. per Unit of Measure" > 1 then begin
-                        prm_UM := rItemUM.Code;
-                        prm_Factor := rItemUM."Qty. per Unit of Measure";
-                        exit;
-                    end;
+        if cUM.EsCaja(prm_Item."No.", prm_Item."Sales Unit of Measure") then begin
+            prm_UM := prm_Item."Sales Unit of Measure";
+            prm_Factor := cUM.FactorUM(prm_Item."No.", prm_UM);
+            exit;
+        end;
 
         prm_UM := prm_Item."Base Unit of Measure";
         prm_Factor := 1;
@@ -335,14 +337,13 @@ codeunit 51102 "Gestion Mapa SGA"
     /// </summary>
     local procedure EstadoNumerico(var prm_Ubicacion: Record "Ubicacion SGA"; prm_SinMedir: Boolean): Integer
     begin
+        // RecalcularOcupacion deja "Estado SGA" en Bloqueada cuando la ubicación lo está.
         if prm_Ubicacion.Bloqueada then
             exit(3);
-        if prm_SinMedir and (prm_Ubicacion."Estado SGA" <> prm_Ubicacion."Estado SGA"::Bloqueada) then
+        if prm_SinMedir then
             exit(4);
 
         case prm_Ubicacion."Estado SGA" of
-            prm_Ubicacion."Estado SGA"::Bloqueada:
-                exit(3);
             prm_Ubicacion."Estado SGA"::Llena:
                 exit(2);
             prm_Ubicacion."Estado SGA"::Parcial:
@@ -376,7 +377,6 @@ codeunit 51102 "Gestion Mapa SGA"
     local procedure Pintar(var prm_Ubicacion: Record "Ubicacion SGA"; var prm_Resumen: Text; var prm_Estilo: Text)
     var
         rContenido: Record "Contenido Ubicacion SGA";
-        lineas: Integer;
     begin
         prm_Estilo := prm_Ubicacion.EstiloEstado();
 
@@ -385,26 +385,26 @@ codeunit 51102 "Gestion Mapa SGA"
             exit;
         end;
 
-        rContenido.SetRange("Cod. Almacen", prm_Ubicacion."Cod. Almacen");
-        rContenido.SetRange("Cod. Bin", prm_Ubicacion."Cod. Bin");
-        lineas := rContenido.Count();
-
-        case lineas of
+        prm_Ubicacion.CalcFields("Lineas Contenido");
+        case prm_Ubicacion."Lineas Contenido" of
             0:
                 prm_Resumen := '-';
             1:
                 begin
+                    rContenido.SetRange("Cod. Almacen", prm_Ubicacion."Cod. Almacen");
+                    rContenido.SetRange("Cod. Bin", prm_Ubicacion."Cod. Bin");
+                    rContenido.SetLoadFields("No. Producto");
                     rContenido.FindFirst();
                     prm_Resumen := rContenido."No. Producto";
                 end;
             else
-                prm_Resumen := Format(lineas) + ' prod';
+                prm_Resumen := Format(prm_Ubicacion."Lineas Contenido") + ' prod';
         end;
 
         // Reservada para una entrada que aún no se ha ubicado: su propio color.
         if prm_Ubicacion."Reservada Por" <> '' then begin
             prm_Estilo := 'StrongAccent';
-            if lineas = 0 then
+            if prm_Ubicacion."Lineas Contenido" = 0 then
                 prm_Resumen := 'RESERV';
         end;
     end;

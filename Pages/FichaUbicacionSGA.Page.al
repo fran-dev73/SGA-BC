@@ -99,18 +99,6 @@ page 51101 "Ficha Ubicacion SGA"
                     Editable = EsVacia;
                     ApplicationArea = All;
                 }
-                field("Capacidad Volumen"; Rec."Capacidad Volumen")
-                {
-                    Editable = EsVacia;
-                    ToolTip = 'Volumen que admite la ubicación. Informativo.';
-                    ApplicationArea = All;
-                }
-                field("Capacidad Peso"; Rec."Capacidad Peso")
-                {
-                    Editable = EsVacia;
-                    ToolTip = 'Peso que admite la ubicación. Informativo.';
-                    ApplicationArea = All;
-                }
             }
             group(Reglas)
             {
@@ -156,23 +144,6 @@ page 51101 "Ficha Ubicacion SGA"
                 {
                     Editable = EsVacia;
                     ToolTip = 'Producto que tiene esta ubicación como casa. Solo se admite este producto.';
-                    ApplicationArea = All;
-                }
-            }
-            group(Reposicion)
-            {
-                Caption = 'Reposición';
-
-                field("Ctdad. Minima"; Rec."Ctdad. Minima")
-                {
-                    Editable = EsVacia;
-                    ToolTip = 'Por debajo de esta cantidad la ubicación es candidata a reposición desde reserva.';
-                    ApplicationArea = All;
-                }
-                field("Ctdad. Maxima"; Rec."Ctdad. Maxima")
-                {
-                    Editable = EsVacia;
-                    ToolTip = 'Cantidad hasta la que se repone la ubicación.';
                     ApplicationArea = All;
                 }
             }
@@ -248,20 +219,13 @@ page 51101 "Ficha Ubicacion SGA"
                 trigger OnAction()
                 var
                     cContenido: Codeunit "Gestion Contenido SGA";
-                    lineas: Integer;
                     UbicacionVaciaErr: Label 'La ubicación %1 está vacía.', Comment = '%1 = ubicación';
-                    VaciarUbicacionQst: Label 'Se va a vaciar la ubicación %1 (%2 líneas de contenido). La mercancía queda sin ubicar, pendiente de volver a ubicar. ¿Continuar?', Comment = '%1 = ubicación, %2 = líneas';
-                    UbicacionVaciadaMsg: Label 'Ubicación %1 vaciada: %2 líneas quedan pendientes de ubicar.', Comment = '%1 = ubicación, %2 = líneas';
                 begin
                     Rec.CalcFields("Lineas Contenido");
                     if Rec."Lineas Contenido" = 0 then
                         Error(UbicacionVaciaErr, Rec."Cod. Bin");
-                    if not Confirm(VaciarUbicacionQst, false, Rec."Cod. Bin", Rec."Lineas Contenido") then
-                        exit;
-
-                    lineas := cContenido.VaciarUbicacion(Rec."Cod. Almacen", Rec."Cod. Bin");
-                    CurrPage.Update(false);
-                    Message(UbicacionVaciadaMsg, Rec."Cod. Bin", lineas);
+                    if cContenido.VaciarUbicacionConDialogo(Rec."Cod. Almacen", Rec."Cod. Bin") > 0 then
+                        CurrPage.Update(false);
                 end;
             }
         }

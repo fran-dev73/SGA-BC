@@ -11,8 +11,9 @@ using Microsoft.Warehouse.Structure;
 ///
 /// Es una tabla compañera 1:1 de la tabla estándar Bin (7302) en lugar de una
 /// tableextension porque AL no permite extender objetos definidos en la propia app.
-/// La fila se crea bajo demanda con Cod. "Gestion Ubicaciones SGA".ObtenerOCrear, de modo
-/// que SGA es puramente aditivo y la topología estándar no se toca.
+/// Si falta la fila de un Bin, el primer movimiento la da de alta sincronizando la topología
+/// (Cod. "Gestion Contenido SGA"), de modo que SGA es puramente aditivo y la topología
+/// estándar no se toca.
 ///
 /// "Estado SGA" y "% Ocupacion" están persistidos (no son FlowField) para poder contar y
 /// filtrar ubicaciones vacías/llenas sin recorrer el contenido. Los mantiene
@@ -104,30 +105,6 @@ table 51101 "Ubicacion SGA"
                 RecalcularOcupacion();
             end;
         }
-        field(72; "Capacidad Volumen"; Decimal)
-        {
-            Caption = 'Capacidad volumen';
-            DataClassification = ToBeClassified;
-            DecimalPlaces = 0 : 5;
-            MinValue = 0;
-
-            trigger OnValidate()
-            begin
-                TestVacia();
-            end;
-        }
-        field(73; "Capacidad Peso"; Decimal)
-        {
-            Caption = 'Capacidad peso';
-            DataClassification = ToBeClassified;
-            DecimalPlaces = 0 : 5;
-            MinValue = 0;
-
-            trigger OnValidate()
-            begin
-                TestVacia();
-            end;
-        }
         field(74; "Control Capacidad"; Enum "Control Capacidad Ubic. SGA")
         {
             Caption = 'Control capacidad';
@@ -191,32 +168,6 @@ table 51101 "Ubicacion SGA"
                 TestVacia();
             end;
         }
-        field(110; "Ctdad. Minima"; Decimal)
-        {
-            Caption = 'Ctdad. mínima';
-            DataClassification = ToBeClassified;
-            DecimalPlaces = 0 : 5;
-            MinValue = 0;
-            ToolTip = 'Por debajo de esta cantidad la ubicación es candidata a reposición desde reserva.';
-
-            trigger OnValidate()
-            begin
-                TestVacia();
-            end;
-        }
-        field(111; "Ctdad. Maxima"; Decimal)
-        {
-            Caption = 'Ctdad. máxima';
-            DataClassification = ToBeClassified;
-            DecimalPlaces = 0 : 5;
-            MinValue = 0;
-            ToolTip = 'Cantidad hasta la que se repone la ubicación.';
-
-            trigger OnValidate()
-            begin
-                TestVacia();
-            end;
-        }
         field(120; "Estado SGA"; Enum "Estado Ubicacion SGA")
         {
             Caption = 'Estado';
@@ -236,27 +187,6 @@ table 51101 "Ubicacion SGA"
             Caption = 'Fecha último movimiento';
             DataClassification = ToBeClassified;
             Editable = false;
-        }
-        field(140; "Zone Code"; Code[10])
-        {
-            Caption = 'Cód. zona BC';
-            Editable = false;
-            FieldClass = FlowField;
-            CalcFormula = lookup(Bin."Zone Code" where("Location Code" = field("Cod. Almacen"), Code = field("Cod. Bin")));
-        }
-        field(141; "Bin Type Code"; Code[10])
-        {
-            Caption = 'Tipo ubicación BC';
-            Editable = false;
-            FieldClass = FlowField;
-            CalcFormula = lookup(Bin."Bin Type Code" where("Location Code" = field("Cod. Almacen"), Code = field("Cod. Bin")));
-        }
-        field(142; Dedicated; Boolean)
-        {
-            Caption = 'Dedicada BC';
-            Editable = false;
-            FieldClass = FlowField;
-            CalcFormula = lookup(Bin.Dedicated where("Location Code" = field("Cod. Almacen"), Code = field("Cod. Bin")));
         }
         field(150; "Cantidad Base"; Decimal)
         {

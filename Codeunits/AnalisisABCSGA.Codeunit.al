@@ -81,20 +81,39 @@ codeunit 51107 "Analisis ABC SGA"
     var
         rCalculo: Record "Calculo ABC SGA";
         rLinea: Record "Clasificacion ABC SGA";
+        noCalculo: Integer;
     begin
         Clear(prm_Clases);
-        rCalculo.SetCurrentKey("Cod. Almacen", "No.");
-        rCalculo.SetRange("Cod. Almacen", prm_Almacen);
-        if not rCalculo.FindLast() then
+        noCalculo := rCalculo.UltimoDelAlmacen(prm_Almacen);
+        if noCalculo = 0 then
             exit;
 
-        rLinea.SetRange("No. Calculo", rCalculo."No.");
+        // La clave es (cálculo, producto): con el filtro por cálculo cada producto sale una vez.
+        rLinea.SetRange("No. Calculo", noCalculo);
         rLinea.SetLoadFields("No. Producto", Clase);
         if rLinea.FindSet() then
             repeat
-                if not prm_Clases.ContainsKey(rLinea."No. Producto") then
-                    prm_Clases.Add(rLinea."No. Producto", rLinea.Clase.AsInteger());
+                prm_Clases.Add(rLinea."No. Producto", rLinea.Clase.AsInteger());
             until rLinea.Next() = 0;
+    end;
+
+    /// <summary>
+    /// Clase de cada hueco útil del almacén por su posición (altura y secuencia), con el reparto
+    /// del último cálculo: tantos huecos A como palés A había, y así con B. Vacío si no hay
+    /// cálculo. Lo usa el mapa 3D para colorear por posición.
+    /// </summary>
+    procedure ClasesHuecosUltimoCalculo(prm_Almacen: Code[10]; var prm_ClaseHueco: Dictionary of [Code[20], Integer])
+    var
+        rCalculo: Record "Calculo ABC SGA";
+        noCalculo: Integer;
+    begin
+        Clear(prm_ClaseHueco);
+        noCalculo := rCalculo.UltimoDelAlmacen(prm_Almacen);
+        if noCalculo = 0 then
+            exit;
+        rCalculo.Get(noCalculo);
+        // Sobre el registro leído, sin guardarlo: solo se quieren las clases.
+        ClasificarHuecos(rCalculo, prm_ClaseHueco);
     end;
 
     local procedure CrearCabecera(var prm_Calculo: Record "Calculo ABC SGA"; prm_Almacen: Code[10]; prm_Config: Record "Config. SGA")
@@ -155,7 +174,7 @@ codeunit 51107 "Analisis ABC SGA"
         // Solo sale un palé que el producto tiene y que lleva más de una unidad base.
         rLinea."Unidad Pale" := cUM.UMPale(prm_Producto);
         if rLinea."Unidad Pale" <> '' then
-            rLinea."Palets Salidos" := Round(prm_CantidadBase / cUM.FactorUM(prm_Producto, rLinea."Unidad Pale"), 0.1)
+            rLinea."Palets Salidos" := Round(cUM.EnPales(prm_Producto, prm_CantidadBase), 0.1)
         else
             rLinea."Sin Unidad Pale" := true;
         rLinea.Insert();
@@ -187,7 +206,7 @@ codeunit 51107 "Analisis ABC SGA"
     begin
         rContenido.SetCurrentKey("Cod. Almacen", "Cod. Bin");
         rContenido.SetRange("Cod. Almacen", prm_Calculo."Cod. Almacen");
-        rContenido.SetFilter(Cantidad, '>0');
+        rContenido.SetFilter("Cantidad Base", '>0');
         if not rContenido.FindSet() then
             exit;
 
@@ -225,8 +244,6 @@ codeunit 51107 "Analisis ABC SGA"
         rLinea.CalcSums("Palets Salidos");
         prm_Calculo."Palets Salidos" := rLinea."Palets Salidos";
         prm_Calculo.Productos := rLinea.Count();
-        // El 20 % de los productos, redondeando hacia arriba: con 7 productos, 2.
-        prm_Calculo."Productos Top 20" := Round(prm_Calculo.Productos * 0.2, 1, '>');
 
         rLinea.SetCurrentKey("No. Calculo", "Palets Salidos");
         rLinea.Ascending(false);
@@ -267,7 +284,7 @@ codeunit 51107 "Analisis ABC SGA"
             if rLinea."Sin Unidad Pale" then
                 prm_Calculo."Productos Sin UM Pale" += 1;
 
-            if posicion <= prm_Calculo."Productos Top 20" then
+            if posicion <= prm_Calculo.ProductosTop20() then
                 salidasTop += rLinea."Palets Salidos";
 
             rLinea.Modify();

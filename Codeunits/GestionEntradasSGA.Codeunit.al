@@ -30,6 +30,9 @@ using System.Environment;
 /// También es dueño del palé de una tarea de producción ("Imprimir y ubicar palés"): prepara
 /// el siguiente palé con su hueco (PrepararPaleTarea), saca su etiqueta (BarTender o, en
 /// Sandbox, el report A5), anota la etiqueta en la tarea y lo ubica (ImprimirYUbicarPale).
+///
+/// Todo palé entra con su SSCC: el leído de su etiqueta o, si no la trae, uno nuevo. Por eso
+/// las entradas se ubican de palé en palé.
 /// </summary>
 codeunit 51105 "Gestion Entradas SGA"
 {
@@ -148,8 +151,8 @@ codeunit 51105 "Gestion Entradas SGA"
     begin
         rConfig.ObtenerConfig();
 
-        if FiltroFechas(FechaDesde, FechaHasta) <> '' then
-            rCabEns.SetFilter("Posting Date", FiltroFechas(FechaDesde, FechaHasta));
+        rCabEns.SetFilter("Posting Date", FiltroFechas(FechaDesde, FechaHasta));
+        rItem.SetLoadFields(Description, "Clase de articulo");
         // Solo embotellados: las elaboraciones sacan granel a depósito, que no va a hueco.
         rCabEns.SetRange("Tipo documento", rCabEns."Tipo documento"::Embotellado);
         if ProductoFiltro <> '' then
@@ -183,9 +186,7 @@ codeunit 51105 "Gestion Entradas SGA"
                 // pantalla y, si tampoco lo hay, el almacén por defecto de la configuración.
                 almacenFila := rCabEns."Location Code";
                 if almacenFila = '' then
-                    almacenFila := prm_Almacen;
-                if almacenFila = '' then
-                    almacenFila := rConfig."Almacen por Defecto";
+                    almacenFila := rConfig.AlmacenODefecto(prm_Almacen);
 
                 // Si la pantalla pide un almacén concreto, el ensamblado registrado en otro no
                 // es de esta lista; los que vienen en blanco ya han heredado el del filtro.
@@ -328,8 +329,8 @@ codeunit 51105 "Gestion Entradas SGA"
     begin
         rItemLedgEntry.SetRange("Entry Type", rItemLedgEntry."Entry Type"::Purchase);
         rItemLedgEntry.SetRange("Document Type", rItemLedgEntry."Document Type"::"Purchase Receipt");
-        if FiltroFechas(FechaDesde, FechaHasta) <> '' then
-            rItemLedgEntry.SetFilter("Posting Date", FiltroFechas(FechaDesde, FechaHasta));
+        rItemLedgEntry.SetFilter("Posting Date", FiltroFechas(FechaDesde, FechaHasta));
+        rItem.SetLoadFields(Description, "Clase de articulo", "Base Unit of Measure");
         // Sin fecha de inicio se mirarían todas las compras de la historia. Se acota a las
         // recepciones que aún tienen stock (movimiento abierto): lo ya consumido o deshecho no
         // tiene nada que colocar en un hueco.
@@ -484,7 +485,9 @@ codeunit 51105 "Gestion Entradas SGA"
     end;
 
     /// <summary>
-    /// Registra la entrada de una fila en la ubicación confirmada.
+    /// Registra la entrada de una fila en la ubicación confirmada, con el SSCC leído de su palé o,
+    /// si no se ha leído (palé sin etiqueta), con uno nuevo. Si a la fila aún le queda, se queda
+    /// sin SSCC ni hueco, con el siguiente palé como cantidad, para proponerle otro.
     /// </summary>
     procedure ConfirmarFila(var prm_Fila: Record "Linea Ubicacion SGA" temporary)
     var
@@ -517,11 +520,17 @@ codeunit 51105 "Gestion Entradas SGA"
         cContenido.FijarReserva(prm_Fila.ReservaFila());
         cContenido.RegistrarEntrada(prm_Fila."Cod. Almacen", prm_Fila."Ubicacion Confirmada",
                                     prm_Fila."No. Producto", prm_Fila."Cod. Variante", prm_Fila."No. Lote",
-                                    prm_Fila."Cod. Unidad Medida", prm_Fila.Cantidad,
+                                    prm_Fila.SSCCPale(), prm_Fila."Cod. Unidad Medida", prm_Fila.Cantidad,
                                     prm_Fila.Origen, prm_Fila."No. Documento", 0, descripcion);
         cUbicaciones.LiberarReservas(prm_Fila.ReservaFila(), '');
 
         CalcularPendiente(prm_Fila);
+        if prm_Fila.Estado = prm_Fila.Estado::Pendiente then begin
+            prm_Fila.SSCC := '';
+            prm_Fila."Ubicacion Propuesta" := '';
+            prm_Fila."Ubicacion Confirmada" := '';
+            prm_Fila.Motivo := '';
+        end;
         prm_Fila.Modify();
     end;
 
@@ -536,8 +545,7 @@ codeunit 51105 "Gestion Entradas SGA"
     begin
         TempFila.Copy(prm_Buffer, true);
         TempFila.Reset();
-        // Por la clave Documento: dentro del bucle cambia Estado, que forma parte de la clave
-        // Pendientes, y recorrer por ella mientras se modifica rompería el barrido.
+        // Por la clave Documento, que no cambia dentro del bucle (cambia Estado).
         TempFila.SetCurrentKey(Origen, "No. Documento", "No. Producto", "Cod. Variante", "No. Lote", "Cod. Unidad Medida");
         if not TempFila.FindSet() then
             exit(0);
@@ -664,8 +672,7 @@ codeunit 51105 "Gestion Entradas SGA"
         prm_Fila."Cantidad Entrada" := Round(lotes.Get(lote) / qtyPorUM, 0.00001);
 
         // Mismo criterio que CargarEnsamblados: el almacén suele ir en blanco en el ensamblado.
-        if prm_Fila."Cod. Almacen" = '' then
-            prm_Fila."Cod. Almacen" := rConfig."Almacen por Defecto";
+        prm_Fila."Cod. Almacen" := rConfig.AlmacenODefecto(prm_Fila."Cod. Almacen");
         if prm_Fila."Cod. Almacen" = '' then begin
             prm_Aviso := SinAlmacenLbl;
             exit(false);
@@ -742,6 +749,10 @@ codeunit 51105 "Gestion Entradas SGA"
     /// Hace Commit (antes del report A5 y después de imprimir), así que no se puede llamar
     /// dentro de una transacción de registro ni desde una TryFunction. La tarea queda modificada:
     /// quien llama la relee.
+    ///
+    /// El SSCC del palé se genera aquí, una vez: el que lleva la etiqueta de BarTender es el
+    /// mismo con el que se ubica. La etiqueta A5 genera el suyo dentro del report, así que en
+    /// Sandbox el palé se ubica con otro SSCC nuevo, distinto del impreso.
     /// </summary>
     procedure ImprimirYUbicarPale(var prm_Tarea: Record "Tareas Produccion"; var prm_Pale: Record "Linea Ubicacion SGA" temporary)
     var
@@ -753,7 +764,9 @@ codeunit 51105 "Gestion Entradas SGA"
             ImprimirEtiquetaA5(prm_Tarea)
         else begin
             ComprobarBarTender();
-            EnviarEtiqueta(prm_Tarea);
+            prm_Pale.SSCC := '';
+            EnviarEtiqueta(prm_Tarea, prm_Pale.SSCCPale());
+            prm_Pale.Modify();
         end;
         // La etiqueta ya ha salido: que un fallo al ubicar no deshaga el contador de
         // impresas. El palé quedaría pendiente y se ubica desde "Ubicar entradas".
@@ -817,9 +830,10 @@ codeunit 51105 "Gestion Entradas SGA"
     /// <summary>
     /// Genera el fichero de la etiqueta para BarTender, suma una etiqueta impresa a la tarea y
     /// sube el fichero a la carpeta que vigila la impresora. Mismo contenido que
-    /// CrearFicheroImpresora de Pag50250.
+    /// CrearFicheroImpresora de Pag50250. El código del palé son los 17 primeros dígitos del SSCC
+    /// (BarTender pone el de control), como allí.
     /// </summary>
-    local procedure EnviarEtiqueta(var prm_Tarea: Record "Tareas Produccion")
+    local procedure EnviarEtiqueta(var prm_Tarea: Record "Tareas Produccion"; prm_SSCC: Code[20])
     var
         rItem: Record Item;
         rDatos: Record "Datos Reports Temporales";
@@ -865,7 +879,7 @@ codeunit 51105 "Gestion Entradas SGA"
                 prm_Tarea."Cod. Pale Defecto" + ';' +
                 dun14 + ';' +
                 ean13 + ';' +
-                CodigoPale(prm_Tarea) + ';' +
+                CopyStr(prm_SSCC, 1, 17) + ';' +
                 ';' +
                 Format(prm_Tarea."Qty. Und. Medida") + ';' +
                 '01' + ';' +
@@ -946,33 +960,6 @@ codeunit 51105 "Gestion Entradas SGA"
     end;
 
     /// <summary>
-    /// Código de unidad de envío del palé (EAN-128), sacado del DUN-14 de la unidad de venta,
-    /// el lote, las cajas por palé y el tipo de precinto. Es lo único de la etiqueta de
-    /// Barras128 de Pag50250 que lleva el fichero de BarTender.
-    /// </summary>
-    local procedure CodigoPale(var prm_Tarea: Record "Tareas Produccion"): Text
-    var
-        rUnidMedProd: Record "Item Unit of Measure";
-        cduCodBarras: Codeunit "Gestion Codigos Barras";
-        codigoDUN14: Code[20];
-        usoPrecinto: Text[1];
-    begin
-        if rUnidMedProd.Get(prm_Tarea."Cod. Producto", prm_Tarea."Unidad Medida Venta") then begin
-            rUnidMedProd.CalcFields("Codigo Barras");
-            codigoDUN14 := CopyStr(rUnidMedProd."Codigo Barras", 1, MaxStrLen(codigoDUN14));
-        end;
-
-        if (StrPos(prm_Tarea."Tipo Precinto", 'B4') > 0) or (StrPos(prm_Tarea."Tipo Precinto", 'E6') > 0) then
-            usoPrecinto := '0';
-        if StrPos(prm_Tarea."Tipo Precinto", 'SP') > 0 then
-            usoPrecinto := '2';
-
-        cduCodBarras.Run();
-        cduCodBarras.GetEAN128PaletsVariante(CopyStr(codigoDUN14, 1, 14), prm_Tarea.Lote, Format(prm_Tarea."Qty. Und. Medida"), usoPrecinto);
-        exit(CopyStr(cduCodBarras.GetEAN128PaletsTxt2(), 5, 17));
-    end;
-
-    /// <summary>
     /// Propuesta para una fila concreta, con la estrategia que diga la configuración para
     /// su origen. El hueco propuesto queda reservado para la fila (ReservarHueco) y el que tenía
     /// antes se suelta. Si otra sesión lo ha reservado entre que se propone y se reserva, se
@@ -1029,10 +1016,14 @@ codeunit 51105 "Gestion Entradas SGA"
     end;
 
     /// <summary>
-    /// Rellena lo ya ubicado, lo que queda (Cantidad) y el estado de una fila: Ubicado cuando ya
-    /// no queda nada y Pendiente si no.
+    /// Rellena lo ya ubicado, lo que se ubica ahora (Cantidad) y el estado de una fila: Ubicado
+    /// cuando ya no queda nada y Pendiente si no. Cada palé lleva su SSCC, así que se ubica de
+    /// palé en palé: Cantidad es lo que queda, sin pasar de un palé del producto.
     /// </summary>
     local procedure CalcularPendiente(var prm_Fila: Record "Linea Ubicacion SGA" temporary)
+    var
+        paleEnUMFila: Decimal;
+        factorPale: Decimal;
     begin
         prm_Fila."Cantidad Ya Ubicada" := CantidadYaUbicada(prm_Fila.Origen, prm_Fila."No. Documento", prm_Fila."No. Producto",
                                                             prm_Fila."Cod. Variante", prm_Fila."No. Lote", prm_Fila."Cod. Unidad Medida");
@@ -1042,6 +1033,13 @@ codeunit 51105 "Gestion Entradas SGA"
             prm_Fila."Cantidad Ya Ubicada" += CantidadYaUbicada(prm_Fila.Origen, prm_Fila."Documento Relacionado", prm_Fila."No. Producto",
                                                                 prm_Fila."Cod. Variante", prm_Fila."No. Lote", prm_Fila."Cod. Unidad Medida");
         prm_Fila.Cantidad := prm_Fila.Pendiente();
+        // FactorPale es 1 si el producto no tiene palé: entonces no se limita a un palé.
+        factorPale := cUM.FactorPale(prm_Fila."No. Producto");
+        if factorPale > 1 then begin
+            paleEnUMFila := Round(factorPale / cUM.FactorUM(prm_Fila."No. Producto", prm_Fila."Cod. Unidad Medida"), 0.00001);
+            if prm_Fila.Cantidad > paleEnUMFila then
+                prm_Fila.Cantidad := paleEnUMFila;
+        end;
         if prm_Fila.Cantidad <= 0 then
             prm_Fila.Estado := prm_Fila.Estado::Ubicado
         else

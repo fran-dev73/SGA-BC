@@ -112,10 +112,9 @@ page 51122 "Mapa 3D Almacen SGA"
                 trigger CeldaPulsada(prm_CodBin: Text)
                 var
                     rContenido: Record "Contenido Ubicacion SGA";
+                    cContenido: Codeunit "Gestion Contenido SGA";
                 begin
-                    rContenido.SetRange("Cod. Almacen", FiltroAlmacen);
-                    rContenido.SetRange("Cod. Bin", CopyStr(prm_CodBin, 1, MaxStrLen(rContenido."Cod. Bin")));
-                    Page.Run(Page::"Contenido Ubicaciones SGA", rContenido);
+                    cContenido.MostrarContenidoUbicacion(FiltroAlmacen, CopyStr(prm_CodBin, 1, MaxStrLen(rContenido."Cod. Bin")));
                 end;
 
                 trigger TrasladoSolicitado(prm_Origen: Text; prm_Destino: Text)
@@ -186,15 +185,34 @@ page 51122 "Mapa 3D Almacen SGA"
         FiltroPasillo: Integer;
         Resumen: Text;
         ControlPreparado: Boolean;
+        Preparada: Boolean;
+        CriterioInicial: Text;
+        BusquedaInicial: Text;
 
     trigger OnOpenPage()
     var
         rConfig: Record "Config. SGA";
     begin
         rConfig.ObtenerConfig();
-        FiltroAlmacen := rConfig."Almacen por Defecto";
-        FiltroZona := rConfig."Zona por Defecto";
+        if FiltroAlmacen = '' then
+            FiltroAlmacen := rConfig."Almacen por Defecto";
+        if not Preparada then
+            FiltroZona := rConfig."Zona por Defecto";
         // No se dibuja aquí: hay que esperar a que el lienzo avise de que está montado.
+    end;
+
+    /// <summary>
+    /// Abre el mapa de un almacén entero coloreado por un criterio ('estado', 'posicion', 'abc'
+    /// o 'caducidad') y con un producto o ubicación ya buscado. Lo usa el análisis ABC para ver
+    /// en qué huecos (A, B o C por su posición) está un producto.
+    /// </summary>
+    procedure Preparar(prm_Almacen: Code[10]; prm_Criterio: Text; prm_Busqueda: Text)
+    begin
+        FiltroAlmacen := prm_Almacen;
+        FiltroZona := '';
+        CriterioInicial := prm_Criterio;
+        BusquedaInicial := prm_Busqueda;
+        Preparada := true;
     end;
 
     local procedure Refrescar()
@@ -207,6 +225,10 @@ page 51122 "Mapa 3D Almacen SGA"
 
         datos := cMapa.DatosMapa3D(FiltroAlmacen, FiltroZona, FiltroPasillo);
         CurrPage.Lienzo.Dibujar(datos);
+        if Preparada then begin
+            CurrPage.Lienzo.Preparar(CriterioInicial, BusquedaInicial);
+            Preparada := false;
+        end;
         CalcularResumen();
         CurrPage.Update(false);
     end;
@@ -263,34 +285,15 @@ page 51122 "Mapa 3D Almacen SGA"
     /// </summary>
     local procedure Vaciar(prm_CodBin: Code[20])
     var
-        rContenido: Record "Contenido Ubicacion SGA";
         cContenido: Codeunit "Gestion Contenido SGA";
         cMapa: Codeunit "Gestion Mapa SGA";
-        detalle: Text;
-        lineas: Integer;
-        LineaDetalleLbl: Label '\  · %1 %2 de %3 (lote %4)', Comment = '%1 = cantidad, %2 = unidad, %3 = producto, %4 = lote';
-        VaciarUbicacionQst: Label 'Vaciar la ubicación %1:%2\\Todo queda sin ubicar, pendiente de volver a ubicar. El stock de BC no cambia. ¿Continuar?', Comment = '%1 = ubicación, %2 = lista del contenido';
-        UbicacionVaciadaMsg: Label 'Ubicación %1 vaciada: %2 líneas quedan pendientes de ubicar.', Comment = '%1 = ubicación, %2 = líneas';
     begin
-        rContenido.SetRange("Cod. Almacen", FiltroAlmacen);
-        rContenido.SetRange("Cod. Bin", prm_CodBin);
-        if not rContenido.FindSet() then
+        if cContenido.VaciarUbicacionConDialogo(FiltroAlmacen, prm_CodBin) = 0 then
             exit;
-
-        repeat
-            detalle += StrSubstNo(LineaDetalleLbl, rContenido.Cantidad, rContenido."Cod. Unidad Medida",
-                                  rContenido."No. Producto", rContenido."No. Lote");
-        until rContenido.Next() = 0;
-
-        if not Confirm(VaciarUbicacionQst, false, prm_CodBin, detalle) then
-            exit;
-
-        lineas := cContenido.VaciarUbicacion(FiltroAlmacen, prm_CodBin);
 
         CurrPage.Lienzo.Actualizar(cMapa.DatosMapa3D(FiltroAlmacen, FiltroZona, FiltroPasillo));
         CalcularResumen();
         CurrPage.Update(false);
-        Message(UbicacionVaciadaMsg, prm_CodBin, lineas);
     end;
 
     local procedure CalcularResumen()

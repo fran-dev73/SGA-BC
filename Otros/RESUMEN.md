@@ -4,7 +4,7 @@ SGA es el módulo de gestión de ubicaciones del almacén dentro de Business Cen
 
 ## Qué resuelve
 
-- **Dónde está cada cosa**: qué producto, lote y caducidad hay en cada hueco, con mapa, mapa 3D y búsqueda.
+- **Dónde está cada cosa**: qué producto, lote, caducidad y palé (SSCC) hay en cada hueco, con mapa, mapa 3D y búsqueda, también de un palé por su SSCC.
 - **Dónde dejar lo que entra**: propone el hueco para compras, ensamblados y palés de la línea, y registra lo que confirma el operario.
 - **De dónde coger lo que sale**: cada pedido de venta se convierte en una orden de picking con el recorrido, el lote y la cantidad; lo recogido vuelve solo al pedido.
 - **Reposición del picking**: planifica traer mercancía de almacenamiento a picking.
@@ -35,6 +35,7 @@ SGA es el módulo de gestión de ubicaciones del almacén dentro de Business Cen
 - Cada ubicación es de **Almacenamiento** (reserva), **Picking** (de donde se prepara) o **sin tipo** (muelles, ajustes: nunca se proponen).
 - Lo que entra va **primero a almacenamiento**; a picking solo si no queda sitio.
 - La capacidad se mide en **palés**, con el palé por defecto de cada producto. Una cantidad se reparte en palés completos, cada uno a su hueco, y un resto.
+- **Todo palé lleva su SSCC**: el de su etiqueta (proveedor o producción) o uno nuevo si no la trae. Las cajas sueltas siguen siendo de su palé aunque cambien de hueco.
 - Dentro de cada tipo, el orden lo da la **estrategia** de la configuración. Para producción, el **primer hueco vacío** siguiendo el recorrido; para compras, la casa del producto, si no junto a lo que ya hay y si no el primer hueco libre.
 - Al recoger se coge primero lo que antes caduca (FEFO, configurable), palés enteros de almacenamiento si el pedido llega a un palé, y lo demás de picking.
 
@@ -67,6 +68,13 @@ SGA es el módulo de gestión de ubicaciones del almacén dentro de Business Cen
 - Que el palé de una tarea pase a su ensamblado registrado y que *Ubicar ensamblados* pida solo lo que falta.
 - Recepciones deshechas del todo o en parte.
 - Etiquetas de ubicación en la impresora real (lectura del código de barras).
+- SSCC: lectura de la etiqueta del palé del proveedor al ubicar recepciones.
+
+## Pendiente
+
+- **Etiqueta del palé con el SSCC que guarda SGA.** Con BarTender coinciden; la etiqueta A5 (Sandbox) genera el suyo. Falta imprimir etiqueta a los palés que reciben un SSCC nuevo (sin etiqueta del proveedor).
+- **SSCC del stock que ya está en el almacén.** En pruebas se carga con la carga inicial, sin SSCC. Para producción, por decidir; se puede meter en *Ubicar producto*, y *Ubicar seleccionadas* aún no lo recoge.
+- **Palé sin SSCC leído en *Ubicar producto* y *Ubicar ensamblados*.** Por decidir si se exige la etiqueta o se genera un SSCC nuevo (lo que hace ahora).
 
 ## Decisiones abiertas
 

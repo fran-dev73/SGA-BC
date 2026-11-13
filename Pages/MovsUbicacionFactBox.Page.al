@@ -69,10 +69,20 @@ page 51110 "Movs. Ubicacion FactBox"
             action(VerTodos)
             {
                 Caption = 'Ver todos';
-                ToolTip = 'Abre el diario completo de movimientos de ubicación.';
+                ToolTip = 'Abre el diario de movimientos de ubicación con el mismo filtro que el FactBox.';
                 ApplicationArea = All;
                 Image = Entries;
-                RunObject = page "Movs. Ubicacion SGA";
+
+                trigger OnAction()
+                var
+                    rMovimiento: Record "Movimiento Ubicacion SGA";
+                begin
+                    // Los filtros del enlace con la página que contiene el FactBox van en el grupo 4.
+                    Rec.FilterGroup(4);
+                    rMovimiento.CopyFilters(Rec);
+                    Rec.FilterGroup(0);
+                    Page.Run(Page::"Movs. Ubicacion SGA", rMovimiento);
+                end;
             }
         }
     }

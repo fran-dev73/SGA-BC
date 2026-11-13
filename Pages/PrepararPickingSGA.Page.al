@@ -209,6 +209,7 @@ page 51121 "Preparar Picking SGA"
         datos.Add('producto', Rec."No. Producto");
         datos.Add('descripcion', Rec."Descripcion Producto");
         datos.Add('lote', Rec."No. Lote");
+        datos.Add('sscc', Rec.SSCC);
         datos.Add('caducidad', Format(Rec."Fecha Caducidad"));
         datos.Add('cantidad', Format(PendienteDocumento));
         datos.Add('unidad', UMPedido);
@@ -359,7 +360,7 @@ page 51121 "Preparar Picking SGA"
         CurrPage.Pantalla.Senal('ok');
 
         // Al quedar recogida sale del filtro de pendientes, así que se recarga la vista.
-        if not SiguienteParada() then begin
+        if not CargarParadas(Rec."No. Orden") then begin
             TerminarOrden();
             exit;
         end;
@@ -384,7 +385,7 @@ page 51121 "Preparar Picking SGA"
         retenida := cPicking.SaltarParada(Rec);
 
         if Rec.Next() = 0 then
-            if not SiguienteParada() then begin
+            if not CargarParadas(Rec."No. Orden") then begin
                 TerminarOrden();
                 exit;
             end;
@@ -412,7 +413,7 @@ page 51121 "Preparar Picking SGA"
 
         resultado := cPicking.SustituirParadaSinStock(Rec, cubierta);
 
-        if not SiguienteParada() then begin
+        if not CargarParadas(Rec."No. Orden") then begin
             TerminarOrden();
             exit;
         end;
@@ -478,15 +479,6 @@ page 51121 "Preparar Picking SGA"
         else
             MotivoSinParadas := resultado + ' ' + MotivoSinParadas;
         Pintar();
-    end;
-
-    /// <summary>
-    /// Recoloca el cursor en la primera parada que siga pendiente y no esté retenida. Devuelve
-    /// false si no queda ninguna, que es la señal de que el preparador ha terminado la orden.
-    /// </summary>
-    local procedure SiguienteParada(): Boolean
-    begin
-        exit(CargarParadas(Rec."No. Orden"));
     end;
 
     /// <summary>

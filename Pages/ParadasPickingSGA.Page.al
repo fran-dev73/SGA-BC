@@ -66,6 +66,10 @@ page 51134 "Paradas Picking SGA"
                     ToolTip = 'Lote que hay que recoger.';
                     ApplicationArea = All;
                 }
+                field(SSCC; Rec.SSCC)
+                {
+                    ApplicationArea = All;
+                }
                 field("Cantidad Pendiente"; Rec."Cantidad Pendiente")
                 {
                     ToolTip = 'Cantidad que queda por recoger, en unidades base.';

@@ -491,6 +491,15 @@ Si el error persiste: hay un bloqueo de base de datos. En ese caso, el administr
 
 ---
 
+## "Al ubicar dice que el SSCC ya está en otra ubicación con otro producto"
+
+**Causa**: se ha leído la etiqueta de otro palé. Un SSCC es de un solo producto y lote, y ese ya está en el almacén con otro.
+
+**Solución**: lee la etiqueta del palé que estás ubicando. Si el palé no tiene etiqueta, deja *SSCC* en blanco y se le da uno nuevo.
+
+---
+
+
 ## "¿Cómo migro desde otra solución SGA?"
 
 **Escenario**: Tenías otro sistema y quieres cambiar a SGA.

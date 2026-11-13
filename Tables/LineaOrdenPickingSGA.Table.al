@@ -65,6 +65,20 @@ table 51109 "Linea Orden Picking SGA"
             Caption = 'Fecha caducidad';
             DataClassification = ToBeClassified;
         }
+        field(36; SSCC; Code[20])
+        {
+            Caption = 'SSCC';
+            DataClassification = ToBeClassified;
+            Editable = false;
+            ToolTip = 'Palé (SSCC) del que se recoge en la ubicación propuesta.';
+        }
+        field(37; "SSCC Recogido"; Code[20])
+        {
+            Caption = 'SSCC recogido';
+            DataClassification = ToBeClassified;
+            Editable = false;
+            ToolTip = 'Palé (SSCC) del que se ha recogido de verdad. Es otro si el preparador ha cogido de otra ubicación o de otro palé.';
+        }
         field(35; "No. Documento Origen"; Code[20])
         {
             Caption = 'Nº documento origen';
@@ -224,7 +238,7 @@ table 51109 "Linea Orden Picking SGA"
         }
         key(LineaPedido; "No. Documento Origen", "No. Linea Origen")
         {
-            SumIndexFields = "Cantidad Recogida UM Pedido";
+            SumIndexFields = "Cantidad Recogida UM Pedido", "Cantidad Recogida";
         }
         // Reubicaciones pendientes hacia una ubicación (la propuesta no la da a otro producto).
         key(Destino; "Cod. Almacen", "Cod. Bin Destino", Estado)
