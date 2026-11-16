@@ -67,14 +67,6 @@ page 51106 "Config. SGA"
                     ToolTip = 'Política para lo que llega en una recepción de compra. Por defecto la estándar: la casa del producto, si no consolidar y si no el primer hueco libre.';
                     ApplicationArea = All;
                 }
-                field("Campo Grupo IIEE"; Rec."Campo Grupo IIEE")
-                {
-                    ApplicationArea = All;
-                }
-                field("Nombre Campo Grupo IIEE"; Rec."Nombre Campo Grupo IIEE")
-                {
-                    ApplicationArea = All;
-                }
                 field("Estrategia Picking"; Rec."Estrategia Picking")
                 {
                     ToolTip = 'Orden en que se coge el stock (FEFO, FIFO…), dentro de cada paso del picking: palés completos de almacenamiento, picking y lo que falte de almacenamiento. Es también el orden con que las reubicaciones eligen qué traer de almacenamiento.';
@@ -122,7 +114,7 @@ page 51106 "Config. SGA"
                 }
                 field("Exigir Confirmar Ubicacion"; Rec."Exigir Confirmar Ubicacion")
                 {
-                    ToolTip = 'Obliga al operario a escanear la ubicación para cerrar la tarea. El picking siempre lee la ubicación de la que recoge en la etiqueta del hueco.';
+                    ToolTip = 'En Ubicar producto, obliga a escanear la etiqueta del hueco en el que se deja cada línea antes de confirmarla. El picking siempre lee la ubicación de la que recoge en la etiqueta del hueco.';
                     ApplicationArea = All;
                 }
                 field("Permitir Desvio Ubicacion"; Rec."Permitir Desvio Ubicacion")
@@ -130,18 +122,9 @@ page 51106 "Config. SGA"
                     ToolTip = 'Permite al operario dejar o coger la mercancía en una ubicación distinta de la sugerida, quedando registrado el desvío.';
                     ApplicationArea = All;
                 }
-                field("Exigir Escanear Producto"; Rec."Exigir Escanear Producto")
-                {
-                    ApplicationArea = All;
-                }
                 field("Exigir Asignacion Picking"; Rec."Exigir Asignacion Picking")
                 {
                     ToolTip = 'Si está activo, las órdenes de picking nacen pendientes de asignar y solo las puede preparar el preparador al que un responsable se las asigne en "Asignar órdenes de picking". Si no, cada preparador coge la siguiente sin asignar.';
-                    ApplicationArea = All;
-                }
-                field("Max. Cajas por Orden"; Rec."Max. Cajas por Orden")
-                {
-                    ToolTip = 'Número máximo de cajas que puede llevar una orden de picking de productos que se preparan por cajas. Al pasarlo, se abre otra orden del mismo producto. 0 = sin límite.';
                     ApplicationArea = All;
                 }
             }
@@ -152,6 +135,18 @@ page 51106 "Config. SGA"
                 field("Nos. Orden SGA"; Rec."Nos. Orden SGA")
                 {
                     ToolTip = 'Serie numérica de las órdenes de trabajo de almacén. La consume la gestión de órdenes de la Fase 2.';
+                    ApplicationArea = All;
+                }
+                field("Nos. SSCC"; Rec."Nos. SSCC")
+                {
+                    ApplicationArea = All;
+                }
+                field("Prefijo Empresa GS1"; Rec."Prefijo Empresa GS1")
+                {
+                    ApplicationArea = All;
+                }
+                field("Digito Extension SSCC"; Rec."Digito Extension SSCC")
+                {
                     ApplicationArea = All;
                 }
             }

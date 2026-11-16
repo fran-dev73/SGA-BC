@@ -29,7 +29,7 @@ lee solo su apartado. Cómo se configura todo está en el [manual de implantaci�
 3. SGA reparte el pedido en **órdenes de picking de un palé como mucho**, porque solo se prepara un palé a la vez:
    - cada palé completo de una línea es una orden;
    - las unidades sueltas de todas las líneas se juntan en órdenes que no pasan de un palé (½ palé de un producto y ¼ de otro van en la misma orden);
-   - los productos que se venden en **caja** (su unidad de venta) van aparte: una orden por producto, con como mucho el máximo de cajas de la configuración (*Máximo de cajas por orden*; 0 = sin límite).
+   - los productos que se venden en **caja** (su unidad de venta) van aparte: una orden por producto, con todas sus cajas, aunque estén en varias líneas del pedido.
    - dentro de cada pedido se prepara primero lo de palé completo, luego las cajas y por último los sueltos. Entre las cajas, las de más volumen salen antes, para que queden abajo al apilar.
 
    Por ejemplo, 4 palés y 2 cajas son 5 órdenes.
@@ -76,7 +76,7 @@ En **Asignar órdenes de picking SGA** salen las órdenes vivas con su cliente, 
 - **Asignar a**: da las seleccionadas a un preparador. También se puede teclear en *Asignada a*.
 - **Quitar asignación**: las devuelve a la bolsa. Una orden empezada se puede reasignar, pero no dejar sin nadie.
 - **Subir prioridad** / **Bajar prioridad**: cuanto mayor la *Prioridad*, antes sale. La prioridad es del **pedido**: al cambiarla, cambian a la vez todas sus órdenes (palés, sueltos y cajas). Las de reubicación cambian solas.
-- **Ver orden** y **Ver pedido**.
+- **Ver pedido**. La ficha de la orden se abre con *Ver* / *Editar* de la propia lista.
 
 Si está activada *Exigir asignación de picking* (en la configuración):
 
@@ -116,7 +116,7 @@ Las de órdenes no cuentan las reubicaciones, que tienen su propia pila.
 
 En el rol center del preparador, **Mi picking** cuenta sus órdenes y sus reubicaciones sin terminar y, si la configuración no exige asignación, las órdenes sin asignar que puede coger.
 
-Para cancelar una orden: *Órdenes de picking* > **Cancelar orden**. Libera lo reservado.
+Para cancelar una orden: *Órdenes de picking* > **Cancelar orden**. Libera lo reservado. Solo se cancela una orden sin terminar; si ya tenía algo recogido, lo avisa y lo pasa al pedido, porque esa mercancía ya no está en sus ubicaciones.
 
 ### Quién es quién
 
@@ -139,16 +139,16 @@ Cada hueco tiene su etiqueta, y el picking lee en ella la ubicación de la que r
 ### Con la pantalla de Business Central
 
 1. Abre **Órdenes de picking SGA** y pulsa **Siguiente orden**. Abre la pantalla de preparación con la orden que te toca, por prioridad, primero las tuyas. Al terminarla pasa sola a la siguiente.
-2. También puedes ver **Mis órdenes**, las vistas *Pendientes* y *Sin asignar*, **Preparar** (una orden concreta) y **Asignármela**.
+2. También tienes las vistas *Mis órdenes*, *Pendientes* y *Sin asignar*, **Preparar** (una orden concreta) y **Asignármela**.
 3. En la pantalla **Preparar picking SGA** cada parada muestra:
    - **VAYA A**: la ubicación, en grande. En un pedido, al lado, **→ PLAYA** y la playa donde dejar lo recogido (la ubicación por defecto de la zona de playas). En una reubicación: **DE** origen **→ A** destino.
    - **COJA**: la cantidad, en la unidad del pedido. Debajo, la descripción del producto y, en pequeño, su código, el lote, la caducidad, el palé (SSCC) y la cantidad en unidades base.
-   - **CONFIRME**: las marcas de lo que falta (*Ubicación*, *Producto*). Rojo es pendiente; verde, hecho.
-4. Lee, en este orden, la **ubicación** de la etiqueta del hueco y, si se pide, el **producto** que coges. El cursor pasa solo a la casilla siguiente cuando la anterior está bien leída (se pone en verde). Cada lectura puede ser un escaneo o teclearse: toca la casilla que toca y escribe.
-5. Si coges otra cantidad, cámbiala con **−** y **+** o tecleándola.
-6. Cuando está completo, la parada **se confirma sola** y pasa a la siguiente.
+   - **CONFIRME**: la marca *Ubicación*. Rojo es pendiente; verde, hecho.
+4. Si coges otra cantidad, cámbiala con **−** y **+** o tecleándola.
+5. Lee la **ubicación** de la etiqueta del hueco del que recoges. Puede ser un escaneo o teclearse: toca la casilla y escribe.
+6. Con una ubicación válida, la parada **se confirma sola** y pasa a la siguiente.
 
-Si una lectura no es correcta, la pantalla lo dice en rojo, con un pitido grave. Vuelve a escanear o a teclear.
+Si lo leído no es una ubicación del almacén, la pantalla lo dice en rojo, con un pitido grave («*… no es una ubicación de este almacén. Escanee la etiqueta del hueco.*»). Vuelve a escanear o a teclear.
 
 **Otros botones:**
 
@@ -156,8 +156,6 @@ Si una lectura no es correcta, la pantalla lo dice en rojo, con un pitido grave.
 - **Sin stock**: si el producto no está en el hueco. Pregunta si buscar en otra ubicación. Si sí, la parada se cancela y lo que faltaba se busca en otro hueco del mismo producto. La pantalla dice de dónde («*No estaba en 101-03-10. Se recoge de otra ubicación: 102-01-00*»). Si no hay en ninguna, el aviso sale en rojo. El hueco vacío no se corrige: hay que recontarlo.
 
 Si recoges de otro hueco, avisa: que lo admita depende de la configuración de desvíos. Al terminar sale *Orden terminada*, la playa en la que dejarla y que lo recogido ya está en el pedido. Si dice que no se ha podido pasar al pedido, avisa a oficina: no se pierde nada.
-
-**El producto se reconoce** por su código de barras, su GTIN o su nº de producto, y también por una etiqueta GS1-128 con (01) o (02). Si la etiqueta trae el lote (10), tiene que ser el de la parada.
 
 **El palé no se lee.** Se da por bueno que lo que coges es del palé de la parada; si coges de otro hueco, del palé de ese hueco. El SSCC sirve para saber dónde está cada palé, no para el picking.
 
@@ -188,12 +186,12 @@ En Zebra las claves ya son esas. Desactiva la salida por teclado del mismo perfi
 **Trabajar:**
 
 1. Entra con el rol **Preparador SGA (PDA)** y pulsa **Preparar pedidos SGA**. Se abre la orden que te toca. Al terminarla carga la siguiente; si no hay más, ofrece **BUSCAR SIGUIENTE ORDEN**.
-2. Ve a la ubicación, coge el producto y **escanéalo**. Si no es el de la parada, lo dice al momento.
-3. Escanea el **código de la ubicación** de la etiqueta del hueco. Si no se lee, tecléalo.
-4. Si coges otra cantidad, cámbiala antes.
+2. Ve a la ubicación y coge el producto.
+3. Si coges otra cantidad, cámbiala antes.
+4. Escanea el **código de la ubicación** de la etiqueta del hueco. Si no se lee, tecléalo.
 5. La parada se confirma sola y pasa a la siguiente.
 
-El cursor está siempre en la casilla que toca leer (ubicación, producto), pero la pantalla no abre el teclado del terminal hasta que tocas una casilla.
+El cursor está siempre en la casilla de la ubicación, pero la pantalla no abre el teclado del terminal hasta que tocas una casilla.
 
 ---
 
@@ -324,7 +322,7 @@ La lista de huecos con su estado y su ocupación, coloreada: gris vacía, verde 
 Qué producto, lote y palé (SSCC) hay en cada hueco: una línea por palé. Vistas **Bloqueado** y **Con reserva**. **Movimientos del palé** enseña la historia del SSCC de la línea.
 
 - **Trasladar**: a otra ubicación. Si eliges *Zona destino*, propone un hueco de esa zona y dice por qué.
-- **Bloquear / desbloquear** una línea (por ejemplo, un lote en cuarentena).
+- **Bloquear / desbloquear** una línea (por ejemplo, un lote en cuarentena). No se puede bloquear lo que ya está reservado por una orden de picking: antes hay que cancelar o buscar en otra ubicación esas paradas.
 - **Recontar**: tecleas la *Cantidad contada* y la diferencia queda registrada, sea de más o de menos.
 - **Quitar de la ubicación**: la línea sale entera y queda pendiente de ubicar. No deja si está reservada.
 
@@ -336,7 +334,7 @@ Una rejilla por *Almacén* y *Pasillo*: una fila por altura y una columna por es
 
 - Arriba, *Almacén*, *Zona* y *Pasillo*. En el lienzo, tres vistas: **3D**, **Planta** y **Frente** (un pasillo de frente, la de trabajo).
 - **Colorear por**: *Estado*, *Posición ABC* (la clase de cada hueco por su altura y su sitio en el recorrido, del último análisis ABC; se pintan también los vacíos), *Rotación ABC* (la clase del producto que hay dentro) o *Caducidad*. Desde el análisis ABC, **Ver en el mapa** lo abre por *Posición ABC* con el producto de la línea buscado. Por estado, las reservadas para una entrada salen en turquesa, y al pasar por encima dice para qué entrada y de quién. **Buscar**: un producto o una ubicación; las que coinciden se marcan en naranja.
-- Ratón: pasar por encima enseña lo que hay; clic abre el contenido; doble clic aísla el pasillo; **clic derecho vacía** la ubicación; **arrastrar** una ubicación con contenido sobre otra la traslada, solo dentro de la misma zona.
+- Ratón: pasar por encima enseña lo que hay; clic abre el contenido; doble clic aísla el pasillo; **clic derecho vacía** la ubicación; **arrastrar** una ubicación con contenido sobre otra la traslada, solo dentro de la misma zona. La rueda acerca y aleja. En *Frente* y *Planta*, si con el zoom no cabe todo a lo ancho, sale abajo una **barra de desplazamiento**: se arrastra, o un clic en ella avanza una pantalla; también se mueve con **Mayús + rueda** o deslizando a los lados en el touchpad.
 
 ### Movimientos de ubicación
 
@@ -346,13 +344,13 @@ El diario de todo: quién movió qué, cuándo y de dónde a dónde. Vistas **Tr
 
 1. Menú *Informes* > **Conciliar con el stock**: elige *Almacén* y *Mostrar solo diferencias*.
 2. El último resultado se vuelve a abrir en *Consultas* > **Conciliación con el stock**. Vistas **Stock sin ubicar** (BC tiene más que las ubicaciones) y **Sobra en ubicaciones** (las ubicaciones tienen más que BC).
-3. Lo que falta, mejor ubicarlo en su sitio. Si no, **Regularizar en ubicación de ajustes** lo deja en la ubicación de ajustes, sin SSCC: es una diferencia, no un palé. Lo que sobra no se regulariza: se recuenta. **Volver a conciliar** para comprobar.
+3. Lo que falta, mejor ubicarlo en su sitio. Si no, **Regularizar en ubicación de ajustes** lo deja en la ubicación de ajustes, sin SSCC: es una diferencia, no un palé, y el picking no coge de ella. No se regulariza lo que espera en *Ubicar recepciones* o *Ubicar ensamblados* (se ubica desde allí), y solo se regulariza en el almacén por defecto, que es el de la ubicación de ajustes. Lo que sobra no se regulariza: se recuenta. **Volver a conciliar** para comprobar.
 
 Lánzala al final del día o cuando alguien no encuentre un producto.
 
 ### Bloquear
 
-Una ubicación: *Ubicaciones SGA* > **Bloquear / desbloquear**, o en su ficha. Una ubicación bloqueada no admite entradas ni se propone para recoger. Un lote concreto se bloquea desde *Contenido de ubicaciones*.
+Una ubicación: *Ubicaciones SGA* > **Bloquear / desbloquear**, o en su ficha. Una ubicación bloqueada, o cualquiera de una zona bloqueada, no admite entradas ni se propone para recoger ni para reubicar; en los mapas sale en rojo. Un lote concreto se bloquea desde *Contenido de ubicaciones*.
 
 ### Análisis ABC (solo observa)
 
@@ -383,8 +381,7 @@ Lo más frecuente está aquí. Los casos con más detalle, con su causa y su sol
 | La orden terminó pero el pedido no tiene cantidad a enviar ni lotes | Corrige la causa (reserva por lote en la línea, permisos) y pulsa *Pasar al pedido* en la orden. |
 | *Siguiente orden*: no tiene órdenes asignadas | Se exige asignación: el responsable reparte en *Asignar órdenes de picking*. |
 | En la PDA no pasa nada al escanear | Revisa el perfil del lector (apartado 3, PDA) y que la salida por teclado esté desactivada. Solo funciona en la app de Business Central. |
-| *El código … no corresponde a ningún producto* | Da de alta el código como referencia de tipo *Código de barras* del producto o en su GTIN. |
 | Un responsable no puede asignar | En *Configuración de usuarios*, marca *Responsable picking SGA*. |
 | Un picking vacío no tiene reubicación | Revisa que haya stock disponible en almacenamiento, una ubicación de picking con sitio y la serie de órdenes. Luego *Planificar reubicaciones*. |
 | El mapa 3D sale en blanco | Elige el almacén y vacía zona y pasillo. Los códigos deben seguir `101-15-03`. |
-| La ubicación leída no existe en SGA | La etiqueta que se ha leído no es de una ubicación SGA del almacén. Lee la etiqueta del hueco que tienes delante. |
+| *… no es una ubicación de este almacén* | La etiqueta que se ha leído no es de una ubicación SGA del almacén. Lee la etiqueta del hueco que tienes delante. |

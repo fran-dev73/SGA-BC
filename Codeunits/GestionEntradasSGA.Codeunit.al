@@ -3,6 +3,7 @@ namespace AntonioNadal.SGA;
 using AntonioNadal.Produccion;
 using Microsoft.Assembly.Document;
 using Microsoft.Assembly.History;
+using Microsoft.Foundation.UOM;
 using Microsoft.Inventory.Item;
 using Microsoft.Inventory.Item.Catalog;
 using Microsoft.Inventory.Ledger;
@@ -49,6 +50,7 @@ codeunit 51105 "Gestion Entradas SGA"
     procedure CargarEntradas(var prm_Buffer: Record "Linea Ubicacion SGA" temporary; prm_Origen: Enum "Origen Mov. SGA"; prm_FechaDesde: Date; prm_FechaHasta: Date; prm_Almacen: Code[10]; prm_SoloPendientes: Boolean; prm_Clase: Integer; prm_Producto: Code[20]): Integer
     begin
         FiltrarLote := false;
+        CualquierLote := false;
         exit(Cargar(prm_Buffer, prm_Origen, prm_FechaDesde, prm_FechaHasta, prm_Almacen, prm_SoloPendientes, prm_Clase, prm_Producto));
     end;
 
@@ -62,6 +64,9 @@ codeunit 51105 "Gestion Entradas SGA"
         FiltrarLote := true;
         VarianteFiltro := prm_Variante;
         LoteFiltro := prm_Lote;
+        // Un producto sin lotes de BC se cuadra por el total (su stock de BC no lleva lote): con
+        // el lote en blanco cuentan todos sus lotes propios.
+        CualquierLote := (prm_Lote = '') and not cStock.LoteEstandar(prm_Producto);
         exit(Cargar(prm_Buffer, prm_Origen, 0D, 0D, prm_Almacen, true, -1, prm_Producto));
     end;
 
@@ -152,7 +157,7 @@ codeunit 51105 "Gestion Entradas SGA"
         rConfig.ObtenerConfig();
 
         rCabEns.SetFilter("Posting Date", FiltroFechas(FechaDesde, FechaHasta));
-        rItem.SetLoadFields(Description, "Clase de articulo");
+        rItem.SetLoadFields("Clase de articulo");
         // Solo embotellados: las elaboraciones sacan granel a depósito, que no va a hueco.
         rCabEns.SetRange("Tipo documento", rCabEns."Tipo documento"::Embotellado);
         if ProductoFiltro <> '' then
@@ -165,12 +170,13 @@ codeunit 51105 "Gestion Entradas SGA"
                 if filtroEnsamblados = '' then
                     exit(0);
                 rCabEns.SetFilter("No.", filtroEnsamblados);
-            end else begin
-                // Un lote más largo que el del ensamblado no puede ser de ningún ensamblado.
-                if StrLen(LoteFiltro) > MaxStrLen(rCabEns.Lote) then
-                    exit(0);
-                rCabEns.SetRange(Lote, LoteFiltro);
-            end;
+            end else
+                if not CualquierLote then begin
+                    // Un lote más largo que el del ensamblado no puede ser de ningún ensamblado.
+                    if StrLen(LoteFiltro) > MaxStrLen(rCabEns.Lote) then
+                        exit(0);
+                    rCabEns.SetRange(Lote, LoteFiltro);
+                end;
         end;
         // El almacén no se filtra en la consulta: está oculto en el pedido de ensamblado
         // (Pag-Ext50105), así que casi todos se registran en blanco y filtrar por él dejaba la
@@ -200,7 +206,6 @@ codeunit 51105 "Gestion Entradas SGA"
                     prm_Buffer."Cod. Variante" := rCabEns."Variant Code";
                     prm_Buffer."Cod. Unidad Medida" := rCabEns."Unit of Measure Code";
                     prm_Buffer."Documento Relacionado" := rCabEns."Order No.";
-                    prm_Buffer."Descripcion Producto" := CopyStr(rItem.Description, 1, MaxStrLen(prm_Buffer."Descripcion Producto"));
                     qtyPorUM := rCabEns."Qty. per Unit of Measure";
                     if qtyPorUM <= 0 then
                         qtyPorUM := 1;
@@ -209,9 +214,9 @@ codeunit 51105 "Gestion Entradas SGA"
                     // documento y lote. Un lote deshecho del todo suma cero y no sale.
                     LotesEnsamblado(rCabEns."Item No.", rCabEns.Lote, '', rCabEns."No.", rCabEns."Quantity (Base)", lotes);
                     foreach lote in lotes.Keys() do
-                        if ((not FiltrarLote) or (lote = LoteFiltro)) and (lotes.Get(lote) > 0) then begin
+                        if ((not FiltrarLote) or CualquierLote or (lote = LoteFiltro)) and (lotes.Get(lote) > 0) then begin
                             prm_Buffer."No. Lote" := lote;
-                            prm_Buffer."Cantidad Entrada" := Round(lotes.Get(lote) / qtyPorUM, 0.00001);
+                            prm_Buffer."Cantidad Entrada" := cUOMMgt.CalcQtyFromBase(lotes.Get(lote), qtyPorUM);
                             CalcularPendiente(prm_Buffer);
                             if (not prm_SoloPendientes) or (prm_Buffer.Estado <> prm_Buffer.Estado::Ubicado) then begin
                                 cargadas += 1;
@@ -330,7 +335,7 @@ codeunit 51105 "Gestion Entradas SGA"
         rItemLedgEntry.SetRange("Entry Type", rItemLedgEntry."Entry Type"::Purchase);
         rItemLedgEntry.SetRange("Document Type", rItemLedgEntry."Document Type"::"Purchase Receipt");
         rItemLedgEntry.SetFilter("Posting Date", FiltroFechas(FechaDesde, FechaHasta));
-        rItem.SetLoadFields(Description, "Clase de articulo", "Base Unit of Measure");
+        rItem.SetLoadFields("Clase de articulo", "Base Unit of Measure");
         // Sin fecha de inicio se mirarían todas las compras de la historia. Se acota a las
         // recepciones que aún tienen stock (movimiento abierto): lo ya consumido o deshecho no
         // tiene nada que colocar en un hueco.
@@ -370,7 +375,7 @@ codeunit 51105 "Gestion Entradas SGA"
                 TempFila.SetRange("No. Lote", rItemLedgEntry."Lot No.");
                 TempFila.SetRange("Cod. Unidad Medida", um);
                 if TempFila.FindFirst() then begin
-                    TempFila."Cantidad Entrada" += Round(rItemLedgEntry.Quantity / factor, 0.00001);
+                    TempFila."Cantidad Entrada" += cUOMMgt.CalcQtyFromBase(rItemLedgEntry.Quantity, factor);
                     TempFila.Modify();
                 end else begin
                     TempFila.Init();
@@ -384,8 +389,7 @@ codeunit 51105 "Gestion Entradas SGA"
                     TempFila."Cod. Variante" := rItemLedgEntry."Variant Code";
                     TempFila."No. Lote" := rItemLedgEntry."Lot No.";
                     TempFila."Cod. Unidad Medida" := um;
-                    TempFila."Cantidad Entrada" := Round(rItemLedgEntry.Quantity / factor, 0.00001);
-                    TempFila."Descripcion Producto" := CopyStr(rItem.Description, 1, MaxStrLen(TempFila."Descripcion Producto"));
+                    TempFila."Cantidad Entrada" := cUOMMgt.CalcQtyFromBase(rItemLedgEntry.Quantity, factor);
                     if (rItemLedgEntry."Source Type" = rItemLedgEntry."Source Type"::Vendor) and
                        rVendor.Get(rItemLedgEntry."Source No.")
                     then
@@ -491,7 +495,11 @@ codeunit 51105 "Gestion Entradas SGA"
     /// </summary>
     procedure ConfirmarFila(var prm_Fila: Record "Linea Ubicacion SGA" temporary)
     var
+        rMovimiento: Record "Movimiento Ubicacion SGA";
         cContenido: Codeunit "Gestion Contenido SGA";
+        factorPale: Decimal;
+        paleEnUMFila: Decimal;
+        MasDeUnPaleErr: Label 'Se ubica de palé en palé, cada uno con su SSCC: como mucho %1 %2 de %3 cada vez.', Comment = '%1 = cantidad de un palé, %2 = unidad, %3 = producto';
         descripcion: Text;
         UbicacionNoIndicadaErr: Label 'Indique la ubicación en la que ha dejado %1.', Comment = '%1 = producto';
         CantidadNoPositivaErr: Label 'La cantidad a ubicar de %1 debe ser mayor que cero.', Comment = '%1 = producto';
@@ -508,8 +516,19 @@ codeunit 51105 "Gestion Entradas SGA"
         if prm_Fila.Cantidad <= 0 then
             Error(CantidadNoPositivaErr, prm_Fila."No. Producto");
 
+        // Lo ya ubicado se vuelve a leer del diario, bloqueándolo: la lista puede llevar rato
+        // abierta, u otra persona haber ubicado la misma entrada, y no se ubica dos veces.
+        rMovimiento.LockTable();
+        prm_Fila."Cantidad Ya Ubicada" := YaUbicadaFila(prm_Fila);
         if prm_Fila.Cantidad > prm_Fila.Pendiente() then
             Error(CantidadExcedePendienteErr, prm_Fila.Pendiente(), prm_Fila."No. Producto");
+        // Cada palé entra con su SSCC: no más de un palé por vez.
+        factorPale := cUM.FactorPale(prm_Fila."No. Producto");
+        if factorPale > 1 then begin
+            paleEnUMFila := cUOMMgt.CalcQtyFromBase(factorPale, cUM.FactorUM(prm_Fila."No. Producto", prm_Fila."Cod. Unidad Medida"));
+            if prm_Fila.Cantidad > paleEnUMFila then
+                Error(MasDeUnPaleErr, paleEnUMFila, prm_Fila."Cod. Unidad Medida", prm_Fila."No. Producto");
+        end;
 
         if prm_Fila.Origen = prm_Fila.Origen::Compra then
             descripcion := StrSubstNo(RecepcionLbl, prm_Fila."No. Documento")
@@ -518,6 +537,7 @@ codeunit 51105 "Gestion Entradas SGA"
 
         // Puede entrar en el hueco reservado para la fila; ya ocupado, la reserva sobra.
         cContenido.FijarReserva(prm_Fila.ReservaFila());
+        cContenido.FijarPropuesta(prm_Fila."Ubicacion Propuesta");
         cContenido.RegistrarEntrada(prm_Fila."Cod. Almacen", prm_Fila."Ubicacion Confirmada",
                                     prm_Fila."No. Producto", prm_Fila."Cod. Variante", prm_Fila."No. Lote",
                                     prm_Fila.SSCCPale(), prm_Fila."Cod. Unidad Medida", prm_Fila.Cantidad,
@@ -540,22 +560,38 @@ codeunit 51105 "Gestion Entradas SGA"
     /// </summary>
     procedure ConfirmarTodas(var prm_Buffer: Record "Linea Ubicacion SGA" temporary): Integer
     var
-        TempFila: Record "Linea Ubicacion SGA" temporary;
+        TempPantalla: Record "Linea Ubicacion SGA" temporary;
+        TempTrabajo: Record "Linea Ubicacion SGA" temporary;
         hechas: Integer;
     begin
-        TempFila.Copy(prm_Buffer, true);
-        TempFila.Reset();
-        // Por la clave Documento, que no cambia dentro del bucle (cambia Estado).
-        TempFila.SetCurrentKey(Origen, "No. Documento", "No. Producto", "Cod. Variante", "No. Lote", "Cod. Unidad Medida");
-        if not TempFila.FindSet() then
+        // Se trabaja sobre una copia aparte y se pasa a la pantalla al final: la tabla de la
+        // pantalla es temporal y no se deshace con un error, así que si una fila falla no debe
+        // quedar ninguna como ubicada sin estarlo.
+        TempPantalla.Copy(prm_Buffer, true);
+        TempPantalla.Reset();
+        if not TempPantalla.FindSet() then
             exit(0);
-
         repeat
-            if (TempFila.Estado <> TempFila.Estado::Ubicado) and (TempFila."Ubicacion Confirmada" <> '') and (TempFila.Cantidad > 0) then begin
-                ConfirmarFila(TempFila);
+            TempTrabajo := TempPantalla;
+            TempTrabajo.Insert();
+        until TempPantalla.Next() = 0;
+
+        // Por la clave Documento, que no cambia dentro del bucle (cambia Estado).
+        TempTrabajo.SetCurrentKey(Origen, "No. Documento", "No. Producto", "Cod. Variante", "No. Lote", "Cod. Unidad Medida");
+        TempTrabajo.FindSet();
+        repeat
+            if (TempTrabajo.Estado <> TempTrabajo.Estado::Ubicado) and (TempTrabajo."Ubicacion Confirmada" <> '') and (TempTrabajo.Cantidad > 0) then begin
+                ConfirmarFila(TempTrabajo);
                 hechas += 1;
             end;
-        until TempFila.Next() = 0;
+        until TempTrabajo.Next() = 0;
+
+        TempTrabajo.Reset();
+        TempTrabajo.FindSet();
+        repeat
+            TempPantalla := TempTrabajo;
+            TempPantalla.Modify();
+        until TempTrabajo.Next() = 0;
 
         exit(hechas);
     end;
@@ -588,7 +624,6 @@ codeunit 51105 "Gestion Entradas SGA"
     var
         rCabEns: Record "Assembly Header";
         rCabEnsReg: Record "Posted Assembly Header";
-        rItem: Record Item;
         rUMPale: Record "Item Unit of Measure";
         rConfig: Record "Config. SGA";
         TempTrozo: Record "Linea Ubicacion SGA" temporary;
@@ -669,7 +704,7 @@ codeunit 51105 "Gestion Entradas SGA"
                 exit(false);
             end;
         prm_Fila."No. Lote" := lote;
-        prm_Fila."Cantidad Entrada" := Round(lotes.Get(lote) / qtyPorUM, 0.00001);
+        prm_Fila."Cantidad Entrada" := cUOMMgt.CalcQtyFromBase(lotes.Get(lote), qtyPorUM);
 
         // Mismo criterio que CargarEnsamblados: el almacén suele ir en blanco en el ensamblado.
         prm_Fila."Cod. Almacen" := rConfig.AlmacenODefecto(prm_Fila."Cod. Almacen");
@@ -677,9 +712,6 @@ codeunit 51105 "Gestion Entradas SGA"
             prm_Aviso := SinAlmacenLbl;
             exit(false);
         end;
-
-        if rItem.Get(prm_Fila."No. Producto") then
-            prm_Fila."Descripcion Producto" := CopyStr(rItem.Description, 1, MaxStrLen(prm_Fila."Descripcion Producto"));
 
         if not rUMPale.Get(prm_Fila."No. Producto", prm_Tarea."Cod. Pale Defecto") or
            (rUMPale."Qty. per Unit of Measure" <= 0)
@@ -702,7 +734,7 @@ codeunit 51105 "Gestion Entradas SGA"
             if (restantePlanBase > 0) and (restantePlanBase < factorPale) then
                 paleBase := restantePlanBase;
         end;
-        pendienteBase := Round(prm_Fila.Pendiente() * qtyPorUM, 0.00001);
+        pendienteBase := cUOMMgt.CalcBaseQty(prm_Fila.Pendiente(), qtyPorUM);
         if paleBase > pendienteBase then
             paleBase := pendienteBase;
 
@@ -723,8 +755,8 @@ codeunit 51105 "Gestion Entradas SGA"
         entradaBase := prm_Fila."Cantidad Entrada" * qtyPorUM;
         yaUbicadoBase := prm_Fila."Cantidad Ya Ubicada" * qtyPorUM;
         prm_Fila."Cod. Unidad Medida" := umDestino;
-        prm_Fila."Cantidad Entrada" := Round(entradaBase / factorDestino, 0.00001);
-        prm_Fila."Cantidad Ya Ubicada" := Round(yaUbicadoBase / factorDestino, 0.00001);
+        prm_Fila."Cantidad Entrada" := cUOMMgt.CalcQtyFromBase(entradaBase, factorDestino);
+        prm_Fila."Cantidad Ya Ubicada" := cUOMMgt.CalcQtyFromBase(yaUbicadoBase, factorDestino);
         prm_Fila.Cantidad := cantidadDestino;
         prm_Fila.Insert();
 
@@ -757,8 +789,14 @@ codeunit 51105 "Gestion Entradas SGA"
     procedure ImprimirYUbicarPale(var prm_Tarea: Record "Tareas Produccion"; var prm_Pale: Record "Linea Ubicacion SGA" temporary)
     var
         EnvironmentInformation: Codeunit "Environment Information";
+        cContenido: Codeunit "Gestion Contenido SGA";
     begin
         ComprobarEtiqueta(prm_Tarea);
+        // Antes de imprimir, que el hueco admita el palé con las mismas reglas que al ubicar:
+        // si no, saldría una etiqueta para un palé que luego no se puede colocar ahí.
+        cContenido.TestEntradaAdmitida(prm_Pale."Cod. Almacen", prm_Pale."Ubicacion Confirmada", prm_Pale."No. Producto",
+                                       prm_Pale."No. Lote", prm_Pale."Cod. Unidad Medida", prm_Pale.Cantidad, prm_Pale.ReservaFila(),
+                                       prm_Pale."Ubicacion Propuesta");
 
         if EnvironmentInformation.IsSandbox() then
             ImprimirEtiquetaA5(prm_Tarea)
@@ -1025,18 +1063,12 @@ codeunit 51105 "Gestion Entradas SGA"
         paleEnUMFila: Decimal;
         factorPale: Decimal;
     begin
-        prm_Fila."Cantidad Ya Ubicada" := CantidadYaUbicada(prm_Fila.Origen, prm_Fila."No. Documento", prm_Fila."No. Producto",
-                                                            prm_Fila."Cod. Variante", prm_Fila."No. Lote", prm_Fila."Cod. Unidad Medida");
-        // Los palés ubicados al imprimir su etiqueta (Ubicar Palets Linea SGA) van con el nº del
-        // pedido de ensamblado, que no es el del registrado: sin sumarlos se ubicarían dos veces.
-        if (prm_Fila."Documento Relacionado" <> '') and (prm_Fila."Documento Relacionado" <> prm_Fila."No. Documento") then
-            prm_Fila."Cantidad Ya Ubicada" += CantidadYaUbicada(prm_Fila.Origen, prm_Fila."Documento Relacionado", prm_Fila."No. Producto",
-                                                                prm_Fila."Cod. Variante", prm_Fila."No. Lote", prm_Fila."Cod. Unidad Medida");
+        prm_Fila."Cantidad Ya Ubicada" := YaUbicadaFila(prm_Fila);
         prm_Fila.Cantidad := prm_Fila.Pendiente();
         // FactorPale es 1 si el producto no tiene palé: entonces no se limita a un palé.
         factorPale := cUM.FactorPale(prm_Fila."No. Producto");
         if factorPale > 1 then begin
-            paleEnUMFila := Round(factorPale / cUM.FactorUM(prm_Fila."No. Producto", prm_Fila."Cod. Unidad Medida"), 0.00001);
+            paleEnUMFila := cUOMMgt.CalcQtyFromBase(factorPale, cUM.FactorUM(prm_Fila."No. Producto", prm_Fila."Cod. Unidad Medida"));
             if prm_Fila.Cantidad > paleEnUMFila then
                 prm_Fila.Cantidad := paleEnUMFila;
         end;
@@ -1044,6 +1076,20 @@ codeunit 51105 "Gestion Entradas SGA"
             prm_Fila.Estado := prm_Fila.Estado::Ubicado
         else
             prm_Fila.Estado := prm_Fila.Estado::Pendiente;
+    end;
+
+    /// <summary>
+    /// Lo ya ubicado de una fila, en su unidad. Los palés ubicados al imprimir su etiqueta
+    /// (Ubicar Palets Linea SGA) van con el nº del pedido de ensamblado, que no es el del
+    /// registrado: sin sumarlos se ubicarían dos veces.
+    /// </summary>
+    local procedure YaUbicadaFila(var prm_Fila: Record "Linea Ubicacion SGA" temporary) ubicada: Decimal
+    begin
+        ubicada := CantidadYaUbicada(prm_Fila.Origen, prm_Fila."No. Documento", prm_Fila."No. Producto",
+                                     prm_Fila."Cod. Variante", prm_Fila."No. Lote", prm_Fila."Cod. Unidad Medida");
+        if (prm_Fila."Documento Relacionado" <> '') and (prm_Fila."Documento Relacionado" <> prm_Fila."No. Documento") then
+            ubicada += CantidadYaUbicada(prm_Fila.Origen, prm_Fila."Documento Relacionado", prm_Fila."No. Producto",
+                                         prm_Fila."Cod. Variante", prm_Fila."No. Lote", prm_Fila."Cod. Unidad Medida");
     end;
 
     /// <summary>
@@ -1087,7 +1133,7 @@ codeunit 51105 "Gestion Entradas SGA"
         until rMov.Next() = 0;
 
         if todasLasUM then
-            exit(Round(totalBase / cUM.FactorUM(prm_Producto, prm_UM), 0.00001));
+            exit(cUOMMgt.CalcQtyFromBase(totalBase, cUM.FactorUM(prm_Producto, prm_UM)));
         exit(total);
     end;
 
@@ -1119,6 +1165,7 @@ codeunit 51105 "Gestion Entradas SGA"
     var
         cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
         cUM: Codeunit "Unidades Producto SGA";
+        cUOMMgt: Codeunit "Unit of Measure Management";
         cStock: Codeunit "Consulta Stock SGA";
         FechaDesde: Date;
         FechaHasta: Date;
@@ -1126,6 +1173,7 @@ codeunit 51105 "Gestion Entradas SGA"
         ProductoFiltro: Code[20];
         // Solo con CargarEntradasLote: deja la carga en un lote.
         FiltrarLote: Boolean;
+        CualquierLote: Boolean;
         VarianteFiltro: Code[10];
         LoteFiltro: Code[50];
 }

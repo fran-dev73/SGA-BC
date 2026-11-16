@@ -206,7 +206,7 @@ page 51128 "Analisis ABC SGA"
                 var
                     pMapa: Page "Mapa 3D Almacen SGA";
                 begin
-                    pMapa.Preparar(Rec."Cod. Almacen", 'posicion', Rec."No. Producto");
+                    pMapa.Preparar(Rec."Cod. Almacen", Rec."No. Calculo", 'posicion', Rec."No. Producto");
                     pMapa.Run();
                 end;
             }

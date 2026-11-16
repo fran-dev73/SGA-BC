@@ -72,7 +72,25 @@ report 51102 "Carga Inicial Contenido SGA"
                         ToolTip = 'Ubicación de paso. Con "Ubicación indicada" va todo aquí; con "Ubicación fija del producto", solo los productos sin casa. Con "Huecos libres" no se usa: el sistema elige el hueco, y lo que no tiene sitio sale como no cargado.';
                         Editable = blnUbicacionIndicadaEditable;
                         ApplicationArea = All;
-                        TableRelation = Bin.Code;
+
+                        trigger OnLookup(var Text: Text): Boolean
+                        var
+                            rUbicacionSGA: Record "Ubicacion SGA";
+                        begin
+                            rUbicacionSGA.SetRange("Cod. Almacen", codAlmacen);
+                            if Page.RunModal(0, rUbicacionSGA) <> Action::LookupOK then
+                                exit(false);
+                            Text := rUbicacionSGA."Cod. Bin";
+                            exit(true);
+                        end;
+
+                        trigger OnValidate()
+                        var
+                            cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
+                        begin
+                            // Solo ubicaciones del almacén que se carga.
+                            cUbicaciones.ComprobarUbicacionExiste(codAlmacen, codUbicacionIndicada);
+                        end;
                     }
                     field(MaxPickingProducto; intMaxPickingProducto)
                     {
@@ -81,12 +99,6 @@ report 51102 "Carga Inicial Contenido SGA"
                         ApplicationArea = All;
                         MinValue = 1;
                         Editable = blnMaxPickingEditable;
-                    }
-                    field(OmitirConContenido; blnOmitirConContenido)
-                    {
-                        Caption = 'Omitir productos que ya están ubicados';
-                        ToolTip = 'Salta los productos que ya tienen contenido en alguna ubicación de este almacén, para poder volver a ejecutar el proceso sin duplicar.';
-                        ApplicationArea = All;
                     }
                     field(Simular; blnSimular)
                     {
@@ -118,7 +130,6 @@ report 51102 "Carga Inicial Contenido SGA"
         codUbicacionIndicada: Code[20];
         // "Huecos Libres" va al final para no cambiar lo que tengan guardado los usuarios (SaveValues).
         optDestino: Option "Ubicacion Fija del Producto","Ubicacion Indicada","Huecos Libres";
-        blnOmitirConContenido: Boolean;
         blnSimular: Boolean;
         blnUbicacionIndicadaEditable: Boolean;
         blnMaxPickingEditable: Boolean;
@@ -137,7 +148,7 @@ report 51102 "Carga Inicial Contenido SGA"
             if not Confirm(ConfirmarCargaQst, false, codAlmacen) then
                 exit;
 
-        cCarga.Configurar(codAlmacen, optDestino, UbicacionIndicadaEfectiva(), blnOmitirConContenido, blnSimular, Producto.GetView());
+        cCarga.Configurar(codAlmacen, optDestino, UbicacionIndicadaEfectiva(), blnSimular, Producto.GetView());
         cCarga.FijarMaxPickingProducto(intMaxPickingProducto);
 
         // Codeunit.Run para poder recoger el fin de simulación, que llega como error para que

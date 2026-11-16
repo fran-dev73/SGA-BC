@@ -56,6 +56,12 @@ page 51130 "Plan Ubicacion SGA Subpag"
                     Style = Strong;
                     ToolTip = 'Hueco en el que se deja. Sale el propuesto; escanee o teclee otro si lo deja en otro sitio.';
                 }
+                field("Ubicacion Leida"; Rec."Ubicacion Leida")
+                {
+                    ApplicationArea = All;
+                    Editable = Rec.Estado <> Rec.Estado::Ubicado;
+                    Visible = ExigeConfirmar;
+                }
                 field(Estado; Rec.Estado)
                 {
                     ApplicationArea = All;
@@ -76,6 +82,16 @@ page 51130 "Plan Ubicacion SGA Subpag"
 
     var
         EstiloLinea: Text;
+        ExigeConfirmar: Boolean;
+
+    trigger OnOpenPage()
+    var
+        rConfig: Record "Config. SGA";
+    begin
+        // La columna de lectura solo hace falta si la configuración exige confirmar la ubicación.
+        rConfig.ObtenerConfig();
+        ExigeConfirmar := rConfig."Exigir Confirmar Ubicacion";
+    end;
 
     trigger OnAfterGetRecord()
     begin

@@ -1,5 +1,6 @@
 namespace AntonioNadal.SGA;
 
+using Microsoft.Foundation.UOM;
 using Microsoft.Inventory.Item;
 using Microsoft.Inventory.Location;
 using Microsoft.Warehouse.Structure;
@@ -233,6 +234,10 @@ table 51109 "Linea Orden Picking SGA"
         key(Recorrido; "No. Orden", Estado, "Secuencia Picking")
         {
         }
+        // Recorrido del preparador: las saltadas quedan detrás de las que no, para el final.
+        key(RecorridoPreparar; "No. Orden", "Veces Saltada", "Secuencia Picking")
+        {
+        }
         key(Producto; "No. Producto", "No. Lote")
         {
         }
@@ -272,10 +277,7 @@ table 51109 "Linea Orden Picking SGA"
     /// </summary>
     procedure ActualizarPendiente()
     begin
-        if "Ctdad. por UM Documento" > 0 then
-            "Cantidad Recogida UM Pedido" := Round("Cantidad Recogida" / "Ctdad. por UM Documento", 0.00001)
-        else
-            "Cantidad Recogida UM Pedido" := "Cantidad Recogida";
+        "Cantidad Recogida UM Pedido" := EnUMDocumento("Cantidad Recogida");
 
         if Estado = Estado::Cancelada then begin
             "Cantidad Pendiente" := 0;
@@ -322,22 +324,26 @@ table 51109 "Linea Orden Picking SGA"
     /// Pasa una cantidad en UM base a la UM del pedido, que es en la que habla el preparador.
     /// </summary>
     procedure EnUMDocumento(prm_CantidadBase: Decimal): Decimal
+    var
+        cUOMMgt: Codeunit "Unit of Measure Management";
     begin
         if "Ctdad. por UM Documento" <= 0 then
             exit(prm_CantidadBase);
 
-        exit(Round(prm_CantidadBase / "Ctdad. por UM Documento", 0.00001));
+        exit(cUOMMgt.CalcQtyFromBase(prm_CantidadBase, "Ctdad. por UM Documento"));
     end;
 
     /// <summary>
     /// Pasa una cantidad en la UM del pedido a UM base.
     /// </summary>
     procedure EnUMBase(prm_CantidadDocumento: Decimal): Decimal
+    var
+        cUOMMgt: Codeunit "Unit of Measure Management";
     begin
         if "Ctdad. por UM Documento" <= 0 then
             exit(prm_CantidadDocumento);
 
-        exit(Round(prm_CantidadDocumento * "Ctdad. por UM Documento", 0.00001));
+        exit(cUOMMgt.CalcBaseQty(prm_CantidadDocumento, "Ctdad. por UM Documento"));
     end;
 
     /// <summary>

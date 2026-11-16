@@ -1,5 +1,6 @@
 namespace AntonioNadal.SGA;
 
+using Microsoft.Foundation.UOM;
 using Microsoft.Inventory.Item;
 
 /// <summary>
@@ -17,26 +18,23 @@ codeunit 51108 "Unidades Producto SGA"
     Access = Public;
 
     /// <summary>
-    /// Cuántas unidades base contiene una unidad de medida del producto (su "Qty. per Unit of Measure").
-    /// Devuelve 1 cuando no hay un factor válido: producto o unidad en blanco, unidad que el producto
-    /// no tiene dada de alta, o factor cero o negativo. Así, quien llama trata la cantidad como si ya
-    /// estuviera en unidades base y nunca multiplica ni divide por cero.
+    /// Cuántas unidades base contiene una unidad de medida del producto, con el estándar
+    /// ("Unit of Measure Management".GetQtyPerUnitOfMeasure): 1 con la unidad base o en blanco,
+    /// y error estándar si el producto no existe, no tiene esa unidad o su factor es cero.
+    /// Nunca devuelve cero.
     /// </summary>
     procedure FactorUM(prm_Producto: Code[20]; prm_UM: Code[10]): Decimal
     var
-        rItemUM: Record "Item Unit of Measure";
+        rItem: Record Item;
+        cUOMMgt: Codeunit "Unit of Measure Management";
     begin
-        if (prm_Producto = '') or (prm_UM = '') then
+        // En blanco el estándar también da 1; así no se lee la ficha ni falla sin producto.
+        if prm_UM = '' then
             exit(1);
 
-        rItemUM.SetLoadFields("Qty. per Unit of Measure");
-        if not rItemUM.Get(prm_Producto, prm_UM) then
-            exit(1);
-
-        if rItemUM."Qty. per Unit of Measure" <= 0 then
-            exit(1);
-
-        exit(rItemUM."Qty. per Unit of Measure");
+        rItem.SetLoadFields("Base Unit of Measure");
+        rItem.Get(prm_Producto);
+        exit(cUOMMgt.GetQtyPerUnitOfMeasure(rItem, prm_UM));
     end;
 
     /// <summary>
@@ -73,32 +71,6 @@ codeunit 51108 "Unidades Producto SGA"
     end;
 
     /// <summary>
-    /// Error si la unidad no es la base del producto ni una de sus unidades de medida. Da el
-    /// error estándar si el producto no existe. Si la unidad vale, devuelve sus unidades base
-    /// (1 la base, y también si su factor no es positivo), para no volver a leerla.
-    /// </summary>
-    procedure TestUMProducto(prm_Producto: Code[20]; prm_UM: Code[10]): Decimal
-    var
-        rItem: Record Item;
-        rItemUM: Record "Item Unit of Measure";
-        UMNoDefinidaErr: Label 'La unidad de medida %1 no está definida para el producto %2.', Comment = '%1 = unidad de medida, %2 = producto';
-    begin
-        rItem.SetLoadFields("Base Unit of Measure");
-        rItem.Get(prm_Producto);
-        if prm_UM = rItem."Base Unit of Measure" then
-            exit(1);
-
-        rItemUM.SetLoadFields("Qty. per Unit of Measure");
-        if not rItemUM.Get(prm_Producto, prm_UM) then
-            Error(UMNoDefinidaErr, prm_UM, prm_Producto);
-
-        if rItemUM."Qty. per Unit of Measure" <= 0 then
-            exit(1);
-
-        exit(rItemUM."Qty. per Unit of Measure");
-    end;
-
-    /// <summary>
     /// El palé del producto: su "Cód. palé por defecto", si lo tiene entre sus unidades y lleva
     /// más de una unidad base. En blanco si no. Es la unidad con la que se mide la capacidad de
     /// las ubicaciones.
@@ -106,14 +78,18 @@ codeunit 51108 "Unidades Producto SGA"
     procedure UMPale(prm_Producto: Code[20]): Code[10]
     var
         rItem: Record Item;
+        rItemUM: Record "Item Unit of Measure";
     begin
         rItem.SetLoadFields("Cod. Pale por Defecto");
         if not rItem.Get(prm_Producto) then
             exit('');
         if rItem."Cod. Pale por Defecto" = '' then
             exit('');
-        // FactorUM da 1 si el producto no tiene esa unidad.
-        if FactorUM(prm_Producto, rItem."Cod. Pale por Defecto") <= 1 then
+        // Sin palé válido no es un error: el producto se cuenta en unidades base.
+        rItemUM.SetLoadFields("Qty. per Unit of Measure");
+        if not rItemUM.Get(prm_Producto, rItem."Cod. Pale por Defecto") then
+            exit('');
+        if rItemUM."Qty. per Unit of Measure" <= 1 then
             exit('');
         exit(rItem."Cod. Pale por Defecto");
     end;
@@ -125,7 +101,7 @@ codeunit 51108 "Unidades Producto SGA"
     /// </summary>
     procedure FactorPale(prm_Producto: Code[20]): Decimal
     begin
-        // FactorUM nunca devuelve cero: con la unidad en blanco o desconocida, uno.
+        // Sin palé, UMPale va en blanco y FactorUM da uno.
         exit(FactorUM(prm_Producto, UMPale(prm_Producto)));
     end;
 

@@ -44,7 +44,7 @@ table 51100 "Zona SGA"
         {
             Caption = 'Grupo IIEE';
             DataClassification = ToBeClassified;
-            ToolTip = 'Grupo IIEE de los productos que se guardan en esta zona. Al ubicar un producto de ese grupo se buscan primero huecos en sus zonas y, si no queda sitio, en el resto del almacén. La zona sigue admitiendo cualquier producto. Un grupo puede tener varias zonas. Requiere "Campo del grupo IIEE en el producto" en la configuración SGA.';
+            ToolTip = 'Grupo IIEE de los productos que se guardan en esta zona. Al ubicar un producto de ese grupo se buscan primero huecos en sus zonas y, si no queda sitio, en el resto del almacén. La zona sigue admitiendo cualquier producto. Un grupo puede tener varias zonas. El grupo del producto es el "Grupo IIEE" de su ficha.';
         }
         field(70; "Prioridad Picking"; Integer)
         {

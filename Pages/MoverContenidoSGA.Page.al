@@ -129,10 +129,13 @@ page 51114 "Mover Contenido SGA"
 
                     trigger OnValidate()
                     var
+                        cUbicacionesAlmacen: Codeunit "Gestion Ubicaciones SGA";
                         MismaUbicacionErr: Label 'La ubicación de destino no puede ser la misma que la de origen.';
                     begin
                         if UbicacionDestino = UbicacionOrigen then
                             Error(MismaUbicacionErr);
+                        // Solo ubicaciones del almacén del traslado.
+                        cUbicacionesAlmacen.ComprobarUbicacionExiste(Almacen, UbicacionDestino);
                         ComprobarZona();
                         // Elegida a mano: ya no se cambia sola al tocar la cantidad.
                         DestinoPropuesto := false;

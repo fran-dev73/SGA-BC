@@ -6,45 +6,49 @@
 
 **Síntoma**: Después de ejecutar *Carga inicial de contenido*, todo el stock aparece en la misma ubicación (normalmente la de ajustes).
 
-**Causa**: Se lanzó con *Ubicación de destino* = "Ubicación indicada" o "Ubicación fija del producto". En esos modos todo el lote va a un único sitio y los productos sin casa van a la indicada (por defecto, la de ajustes).
+**Causa**: Se lanzó con *Ubicación de destino* = *Ubicación indicada* o *Ubicación fija del producto*. Con *Ubicación indicada* todo va a esa ubicación. Con *Ubicación fija del producto* cada producto va a su casa (la ubicación que lo tiene como *Producto fijo* o el *Nº estante* de su ficha), y los que no tienen casa van a la indicada. La indicada sale por defecto con la *Ubic. ajustes* de la configuración.
 
-**Solución**: usa **Huecos libres**, que reparte cada palé a su hueco. Si ya cargaste, reparte lo de la ubicación de paso con *Trasladar*, o vacía el contenido y vuelve a cargar con *Huecos libres* (primero en simulación).
+**Solución**: usa **Huecos libres**, que reparte cada palé a su hueco. Si ya cargaste:
+1. Abre la ficha de esa ubicación y pulsa **Vaciar ubicación**. Todo queda pendiente de ubicar. El stock de BC no cambia.
+2. Relanza la carga con *Huecos libres*, primero con **Solo simular**. Solo carga lo que falta por ubicar.
 
 ---
 
 ## "La carga inicial por huecos libres ha dejado cosas sin cargar"
 
-Al terminar, el mensaje ya resume **cuánto se ha quedado fuera por cada motivo**. El detalle está en la vista **No cargado** del resultado: la columna *Motivo* empieza siempre por la causa y sigue con qué hacer.
+Al terminar se abre **Resultado de la carga inicial**. La vista **No cargado** enseña lo que se ha quedado fuera, y la columna *Motivo* dice por qué.
 
-| El motivo empieza por… | Qué pasa | Qué hacer |
+| El motivo dice… | Qué pasa | Qué hacer |
 |---|---|---|
-| *No queda espacio en ubicaciones de Palé / Caja / Unidad…* | Hay ubicaciones de esa clase, pero (casi) todas están llenas o sin sitio. Sigue un desglose del resto (bloqueadas, con otro producto…) | Falta espacio: libera ubicaciones o configura más de esa clase (*Admite*) |
-| *No hay ninguna ubicación de Palé / Caja / Unidad en el almacén* | No hay ni una ubicación configurada para esa clase | Configura alguna: ficha de la ubicación, *Admite* y *Capacidad* |
-| *Las N ubicaciones de … son de muelle, cuarentena…* | Existen, pero no son de *Picking* ni *Reserva* | Cambia su *Tipo ubicación* |
-| *Ninguna de las N ubicaciones de … sirve…* | Hay sitio, pero no sirven por otra razón, y dice cuántas por cada una: bloqueadas, reservadas a otro producto (*Producto fijo*), con otro producto, con otro lote | Según el desglose: desbloquear, quitar el producto fijo, permitir mezcla… |
-| *La unidad … no es el palé, la caja ni la unidad del producto* | La ficha del producto no tiene bien sus unidades | Revisa *Cód. palé por defecto* y *Unidad de medida de venta* |
-| *El producto no tiene palé por defecto en su ficha* | Sin palé no se puede repartir por huecos | Rellena el *Cód. palé por defecto* y relanza con *Omitir productos que ya están ubicados* |
-| *El producto no tiene caja* | Su *Unidad de medida de venta* está vacía, es la base o es tan grande como el palé | Corrígela en la ficha del producto |
-| *Producto bloqueado* | | Desbloquéalo si tiene que estar en almacén |
+| *No queda espacio (almacén …): N de M ubicaciones están llenas o sin sitio…* | La mayoría de las ubicaciones no tienen sitio. Sigue un desglose del resto (bloqueadas, con otro producto…) | Libera ubicaciones, amplía su *Capacidad (palés)* o crea más |
+| *No hay ninguna ubicación de almacenamiento ni de picking en el almacén …* | Ninguna ubicación tiene tipo | Pon *Tipo ubicación* = *Almacenamiento* o *Picking* a las ubicaciones donde se guarda la mercancía |
+| *Ninguna de las N ubicaciones del almacén … sirve para…* | Hay sitio, pero no sirven por otra razón. Dice cuántas por cada una | Según el desglose (ver "En *Ubicar producto* una línea sale como *No se puede ubicar*") |
+| … *de picking, porque el producto ya ocupa todas las ubicaciones de picking que se le permiten* | El producto ya llena su cupo de picking y no queda sitio en almacenamiento | Libera almacenamiento o sube *Máx. ubicaciones de picking por producto* |
+| *El producto no tiene palé por defecto en su ficha, así que no se puede repartir por huecos…* | Sin palé no se reparte por huecos | Rellena su *Cód. palé por defecto* y relanza la carga: solo carga lo que falta |
+| *El producto … no tiene palé en su ficha y la capacidad de las ubicaciones se cuenta en palés…* | Sin palé no se puede medir lo que ocupa | Igual: rellena el *Cód. palé por defecto* |
+| *Producto bloqueado.* | | Desbloquéalo si tiene que estar en almacén |
 
-Recuerda las reglas de cada clase: los palés van a huecos de *Palé*; las cajas, a *Caja* si son menos de 10 y a *Palé* si son 10 o más; las botellas que no llegan a una caja, a huecos de *Unidad*. Las ubicaciones con *Admite* en blanco no se usan nunca.
+Cómo reparte *Huecos libres*: cada palé completo a un hueco vacío, siguiendo la ruta. Primero picking, sin pasar de *Máx. ubicaciones de picking por producto*, y luego almacenamiento. El resto del lote, junto, a un hueco con sitio, mejor donde ya esté el producto. Las ubicaciones sin tipo no se usan nunca.
 
-Lo que no se carga se ve, lote a lote, en **Pendiente de ubicar**, desde donde se puede ubicar a mano o volver a buscar hueco para varias líneas a la vez (con simulación).
+Lo que no se carga se ve, lote a lote, en **Pendiente de ubicar**. Desde ahí se ubica a mano (**Ubicar**) o se busca hueco para varias líneas a la vez (**Ubicar seleccionadas**, con opción de simular).
 
 ---
 
 ## "La ocupación de una ubicación dice 150% y no tiene sentido"
 
-**Síntoma**: `% Ocupacion` > 100 en una ubicación, o el `Estado SGA` dice "Llena" pero quedaría un 20% libre.
+**Síntoma**: *% ocupación* > 100 en una ubicación, o el *Estado* dice *Llena* y aún cabe más.
 
-**Causa**: La ocupación se calculó con datos obsoletos, o las capacidades cambiaron sin recalcular. Lo típico: se ha cambiado el palé por defecto o la unidad de venta de un producto que ya está ubicado, y eso cambia cuántos palés o cajas cuenta su contenido. La propuesta de hueco se fía del estado y del % guardados: mientras no se recalcule, puede no ofrecer una ubicación que en realidad tiene sitio (o tenerla por libre de más).
+**Causas posibles**:
+1. **Capacidad 0**: sin capacidad declarada, con cualquier cosa dentro sale *Llena* al 100%.
+2. **Se dejó por encima de la capacidad**: la carga inicial, un recuento al alza y la regularización de la conciliación no miran la capacidad. Con *Control capacidad* = *Avisar*, una entrada que no cabe se deja si se confirma.
+3. **Datos sin recalcular**: se ha cambiado el *Cód. palé por defecto* de un producto que ya está ubicado, y eso cambia cuántos palés cuenta su contenido. La propuesta de hueco usa el estado y el % guardados: hasta recalcular, puede no ofrecer una ubicación que tiene sitio.
 
 **Solución**:
-1. Abre la ficha de la ubicación (`Ubicaciones SGA` > pulsa en la ubicación).
-2. Pulsa la acción *Recalcular estado*.
-3. Se recalcula en el momento.
+1. Abre la ficha de la ubicación (*Ubicaciones SGA* > pulsa su código).
+2. Pulsa **Recalcular ocupación**.
+3. Para todo el almacén: *Ubicaciones SGA* > **Recalcular ocupación**.
 
-**Si aun así sigue mal**: puede haber líneas de contenido con cantidad 0 (fantasma). Entra en el contenido de esa ubicación y mira si hay líneas vacías. Si las hay, traslada manualmente o bórralas.
+Si sigue por encima de 100, es que de verdad tiene más de lo que dice su capacidad: traslada lo que sobre.
 
 ---
 
@@ -53,219 +57,190 @@ Lo que no se carga se ve, lote a lote, en **Pendiente de ubicar**, desde donde s
 **Síntoma**: Buscas un producto que sabes que existe y no aparece nada.
 
 **Causas posibles**:
-1. El producto **no está ubicado** (está en BC pero fuera de SGA).
-2. El producto **está bloqueado** en todas partes.
-3. Estás filtrando por `Lote` incorrecto (si el lote no coincide, no aparece).
-4. Estás filtrando por `Almacen` y el producto está en otro.
+1. El producto **no está ubicado**: está en BC pero en ninguna ubicación.
+2. Tienes marcado *Solo con cantidad disponible*, y todo lo que hay está bloqueado o reservado.
+3. Estás filtrando por un *Lote* que no es.
+4. Estás filtrando por un *Almacén* y el producto está en otro.
 
 **Solución**:
-1. Abre la página *¿Dónde está el producto?*.
-2. Busca el producto (sin filtros adicionales).
-3. Si sale algo: está ubicado. Mira si está bloqueado o si tienes el lote correcto.
-4. Si **no sale nada**: entra en *Carga inicial* (sin simular), selecciona ese producto, y ejecúta. Lo dejará en su ubicación fija o, si no tiene, en la ubicación indicada (por defecto, la de ajustes).
-5. Después lanza *Conciliar* para asegurar que BC y SGA ahora coinciden.
+1. Abre *¿Dónde está el producto?*.
+2. Busca el producto sin filtros de *Lote* ni *Almacén* y desmarca *Solo con cantidad disponible*.
+3. Si sale algo: está ubicado. Mira si está bloqueado o reservado.
+4. Si **no sale nada**: búscalo en **Pendiente de ubicar** y ubícalo desde ahí con **Ubicar**.
 
 ---
 
-## "Conciliar dice que falta stock y me mete 500 cajas en ajustes"
+## "Conciliar dice que falta stock en las ubicaciones"
 
-**Síntoma**: Ejecutas *Conciliar con el stock* y de repente aparece una diferencia grande que no esperas.
+**Síntoma**: *Conciliar con el stock* enseña una diferencia grande que no esperas.
 
 **Causas posibles**:
-1. **Alguien tocó BC sin avisar**: compra recibida, producción cerrada, ajuste en IIEE, etc.
-2. **Elemento recién creado**: Item nuevo que no estaba en la carga inicial.
-3. **Variante nueva**: producto existente pero con una variante que SGA no conoce.
+1. **Está pendiente en *Ubicar recepciones* o *Ubicar ensamblados***: ha entrado en BC y aún no se ha colocado.
+2. **Ha entrado en BC por otra vía**: un diario de producto, un ajuste positivo… Eso no pasa por ninguna pantalla de SGA.
 
 **Solución**:
-1. Abre el resultado de la conciliación (`Conciliación SGA vs stock`).
-2. Filtra por `Estado = SinUbicar`.
-3. Mira qué producto es. Pregunta: ¿esto acaba de llegar o de crearse?
-4. Si es algo que acaba de llegar: **no regularices aún**. Primero mételo manualmente en la ubicación correcta.
-   - Abre *Contenido de ubicaciones*.
-   - Añade una fila (o usa la acción correspondiente).
-   - Mete el producto en la ubicación de recepción.
-   - Vuelve a lanzar *Conciliar*.
-5. Si regularizas directamente, todo irá a `Ubicacion Ajustes`, que luego tendrás que redirigir manualmente.
+1. Abre el resultado (*Conciliación con el stock*), vista **Stock sin ubicar**.
+2. Mira qué producto es y de dónde viene.
+3. Si espera en *Ubicar recepciones* o *Ubicar ensamblados*: ubícalo desde allí.
+4. Si no: **no regularices aún**. Ubícalo en su sitio desde *Pendiente de ubicar* > **Ubicar**.
+5. Pulsa **Volver a conciliar**.
+
+Si regularizas directamente, todo va a la ubicación de ajustes, y el picking no coge de ella. Luego hay que trasladarlo a su hueco.
 
 ---
 
-## "Hay un lote bloqueado y no puedo desbloquearlo"
+## "Hay un lote bloqueado y no consigo que se use"
 
-**Síntoma**: Una línea de contenido está bloqueada, pulsas *Alternar bloqueo* pero sigue bloqueada.
+**Síntoma**: Desbloqueas una línea de contenido, pero el picking sigue sin cogerla o no se puede dejar mercancía en esa ubicación.
 
-**Causa**: Posiblemente la ubicación completa está bloqueada (no solo la línea).
+**Causa**: Hay tres bloqueos distintos: el de la línea, el de la ubicación y el de su zona. Desbloquear uno no desbloquea los otros.
 
 **Solución**:
-1. Abre *Contenido de ubicaciones*, filtra por esa ubicación.
-2. Mira si la línea está marcada como `Bloqueado = Yes`.
-3. Si es la línea: pulsa *Alternar bloqueo* sobre esa línea (no sobre la ubicación).
-4. Si es la ubicación: entra en *Ubicaciones SGA*, busca la ubicación, abre su ficha, y pulsa *Alternar bloqueo*.
-5. Limpia el motivo de bloqueo si ya no aplica.
+1. **La línea**: *Contenido de ubicaciones*, filtra por esa ubicación, mira la columna *Bloqueado* y pulsa **Bloquear / desbloquear** sobre esa línea.
+2. **La ubicación**: *Ubicaciones SGA*, selecciónala y pulsa **Bloquear / desbloquear**. O en su ficha, desmarca *Bloqueada*. Limpia el *Motivo bloqueo* si ya no aplica.
+3. **La zona**: *Zonas*, desmarca *Bloqueada* en su zona.
 
-**Si aun así no puedes**: puede haber un bug. Prueba:
-1. Abre la ficha de la ubicación.
-2. En el campo `Bloqueada`, pon `No` manualmente.
-3. Pulsa guardar.
-4. Intenta la acción de nuevo.
+No se puede bloquear una línea con cantidad reservada: sale *No se puede bloquear: … están reservados por órdenes de picking…*. Antes hay que cancelar esas paradas o buscar en otra ubicación.
 
 ---
 
-## "Lancé un traslado y la cantidad no cambió en la ubicación destino"
+## "Lancé un traslado y no se hizo"
 
-**Síntoma**: Trasladas 50 cajas de A a B, la ubicación A pierde 50, pero la ubicación B no las recibe.
+**Síntoma**: Al trasladar sale un mensaje y la mercancía sigue en el origen.
 
-**Causa**: El traslado intentó pero no pudo a causa de una validación (capacidad, bloqueo, mezcla).
+**Causa**: La ubicación destino no admite la mercancía. Un traslado es todo o nada: si se rechaza, no cambia ni el origen ni el destino.
 
-**Solución**:
-1. Abre la ficha de la ubicación **destino**.
-2. Mira el `Motivo Bloqueo` (si está bloqueada).
-3. Mira la `Capacidad` vs ocupación actual.
-4. Mira la regla de `PermiteMezclaProducto` (¿ya hay otro producto ahí?).
-5. Si la ubicación destino tiene un `Producto Fijo` asignado, ¿coincide con el que trasladas?
-6. Si todo eso está OK, prueba de nuevo.
-
-Si ves un error específico en pantalla, cópialo y pregunta. Probablemente sea una validación que le pega al traslado.
+**Solución**: lee el mensaje y mira "Al dejar mercancía me dice que la ubicación no la admite". Además, en el traslado:
+- *La ubicación de destino no puede ser la misma que la de origen.*
+- *No puede trasladar más de N unidades.*: es lo disponible en la línea (lo reservado no cuenta).
+- Desde el mapa 3D, *La ubicación … es de la zona … y la … de la zona …*: entre zonas se traslada desde *Contenido de ubicaciones* > **Trasladar**.
 
 ---
 
 ## "El mapa de almacén no muestra todas las estanterías de mi pasillo"
 
-**Síntoma**: Abres el mapa y ves celdas en blanco a la derecha, aunque sabes que hay ubicaciones allí.
+**Síntoma**: Abres el mapa y faltan las estanterías del final, aunque sabes que hay ubicaciones allí.
 
-**Causa**: El mapa dibuja una columna por estantería, de la E01 a la E32 (es un límite de pantalla, no de datos: SGA guarda las que haya).
+**Causas**:
+1. El mapa dibuja como mucho 32 columnas, una por estantería. Es un límite de pantalla, no de datos. El aviso lo dice: *Hay estanterías hasta la N y la rejilla solo dibuja 32…*.
+2. La ubicación no sigue el formato de código `pasillo-estantería-altura` (`101-15-03`). Las que tienen otro formato no salen en el mapa.
 
 **Solución**:
-1. Filtra por **Pasillo** para ver ese pasillo de frente: es la vista de alzado y entra entera en pantalla.
-2. Si hay estanterías más allá de la 32, el mapa te avisa con el número real. Para verlas usa el **mapa 3D** o la lista (`Ubicaciones SGA`) y, si lo quieres en Excel, *Abrir en Excel* desde esa lista.
+1. Filtra por **Pasillo** para ver ese pasillo de frente.
+2. Para las estanterías más allá de la 32 usa el **mapa 3D**, o la lista *Ubicaciones SGA* y, si lo quieres en Excel, *Abrir en Excel*.
 
-**Nota**: el mapa se reconstruye al abrirlo, así que los cambios de ubicaciones aparecen solos. Si no ves una ubicación recién creada, cierra y vuelve a abrir.
+**Nota**: el mapa se reconstruye al abrirlo y con **Actualizar**. Si no ves una ubicación recién creada, pulsa *Actualizar*.
 
 ---
 
 ## "Me ha metido más de un palé en la misma ubicación"
 
-**Causa más probable**: la ubicación tiene **Capacidad = 0**, que significa *sin límite*. Con la estrategia estándar, SGA consolida el mismo producto donde ya está, y sin límite le caben todos los palés.
+**Causa más probable**: la ubicación tiene *Capacidad (palés)* = 0, que significa *sin límite*. Con la estrategia estándar, SGA consolida el mismo producto donde ya está, y sin límite le caben todos los palés.
 
 **Solución**:
 1. Deshaz lo mal ubicado: *Contenido de ubicaciones*, filtra por esa ubicación, selecciona las líneas y pulsa **Quitar de la ubicación**. Quedan pendientes de ubicar.
-2. Pon **Capacidad = 1** en las ubicaciones de palé (ficha o lista de ubicaciones). Al generarlas, rellena *Capacidad uds.* con 1.
-3. Vuelve a ubicar con *Ubicar producto* > *Ubicar todo lo pendiente* > *Proponer ubicación*: ahora irá un palé por hueco.
+2. Con la ubicación ya vacía, pon *Capacidad (palés)* = 1 en su ficha. Para muchas a la vez: *Ubicaciones SGA* > **Cambiar en bloque** (las que tengan contenido no se cambian). Al generarlas, rellena *Capacidad (palés)* con 1.
+3. Vuelve a ubicar con *Ubicar producto* > **Ubicar todo lo pendiente** > **Proponer ubicación**: ahora irá un palé por hueco.
 
 ---
 
-## "Ubico palés y cajas y no me propone sitio para las cajas"
+## "En *Ubicar producto* una línea sale como *No se puede ubicar*"
 
-**Síntoma**: En *Ubicar producto*, la línea de las cajas sale en la tabla como **No se puede ubicar**.
+**Síntoma**: En la tabla *Dónde dejarlo*, una línea sale como **No se puede ubicar**.
 
-**Causa**: las cajas van a ubicaciones de **Caja** si son menos de 10, y de **Palé** (de esa misma referencia) si son 10 o más. Los huecos sin configurar (*Admite* en blanco) no se proponen nunca. El motivo de la línea dice cuál de estos casos es:
+**Causa**: Ninguna ubicación la admite. La columna *Motivo* dice por qué:
 
 | El motivo dice | Qué hacer |
 |---|---|
-| *No hay ninguna ubicación de caja* | Crear una: ficha de una ubicación de tipo *Picking* o *Reserva* → *Admite* = Caja, marcar *Acepta múltiples productos*, *Capacidad* en cajas (por ejemplo 72). |
-| *No hay ninguna ubicación de palé* | Con 10 o más cajas se busca un hueco de palé libre: genera más o pon *Admite* = Palé en alguno. |
-| *…pero son de muelle, cuarentena, ajustes u otro uso* | Cambiar el *Tipo ubicación* de alguna a *Picking* o *Reserva*. |
-| *…pero ninguna tiene sitio* | Liberar una, ampliar su *Capacidad* o configurar más ubicaciones de esa clase. |
-| *La unidad … no es ni el palé por defecto, ni la unidad de venta, ni la unidad base* | Ubica en una de esas tres unidades del producto, o revisa su ficha (*Unidad de medida de venta*, *Cód. palé por defecto*). |
-| *El producto … no tiene palé en su ficha: … son demasiadas para un hueco de caja* | Son 10 cajas o más de un producto sin palé: no se mandan a un hueco de caja, y sin el tamaño del palé no se puede medir cuánto ocupan en uno de palé. En *Unidades de medida del producto* crea el palé con su cantidad y su *Unidad anterior* (la caja), y ponlo en *Cód. palé por defecto*. BC deja añadir unidades a un producto con movimientos. |
+| *No hay ninguna ubicación de almacenamiento ni de picking en el almacén …* | Pon *Tipo ubicación* = *Almacenamiento* o *Picking* a las ubicaciones donde se guarda la mercancía. |
+| *No queda espacio (almacén …): N de M ubicaciones están llenas o sin sitio…* | Libera ubicaciones, amplía su *Capacidad (palés)* o crea más. |
+| *El producto … no tiene palé en su ficha y la capacidad de las ubicaciones se cuenta en palés…* | Rellena el *Cód. palé por defecto* del producto. |
+| *Ninguna de las N ubicaciones del almacén … sirve para…*, con el desglose: | |
+| · *bloqueadas* | Desbloquea la ubicación o su zona. |
+| · *reservadas a otro producto ("Producto fijo")* | Son la casa de otro producto. Quita el *Producto fijo* si ya no lo es. |
+| · *llenas o sin sitio* | Libera o amplía su *Capacidad (palés)*. |
+| · *con otro producto (no aceptan mezcla)* | Elige otra o marca *Permite mezcla de productos* (solo con la ubicación vacía). |
+| · *con otro lote (no aceptan mezcla de lotes)* | Igual, con *Permite mezcla de lotes*. |
+| · *vacías, esperando una reubicación de otro producto* | Son de picking y esperan su producto. Se liberan al hacer o cancelar esa reubicación. |
+| · *con sitio, pero ya propuestas a otras líneas de este reparto* | Confirma las líneas que tienen hueco y vuelve a pulsar *Proponer ubicación*. |
+| · *reservadas para otra entrada que se está ubicando* | Espera, o *Ubicaciones SGA* > vista *Reservadas* > **Liberar reserva** si nadie las está usando. |
+| *No queda ningún hueco vacío que admita …* | La estrategia es *Solo hueco vacío*: libera un hueco o cambia la estrategia en *Configuración SGA*. |
+| *… no tiene ubicación fija con sitio…* | La estrategia es *Solo ubicación fija*: dale casa al producto (*Producto fijo* o *Nº estante*) o cambia la estrategia. |
 
-Si quieres mover el corte de las 10 cajas: *Configuración SGA* > **Cajas mínimas para hueco de palé**.
-
-Después vuelve a pulsar *Proponer ubicación*: la pantalla conserva lo que falta por ubicar.
-
----
-
-## "Me propone botellas en una ubicación de palé" o "no me propone una ubicación que existe"
-
-**Causa**: casi siempre, la ubicación tiene **Admite en blanco**. *Sincronizar ubicaciones* da de alta los huecos así; solo *Generar ubicaciones* les pone el tipo. Un hueco en blanco **no se propone nunca**, y desde el 2026-10-30 tampoco acepta botellas sueltas.
-
-**Solución**: abre la ficha de la ubicación (pulsa su código en *Ubicaciones SGA*) y pon *Admite* = Palé, Caja o Unidad. Para muchas a la vez: *Ubicaciones SGA* > **Cambiar ubicaciones en bloque**.
+Después vuelve a pulsar **Proponer ubicación**.
 
 ---
 
-## "Me dice que la ubicación admite otra cosa"
+## "No me propone una ubicación que existe"
 
-**Síntoma**: Al confirmar sale *"La ubicación 101-15-03 admite Palé y no se puede dejar mercancía en BOTELLA en ella…"*.
+**Causa**: casi siempre, la ubicación **no tiene tipo**. *Sincronizar ubicaciones* da de alta las ubicaciones así; *Generar ubicaciones* les pone el tipo. Una ubicación sin tipo **no se propone nunca**.
 
-**Causa**: lo que se deja no es de la clase que admite el hueco:
-- Un hueco de **Palé** acepta palés y cajas de una referencia, pero no botellas sueltas.
-- Un hueco de **Caja** acepta solo cajas.
-- Un hueco de **Unidad** acepta solo botellas sueltas.
+Si tiene tipo, puede ser que:
+- Está bloqueada, ella o su zona.
+- Es la casa de otro producto (*Producto fijo*).
+- Está reservada para otra entrada que se está ubicando.
+- No tiene sitio, o tiene otro producto o lote y no acepta mezcla.
+- Es de picking y espera una reubicación de otro producto.
+- Es de picking y hay sitio en almacenamiento: al ubicar se propone primero almacenamiento.
+- El producto tiene grupo IIEE con zonas y queda sitio en ellas: se propone primero ahí.
 
-**Solución**, según lo que quieras:
-1. **Llevarlo al hueco que toca**: vuelve a pedir propuesta.
-2. **Si el hueco debería admitir eso**: abre su ficha y cambia *Admite*. Ajusta la *Capacidad* a esa clase (palés, cajas o unidades).
-3. **Si lo que está mal es la unidad tecleada**: corrige el campo *Unidad de medida* de la pantalla.
-
-**Si la unidad sí es la que corresponde y aun así sale el mensaje**: revisa la ficha del producto. La caja es su *Unidad de medida de venta* y el palé su *Cód. palé por defecto*.
+**Solución**: *Ubicaciones SGA* > vista **Sin tipo**. Abre la ficha (pulsa su código) y pon *Tipo ubicación* = *Almacenamiento* o *Picking*. Para muchas a la vez: selecciónalas y pulsa **Cambiar en bloque**.
 
 ---
 
-## "No me deja marcar 'Acepta múltiples productos' en una ubicación"
+## "Al dejar mercancía me dice que la ubicación no la admite"
 
-**Síntoma**: Marcas la casilla y salta *"Solo las ubicaciones de caja o de unidades sueltas pueden aceptar varios productos"*.
+**Síntoma**: Al confirmar una ubicación, al trasladar o al ubicar una entrada sale uno de estos mensajes:
 
-**Causa**: Solo los huecos de **Caja** y de **Unidad** se comparten entre productos. Un hueco de palé es de una referencia, también cuando guarda un palé incompleto en cajas.
+| Mensaje | Qué hacer |
+|---|---|
+| *La ubicación … está bloqueada: …* | Elige otra, o desbloquéala (a ella o a su zona). |
+| *La ubicación … está reservada para … (…).* | Está propuesta a otra entrada. Elige otra, o pide que la liberen (*Ubicaciones SGA* > **Liberar reserva**). |
+| *La ubicación … está reservada para el producto ….* | Tiene *Producto fijo*: solo admite ese producto. |
+| *La ubicación … no permite mezclar productos y ya contiene ….* | Elige otra. *Permite mezcla de productos* solo se cambia con la ubicación vacía. |
+| *La ubicación … no permite mezclar lotes y ya contiene el lote ….* | Igual, con *Permite mezcla de lotes*. |
+| *La ubicación … no tiene hueco: capacidad …, ocupado …, se intenta añadir ….* | El control de capacidad es *Bloquear*. Elige otra o libera sitio. |
+| *La ubicación … se queda por encima de su capacidad (… de …). ¿Desea continuar?* | El control de capacidad es *Avisar*: si confirmas, se deja igualmente. |
+| *La ubicación … no está en ninguna zona del grupo IIEE del producto … (…). ¿Desea dejarlo ahí de todos modos?* | Confirma si de verdad va ahí. |
 
-**Solución**: comprueba que esa ubicación tiene *Admite* = Caja o Unidad.
+El control de capacidad de cada ubicación está en su ficha (*Control capacidad*). Con *Según configuración* manda el de *Configuración SGA* > *Controles*.
 
 ---
 
 ## "El mapa 3D sale en blanco"
 
-**Síntoma**: Abres *Mapa 3D de almacén* y el panel aparece vacío o no aparece nada.
+**Síntoma**: Abres *Mapa 3D de almacén* y el panel aparece vacío.
 
 **Causas por orden de probabilidad**:
-1. **No hay almacén seleccionado**: el campo *Almacén* está vacío. Se rellena con el almacén por defecto de la configuración; si no hay ninguno configurado, elígelo a mano.
-2. **Las ubicaciones no siguen el formato de código**: el mapa deduce la posición de cada bloque del código `pasillo-estantería-altura` (`101-15-03`: pasillo de 3 dígitos, estantería de 2 y altura de 2). Las ubicaciones con otro formato (otro número de partes, letras o una cantidad de dígitos distinta) no se pueden colocar y no se dibujan. Compruébalo en la lista de ubicaciones.
-3. **Filtro demasiado estrecho**: tienes puesta una zona o un pasillo que no existe. Vacía los filtros.
+1. **No hay almacén seleccionado**: el campo *Almacén* está vacío y el *Resumen* dice *Indique un almacén para dibujar el mapa.* Se rellena con el almacén por defecto de la configuración; si no hay ninguno, elígelo a mano.
+2. **Filtro demasiado estrecho**: el mapa se abre con la *Zona por defecto* de la configuración. Si esa zona no tiene ubicaciones, o tienes puesto un pasillo que no existe, no se dibuja nada. Vacía *Zona* y *Pasillo*.
+3. **Las ubicaciones no siguen el formato de código**: el mapa saca la posición de cada bloque del código `pasillo-estantería-altura` (`101-15-03`: pasillo de 3 dígitos, estantería de 2 y altura de 2). Las ubicaciones con otro formato (otro número de partes, letras o una cantidad de dígitos distinta) no se dibujan. Compruébalo en la lista de ubicaciones.
 
 ---
 
 ## "Recuento manual: conté 80 pero el sistema dice que hay 100"
 
-**Síntoma**: Abres *Recontar* en una línea de contenido, metes 80, y ves que la diferencia es -20.
+**Síntoma**: Pulsas **Recontar** en una línea de contenido, metes 80 en *Cantidad contada* y la *Diferencia* es -20.
 
-**¿Es un error?** No necesariamente:
-- Si la diferencia es negativa (falta), **alguien cogió 20 cajas que SGA no registró**.
-- Si la diferencia es positiva (sobra), **hay 20 de más de las que se conoce**.
+La cantidad va en unidades base. El recuento corrige solo la ubicación: el stock de BC no cambia.
 
 **Soluciones**:
-1. **Si falta** (negativo): Alguien hizo picking manual o traslado sin avisar.
-   - Mete el recuento (80).
-   - SGA crea un movimiento de ajuste por los -20.
-   - Pregunta quién las cogió.
+1. **Si falta** (negativo): alguien cogió mercancía o la llevó a otro hueco sin registrarlo.
+   - Mete el recuento (80). Queda un movimiento de recuento por -20.
+   - Busca dónde está: *¿Dónde está el producto?*.
+2. **Si sobra** (positivo): hay más de lo registrado.
+   - Mete el recuento. Queda un movimiento de recuento por la diferencia.
+   - Investiga de dónde ha salido.
 
-2. **Si sobra** (positivo): Hay un error en la entrada.
-   - Mete el recuento (80).
-   - SGA registra un ajuste +20.
-   - Investiga: ¿se metieron 20 de más? ¿llegaron con error de BC?
-
-Luego, lanza *Conciliar* para que regularice de acuerdo.
-
----
-
-## "Dos usuarios están editando el mapa simultáneamente"
-
-**Síntoma**: Usuario A abre el mapa, lo edita. Usuario B abre el mapa al mismo tiempo. Cuando B guarda, sobrescribe los cambios de A (o falla).
-
-**Realidad**: El mapa es de **solo lectura**. No se puede editar desde ahí. Si ves un error de "locked record", es posible que:
-1. El buffer se está rellenando.
-2. Otra persona tiene un informe corriendo.
-
-**Solución**:
-1. Espera un momento.
-2. Recarga la página (F5 o botón atrás).
-3. Intenta de nuevo.
-
-Si el error persiste: hay un bloqueo de base de datos. En ese caso, el administrador tendrá que revisar SQL (probablemente un informe que tardó más de lo esperado).
+Los recuentos se ven en *Movimientos de ubicación*, vista **Ajustes y recuentos**. Después lanza *Conciliar con el stock* para ver si las ubicaciones cuadran con BC.
 
 ---
 
 ## "No me deja cambiar la configuración de una ubicación"
 
-**Síntoma**: En la ficha, *Admite*, capacidad, zona y el resto salen en gris; o al cambiar en bloque dice que *N no se han cambiado porque tienen contenido*.
+**Síntoma**: En la ficha, tipo, capacidad, zona y el resto salen en gris. O al cambiar en bloque dice que *N no se han cambiado porque tienen contenido*.
 
-**Causa**: la configuración de una ubicación solo se cambia **vacía**. Si no, lo que ya hay dentro podría dejar de cumplirla (un palé en un hueco que pasa a ser de cajas, dos referencias en uno que deja de aceptar mezcla…).
+**Causa**: la configuración de una ubicación solo se cambia **vacía**. Si no, lo que ya hay dentro podría dejar de cumplirla (dos palés en un hueco que pasa a ser de uno, dos productos en uno que deja de aceptar mezcla…).
 
 **Solución**: traslada su contenido a otra ubicación o vacíala, y vuelve a cambiarla. Si lo que quieres es que no se use mientras tanto, **bloquéala**: eso sí se puede con mercancía dentro.
 
@@ -273,103 +248,98 @@ Si el error persiste: hay un bloqueo de base de datos. En ese caso, el administr
 
 ## "Quiero bajar la capacidad de una ubicación que está llena"
 
-**Causa**: la capacidad es configuración, y solo se cambia con la ubicación vacía (ver el apartado anterior). Así no puede quedar una ubicación con más dentro de lo que dice su capacidad.
+**Causa**: la capacidad es configuración, y solo se cambia con la ubicación vacía (ver el apartado anterior).
 
 **Solución**: traslada lo que sobre a otra ubicación, vacíala, cambia la capacidad y vuelve a dejar lo que quepa.
 
 ---
 
-## "La conciliación regularizó mal y ahora hay diferencias que no existían"
+## "Regularicé y la mercancía está en la ubicación de ajustes"
 
-**Síntoma**: Después de regularizar una diferencia, la siguiente conciliación muestra nuevas diferencias.
+**Síntoma**: Después de regularizar, el producto sale en la ubicación de ajustes y no en su hueco.
 
-**Causa**: Posiblemente el movimiento de ajuste se registró en la ubicación equivocada.
+**Causa**: *Regularizar en ubicación de ajustes* deja siempre la diferencia en la *Ubic. ajustes* de la configuración, sin SSCC. El picking no coge de esa ubicación.
 
 **Solución**:
-1. Abre *Movimientos de ubicación*.
-2. Filtra por los últimos movimientos (debe haber un "Ajuste" de hace poco).
-3. Verifica que la ubicación origen/destino son correctas.
-4. Si está mal: **no hay marcha atrás fácil**. El diario es inmutable. Tienes que registrar un **movimiento de traslado inverso** (desde la ubicación equivocada a la correcta).
+1. Abre *Contenido de ubicaciones* y filtra por la ubicación de ajustes.
+2. Selecciona la línea y pulsa **Trasladar** a la ubicación donde está de verdad.
 
-**Mejor prevención**: No regularices directamente sin revisión. En *Conciliación SGA*, mira bien dónde va cada cosa antes de pulsar *Regularizar*.
+Los movimientos no se modifican ni se borran: lo mal hecho se corrige con otro movimiento.
+
+**Mejor prevención**: en *Conciliación con el stock*, ubica lo que falta en su sitio antes de pensar en regularizar.
 
 ---
 
 ## "¿Por qué SGA y BC difieren en un lote que no debería existir?"
 
-**Síntoma**: Conciliar reporta un lote con diferencia, pero ese lote está vencido hace meses.
+**Síntoma**: La conciliación enseña un lote con diferencia, pero ese lote está vencido hace meses.
 
-**Causa**: El Item Ledger Entry en BC tiene un lote/caducidad que SGA no vio en la carga inicial (posiblemente porque estaba en un almacén diferente o llegó después de la carga).
+**Causa**: BC y las ubicaciones no tienen lo mismo de ese lote.
 
 **Solución**:
-1. Abre *Item Ledger Entry* en BC (módulo Inventario).
-2. Filtra por ese producto y ese lote.
-3. ¿Cuál es el `Remaining Quantity`?
-4. Si es > 0: ese stock existe y hay que ubicarlo. Lanza *Carga inicial* solo para ese producto.
-5. Si es <= 0: fue consumido y no debería estar. Pregunta a administrador por qué el IIEE no se cerró.
+1. En *Conciliación con el stock*, selecciona la línea y pulsa **Movs. producto** para ver los movimientos de BC.
+2. Si está en la vista **Stock sin ubicar**: BC tiene stock de ese lote. Si existe, ubícalo desde *Pendiente de ubicar*. Si no existe, hay que corregir el stock en BC.
+3. Si está en la vista **Sobra en ubicaciones**: las ubicaciones tienen más que BC. Busca el lote con **Ubicaciones del producto** y haz un **Recontar** con la cantidad real.
 
 ---
 
 ## "Regularizar no funcionó"
 
-**Síntoma**: Ejecutas *Regularizar* en *Conciliación SGA vs stock*, pero cuando vuelves a conciliar aparece la misma diferencia.
+**Síntoma**: Pulsas *Regularizar en ubicación de ajustes* en *Conciliación con el stock* y la diferencia sigue.
 
-**Causas posibles**:
-1. **No hizo commit**: regularizaste pero no guardaste. Pulsa Guardar después.
-2. **Ubicación destino no existe**: el ajuste intentó meterse en la ubicación de ajustes, pero esa no está configurada.
-3. **Diferencia es negativa**: regularizar solo funciona para faltas (Stock BC > Stock SGA). Para excesos, requiere recuento.
+**Mensajes y qué hacer**:
+- *En esta línea sobra contenido en las ubicaciones…*: lo que sobra no se regulariza. Recuenta las ubicaciones que tienen el producto.
+- *Los … sin ubicar de esta línea están pendientes en Ubicar recepciones o Ubicar ensamblados…*: ubícalo desde esas pantallas.
+- *Debe configurar la ubicación de ajustes en la configuración de SGA.*: pon la *Ubic. ajustes* en *Configuración SGA* > *Ubicaciones por flujo*.
+- *No se puede regularizar en el almacén …: la ubicación de ajustes (…) es del almacén por defecto (…)…*: solo se regulariza en el almacén por defecto. En otro almacén, ubica la mercancía.
+- *Esta línea ya cuadra.*: no hay nada que regularizar.
 
-**Solución**:
-1. Abre *Configuración SGA*.
-2. Verifica que `Ubicacion Ajustes` está asignada y existe.
-3. Si no existe: crea esa ubicación primero, asígnaIa en config, y vuelve a intentar.
-4. Asegúrate de guardar después de regularizar.
+Después pulsa **Volver a conciliar**.
 
 ---
 
-## "Alguien buscó en la base de datos y metió datos directamente"
+## "El contenido de las ubicaciones no cuadra con sus movimientos"
 
-**Síntoma**: Contenido SGA cambió de forma que SGA no puede explicar. Ocupación descuadra, movimientos no coinciden.
+**Síntoma**: La ocupación descuadra o el contenido no se explica con los movimientos de ubicación.
 
-**Causa**: Alguien corrió una query SQL directa, burlando `Cod51100`.
+**Causa**: El contenido y los movimientos solo se escriben desde la gestión de contenido de SGA. Cualquier otro intento desde BC da error (*El contenido de ubicación solo se puede modificar desde la gestión de contenido SGA…*). Si aun así descuadra, alguien ha escrito en las tablas por fuera de BC.
 
 **Recuperación**:
-1. **Mejor opción**: Abre *Sincronizar ubicaciones* > marca *Reconstruir contenido* > ejecuta.
-   - Esto **borra todo** el contenido y lo regenera desde el diario.
-   - Toma tiempo (lee todos los movimientos), pero garantiza consistencia.
-2. **Después**: Lanza *Conciliar* para comprobar que todo cuadra.
-
-**Prevención**: Quita permisos directos a la BD a quien no los necesite. SGA debe ser el único que toque esas tablas.
+1. Abre *Sincronizar ubicaciones*, marca **Reconstruir contenido desde los movimientos** y ejecuta.
+   - Borra el contenido por ubicación y lo vuelve a construir desde el diario de movimientos.
+   - Las reservas de las órdenes abiertas se vuelven a calcular y los bloqueos se conservan.
+2. Después lanza *Conciliar con el stock* para comprobar que cuadra con BC.
 
 ---
 
-## "¿Por qué tardó tanto la conciliación?"
+## "¿Por qué tarda tanto la conciliación?"
 
-**Síntoma**: *Conciliar con el stock* tarda > 1 minuto incluso con pocos movimientos.
+**Síntoma**: *Conciliar con el stock* tarda mucho.
 
-**Causas posibles**:
-1. **Muchos Items/Lotes**: si tienes 10.000+ combinaciones de producto+variante+lote, es lógico.
-2. **Índices débiles**: la query de Item Ledger Entry o Contenido SGA está haciendo table scan.
-3. **Base de datos lenta**: I/O saturado.
+**Causa**: Recorre producto a producto todo el stock de BC y todo el contenido de las ubicaciones.
 
 **Solución**:
-1. Filtra por `Almacen` específico en la conciliación (no hagas "todo a la vez").
-2. Si es recurrente: pídele al administrador que verifique índices en las tablas grandes.
-3. Si es la primera conciliación y es lenta porque hay millones de IIEE: es normal. Espera.
+1. Indica un *Almacén* (en blanco concilia todos).
+2. Filtra los productos: por nº, categoría o grupo contable de inventario.
+3. Marca *Mostrar solo diferencias*.
 
 ---
 
 ## "El preparador pulsa *Siguiente orden* y le dice que no tiene órdenes asignadas"
 
-**Causa**: está activada *Exigir asignación de picking* y el responsable aún no le ha asignado nada. Las órdenes recién enviadas esperan en *Pendiente de asignar*.
+**Mensaje**: *No tiene órdenes de picking asignadas. Pida a su responsable que le asigne alguna.*
 
-**Solución**: el responsable abre *Asignar órdenes de picking*, vista *Sin asignar*, y las reparte con *Asignar a*. Si no queréis este paso, desactiva la casilla en *Configuración SGA* > *Controles*: las órdenes que estaban esperando pasan a cogerse con *Siguiente orden*.
+**Causa**: está activada *Exigir asignación de picking* y el responsable aún no le ha asignado nada. Las órdenes recién enviadas esperan como *Pendiente de asignar*.
+
+**Solución**: el responsable abre *Asignar órdenes de picking*, vista *Sin asignar*, y las reparte con **Asignar a**. Si no queréis este paso, desmarca la casilla en *Configuración SGA* > *Controles*: las órdenes que estaban esperando pasan a cogerse con *Siguiente orden*.
 
 ---
 
 ## "Me dice que la orden está asignada a otro y solo la puede preparar el asignado"
 
-**Causa**: con *Exigir asignación*, cada orden es de su preparador, y nadie más puede abrirla ni confirmar paradas.
+**Mensaje**: *La orden … está asignada a …. Solo la puede preparar el preparador asignado.*
+
+**Causa**: con *Exigir asignación de picking*, cada orden es de su preparador, y nadie más puede abrirla ni confirmar paradas.
 
 **Solución**: si hay que cambiar de preparador (por ejemplo, porque el asignado se ha ido), el responsable la reasigna en *Asignar órdenes de picking*. Una orden empezada se puede reasignar, pero no dejar sin nadie.
 
@@ -377,7 +347,7 @@ Si el error persiste: hay un bloqueo de base de datos. En ese caso, el administr
 
 ## "Soy responsable y no me deja asignar órdenes"
 
-**Síntoma**: Sale *"Solo un responsable de picking puede asignar órdenes o cambiar su prioridad"* al abrir *Asignar órdenes de picking*, al cambiar el preparador o al tocar la prioridad.
+**Síntoma**: Sale *Solo un responsable de picking puede asignar órdenes o cambiar su prioridad. Pida que le marquen "Responsable picking SGA" en Configuración de usuarios.* al abrir *Asignar órdenes de picking*, al cambiar el preparador o al tocar la prioridad.
 
 **Causa**: con *Exigir asignación de picking* activo, solo pueden repartir los usuarios marcados como responsables. Tener el conjunto de permisos *SGA - Responsable de almacén* no basta.
 
@@ -387,6 +357,8 @@ Si el error persiste: hay un bloqueo de base de datos. En ese caso, el administr
 
 ## "No puedo quitar la asignación de una orden"
 
+**Mensaje**: *La orden … ya está empezada. Reasígnela a otro preparador en lugar de dejarla sin asignar.*
+
 **Causa**: la orden ya tiene recogidas (*En proceso*) y se exige asignación. Si se dejara sin nadie, quedaría a medias sin que ningún preparador la viera.
 
 **Solución**: reasígnala a otro preparador.
@@ -395,65 +367,58 @@ Si el error persiste: hay un bloqueo de base de datos. En ese caso, el administr
 
 ## "Operario dice que no puede hacer picking desde SGA"
 
-**Síntoma**: El operario abre la página de picking y dice que no ve las paradas correctas o que la ubicación no es la esperada.
+**Síntoma**: El operario abre la pantalla de picking y no ve las paradas que espera, o la ubicación no es la esperada.
 
 **Causas comunes**:
 
-1. **No hay orden de picking creada**: El pedido de venta está ahí pero **no se ha enviado** a picking. El operario no ve nada porque no hay paradas.
-   - **Solución**: Lanza el pedido y pulsa *Almacén SGA > Enviar a SGA*.
+1. **No hay orden de picking creada**: el pedido de venta está ahí pero **no se ha enviado** a SGA.
+   - **Solución**: lanza el pedido y pulsa *Almacén SGA* > **Enviar a SGA**.
 
-2. **Hay stock en BC pero no está ubicado**: El sistema genera la orden pero sin paradas: significa que no hay contenido ubicado del producto.
-   - **Solución**: Lanza *Ubicar producto* para las cantidades que tienes, o *Carga inicial* si es la primera vez.
+2. **No hay stock ubicado del producto**: si no hay nada ubicado de ningún producto del pedido, no se crea ninguna orden (*No se ha podido generar ninguna parada…*). Si falta solo de algunos, las órdenes se crean con lo que hay y el aviso dice qué falta.
+   - **Solución**: ubica lo que hay (*Ubicar recepciones*, *Pendiente de ubicar*). Lo que falta se envía en una segunda ronda.
 
-3. **No hay capacidad en las ubicaciones propuestas**: SGA propone un hueco pero descarta otros por capacidad llena.
-   - **Solución**: Bloquea los llenos y relanza el picking, o revisa la estrategia de picking.
+3. **El stock está bloqueado o en una ubicación que no se coge**: el picking no coge de líneas bloqueadas, de ubicaciones o zonas bloqueadas ni de la ubicación de ajustes.
+   - **Solución**: desbloquea lo que proceda o traslada lo de ajustes a su hueco, y vuelve a enviar lo que falte.
 
-4. **El producto está bloqueado en todas las ubicaciones**: Marcaste "No hay stock aquí" porque no encontrabas el producto, y eso canceló la parada.
-   - **Solución**: Abre *Órdenes de picking*, ve la ficha de la orden, y verás qué paradas están canceladas.
+4. **La parada se canceló o quedó retenida**: con **Sin stock**, la parada se cancela y lo que faltaba se busca en otra ubicación. Una parada saltada dos veces queda **retenida** y el preparador ya no la ve.
+   - **Solución**: abre la ficha de la orden en *Órdenes de picking* y mira el estado de cada parada. Las retenidas se resuelven en *Paradas retenidas* con **Buscar en otra ubicación**.
 
 5. **Hay stock ubicado pero está reservado**: otro pedido ya lo tiene en una orden abierta. En *Contenido de ubicaciones* se ve en *Cantidad reservada*.
    - **Solución**: espera a que se prepare la otra orden, o cancélala si ya no hace falta: al cancelar se libera la reserva.
 
-**PDA**: Por ahora SGA es escritorio. La Fase 3 añadirá una página de PDA con soporte de escáner.
+**PDA**: el preparador entra con el rol **Preparador SGA (PDA)** y pulsa **Preparar pedidos SGA**, que abre la pantalla *Preparar picking SGA* con su siguiente orden. La preparación del terminal está en la guía de uso.
 
 ---
 
 ## "No me deja enviar el pedido a picking"
 
 **Mensajes y qué hacer**:
-- *"El pedido debe estar lanzado"*: lánzalo. Mientras se prepara, el pedido no debe cambiar.
-- *"Ya tiene abierta la orden de picking X"*: solo puede haber una orden viva por pedido. Termínala o cancélala desde *Órdenes de picking*.
-- *"No tiene nada pendiente de preparar"*: todo lo que queda por servir ya está recogido en órdenes anteriores. Falta pasarlo al pedido y registrar el envío.
+- *No se puede enviar el pedido … a SGA* (Estado debe ser igual a «Lanzado»): lánzalo. Un pedido enviado a SGA ya no se puede volver a abrir.
+- *El pedido … tiene sin terminar la orden de picking …*: lo que falte se envía cuando estén terminadas todas sus órdenes. Termínala o cancélala desde *Órdenes de picking*.
+- *El pedido … no tiene nada pendiente de preparar…*: todo lo que queda por servir ya está recogido. Falta pasarlo al pedido y registrar el envío.
+- *Estos productos no tienen palé en su ficha ("Cód. palé por defecto") y SGA prepara por palés…*: rellena el *Cód. palé por defecto* de esos productos.
+- *Configure la serie "Nos. orden SGA" en la configuración de SGA…*: pon la serie en *Configuración SGA* > *Numeración*.
+- *No se ha podido generar ninguna parada: no hay contenido ubicado disponible de los productos del pedido.*: ubica primero el stock.
 
 ---
 
 ## "La orden se terminó pero el pedido no tiene la cantidad a enviar ni los lotes"
 
-**Síntoma**: Al terminar, el preparador vio *"Orden terminada, pero no se ha podido pasar al pedido"*. O la orden sale en la vista *Terminadas sin pasar al pedido*.
+**Síntoma**: Al terminar, el preparador vio *No se ha podido pasar al pedido …: … Avise a oficina para que lo pase desde la orden.* O la orden sale en la vista *Terminadas sin pasar al pedido*.
 
 **Causas posibles**:
-1. **La línea tiene reservas por lote**: alguien reservó un lote concreto en el pedido. SGA no las deshace solo.
-2. **El almacén exige envío de almacén** (*Require Shipment*): BC no deja poner a mano la cantidad a enviar en esos almacenes.
-3. **Redondeo de la unidad de medida**: lo recogido en unidades no da un número válido de cajas según la precisión de redondeo del producto.
-4. **Permisos**: el usuario no puede modificar líneas de venta o movimientos de reserva.
+1. **La línea tiene reservas por lote**: alguien reservó un lote concreto en el pedido. SGA no las deshace solo (*La línea … del pedido … tiene reservas por lote. Anúlelas antes de pasar el picking al pedido.*).
+2. **BC no acepta la cantidad a enviar o el lote**: el mensaje del preparador trae el error de BC.
 
-**Solución**: corrige la causa y pulsa *Pasar al pedido* en la orden, o *Pasar picking al pedido* en el pedido. Se puede repetir sin miedo: suma lo recogido de todas las órdenes y descuenta lo ya enviado.
+**Solución**: corrige la causa y pulsa **Pasar al pedido** en la orden, o **Pasar picking al pedido** en el pedido. Se puede repetir sin miedo: suma lo recogido de todas las órdenes y descuenta lo ya enviado.
 
 ---
 
 ## "Cambié a mano la cantidad a enviar o los lotes del pedido"
 
-**Qué pasa**: SGA no se entera. Si se envía un lote o una cantidad distinta de lo recogido, BC y las ubicaciones se descuadran. La conciliación lo enseñará (*SobraEnSGA* en el lote recogido, *SinUbicar* o negativo en el otro).
+**Qué pasa**: SGA no se entera. Si se envía un lote o una cantidad distinta de lo recogido, BC y las ubicaciones se descuadran. La conciliación lo enseña: el lote recogido sale en *Stock sin ubicar* (ya no está en su hueco, pero BC lo sigue teniendo) y el lote enviado sale en *Sobra en ubicaciones* (BC ya no lo tiene, pero sigue en su hueco).
 
-**Solución**: antes de registrar, vuelve a *Pasar picking al pedido* para dejar lo recogido. Si ya se registró, corrige las ubicaciones con un recuento.
-
----
-
-## "El preparador ve las cantidades en unidades y no en cajas"
-
-**Causa**: la orden se creó antes de este cambio, cuando las paradas no guardaban la unidad del pedido. En ese caso enseña la unidad base.
-
-**Solución**: cancela la orden y vuelve a enviar el pedido a picking.
+**Solución**: antes de registrar, vuelve a pulsar **Pasar picking al pedido** para dejar lo recogido. Si ya se registró, recuenta el hueco del lote que sobra y ubica el que falta.
 
 ---
 
@@ -462,12 +427,12 @@ Si el error persiste: hay un bloqueo de base de datos. En ese caso, el administr
 **Síntoma**: Abres *Ubicar recepciones*, pones la fecha y la recepción no aparece.
 
 **Causas posibles**:
-1. **Filtros**: la pantalla busca por la *fecha de registro* del albarán (no por el día en que llegó el camión) y por la **Clase de artículo** de la ficha del producto (por defecto *Prod. externo*), y por **Producto** si se ha puesto uno. Deja las fechas y el producto en blanco y pon la clase en *Todas* para verlo todo. Sin fecha *desde*, solo salen las recepciones que aún tienen stock.
+1. **Filtros**: la pantalla busca por la *fecha de registro* del albarán (no por el día en que llegó el camión), por la **Clase de artículo** de la ficha del producto (por defecto *Prod. externo*) y por **Producto** si se ha puesto uno. Deja las fechas y el producto en blanco y pon la clase en *Todas* para verlo todo.
 2. **Almacén filtrado**: el albarán es de otro almacén. Vacía el filtro *Almacén*.
 3. **Ya está ubicada**: con *Solo lo que falta por ubicar* marcado, lo ya colocado se oculta. Desmárcalo.
 4. **Se deshizo la recepción**: si la cantidad neta del albarán es cero, la línea no sale.
 5. **No se registró como albarán de compra**: la pantalla lee los movimientos de producto de tipo *Compra* con documento *Albarán compra*. Lo que entre por otra vía (un diario de producto, un ajuste positivo) no aparece. Eso se ubica con *Ubicar producto* > *Ubicar todo lo pendiente*.
-6. **Es anterior a la *Fecha inicio SGA***: lo registrado antes de esa fecha no sale nunca. Ya es stock de BC; si no está en ningún hueco, sale en *Pendiente de ubicar* como *A ubicar*.
+6. **Es anterior a la *Fecha inicio SGA***: lo registrado antes de esa fecha no sale nunca. Ya es stock de BC; si no está en ningún hueco, sale en *Pendiente de ubicar*.
 
 **Solución**: revisa 1 a 4. Si es el 5, ubícalo con *Ubicar producto*. Si es el 6, desde *Pendiente de ubicar*.
 
@@ -479,51 +444,44 @@ Si el error persiste: hay un bloqueo de base de datos. En ese caso, el administr
 
 **Causa**: Deshacer en BC resta la cantidad de la recepción, pero lo que ya estaba colocado no se saca solo de la ubicación. SGA no toca el contenido desde el registro de BC.
 
-**Solución**: entra en *Contenido de ubicaciones*, busca la línea y haz un *Recontar* con la cantidad real. La conciliación lo habría enseñado como *SobraEnSGA*.
+**Solución**: entra en *Contenido de ubicaciones*, busca la línea y haz un **Recontar** con la cantidad real. La conciliación lo habría enseñado en *Sobra en ubicaciones*.
 
 ---
 
 ## "No encuentro *Ubicar ensamblados* en el buscador"
 
-**Causa**: La pantalla ahora sirve para ensamblados y recepciones, y en el buscador (Alt+Q) sale como **Ubicar entradas**. Abierta desde ahí, muestra ensamblados.
+**Causa**: La pantalla sirve para ensamblados y recepciones, y en el buscador (Alt+Q) sale como **Ubicar entradas SGA**. Abierta desde ahí, muestra ensamblados.
 
 **Solución**: busca "Ubicar entradas", o entra por el rol *Almacén SGA*, que tiene una entrada separada para *Ubicar ensamblados* y otra para *Ubicar recepciones*.
 
 ---
 
-## "Al ubicar dice que el SSCC ya está en otra ubicación con otro producto"
+## "Al ubicar dice que el SSCC ya está en una ubicación"
 
-**Causa**: se ha leído la etiqueta de otro palé. Un SSCC es de un solo producto y lote, y ese ya está en el almacén con otro.
+**Mensaje**: *El SSCC … ya está en la ubicación … con …, lote …. Es un palé que ya entró: revise la etiqueta.*
+
+**Causa**: se ha leído una etiqueta que ya está en el almacén: la de otro palé, o la misma leída dos veces. Una entrada es siempre un palé nuevo.
 
 **Solución**: lee la etiqueta del palé que estás ubicando. Si el palé no tiene etiqueta, deja *SSCC* en blanco y se le da uno nuevo.
 
 ---
 
-
 ## "¿Cómo migro desde otra solución SGA?"
 
-**Escenario**: Tenías otro sistema y quieres cambiar a SGA.
+SGA no importa ubicaciones de otro sistema. Arranca con la **Carga inicial de contenido**, que reparte el stock que ya tiene BC (ver el [manual de implantación](MANUAL_IMPLANTACION_SGA.md#7-carga-inicial)).
 
 **Pasos**:
-1. **Exporta el contenido del viejo sistema**: producto, ubicación, lote, cantidad.
-2. **Asegúrate de que BC tiene ese stock** (debe coincidir el total).
-3. **Sincroniza ubicaciones** en SGA.
-4. **Lanza *Carga inicial*** con los datos del viejo sistema (o mejor, importa manualmente vía una página de "Carga manual" que tendrás que crear).
-5. **Lanza *Conciliar*** para verificar que BC y SGA coinciden.
-
-La Fase 1 no tiene herramientas de importación masiva, así que tendrás que:
-- O crear una página de importación específica.
-- O hacerlo línea por línea.
-- O pedirme que extienda `Cod51100.RegistrarCargaInicial` con un parámetro de "importa desde tabla temporal".
+1. **Asegúrate de que BC tiene ese stock**, lote a lote.
+2. **Crea las ubicaciones** con *Generar ubicaciones* (o *Sincronizar ubicaciones* si ya existen en BC) y ponles tipo y capacidad.
+3. Si quieres respetar dónde estaba cada producto, ponle esa ubicación como *Producto fijo* o como *Nº estante* en su ficha, y lanza la carga con *Ubicación fija del producto*. Si no, con *Huecos libres*.
+4. **Lanza la carga** primero con *Solo simular*.
+5. **Lanza *Conciliar con el stock*** para verificar que BC y las ubicaciones coinciden.
 
 ---
 
 ## "Necesito un reporte personalizado"
 
-**Opciones**:
-1. **Usa las listas**: *Contenido de ubicaciones* y *Ubicaciones SGA* tienen todos los datos. Filtra, pulsa *Abrir en Excel* y personaliza ahí.
-2. **Crea un reporte propio**: Basándote en `Contenido SGA` y `Ubicacion SGA`. Puedo ayudarte si necesitas una query específica.
-3. **Pide funcionalidad**: Si es algo que repetirás cada semana, mejor integrado. Avisa qué necesitas.
+**Usa las listas**: *Contenido de ubicaciones*, *Ubicaciones SGA* y *Movimientos de ubicación* tienen todos los datos. Filtra, pulsa *Abrir en Excel* y personaliza ahí.
 
 ---
 
@@ -531,19 +489,19 @@ La Fase 1 no tiene herramientas de importación masiva, así que tendrás que:
 
 | Problema | Acción rápida |
 |---|---|
-| No encuentro un producto | *¿Dónde está el producto?* o *Conciliar* |
-| Ocupación incoherente | Ficha ubicación > *Recalcular estado* |
-| Carga inicial metió todo en un sitio | Revisa `Shelf No.` de productos |
-| Diferencia grande en conciliación | Busca en *Conciliación SGA* > investiga |
-| Ubicación bloqueada, no puedo desbloquearla | Ficha > campo `Bloqueada` > pon No |
-| Traslado no funcionó | Revisa capacidad y reglas de destino |
-| Una recepción no sale para ubicar | Revisa fecha de registro, almacén y *Solo lo que falta* |
+| No encuentro un producto | *¿Dónde está el producto?* sin filtros, o *Pendiente de ubicar* |
+| Ocupación incoherente | Ficha ubicación > *Recalcular ocupación* |
+| Carga inicial metió todo en un sitio | *Vaciar ubicación* y relanza con *Huecos libres* |
+| Diferencia grande en conciliación | *Conciliación con el stock* > vista *Stock sin ubicar* > ubícalo en su sitio |
+| Lote desbloqueado que sigue sin usarse | Revisa el bloqueo de la ubicación y de su zona |
+| Traslado no funcionó | Lee el mensaje: bloqueo, reserva, producto fijo, mezcla o capacidad del destino |
+| Una línea *No se puede ubicar* | Lee el *Motivo*: tipo, espacio, palé del producto o el desglose |
+| No se propone una ubicación que existe | Casi siempre no tiene tipo: vista *Sin tipo* y ponlo en su ficha |
+| Una recepción no sale para ubicar | Revisa fecha de registro, clase de artículo, almacén y *Solo lo que falta por ubicar* |
 | Deshice una recepción ya ubicada | *Contenido de ubicaciones* > *Recontar* |
-| No deja enviar a picking | Lanza el pedido y revisa que no tenga otra orden abierta |
+| No deja enviar a picking | Lanza el pedido y revisa que no tenga otra orden sin terminar |
 | El preparador no tiene órdenes asignadas | *Asignar órdenes de picking* > *Asignar a* |
 | El responsable no puede asignar | Configuración de usuarios > *Responsable picking SGA* |
-| Un hueco rechaza lo que intento dejar | Ver "Me dice que la ubicación admite otra cosa": palé acepta palés y cajas; caja, solo cajas; unidad, solo botellas |
-| No se propone una ubicación que existe | Tiene *Admite* en blanco: configúralo en su ficha |
 | Picking terminado pero el pedido sin lotes | Orden > *Pasar al pedido* |
-| Todo se rompió y no sé qué pasó | *Sincronizar* > *Reconstruir contenido* |
-
+| Lo regularizado está en ajustes | *Contenido de ubicaciones* > *Trasladar* a su hueco |
+| El contenido no cuadra con los movimientos | *Sincronizar ubicaciones* > *Reconstruir contenido desde los movimientos* |

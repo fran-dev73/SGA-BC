@@ -2,10 +2,8 @@ namespace AntonioNadal.SGA;
 
 using Microsoft.Foundation.NoSeries;
 using Microsoft.Foundation.UOM;
-using Microsoft.Inventory.Item;
 using Microsoft.Inventory.Location;
 using Microsoft.Warehouse.Structure;
-using System.Reflection;
 
 /// <summary>
 /// Table Config. SGA (ID 51104).
@@ -32,6 +30,21 @@ table 51104 "Config. SGA"
             DataClassification = ToBeClassified;
             TableRelation = Location;
             ToolTip = 'Almacén que se propone en las consultas y el mapa, y sobre el que se resuelven las ubicaciones por defecto de esta configuración.';
+
+            trigger OnValidate()
+            var
+                rZona: Record "Zona SGA";
+                rBin: Record Bin;
+            begin
+                // La zona y la ubicación de ajustes son de un almacén: si no son del nuevo, se
+                // vacían para que no queden apuntando al anterior.
+                if "Zona por Defecto" <> '' then
+                    if not rZona.Get("Almacen por Defecto", "Zona por Defecto") then
+                        "Zona por Defecto" := '';
+                if "Ubic. Ajustes" <> '' then
+                    if not rBin.Get("Almacen por Defecto", "Ubic. Ajustes") then
+                        "Ubic. Ajustes" := '';
+            end;
         }
         field(12; "Zona por Defecto"; Code[10])
         {
@@ -66,22 +79,6 @@ table 51104 "Config. SGA"
             DataClassification = ToBeClassified;
             ToolTip = 'Cómo se propone el hueco para lo que llega en una recepción de compra. Por defecto la estándar: la casa del producto, si no consolidar y si no el primer hueco libre.';
         }
-        field(36; "Campo Grupo IIEE"; Integer)
-        {
-            Caption = 'Campo del grupo IIEE en el producto';
-            DataClassification = ToBeClassified;
-            TableRelation = Field."No." where(TableNo = const(27), Type = filter(Code | Text));
-            BlankZero = true;
-            ToolTip = 'Campo de la ficha del producto que guarda su grupo IIEE. Con él, al ubicar se buscan primero huecos en las zonas de ese grupo ("Grupo IIEE" de la zona) y, si no queda sitio, en el resto del almacén. En blanco no se agrupa por grupo IIEE.';
-        }
-        field(37; "Nombre Campo Grupo IIEE"; Text[80])
-        {
-            Caption = 'Nombre del campo del grupo IIEE';
-            Editable = false;
-            FieldClass = FlowField;
-            CalcFormula = lookup(Field."Field Caption" where(TableNo = const(27), "No." = field("Campo Grupo IIEE")));
-            ToolTip = 'Nombre del campo de la ficha del producto elegido como grupo IIEE.';
-        }
         field(31; "Estrategia Picking"; Enum "Estrategia Picking SGA")
         {
             Caption = 'Estrategia picking';
@@ -105,7 +102,7 @@ table 51104 "Config. SGA"
             Caption = 'Exigir confirmar ubicación';
             DataClassification = ToBeClassified;
             InitValue = true;
-            ToolTip = 'Obliga al operario a escanear la ubicación para cerrar la tarea de ubicar mercancía. El picking pide siempre la ubicación de la que recoge, leída de la etiqueta del hueco.';
+            ToolTip = 'En Ubicar producto, obliga a escanear la etiqueta del hueco en el que se deja cada línea ("Ubicación leída") antes de confirmarla. El picking pide siempre la ubicación de la que recoge, leída de la etiqueta del hueco.';
         }
         field(43; "Permitir Desvio Ubicacion"; Boolean)
         {
@@ -120,25 +117,43 @@ table 51104 "Config. SGA"
             DataClassification = ToBeClassified;
             ToolTip = 'Si está activo, las órdenes de picking nacen pendientes de asignar y solo las puede preparar el preparador al que un responsable se las asigne en "Asignar órdenes de picking". Si no, cada preparador coge la siguiente sin asignar.';
         }
-        field(46; "Max. Cajas por Orden"; Integer)
-        {
-            Caption = 'Máximo de cajas por orden';
-            DataClassification = ToBeClassified;
-            MinValue = 0;
-            ToolTip = 'Número máximo de cajas que puede llevar una orden de picking de productos que se preparan por cajas. Al pasarlo, se abre otra orden del mismo producto. 0 = sin límite: todas las cajas del producto van en una orden.';
-        }
-        field(47; "Exigir Escanear Producto"; Boolean)
-        {
-            Caption = 'Exigir escanear producto al recoger';
-            DataClassification = ToBeClassified;
-            ToolTip = 'Si está activo, al confirmar cada parada de picking el preparador tiene que escanear el código de barras del producto que recoge (GTIN, referencia de código de barras o GS1-128). Si el GS1-128 trae lote, se comprueba contra el lote de la parada.';
-        }
         field(50; "Nos. Orden SGA"; Code[20])
         {
             Caption = 'Nºs orden SGA';
             DataClassification = ToBeClassified;
             TableRelation = "No. Series";
             ToolTip = 'Serie numérica de las órdenes de trabajo de almacén. La consume la gestión de órdenes de la Fase 2.';
+        }
+        field(51; "Nos. SSCC"; Code[20])
+        {
+            Caption = 'Nºs SSCC';
+            DataClassification = ToBeClassified;
+            TableRelation = "No. Series";
+            ToolTip = 'Serie numérica de la que salen los SSCC nuevos de los palés que entran sin etiqueta. Solo dígitos. Si es la misma serie que usan las etiquetas de palé del resto del sistema, con el mismo prefijo y dígito de extensión, comparten contador y no se repite ningún SSCC.';
+        }
+        field(52; "Prefijo Empresa GS1"; Code[12])
+        {
+            Caption = 'Prefijo empresa GS1';
+            DataClassification = ToBeClassified;
+            ToolTip = 'Prefijo de empresa que asigna GS1 (entre 6 y 12 dígitos). Va en cada SSCC nuevo, detrás del dígito de extensión.';
+
+            trigger OnValidate()
+            var
+                PrefijoNoValidoErr: Label 'El prefijo de empresa GS1 tiene que ser de 6 a 12 dígitos.';
+            begin
+                if "Prefijo Empresa GS1" = '' then
+                    exit;
+                if (StrLen("Prefijo Empresa GS1") < 6) or (DelChr("Prefijo Empresa GS1", '=', '0123456789') <> '') then
+                    Error(PrefijoNoValidoErr);
+            end;
+        }
+        field(53; "Digito Extension SSCC"; Integer)
+        {
+            Caption = 'Dígito extensión SSCC';
+            DataClassification = ToBeClassified;
+            MinValue = 0;
+            MaxValue = 9;
+            ToolTip = 'Primer dígito de cada SSCC nuevo (0 a 9). Lo elige la empresa; con un dígito distinto del de las etiquetas de palé del resto del sistema, los SSCC de SGA nunca coinciden con ellas aunque las series vayan por separado.';
         }
         field(70; "Fecha Inicio SGA"; Date)
         {
@@ -215,26 +230,6 @@ table 51104 "Config. SGA"
     procedure DesvioPermitido(prm_Propuesta: Code[20]; prm_Confirmada: Code[20]): Boolean
     begin
         exit("Permitir Desvio Ubicacion" or (prm_Confirmada = prm_Propuesta));
-    end;
-
-    /// <summary>
-    /// Grupo IIEE del producto, leído del campo de su ficha que diga "Campo Grupo IIEE". Se lee
-    /// por número de campo para que SGA no dependa de la extensión que lo define. En blanco si no
-    /// está configurado o el producto no lo tiene. Trabaja sobre la configuración ya leída.
-    /// </summary>
-    procedure GrupoIIEEProducto(prm_Producto: Code[20]) grupo: Code[20]
-    var
-        rItem: Record Item;
-        ref: RecordRef;
-    begin
-        if ("Campo Grupo IIEE" = 0) or (prm_Producto = '') then
-            exit('');
-        ref.Open(Database::Item);
-        ref.SetLoadFields("Campo Grupo IIEE");
-        ref.Field(rItem.FieldNo("No.")).SetRange(prm_Producto);
-        if ref.FindFirst() then
-            grupo := CopyStr(Format(ref.Field("Campo Grupo IIEE").Value()), 1, MaxStrLen(grupo));
-        ref.Close();
     end;
 
     /// <summary>

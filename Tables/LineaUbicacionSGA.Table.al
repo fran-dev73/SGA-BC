@@ -1,5 +1,6 @@
 namespace AntonioNadal.SGA;
 
+using Microsoft.Inventory.Item;
 using Microsoft.Warehouse.Structure;
 
 /// <summary>
@@ -82,7 +83,9 @@ table 51114 "Linea Ubicacion SGA"
         {
             Caption = 'Descripción';
             ToolTip = 'Descripción del producto.';
-            DataClassification = ToBeClassified;
+            Editable = false;
+            FieldClass = FlowField;
+            CalcFormula = lookup(Item.Description where("No." = field("No. Producto")));
         }
         field(26; "Cod. Variante"; Code[10])
         {
@@ -106,7 +109,7 @@ table 51114 "Linea Ubicacion SGA"
 
             trigger OnValidate()
             var
-                cLectura: Codeunit "Lectura Codigos SGA";
+                cLectura: Codeunit "Codigos Barras SGA";
             begin
                 SSCC := cLectura.SSCCLeido(SSCC);
             end;
@@ -141,6 +144,12 @@ table 51114 "Linea Ubicacion SGA"
                 else
                     cUbicaciones.TestReservarHueco("Cod. Almacen", "Ubicacion Confirmada", ReservaFila());
             end;
+        }
+        field(32; "Ubicacion Leida"; Code[20])
+        {
+            Caption = 'Ubicación leída';
+            ToolTip = 'Ubicación escaneada de la etiqueta del hueco al dejar la mercancía. Con "Exigir confirmar ubicación" tiene que ser la ubicación en la que se deja.';
+            DataClassification = ToBeClassified;
         }
         field(40; Estado; Option)
         {
@@ -237,7 +246,7 @@ table 51114 "Linea Ubicacion SGA"
     /// </summary>
     procedure SSCCPale(): Code[20]
     var
-        cLectura: Codeunit "Lectura Codigos SGA";
+        cLectura: Codeunit "Codigos Barras SGA";
     begin
         if SSCC = '' then
             SSCC := cLectura.NuevoSSCC();

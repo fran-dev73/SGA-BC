@@ -400,6 +400,8 @@ table 51101 "Ubicacion SGA"
     begin
         rContenido.SetRange("Cod. Almacen", "Cod. Almacen");
         rContenido.SetRange("Cod. Bin", "Cod. Bin");
+        // Una línea en negativo (con "Permitir cantidad negativa") no libera sitio.
+        rContenido.SetFilter("Cantidad Base", '>%1', 0);
         rContenido.SetLoadFields("No. Producto", "Cantidad Base");
         if not rContenido.FindSet() then
             exit(0);

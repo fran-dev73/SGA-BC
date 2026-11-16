@@ -377,7 +377,7 @@ Lo demás quedará pendiente para volver a proponer.</div>
   <div class="donde"><span class="k">Dónde</span><span><span class="ui">Pedido de venta</span> · Almacén SGA › <b>Enviar a SGA</b>.</span></div>
   <ul>
     <li>El pedido tiene que estar <b>lanzado</b>, no tener órdenes de picking sin terminar y todos sus productos deben tener palé en la ficha. Una vez enviado, <b>no se puede volver a abrir</b>.</li>
-    <li>El pedido se reparte en <b>órdenes de un palé como mucho</b>: una por cada palé completo, y las cajas y unidades sueltas juntas hasta llenar un palé. 4 palés y 2 cajas son 5 órdenes.</li>
+    <li>El pedido se reparte en <b>órdenes de un palé como mucho</b>: una por cada palé completo, y las unidades sueltas juntas hasta llenar un palé. Lo pedido en <b>cajas</b> (la unidad de venta del producto) va aparte: una orden por producto con todas sus cajas, aunque estén en varias líneas. 4 palés y 2 cajas de otro producto son 5 órdenes.</li>
     <li>En cada orden, SGA busca dónde está el producto y crea una <b>parada</b> por cada hueco y lote que hay que coger.</li>
     <li>Lo que va a coger cada parada queda <b>reservado</b>: otro pedido ya no lo ve como disponible.</li>
     <li>Si el pedido ya se preparó en parte, solo manda a recoger lo que falta. Si no hay stock ubicado suficiente, las órdenes se crean con lo que hay y avisa de lo que falta.</li>
@@ -410,8 +410,8 @@ Lo demás quedará pendiente para volver a proponer.</div>
     <li><b>Cuánta cantidad</b>, en la unidad del pedido (cajas, palés…).</li>
   </ul>
   <ol class="pasos">
-    <li>Escanea la etiqueta del hueco del que recoges.</li>
-        <li>Ajusta la cantidad si has cogido menos y pulsa <b>Confirmar recogida</b>. Pasa sola a la siguiente parada.</li>
+    <li>Ajusta la cantidad si has cogido menos.</li>
+    <li>Escanea la etiqueta del hueco del que recoges: es lo único que se lee. Con una ubicación válida la parada se confirma sola y pasa a la siguiente.</li>
   </ol>
   <p>También se puede <b>Saltar</b> la parada o marcar <b>Sin stock</b> (la cancela y busca el producto en otra ubicación).</p>
   <p><b>Saltar</b> deja la parada para el final: al acabar el recorrido vuelve a salir. Si se salta por segunda vez queda <b>retenida</b>: el preparador ya no la ve y la resuelve el jefe de almacén desde <b>Paradas retenidas</b> (pila del rol center), con <b>Buscar en otra ubicación</b>. Mientras tanto, la orden no se termina, pero lo recogido ya pasa al pedido.</p>

@@ -1,21 +1,16 @@
 namespace AntonioNadal.SGA;
 
-using Microsoft.Inventory.Item;
-using Microsoft.Inventory.Item.Catalog;
+using Microsoft.Foundation.NoSeries;
 
 /// <summary>
-/// Codeunit Lectura Codigos SGA (ID 51114).
-/// Interpreta lo que lee el escáner: si es una ubicación, un palé (SSCC) o un producto y, para
-/// un producto, cuál es, con su variante y su lote si el código los trae.
-///
-/// Un producto se reconoce por, en este orden: referencia de tipo código de barras, GTIN de
-/// la ficha y nº de producto. Una lectura GS1-128 aporta el SSCC de (00), el GTIN de (01) o
-/// (02) y el lote de (10); un GTIN-14 que empieza por 0 se busca también como EAN-13.
-///
-/// También da los SSCC nuevos, con el mismo generador que el resto del sistema (Cod. "Gestion
-/// Codigos Barras".generaSSCC).
+/// Codeunit Codigos Barras SGA (ID 51114).
+/// Todo lo de códigos de barras de SGA, sin depender del resto del proyecto:
+/// - Interpreta lo que lee el escáner: si es una ubicación o un palé (SSCC, solo o en el (00)
+///   de una lectura GS1-128).
+/// - Da los SSCC nuevos (NuevoSSCC) con la serie, el prefijo de empresa GS1 y el dígito de
+///   extensión de la configuración de SGA.
 /// </summary>
-codeunit 51114 "Lectura Codigos SGA"
+codeunit 51114 "Codigos Barras SGA"
 {
     /// <summary>
     /// Devuelve true si la lectura es el código de una ubicación SGA del almacén, y su código
@@ -38,34 +33,6 @@ codeunit 51114 "Lectura Codigos SGA"
 
         prm_Bin := CopyStr(lectura, 1, MaxStrLen(prm_Bin));
         exit(true);
-    end;
-
-    /// <summary>
-    /// Devuelve true si la lectura identifica un producto. prm_Variante y prm_Lote quedan en
-    /// blanco si el código no los trae.
-    /// </summary>
-    procedure LeerProducto(prm_Lectura: Text; var prm_Producto: Code[20]; var prm_Variante: Code[10]; var prm_Lote: Code[50]): Boolean
-    var
-        codigo: Text;
-        gtin: Text;
-        sscc: Text;
-    begin
-        Clear(prm_Producto);
-        Clear(prm_Variante);
-        Clear(prm_Lote);
-
-        codigo := Normalizar(prm_Lectura);
-        if LeerGS1(codigo, gtin, prm_Lote, sscc) then
-            codigo := gtin;
-
-        if BuscarProducto(codigo, prm_Producto, prm_Variante) then
-            exit(true);
-
-        // GTIN-14 de la unidad: un 0 delante del EAN-13.
-        if (StrLen(codigo) = 14) and (CopyStr(codigo, 1, 1) = '0') then
-            exit(BuscarProducto(CopyStr(codigo, 2), prm_Producto, prm_Variante));
-
-        exit(false);
     end;
 
     /// <summary>
@@ -110,81 +77,65 @@ codeunit 51114 "Lectura Codigos SGA"
     end;
 
     /// <summary>
-    /// Un SSCC nuevo para un palé que no lo trae, del mismo generador que las etiquetas de palé
-    /// del resto del sistema.
+    /// Un SSCC nuevo para un palé que no lo trae. Son 18 dígitos: el dígito de extensión, el
+    /// prefijo de empresa GS1, el siguiente número de la serie de SSCC (rellenado con ceros
+    /// hasta completar 17) y el dígito de control. La serie es una serie estándar de BC: si es
+    /// la misma que usan las etiquetas de palé del resto del sistema, con el mismo prefijo y
+    /// dígito de extensión, los dos comparten contador y no se repite ningún SSCC.
     /// </summary>
     procedure NuevoSSCC(): Code[20]
     var
-        cduCodBarras: Codeunit "Gestion Codigos Barras";
+        rConfig: Record "Config. SGA";
+        cSerie: Codeunit "No. Series";
+        numero: Text;
+        base: Text;
+        largoReferencia: Integer;
+        SerieNoNumericaErr: Label 'La serie de SSCC %1 ha dado el número %2, que no es solo de dígitos. Revise la serie en la configuración de SGA.', Comment = '%1 = serie, %2 = número';
+        SerieLargaErr: Label 'El número %1 de la serie de SSCC %2 no cabe: con el prefijo de empresa GS1 %3, como mucho tiene %4 dígitos.', Comment = '%1 = número, %2 = serie, %3 = prefijo, %4 = dígitos';
     begin
-        exit(cduCodBarras.generaSSCC());
+        rConfig.ObtenerConfig();
+        rConfig.TestField("Nos. SSCC");
+        rConfig.TestField("Prefijo Empresa GS1");
+
+        numero := cSerie.GetNextNo(rConfig."Nos. SSCC");
+        if not SoloDigitos(numero) then
+            Error(SerieNoNumericaErr, rConfig."Nos. SSCC", numero);
+
+        largoReferencia := 16 - StrLen(rConfig."Prefijo Empresa GS1");
+        if StrLen(numero) > largoReferencia then
+            Error(SerieLargaErr, numero, rConfig."Nos. SSCC", rConfig."Prefijo Empresa GS1", largoReferencia);
+
+        base := Format(rConfig."Digito Extension SSCC") + rConfig."Prefijo Empresa GS1" + PadStr('', largoReferencia - StrLen(numero), '0') + numero;
+        exit(CopyStr(base + Format(DigitoControl(base)), 1, 20));
     end;
 
     /// <summary>
-    /// 18 dígitos con el dígito de control GS1 correcto: los 17 primeros por 3 y 1 alternos,
-    /// empezando por 3, y el último completa la decena.
+    /// 18 dígitos con el dígito de control GS1 correcto (DigitoControl de los 17 primeros).
     /// </summary>
     local procedure SSCCValido(prm_SSCC: Text): Boolean
     var
         digito: Integer;
-        suma: Integer;
-        i: Integer;
     begin
         if (StrLen(prm_SSCC) <> 18) or not SoloDigitos(prm_SSCC) then
             exit(false);
 
-        for i := 1 to 17 do begin
-            Evaluate(digito, CopyStr(prm_SSCC, i, 1));
-            if i mod 2 = 1 then
-                suma += digito * 3
-            else
-                suma += digito;
-        end;
         Evaluate(digito, CopyStr(prm_SSCC, 18, 1));
-        exit((10 - suma mod 10) mod 10 = digito);
+        exit(DigitoControl(CopyStr(prm_SSCC, 1, 17)) = digito);
+    end;
+
+    /// <summary>
+    /// Dígito de control GS1 de los 17 primeros dígitos de un SSCC: por 3 y 1 alternos,
+    /// empezando por 3, y el dígito completa la decena (StrCheckSum de la plataforma).
+    /// </summary>
+    local procedure DigitoControl(prm_Digitos: Text): Integer
+    begin
+        // Pesos GS1 de los 17 dígitos: 3 y 1 alternos.
+        exit(StrCheckSum(prm_Digitos, '31313131313131313'));
     end;
 
     local procedure SoloDigitos(prm_Texto: Text): Boolean
     begin
         exit((prm_Texto <> '') and (DelChr(prm_Texto, '=', '0123456789') = ''));
-    end;
-
-    local procedure BuscarProducto(prm_Codigo: Text; var prm_Producto: Code[20]; var prm_Variante: Code[10]): Boolean
-    var
-        rItemReference: Record "Item Reference";
-        rItem: Record Item;
-    begin
-        if (prm_Codigo = '') or (StrLen(prm_Codigo) > MaxStrLen(rItemReference."Reference No.")) then
-            exit(false);
-
-        rItemReference.SetLoadFields("Item No.", "Variant Code");
-        rItemReference.SetRange("Reference Type", rItemReference."Reference Type"::"Bar Code");
-        rItemReference.SetRange("Reference No.", prm_Codigo);
-        if rItemReference.FindFirst() then begin
-            prm_Producto := rItemReference."Item No.";
-            prm_Variante := rItemReference."Variant Code";
-            exit(true);
-        end;
-
-        if StrLen(prm_Codigo) <= MaxStrLen(rItem.GTIN) then begin
-            rItem.SetLoadFields("No.");
-            rItem.SetRange(GTIN, prm_Codigo);
-            if rItem.FindFirst() then begin
-                prm_Producto := rItem."No.";
-                exit(true);
-            end;
-        end;
-
-        if StrLen(prm_Codigo) <= MaxStrLen(rItem."No.") then begin
-            rItem.Reset();
-            rItem.SetLoadFields("No.");
-            if rItem.Get(CopyStr(prm_Codigo, 1, MaxStrLen(rItem."No."))) then begin
-                prm_Producto := rItem."No.";
-                exit(true);
-            end;
-        end;
-
-        exit(false);
     end;
 
     /// <summary>

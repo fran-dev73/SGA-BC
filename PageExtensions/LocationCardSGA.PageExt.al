@@ -47,10 +47,17 @@ pageextension 51102 "Location Card SGA" extends "Location Card"
                 action(MapaSGA)
                 {
                     Caption = 'Mapa de almacén';
-                    ToolTip = 'Rejilla de la nave con el estado de ocupación de cada hueco.';
+                    ToolTip = 'Rejilla de la nave de este almacén con el estado de ocupación de cada hueco.';
                     ApplicationArea = All;
                     Image = Map;
-                    RunObject = page "Mapa Almacen SGA";
+
+                    trigger OnAction()
+                    var
+                        pMapa: Page "Mapa Almacen SGA";
+                    begin
+                        pMapa.FijarAlmacen(Rec.Code);
+                        pMapa.Run();
+                    end;
                 }
             }
         }

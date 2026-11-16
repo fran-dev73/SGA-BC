@@ -74,7 +74,7 @@ page 51108 "Consulta Ubic. Producto SGA"
 
                     trigger OnValidate()
                     var
-                        cLectura: Codeunit "Lectura Codigos SGA";
+                        cLectura: Codeunit "Codigos Barras SGA";
                     begin
                         FiltroSSCC := cLectura.SSCCLeido(FiltroSSCC);
                         if FiltroSSCC <> '' then begin

@@ -8,7 +8,7 @@ namespace AntonioNadal.SGA;
 profile "PREPARADOR SGA"
 {
     Caption = 'Preparador SGA (PDA)';
-    ProfileDescription = 'Preparador o carretillero con PDA: prepara la siguiente orden de picking o reubicación escaneando producto y ubicación, y consulta dónde está cada producto.';
+    ProfileDescription = 'Preparador o carretillero con PDA: prepara la siguiente orden de picking o reubicación escaneando la ubicación, y consulta dónde está cada producto.';
     RoleCenter = "Rol Center Preparador SGA";
     Enabled = true;
 }

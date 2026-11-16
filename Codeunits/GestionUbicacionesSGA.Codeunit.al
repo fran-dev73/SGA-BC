@@ -2,6 +2,7 @@ namespace AntonioNadal.SGA;
 
 using Microsoft.Inventory.Item;
 using Microsoft.Warehouse.Structure;
+using System.Text;
 
 /// <summary>
 /// Codeunit Gestion Ubicaciones SGA (ID 51101).
@@ -39,6 +40,9 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     var
         rBin: Record Bin;
         rUbicacionSGA: Record "Ubicacion SGA";
+        pasillo: Integer;
+        estanteria: Integer;
+        altura: Integer;
     begin
         if prm_Almacen <> '' then
             rBin.SetRange("Location Code", prm_Almacen);
@@ -57,6 +61,10 @@ codeunit 51101 "Gestion Ubicaciones SGA"
                 else
                     rUbicacionSGA."Permite Mezcla Producto" := true;
                 rUbicacionSGA."Permite Mezcla Lote" := true;
+                // Con un código pasillo-estantería-altura, la ruta sale de él como al generarlas;
+                // si no, queda a 0 y la toma de su zona al asignársela.
+                if TrocearCodigo(rBin.Code, pasillo, estanteria, altura) then
+                    rUbicacionSGA."Secuencia Picking" := SecuenciaDesde(pasillo, estanteria, altura);
                 rUbicacionSGA.Insert();
             end;
         until rBin.Next() = 0;
@@ -93,8 +101,8 @@ codeunit 51101 "Gestion Ubicaciones SGA"
 
     /// <summary>
     /// Cambio en bloque de los datos de gestión de las ubicaciones de la selección (con sus
-    /// filtros y marcas). Solo se toca lo marcado con prm_Cambiar*, con el valor de la plantilla;
-    /// la zona se asigna tal cual, sin validar. Devuelve cuántas ubicaciones ha cambiado.
+    /// filtros y marcas). Solo se toca lo marcado con prm_Cambiar*, con el valor de la plantilla,
+    /// validado como en la ficha. Devuelve cuántas ubicaciones ha cambiado.
     /// Las que tienen contenido se saltan: su configuración solo se cambia vacías (TestVacia de
     /// la tabla). Cuántas se saltan sale en prm_Omitidas y las primeras (hasta 5) en prm_Ejemplos.
     /// </summary>
@@ -124,7 +132,8 @@ codeunit 51101 "Gestion Ubicaciones SGA"
                 if prm_CambiarTipo then
                     rUbicacionSGA.Validate("Tipo Ubicacion", TempPlantilla."Tipo Ubicacion");
                 if prm_CambiarZona then
-                    rUbicacionSGA."Cod. Zona SGA" := TempPlantilla."Cod. Zona SGA";
+                    // Con Validate hereda de la zona el tipo y la secuencia si aún no los tiene.
+                    rUbicacionSGA.Validate("Cod. Zona SGA", TempPlantilla."Cod. Zona SGA");
                 // La ocupación la recalcula la validación de "Capacidad Uds."; vacía, nada más la cambia.
                 rUbicacionSGA.Modify(true);
                 hechas += 1;
@@ -377,17 +386,14 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     end;
 
     /// <summary>
-    /// Formatea un entero a prm_Digitos cifras con ceros a la izquierda. No se usa PadStr porque
-    /// en AL rellena por la derecha: PadStr('5', 2, '0') devuelve '50', no '05'.
+    /// Formatea un entero a prm_Digitos cifras con ceros a la izquierda, con el formato
+    /// estándar de la plataforma (Integer,N con Filler Character 0).
     /// </summary>
     procedure ConCeros(prm_Valor: Integer; prm_Digitos: Integer): Text
     var
-        texto: Text;
+        FormatoCerosTok: Label '<Integer,%1><Filler Character,0>', Locked = true, Comment = '%1 = nº de cifras';
     begin
-        texto := Format(prm_Valor);
-        if StrLen(texto) < prm_Digitos then
-            exit(PadStr('', prm_Digitos - StrLen(texto), '0') + texto);
-        exit(texto);
+        exit(Format(prm_Valor, 0, StrSubstNo(FormatoCerosTok, prm_Digitos)));
     end;
 
     /// <summary>
@@ -423,6 +429,8 @@ codeunit 51101 "Gestion Ubicaciones SGA"
         entrada: Decimal;
         ZonaGrupoTxt: Label 'Zona del grupo IIEE %1. %2', Comment = '%1 = grupo IIEE, %2 = por qué ese hueco';
         FueraZonaGrupoTxt: Label 'Fuera de las zonas del grupo IIEE %1: no queda sitio en ellas. %2', Comment = '%1 = grupo IIEE, %2 = por qué ese hueco';
+        SinHuecoVacioTxt: Label 'No queda ningún hueco vacío que admita %1. La estrategia de esta entrada ("Solo hueco vacío") no usa huecos a medias: libere un hueco o cambie la estrategia en la configuración.', Comment = '%1 = producto';
+        SinUbicacionFijaTxt: Label '%1 no tiene ubicación fija con sitio ("Producto fijo" en la ubicación o "Nº estantería" en la ficha). La estrategia de esta entrada ("Solo ubicación fija") no busca en otras.', Comment = '%1 = producto';
     begin
         prm_Motivo := '';
         // Lo que ocupa la cantidad, en palés, depende solo del producto: se calcula una vez y
@@ -447,24 +455,35 @@ codeunit 51101 "Gestion Ubicaciones SGA"
             end;
         end;
 
+        // Sin hueco, el porqué depende de la estrategia: las que solo miran una clase de hueco
+        // dicen eso, no el recuento general (que contaría como válidos huecos que no buscan).
         if codigo = '' then
-            prm_Motivo := ExplicarSinHuecoLote(prm_Almacen, prm_Producto, prm_Lote, prm_UM, prm_Cantidad);
+            case prm_Estrategia of
+                prm_Estrategia::"Solo Hueco Vacio":
+                    prm_Motivo := StrSubstNo(SinHuecoVacioTxt, prm_Producto);
+                prm_Estrategia::"Solo Ubicacion Fija":
+                    prm_Motivo := StrSubstNo(SinUbicacionFijaTxt, prm_Producto);
+                else
+                    prm_Motivo := ExplicarSinHuecoLote(prm_Almacen, prm_Producto, prm_Lote, prm_UM, prm_Cantidad);
+            end;
 
         exit(codigo);
     end;
 
     /// <summary>
-    /// Zonas del almacén asignadas al grupo IIEE del producto (campo "Grupo IIEE" de la zona).
-    /// Vacía si el producto no tiene grupo, no está configurado de dónde leerlo, o el grupo no
-    /// tiene zonas. En prm_Grupo, el grupo del producto.
+    /// Zonas del almacén asignadas al grupo IIEE del producto (campo "Grupo IIEE" de la zona y de
+    /// la ficha del producto). Vacía si el producto no tiene grupo o el grupo no tiene zonas. En
+    /// prm_Grupo, el grupo del producto.
     /// </summary>
     local procedure ZonasGrupoIIEE(prm_Almacen: Code[10]; prm_Producto: Code[20]; var prm_Grupo: Code[20]) zonas: List of [Code[10]]
     var
-        rConfig: Record "Config. SGA";
+        rItem: Record Item;
         rZona: Record "Zona SGA";
     begin
-        rConfig.ObtenerConfig();
-        prm_Grupo := rConfig.GrupoIIEEProducto(prm_Producto);
+        prm_Grupo := '';
+        rItem.SetLoadFields("Grupo IIEE");
+        if rItem.Get(prm_Producto) then
+            prm_Grupo := rItem."Grupo IIEE";
         if prm_Grupo = '' then
             exit;
         rZona.SetRange("Cod. Almacen", prm_Almacen);
@@ -665,15 +684,12 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     /// </summary>
     procedure ProponerReparto(prm_Estrategia: Enum "Estrategia Ubicacion SGA"; prm_Almacen: Code[10]; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50]; prm_CantidadBase: Decimal; var TempLinea: Record "Linea Ubicacion SGA" temporary)
     var
-        rItem: Record Item;
         excluidas: Text;
         motivo: Text;
         hueco: Code[20];
         MaxLineasReparto: Integer;
     begin
         MaxLineasReparto := 200;
-        rItem.SetLoadFields(Description);
-        if rItem.Get(prm_Producto) then;
         // El tope corta el reparto al crearlo, por si una cantidad desorbitada o una unidad mal
         // configurada diera miles de palés.
         cUM.Repartir(prm_Producto, prm_CantidadBase, '', MaxLineasReparto, TempLinea);
@@ -684,7 +700,6 @@ codeunit 51101 "Gestion Ubicaciones SGA"
                 hueco := ProponerUbicacionCon(prm_Estrategia, excluidas, prm_Almacen, prm_Producto, prm_Variante, prm_Lote,
                                               TempLinea."Cod. Unidad Medida", TempLinea.Cantidad, motivo);
                 TempLinea.Origen := TempLinea.Origen::Manual;
-                TempLinea."Descripcion Producto" := CopyStr(rItem.Description, 1, MaxStrLen(TempLinea."Descripcion Producto"));
                 TempLinea."Cod. Almacen" := prm_Almacen;
                 TempLinea."Cod. Variante" := prm_Variante;
                 TempLinea."No. Lote" := prm_Lote;
@@ -715,13 +730,18 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     var
         rConfig: Record "Config. SGA";
         cContenido: Codeunit "Gestion Contenido SGA";
+        cLectura: Codeunit "Codigos Barras SGA";
         lineas: List of [Integer];
+        ssccs: List of [Code[20]];
+        sscc: Code[20];
         n: Integer;
+        i: Integer;
         restoBase: Decimal;
         SinLineasConfirmarErr: Label 'No hay ninguna línea con ubicación que confirmar.';
         IndiqueUbicacionErr: Label 'Indique la ubicación de la línea "%1".', Comment = '%1 = qué';
         DesvioNoPermitidoErr: Label 'La configuración no permite desviarse de la ubicación propuesta (%1) en la línea "%2".', Comment = '%1 = ubicación, %2 = qué';
-        SinPropuestaErr: Label 'La línea "%1" no tiene ubicación propuesta y la configuración exige proponer antes de confirmar.', Comment = '%1 = qué';
+        SinLecturaErr: Label 'Escanee la etiqueta de la ubicación en la que deja la línea "%1": la configuración exige confirmar la ubicación.', Comment = '%1 = qué';
+        LecturaDistintaErr: Label 'Se ha leído la ubicación %1, pero la línea "%3" se deja en %2. Lleve la mercancía a %2 y escanee su etiqueta, o cambie la ubicación.', Comment = '%1 = ubicación leída, %2 = ubicación de la línea, %3 = qué';
         UbicadoGuiadoLbl: Label 'Ubicado desde la pantalla de ubicación guiada.';
     begin
         rConfig.ObtenerConfig();
@@ -738,8 +758,14 @@ codeunit 51101 "Gestion Ubicaciones SGA"
                         Error(IndiqueUbicacionErr, TempLinea.Paso);
                 end else begin
                     ComprobarUbicacionExiste(prm_Almacen, TempLinea."Ubicacion Confirmada");
-                    if (TempLinea."Ubicacion Propuesta" = '') and rConfig."Exigir Confirmar Ubicacion" then
-                        Error(SinPropuestaErr, TempLinea.Paso);
+                    // Exigir confirmar: la etiqueta del hueco tiene que estar leída y ser la de
+                    // la ubicación en la que se deja, para certificar que se ha llevado ahí.
+                    if rConfig."Exigir Confirmar Ubicacion" then begin
+                        if TempLinea."Ubicacion Leida" = '' then
+                            Error(SinLecturaErr, TempLinea.Paso);
+                        if TempLinea."Ubicacion Leida" <> TempLinea."Ubicacion Confirmada" then
+                            Error(LecturaDistintaErr, TempLinea."Ubicacion Leida", TempLinea."Ubicacion Confirmada", TempLinea.Paso);
+                    end;
                     if TempLinea."Ubicacion Propuesta" <> '' then
                         if not rConfig.DesvioPermitido(TempLinea."Ubicacion Propuesta", TempLinea."Ubicacion Confirmada") then
                             Error(DesvioNoPermitidoErr, TempLinea."Ubicacion Propuesta", TempLinea.Paso);
@@ -750,12 +776,23 @@ codeunit 51101 "Gestion Ubicaciones SGA"
         if lineas.Count() = 0 then
             Error(SinLineasConfirmarErr);
 
+        // Primero se registran todas y después se marcan: la tabla de la pantalla es temporal y
+        // no se deshace con un error, así que si una falla no debe quedar ninguna como ubicada.
         TempLinea.Reset();
         foreach n in lineas do begin
             TempLinea.Get(n);
-            // El palé sin etiqueta recibe un SSCC nuevo, que queda en la línea para verlo.
+            // El palé sin etiqueta recibe un SSCC nuevo; se guarda en sscc y se pone al final.
+            sscc := CopyStr(TempLinea.SSCC, 1, MaxStrLen(sscc));
+            if sscc = '' then
+                sscc := cLectura.NuevoSSCC();
+            ssccs.Add(sscc);
+            cContenido.FijarPropuesta(TempLinea."Ubicacion Propuesta");
             cContenido.RegistrarEntrada(prm_Almacen, TempLinea."Ubicacion Confirmada", prm_Producto, prm_Variante, prm_Lote,
-                                        TempLinea.SSCCPale(), TempLinea."Cod. Unidad Medida", TempLinea.Cantidad, "Origen Mov. SGA"::Manual, '', 0, UbicadoGuiadoLbl);
+                                        sscc, TempLinea."Cod. Unidad Medida", TempLinea.Cantidad, "Origen Mov. SGA"::Manual, '', 0, UbicadoGuiadoLbl);
+        end;
+        for i := 1 to lineas.Count() do begin
+            TempLinea.Get(lineas.Get(i));
+            TempLinea.SSCC := ssccs.Get(i);
             TempLinea.Estado := TempLinea.Estado::Ubicado;
             TempLinea.Motivo := '';
             TempLinea.Modify();
@@ -1167,17 +1204,18 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     end;
 
     /// <summary>
-    /// Filtro de AL con las zonas de la lista ('A|B'), cada una entre comillas por si lleva
-    /// algún carácter de filtro.
+    /// Filtro de AL con las zonas de la lista ('A|B'). AddQuotes estándar entrecomilla la zona
+    /// que lleva algún carácter de filtro.
     /// </summary>
     local procedure FiltroZonas(prm_Zonas: List of [Code[10]]) filtro: Text
     var
+        cSelectionFilterMgt: Codeunit SelectionFilterManagement;
         zona: Code[10];
     begin
         foreach zona in prm_Zonas do begin
             if filtro <> '' then
                 filtro += '|';
-            filtro += '''' + zona + '''';
+            filtro += cSelectionFilterMgt.AddQuotes(zona);
         end;
     end;
 

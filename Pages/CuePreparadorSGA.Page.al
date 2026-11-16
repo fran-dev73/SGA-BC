@@ -38,7 +38,15 @@ page 51135 "Cue Preparador SGA"
                     ToolTip = 'Órdenes de picking sin asignar que puede coger con Preparar pedidos.';
                     ApplicationArea = All;
                     DrillDownPageId = "Ordenes Picking SGA";
-                    Visible = not ExigeAsignacion;
+                    Visible = (not ExigeAsignacion) and (not Carretillero);
+                }
+                // Al carretillero "Siguiente orden" solo le da reubicaciones: se le cuentan esas.
+                field("Reubicaciones Disponibles"; Rec."Reubicaciones Disponibles")
+                {
+                    ToolTip = 'Reubicaciones sin asignar que puede coger con Siguiente orden.';
+                    ApplicationArea = All;
+                    DrillDownPageId = "Ordenes Picking SGA";
+                    Visible = (not ExigeAsignacion) and Carretillero;
                 }
             }
         }
@@ -46,10 +54,12 @@ page 51135 "Cue Preparador SGA"
 
     var
         ExigeAsignacion: Boolean;
+        Carretillero: Boolean;
 
     trigger OnOpenPage()
     var
         rConfig: Record "Config. SGA";
+        cPicking: Codeunit "Gestion Picking SGA";
     begin
         Rec.ObtenerCue();
         Rec.FiltrarCue();
@@ -57,5 +67,6 @@ page 51135 "Cue Preparador SGA"
         // Con asignación exigida, el preparador no coge órdenes por su cuenta.
         rConfig.ObtenerConfig();
         ExigeAsignacion := rConfig."Exigir Asignacion Picking";
+        Carretillero := cPicking.EsCarretillero();
     end;
 }

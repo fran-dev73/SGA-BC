@@ -65,9 +65,9 @@ page 51119 "Ficha Orden Picking SGA"
                 }
                 field(Prioridad; Rec.Prioridad)
                 {
-                    ToolTip = 'Cuanto mayor, antes le sale al preparador con "Siguiente orden".';
+                    ToolTip = 'Prioridad del pedido: cuanto mayor, antes sale con "Siguiente orden". Se cambia en "Asignar órdenes de picking" con "Subir prioridad" y "Bajar prioridad", para todas las órdenes del pedido.';
                     ApplicationArea = All;
-                    Editable = not ExigeAsignacion;
+                    Editable = false;
                 }
                 field("Nombre Cliente"; Rec."Nombre Cliente")
                 {
@@ -96,17 +96,16 @@ page 51119 "Ficha Orden Picking SGA"
                     ApplicationArea = All;
                     Editable = false;
                 }
-                field("Fecha Creacion"; Rec."Fecha Creacion")
+                field(FechaCreacion; Rec.SystemCreatedAt)
                 {
+                    Caption = 'Fecha creación';
                     ToolTip = 'Momento en que se creó la orden.';
                     ApplicationArea = All;
                     Editable = false;
                 }
                 field("Cod. Usuario Creacion"; Rec."Cod. Usuario Creacion")
                 {
-                    ToolTip = 'Usuario que creó la orden.';
                     ApplicationArea = All;
-                    Editable = false;
                 }
                 field("Fecha Finalizacion"; Rec."Fecha Finalizacion")
                 {
@@ -178,12 +177,9 @@ page 51119 "Ficha Orden Picking SGA"
                 trigger OnAction()
                 var
                     cPicking: Codeunit "Gestion Picking SGA";
-                    CancelarOrdenQst: Label '¿Cancelar la orden %1 y todas sus paradas pendientes?', Comment = '%1 = nº orden';
                 begin
-                    if not Confirm(CancelarOrdenQst, false, Rec."No. Orden") then
-                        exit;
-                    cPicking.CancelarOrden(Rec);
-                    CurrPage.Update(false);
+                    if cPicking.CancelarOrdenConDialogo(Rec) then
+                        CurrPage.Update(false);
                 end;
             }
         }

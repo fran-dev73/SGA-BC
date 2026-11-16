@@ -27,38 +27,40 @@ codeunit 51103 "Consulta Stock SGA"
     /// </summary>
     procedure AcumularStockPorLote(prm_Producto: Code[20]; prm_Almacen: Code[10]; var rStock: Record "Buffer Conciliacion SGA")
     var
-        rItemLedgEntry: Record "Item Ledger Entry";
         cUM: Codeunit "Unidades Producto SGA";
+        qMovsAbiertos: Query "Grouped Item Ledger Entries";
         umBase: Code[10];
     begin
-        rItemLedgEntry.SetCurrentKey("Item No.", Open, "Variant Code", Positive, "Location Code", "Posting Date");
+        // La query estándar suma la cantidad pendiente de los movimientos abiertos; agrupa
+        // también por UM, serie y paquete, y AcumularFila junta lo que cae en la misma fila.
         if prm_Producto <> '' then
-            rItemLedgEntry.SetRange("Item No.", prm_Producto);
-        rItemLedgEntry.SetRange(Open, true);
+            qMovsAbiertos.SetRange(Item_No, prm_Producto);
         if prm_Almacen <> '' then
-            rItemLedgEntry.SetRange("Location Code", prm_Almacen);
-        rItemLedgEntry.SetLoadFields("Item No.", "Variant Code", "Location Code", "Lot No.", "Remaining Quantity");
-        if not rItemLedgEntry.FindSet() then
-            exit;
-
-        repeat
+            qMovsAbiertos.SetRange(Location_Code, prm_Almacen);
+        qMovsAbiertos.Open();
+        while qMovsAbiertos.Read() do
             // Los movimientos de un producto que ya no existe no se acumulan.
-            if rItemLedgEntry."Remaining Quantity" <> 0 then
-                if cUM.LeerUMBase(rItemLedgEntry."Item No.", umBase) then
-                    AcumularFila(rStock, rItemLedgEntry."Item No.", rItemLedgEntry."Variant Code", rItemLedgEntry."Location Code",
-                                 rItemLedgEntry."Lot No.", umBase, rItemLedgEntry."Remaining Quantity", 0);
-        until rItemLedgEntry.Next() = 0;
+            if cUM.LeerUMBase(qMovsAbiertos.Item_No, umBase) then
+                AcumularFila(rStock, qMovsAbiertos.Item_No, qMovsAbiertos.Variant_Code, qMovsAbiertos.Location_Code,
+                             qMovsAbiertos.Lot_No_, umBase, qMovsAbiertos.Remaining_Quantity, 0);
+        qMovsAbiertos.Close();
     end;
 
     /// <summary>
     /// Acumula en el buffer el contenido que SGA tiene ubicado de un producto,
     /// desglosado por variante y lote. Con el producto en blanco, todos los del almacén.
+    /// Un producto sin lotes de BC se acumula sin lote: su stock de BC no lo lleva aunque SGA
+    /// guarde el del ensamblado, y comparar lote a lote daría una fila "sin ubicar" y otra
+    /// "sobra" de la misma mercancía.
     /// </summary>
     procedure AcumularContenidoUbicado(prm_Producto: Code[20]; prm_Almacen: Code[10]; var rStock: Record "Buffer Conciliacion SGA")
     var
         rContenido: Record "Contenido Ubicacion SGA";
         cUM: Codeunit "Unidades Producto SGA";
+        conLoteBC: Dictionary of [Code[20], Boolean];
         umBase: Code[10];
+        lote: Code[50];
+        loteEstandarProducto: Boolean;
     begin
         rContenido.SetCurrentKey("No. Producto", "Cod. Variante", "Cod. Almacen", "No. Lote");
         if prm_Producto <> '' then
@@ -70,9 +72,16 @@ codeunit 51103 "Consulta Stock SGA"
             exit;
 
         repeat
+            if not conLoteBC.Get(rContenido."No. Producto", loteEstandarProducto) then begin
+                loteEstandarProducto := LoteEstandar(rContenido."No. Producto");
+                conLoteBC.Add(rContenido."No. Producto", loteEstandarProducto);
+            end;
+            lote := rContenido."No. Lote";
+            if not loteEstandarProducto then
+                lote := '';
             if cUM.LeerUMBase(rContenido."No. Producto", umBase) then
                 AcumularFila(rStock, rContenido."No. Producto", rContenido."Cod. Variante", rContenido."Cod. Almacen",
-                             rContenido."No. Lote", umBase, 0, rContenido."Cantidad Base");
+                             lote, umBase, 0, rContenido."Cantidad Base");
         until rContenido.Next() = 0;
     end;
 
@@ -116,7 +125,14 @@ codeunit 51103 "Consulta Stock SGA"
     procedure RegularizarConciliacion(var prm_Fila: Record "Buffer Conciliacion SGA"): Boolean
     var
         rConfig: Record "Config. SGA";
+        TempEntradas: Record "Linea Ubicacion SGA" temporary;
+        TempLote: Record "Buffer Conciliacion SGA" temporary;
         cContenido: Codeunit "Gestion Contenido SGA";
+        cEntradas: Codeunit "Gestion Entradas SGA";
+        enDocumentos: Decimal;
+        aRegularizar: Decimal;
+        OtroAlmacenErr: Label 'No se puede regularizar en el almacén %1: la ubicación de ajustes (%2) es del almacén por defecto (%3). Esa diferencia se resuelve ubicando la mercancía.', Comment = '%1 = almacén de la línea, %2 = ubicación de ajustes, %3 = almacén por defecto';
+        TodoEnDocumentosMsg: Label 'Los %1 sin ubicar de esta línea están pendientes en Ubicar recepciones o Ubicar ensamblados: ubíquelos desde allí.', Comment = '%1 = cantidad';
         LineaYaCuadraMsg: Label 'Esta línea ya cuadra.';
         UbicAjustesSinConfigurarErr: Label 'Debe configurar la ubicación de ajustes en la configuración de SGA.';
         ColocarEnAjustesQst: Label 'Se van a colocar %1 unidades de %2 en la ubicación de ajustes %3, para que dejen de estar sin ubicar. El stock de BC no cambia. ¿Desea continuar?', Comment = '%1 = diferencia, %2 = producto, %3 = ubicación de ajustes';
@@ -137,19 +153,34 @@ codeunit 51103 "Consulta Stock SGA"
         rConfig.ObtenerConfig();
         if rConfig."Ubic. Ajustes" = '' then
             Error(UbicAjustesSinConfigurarErr);
+        // La ubicación de ajustes es una ubicación del almacén por defecto.
+        if prm_Fila."Cod. Almacen" <> rConfig."Almacen por Defecto" then
+            Error(OtroAlmacenErr, prm_Fila."Cod. Almacen", rConfig."Ubic. Ajustes", rConfig."Almacen por Defecto");
 
-        if not Confirm(ColocarEnAjustesQst, false, prm_Fila.Diferencia, prm_Fila."No. Producto", rConfig."Ubic. Ajustes") then
+        // Lo que espera en Ubicar recepciones o Ubicar ensamblados no se regulariza: esas
+        // pantallas lo seguirían pidiendo y, al ubicarlo, sobraría. Solo se lleva a ajustes el resto.
+        // La fila es de la tabla real; el cálculo pide una temporal con el lote.
+        TempLote := prm_Fila;
+        enDocumentos := PendienteEnDocumentos(cEntradas, TempEntradas, "Origen Mov. SGA"::Compra, prm_Fila."Cod. Almacen", TempLote) +
+                        PendienteEnDocumentos(cEntradas, TempEntradas, "Origen Mov. SGA"::Produccion, prm_Fila."Cod. Almacen", TempLote);
+        aRegularizar := prm_Fila.Diferencia - enDocumentos;
+        if aRegularizar <= 0 then begin
+            Message(TodoEnDocumentosMsg, prm_Fila.Diferencia);
+            exit(false);
+        end;
+
+        if not Confirm(ColocarEnAjustesQst, false, aRegularizar, prm_Fila."No. Producto", rConfig."Ubic. Ajustes") then
             exit(false);
 
         // El stock que BC tiene y SGA no aparece en la ubicación de ajustes hasta que
         // alguien lo coloque físicamente donde le corresponde.
         if cContenido.RegistrarAjuste(prm_Fila."Cod. Almacen", rConfig."Ubic. Ajustes", prm_Fila."No. Producto",
-                                      prm_Fila."Cod. Variante", prm_Fila."No. Lote", '', prm_Fila."Unidad Medida Base",
-                                      prm_Fila.Diferencia, RegularizacionConciliacionLbl) = 0
+                                      prm_Fila."Cod. Variante", prm_Fila."No. Lote", prm_Fila."Unidad Medida Base",
+                                      aRegularizar, RegularizacionConciliacionLbl) = 0
         then
             exit(false);
 
-        prm_Fila."Stock SGA" := prm_Fila."Stock BC";
+        prm_Fila."Stock SGA" += aRegularizar;
         prm_Fila.CalcularDiferencia();
         prm_Fila.Modify();
 
@@ -256,7 +287,7 @@ codeunit 51103 "Consulta Stock SGA"
                 productoCuenta := false;
                 if existencias.Get(producto) > 0 then
                     if rItem.Get(producto) then
-                        productoCuenta := rItem.Type = rItem.Type::Inventory;
+                        productoCuenta := rItem.IsInventoriableType();
             end;
 
             if productoCuenta then begin
@@ -391,6 +422,12 @@ codeunit 51103 "Consulta Stock SGA"
     procedure PendienteDeUbicar(prm_Almacen: Code[10]; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50]; var prm_StockBase: Decimal; var prm_UbicadoBase: Decimal): Decimal
     var
         rItem: Record Item;
+        TempLote: Record "Buffer Conciliacion SGA" temporary;
+        TempEntradas: Record "Linea Ubicacion SGA" temporary;
+        cEntradas: Codeunit "Gestion Entradas SGA";
+        loteBC: Code[50];
+        pendiente: Decimal;
+        enDocumentos: Decimal;
     begin
         prm_StockBase := 0;
         prm_UbicadoBase := 0;
@@ -401,18 +438,36 @@ codeunit 51103 "Consulta Stock SGA"
         if not rItem.Get(prm_Producto) then
             exit(0);
 
+        // Sin lotes de BC, el stock de BC no lleva lote aunque SGA guarde el del ensamblado: se
+        // compara el total del producto, como en la conciliación.
+        if LoteEstandar(prm_Producto) then
+            loteBC := prm_Lote;
+
         if prm_Almacen <> '' then
             rItem.SetRange("Location Filter", prm_Almacen);
         if prm_Variante <> '' then
             rItem.SetRange("Variant Filter", prm_Variante);
-        if prm_Lote <> '' then
-            rItem.SetRange("Lot No. Filter", prm_Lote);
+        if loteBC <> '' then
+            rItem.SetRange("Lot No. Filter", loteBC);
         rItem.CalcFields(Inventory);
 
         prm_StockBase := rItem.Inventory;
-        prm_UbicadoBase := TotalUbicadoProducto(prm_Almacen, prm_Producto, prm_Variante, prm_Lote);
+        prm_UbicadoBase := TotalUbicadoProducto(prm_Almacen, prm_Producto, prm_Variante, loteBC);
+        pendiente := prm_StockBase - prm_UbicadoBase;
+        if pendiente <= 0 then
+            exit(pendiente);
 
-        exit(prm_StockBase - prm_UbicadoBase);
+        // Lo pendiente en Ubicar recepciones y Ubicar ensamblados se ubica desde allí, que lo
+        // cuentan por su documento: si se ubicara aquí, lo volverían a pedir. Igual que en
+        // "Pendiente de ubicar" (CargarPendienteUbicar).
+        TempLote."No. Producto" := prm_Producto;
+        TempLote."Cod. Variante" := prm_Variante;
+        TempLote."No. Lote" := loteBC;
+        enDocumentos := PendienteEnDocumentos(cEntradas, TempEntradas, "Origen Mov. SGA"::Compra, prm_Almacen, TempLote) +
+                        PendienteEnDocumentos(cEntradas, TempEntradas, "Origen Mov. SGA"::Produccion, prm_Almacen, TempLote);
+        if enDocumentos > pendiente then
+            enDocumentos := pendiente;
+        exit(pendiente - enDocumentos);
     end;
 
     /// <summary>
@@ -437,29 +492,21 @@ codeunit 51103 "Consulta Stock SGA"
     end;
 
     /// <summary>
-    /// Caducidad de un lote: la del último movimiento de producto del lote que la lleva, en
-    /// cualquier almacén. La variante solo filtra si viene informada. Es la fecha que se guarda
-    /// en el contenido y en los movimientos al ubicar, y la que enseña "Pendiente de ubicar".
+    /// Caducidad de un lote, con el estándar (ExistingExpirationDate de "Item Tracking
+    /// Management"): la de su última entrada en el producto y variante. Es la fecha que se
+    /// guarda en el contenido y en los movimientos al ubicar, y la que enseña "Pendiente de ubicar".
     /// </summary>
     procedure CaducidadLote(prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50]): Date
     var
-        rItemLedgEntry: Record "Item Ledger Entry";
+        TempItemTrackingSetup: Record "Item Tracking Setup" temporary;
+        cItemTrackingMgt: Codeunit "Item Tracking Management";
+        existenMovs: Boolean;
     begin
         if prm_Lote = '' then
             exit(0D);
 
-        // La caducidad se toma de los movimientos de producto del lote, que es donde ya
-        // la registran los flujos de compra y de fabricación.
-        rItemLedgEntry.SetRange("Item No.", prm_Producto);
-        rItemLedgEntry.SetRange("Lot No.", prm_Lote);
-        if prm_Variante <> '' then
-            rItemLedgEntry.SetRange("Variant Code", prm_Variante);
-        rItemLedgEntry.SetFilter("Expiration Date", '<>%1', 0D);
-        rItemLedgEntry.SetLoadFields("Expiration Date");
-        if rItemLedgEntry.FindLast() then
-            exit(rItemLedgEntry."Expiration Date");
-
-        exit(0D);
+        TempItemTrackingSetup."Lot No." := prm_Lote;
+        exit(cItemTrackingMgt.ExistingExpirationDate(prm_Producto, prm_Variante, TempItemTrackingSetup, false, existenMovs));
     end;
 
     /// <summary>

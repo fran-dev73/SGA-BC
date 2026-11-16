@@ -74,18 +74,23 @@ codeunit 51107 "Analisis ABC SGA"
     end;
 
     /// <summary>
-    /// Clase (A, B o C, como entero de "Clase ABC SGA") de cada producto en el último cálculo
-    /// del almacén. Vacío si no hay ningún cálculo. Lo usa el mapa para colorear por rotación.
+    /// Clases (A, B o C, como entero de "Clase ABC SGA") de un cálculo: la de cada producto
+    /// (prm_Clases, para colorear por rotación) y la de cada hueco por su posición
+    /// (prm_ClaseHueco, para colorear por posición). Con prm_NoCalculo = 0, el último del
+    /// almacén. Vacíos si no hay cálculo. Lo usa el mapa 3D.
     /// </summary>
-    procedure ClasesUltimoCalculo(prm_Almacen: Code[10]; var prm_Clases: Dictionary of [Code[20], Integer])
+    procedure ClasesDeCalculo(prm_Almacen: Code[10]; prm_NoCalculo: Integer; var prm_Clases: Dictionary of [Code[20], Integer]; var prm_ClaseHueco: Dictionary of [Code[20], Integer])
     var
         rCalculo: Record "Calculo ABC SGA";
         rLinea: Record "Clasificacion ABC SGA";
         noCalculo: Integer;
     begin
         Clear(prm_Clases);
-        noCalculo := rCalculo.UltimoDelAlmacen(prm_Almacen);
+        Clear(prm_ClaseHueco);
+        noCalculo := prm_NoCalculo;
         if noCalculo = 0 then
+            noCalculo := rCalculo.UltimoDelAlmacen(prm_Almacen);
+        if not rCalculo.Get(noCalculo) then
             exit;
 
         // La clave es (cálculo, producto): con el filtro por cálculo cada producto sale una vez.
@@ -95,38 +100,18 @@ codeunit 51107 "Analisis ABC SGA"
             repeat
                 prm_Clases.Add(rLinea."No. Producto", rLinea.Clase.AsInteger());
             until rLinea.Next() = 0;
-    end;
 
-    /// <summary>
-    /// Clase de cada hueco útil del almacén por su posición (altura y secuencia), con el reparto
-    /// del último cálculo: tantos huecos A como palés A había, y así con B. Vacío si no hay
-    /// cálculo. Lo usa el mapa 3D para colorear por posición.
-    /// </summary>
-    procedure ClasesHuecosUltimoCalculo(prm_Almacen: Code[10]; var prm_ClaseHueco: Dictionary of [Code[20], Integer])
-    var
-        rCalculo: Record "Calculo ABC SGA";
-        noCalculo: Integer;
-    begin
-        Clear(prm_ClaseHueco);
-        noCalculo := rCalculo.UltimoDelAlmacen(prm_Almacen);
-        if noCalculo = 0 then
-            exit;
-        rCalculo.Get(noCalculo);
-        // Sobre el registro leído, sin guardarlo: solo se quieren las clases.
+        // Clase de cada hueco útil por su posición (altura y secuencia), con el reparto de ese
+        // cálculo: tantos huecos A como palés A había, y así con B. Sobre el registro leído,
+        // sin guardarlo: solo se quieren las clases.
         ClasificarHuecos(rCalculo, prm_ClaseHueco);
     end;
 
     local procedure CrearCabecera(var prm_Calculo: Record "Calculo ABC SGA"; prm_Almacen: Code[10]; prm_Config: Record "Config. SGA")
-    var
-        rUltimo: Record "Calculo ABC SGA";
     begin
-        if rUltimo.FindLast() then;
-
+        // El nº lo da AutoIncrement al insertar; fecha y usuario, SystemCreatedAt/By.
         prm_Calculo.Init();
-        prm_Calculo."No." := rUltimo."No." + 1;
         prm_Calculo."Cod. Almacen" := prm_Almacen;
-        prm_Calculo."Fecha Calculo" := CurrentDateTime();
-        prm_Calculo.Usuario := CopyStr(UserId(), 1, MaxStrLen(prm_Calculo.Usuario));
         prm_Calculo."Fecha Hasta" := Today();
         prm_Calculo."Fecha Desde" := Today() - prm_Config."Dias Analisis ABC" + 1;
         prm_Calculo."Corte A" := prm_Config."Corte ABC Clase A";

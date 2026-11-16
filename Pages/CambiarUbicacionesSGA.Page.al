@@ -100,10 +100,30 @@ page 51126 "Cambiar Ubicaciones SGA"
                 field(Zona; Zona)
                 {
                     Caption = 'Zona';
-                    ToolTip = 'Zona a la que pasan las ubicaciones.';
+                    ToolTip = 'Zona a la que pasan las ubicaciones. Solo las zonas de su almacén. Las ubicaciones sin tipo o sin secuencia de picking toman las de la zona.';
                     ApplicationArea = All;
-                    TableRelation = "Zona SGA".Code;
                     Editable = CambiarZona;
+
+                    trigger OnLookup(var Text: Text): Boolean
+                    var
+                        rZona: Record "Zona SGA";
+                    begin
+                        rZona.SetRange("Cod. Almacen", rSeleccion."Cod. Almacen");
+                        if Page.RunModal(0, rZona) <> Action::LookupOK then
+                            exit(false);
+                        Text := rZona.Code;
+                        exit(true);
+                    end;
+
+                    trigger OnValidate()
+                    var
+                        rZona: Record "Zona SGA";
+                        ZonaDeOtroAlmacenErr: Label 'La zona %1 no es del almacén %2.', Comment = '%1 = zona, %2 = almacén';
+                    begin
+                        if Zona <> '' then
+                            if not rZona.Get(rSeleccion."Cod. Almacen", Zona) then
+                                Error(ZonaDeOtroAlmacenErr, Zona, rSeleccion."Cod. Almacen");
+                    end;
                 }
             }
         }
@@ -136,6 +156,8 @@ page 51126 "Cambiar Ubicaciones SGA"
         ConContenidoLbl: Label ' (%1 con contenido: no se cambiarán)', Comment = '%1 = número';
     begin
         rSeleccion.Copy(prm_Seleccion);
+        // Para limitar la zona a la del almacén de la selección.
+        if rSeleccion.FindFirst() then;
         Resumen := StrSubstNo(NumUbicacionesLbl, rSeleccion.Count());
         conContenidoNum := cUbicaciones.ContarConContenido(rSeleccion);
         if conContenidoNum > 0 then

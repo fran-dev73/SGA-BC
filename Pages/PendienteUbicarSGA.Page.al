@@ -351,7 +351,7 @@ page 51131 "Pendiente Ubicar SGA"
             exit;
         simular := opcion = 2;
 
-        cCarga.Configurar(FiltroAlmacen, 2, '', false, simular, '');
+        cCarga.Configurar(FiltroAlmacen, 2, '', simular, '');
         cCarga.FijarPendientes(TempSeleccion);
         // Codeunit.Run para recoger el fin de simulación, que llega como error para que la base
         // de datos deshaga lo escrito.

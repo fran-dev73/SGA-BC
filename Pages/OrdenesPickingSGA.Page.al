@@ -74,8 +74,9 @@ page 51118 "Ordenes Picking SGA"
                     Style = Unfavorable;
                     DrillDownPageId = "Paradas Picking SGA";
                 }
-                field("Fecha Creacion"; Rec."Fecha Creacion")
+                field(FechaCreacion; Rec.SystemCreatedAt)
                 {
+                    Caption = 'Fecha creación';
                     ToolTip = 'Momento en que se creó la orden.';
                     ApplicationArea = All;
                 }
@@ -135,23 +136,6 @@ page 51118 "Ordenes Picking SGA"
                     CurrPage.Update(false);
                 end;
             }
-            action(MisOrdenes)
-            {
-                Caption = 'Mis órdenes';
-                ToolTip = 'Muestra solo las órdenes pendientes asignadas a usted.';
-                ApplicationArea = All;
-                Image = User;
-
-                trigger OnAction()
-                var
-                    cPicking: Codeunit "Gestion Picking SGA";
-                begin
-                    Rec.SetRange("Cod. Usuario Asignado", cPicking.UsuarioActual());
-                    Rec.SetFilter(Estado, '%1|%2', Rec.Estado::Abierta, Rec.Estado::"En Proceso");
-                    Rec.SetCurrentKey(Estado, Prioridad, "No. Orden");
-                    CurrPage.Update(false);
-                end;
-            }
             action(PasarAPedido)
             {
                 Caption = 'Pasar al pedido';
@@ -195,12 +179,9 @@ page 51118 "Ordenes Picking SGA"
                 trigger OnAction()
                 var
                     cPicking: Codeunit "Gestion Picking SGA";
-                    CancelarOrdenQst: Label '¿Cancelar la orden %1 y todas sus paradas pendientes?', Comment = '%1 = nº orden';
                 begin
-                    if not Confirm(CancelarOrdenQst, false, Rec."No. Orden") then
-                        exit;
-                    cPicking.CancelarOrden(Rec);
-                    CurrPage.Update(false);
+                    if cPicking.CancelarOrdenConDialogo(Rec) then
+                        CurrPage.Update(false);
                 end;
             }
         }
@@ -231,9 +212,6 @@ page 51118 "Ordenes Picking SGA"
                 actionref(SegundaRonda_Promoted; SegundaRonda)
                 {
                 }
-                actionref(MisOrdenes_Promoted; MisOrdenes)
-                {
-                }
                 actionref(Asignarme_Promoted; Asignarme)
                 {
                 }
@@ -246,6 +224,12 @@ page 51118 "Ordenes Picking SGA"
 
     views
     {
+        view(MisOrdenes)
+        {
+            Caption = 'Mis órdenes';
+            Filters = where("Cod. Usuario Asignado" = filter('%user'), Estado = filter(Abierta | "En Proceso"));
+            OrderBy = ascending(Estado, Prioridad, "No. Orden");
+        }
         view(Pendientes)
         {
             Caption = 'Pendientes';

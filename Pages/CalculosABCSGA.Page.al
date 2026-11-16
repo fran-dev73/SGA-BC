@@ -26,8 +26,10 @@ page 51129 "Calculos ABC SGA"
                 {
                     ApplicationArea = All;
                 }
-                field("Fecha Calculo"; Rec."Fecha Calculo")
+                field(FechaCalculo; Rec.SystemCreatedAt)
                 {
+                    Caption = 'Calculado el';
+                    ToolTip = 'Cuándo se hizo el cálculo.';
                     ApplicationArea = All;
                 }
                 field("Cod. Almacen"; Rec."Cod. Almacen")

@@ -163,7 +163,13 @@ codeunit 51113 "Reubicaciones SGA"
         prm_Contenido.FiltrarDisponible(prm_Almacen, prm_Producto, prm_Variante);
         prm_Contenido.SetRange("Tipo Ubicacion", prm_Contenido."Tipo Ubicacion"::Almacenamiento);
         cPicking.OrdenarPorEstrategia(prm_Contenido, rConfig."Estrategia Picking");
-        exit(prm_Contenido.FindFirst());
+        // El primero que se pueda coger: no de una ubicación o zona bloqueada.
+        if prm_Contenido.FindSet() then
+            repeat
+                if prm_Contenido.SePuedeCoger(false) then
+                    exit(true);
+            until prm_Contenido.Next() = 0;
+        exit(false);
     end;
 
     /// <summary>

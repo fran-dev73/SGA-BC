@@ -39,7 +39,7 @@ pageextension 51104 "Sales Order SGA" extends "Sales Order"
                 action(EnviarASGA)
                 {
                     Caption = 'Enviar a SGA';
-                    ToolTip = 'Genera las órdenes de picking del pedido, de un palé como mucho cada una: una por palé completo y las cajas y unidades sueltas juntas hasta llenar un palé. Dice de qué ubicación y qué lote coger cada producto y lo reserva. El pedido debe estar lanzado y, una vez enviado, ya no se puede volver a abrir.';
+                    ToolTip = 'Genera las órdenes de picking del pedido: una por palé completo, una por producto para lo que se vende en cajas y las unidades sueltas juntas hasta llenar un palé. Dice de qué ubicación y qué lote coger cada producto y lo reserva. Los productos no inventariables no pasan por SGA. El pedido debe estar lanzado y, una vez enviado, ya no se puede volver a abrir.';
                     ApplicationArea = All;
                     Image = CreateWarehousePick;
 

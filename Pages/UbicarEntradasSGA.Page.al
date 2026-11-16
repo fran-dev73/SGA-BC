@@ -251,19 +251,31 @@ page 51123 "Ubicar Entradas SGA"
 
                 trigger OnAction()
                 var
+                    TempFila: Record "Linea Ubicacion SGA" temporary;
                     cEntradas: Codeunit "Gestion Entradas SGA";
                     propuestas: Integer;
                     UbicacionesPropuestasMsg: Label 'Se han propuesto %1 ubicaciones.', Comment = '%1 = número de propuestas';
-                    NingunaPropuestaMsg: Label 'No se ha podido proponer ninguna ubicación. Revise que haya huecos libres y sin bloquear.';
+                    NingunaPropuestaMsg: Label 'No se ha podido proponer ninguna ubicación: la columna "Por qué ahí" de cada línea dice el motivo.';
+                    NadaQueProponerMsg: Label 'No hay líneas pendientes sin ubicación propuesta.';
+                    sinPropuesta: Integer;
                 begin
+                    TempFila.Copy(Rec, true);
+                    TempFila.Reset();
+                    TempFila.SetFilter(Estado, '<>%1', TempFila.Estado::Ubicado);
+                    TempFila.SetRange("Ubicacion Propuesta", '');
+                    sinPropuesta := TempFila.Count();
+
                     propuestas := cEntradas.ProponerParaTodos(Rec);
                     ActualizarResumen();
                     CurrPage.Update(false);
 
-                    if propuestas = 0 then
-                        Message(NingunaPropuestaMsg)
+                    if sinPropuesta = 0 then
+                        Message(NadaQueProponerMsg)
                     else
-                        Message(UbicacionesPropuestasMsg, propuestas);
+                        if propuestas = 0 then
+                            Message(NingunaPropuestaMsg)
+                        else
+                            Message(UbicacionesPropuestasMsg, propuestas);
                 end;
             }
             action(OtraUbicacion)
@@ -296,9 +308,12 @@ page 51123 "Ubicar Entradas SGA"
                 var
                     cEntradas: Codeunit "Gestion Entradas SGA";
                     LineaUbicadaMsg: Label 'Ubicado %1 de %2 en %3.', Comment = '%1 = cantidad, %2 = producto, %3 = ubicación';
+                    LineaYaUbicadaErr: Label 'Esta línea ya está ubicada.';
                     cantidad: Decimal;
                     ubicacion: Code[20];
                 begin
+                    if Rec.Estado = Rec.Estado::Ubicado then
+                        Error(LineaYaUbicadaErr);
                     cantidad := Rec.Cantidad;
                     ubicacion := Rec."Ubicacion Confirmada";
 
@@ -549,7 +564,10 @@ page 51123 "Ubicar Entradas SGA"
         TempFila.SetFilter(Estado, '<>%1', TempFila.Estado::Ubicado);
         pendientes := TempFila.Count();
 
+        // Sin hueco son solo las que se intentaron proponer y no encontraron sitio (llevan el
+        // motivo); las que aún no se han propuesto no cuentan.
         TempFila.SetRange("Ubicacion Propuesta", '');
+        TempFila.SetFilter(Motivo, '<>%1', '');
         sinHueco := TempFila.Count();
 
         if EsCompra then begin

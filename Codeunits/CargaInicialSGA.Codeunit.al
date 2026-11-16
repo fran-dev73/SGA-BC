@@ -37,8 +37,8 @@ codeunit 51106 "Carga Inicial SGA"
 
     var
         TempResultado: Record "Linea Ubicacion SGA" temporary;
-        // Modo "solo pendientes" (página Pendiente Ubicar SGA): en vez de todo el stock, se reparte
-        // la cantidad indicada de cada lote.
+        // Lo que se reparte, lote a lote ("A Ubicar"): lo calcula Run para la carga entera, o lo
+        // fija FijarPendientes con las líneas elegidas en Pendiente Ubicar SGA.
         TempPendientes: Record "Buffer Conciliacion SGA" temporary;
         cContenido: Codeunit "Gestion Contenido SGA";
         cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
@@ -49,9 +49,9 @@ codeunit 51106 "Carga Inicial SGA"
         UbicacionIndicada: Code[20];
         VistaProductos: Text;
         Destino: Option "Ubicacion Fija del Producto","Ubicacion Indicada","Huecos Libres";
-        OmitirConContenido: Boolean;
         Simular: Boolean;
         MotivoSinHuecoPale: Text[500];
+        ProductoMotivoSinHueco: Code[20];
         SoloPendientes: Boolean;
         MaxPickingProducto: Integer;
         DescripcionMovimiento: Text;
@@ -62,12 +62,11 @@ codeunit 51106 "Carga Inicial SGA"
     /// <summary>
     /// Fija los parámetros. prm_VistaProductos es el GetView del filtro de productos del informe.
     /// </summary>
-    procedure Configurar(prm_Almacen: Code[10]; prm_Destino: Option "Ubicacion Fija del Producto","Ubicacion Indicada","Huecos Libres"; prm_UbicacionIndicada: Code[20]; prm_OmitirConContenido: Boolean; prm_Simular: Boolean; prm_VistaProductos: Text)
+    procedure Configurar(prm_Almacen: Code[10]; prm_Destino: Option "Ubicacion Fija del Producto","Ubicacion Indicada","Huecos Libres"; prm_UbicacionIndicada: Code[20]; prm_Simular: Boolean; prm_VistaProductos: Text)
     begin
         Almacen := prm_Almacen;
         Destino := prm_Destino;
         UbicacionIndicada := prm_UbicacionIndicada;
-        OmitirConContenido := prm_OmitirConContenido;
         Simular := prm_Simular;
         VistaProductos := prm_VistaProductos;
     end;
@@ -94,7 +93,6 @@ codeunit 51106 "Carga Inicial SGA"
         TempPendientes.Copy(prm_Pendientes, true);
         SoloPendientes := true;
         Destino := Destino::"Huecos Libres";
-        OmitirConContenido := false;
         DescripcionMovimiento := UbicacionPendientesLbl;
     end;
 
@@ -124,13 +122,25 @@ codeunit 51106 "Carga Inicial SGA"
     local procedure Procesar()
     var
         rProducto: Record Item;
+        rConfig: Record "Config. SGA";
         AlmacenObligatorioErr: Label 'Debe indicar el almacén que se va a cargar.';
         UbicacionDestinoObligatoriaErr: Label 'Debe indicar la ubicación de destino.';
+        FechaInicioObligatoriaErr: Label 'Ponga la "Fecha inicio SGA" en la configuración antes de la carga inicial: las recepciones y ensamblados desde esa fecha se ubican desde sus pantallas y no los coge la carga.';
     begin
         if Almacen = '' then
             Error(AlmacenObligatorioErr);
         if (Destino = Destino::"Ubicacion Indicada") and (UbicacionIndicada = '') then
             Error(UbicacionDestinoObligatoriaErr);
+
+        // Se carga, lote a lote, lo mismo que "Pendiente de ubicar" tiene "A ubicar": el stock de
+        // BC menos lo ya ubicado y menos lo que espera en recepciones o ensamblados. Así la carga
+        // se puede repetir sin duplicar y no coge lo que tiene su propio documento.
+        if not SoloPendientes then begin
+            rConfig.ObtenerConfig();
+            if rConfig."Fecha Inicio SGA" = 0D then
+                Error(FechaInicioObligatoriaErr);
+            cStock.CargarPendienteUbicar(Almacen, TempPendientes);
+        end;
 
         TempResultado.Reset();
         TempResultado.DeleteAll();
@@ -138,6 +148,7 @@ codeunit 51106 "Carga Inicial SGA"
         Clear(cUbicaciones);
         cUbicaciones.FijarPickingPrimero(not SoloPendientes, MaxPickingProducto);
         MotivoSinHuecoPale := '';
+        ProductoMotivoSinHueco := '';
 
         if SoloPendientes then begin
             ProcesarPendientes();
@@ -228,17 +239,11 @@ codeunit 51106 "Carga Inicial SGA"
         TempStock: Record "Buffer Conciliacion SGA" temporary;
         ProductoBloqueadoLbl: Label 'Producto bloqueado.';
     begin
-        if SoloPendientes then
-            CopiarPendientes(prm_Producto."No.", TempStock)
-        else
-            cStock.AcumularStockPorLote(prm_Producto."No.", Almacen, TempStock);
+        CopiarPendientes(prm_Producto."No.", TempStock);
 
         TempStock.Reset();
         TempStock.SetFilter("Stock BC", '>%1', 0);
         if not TempStock.FindSet() then
-            exit;
-
-        if OmitirConContenido and YaTieneContenido(prm_Producto."No.") then
             exit;
 
         repeat
@@ -320,10 +325,12 @@ codeunit 51106 "Carga Inicial SGA"
                 hueco := cUbicaciones.ProponerHuecoPaleRuta(Almacen, prm_Producto."No.", motivo);
                 if hueco = '' then begin
                     // Sin hueco para este palé no lo habrá para los siguientes: se anotan juntos.
-                    // Agotados los huecos vacíos, el motivo es el mismo para todos los productos: se
-                    // calcula una vez, porque recorre todos los huecos.
-                    if MotivoSinHuecoPale = '' then
+                    // El motivo recorre todos los huecos y depende del producto (su palé, su
+                    // picking): se calcula una vez por producto, no en cada lote.
+                    if ProductoMotivoSinHueco <> prm_Producto."No." then begin
                         MotivoSinHuecoPale := CopyStr(cUbicaciones.ExplicarSinHuecoLote(Almacen, prm_Producto."No.", prm_Stock."No. Lote", umPale, 1), 1, MaxStrLen(MotivoSinHuecoPale));
+                        ProductoMotivoSinHueco := prm_Producto."No.";
+                    end;
                     AnotarNoCargado(prm_Producto, prm_Stock, umPale, pales - i, (pales - i) * TempTrozo."Cantidad Base", MotivoSinHuecoPale);
                     i := pales;
                 end else begin
@@ -382,7 +389,6 @@ codeunit 51106 "Carga Inicial SGA"
         TempResultado.Origen := TempResultado.Origen::"Carga Inicial";
         TempResultado."Cod. Almacen" := Almacen;
         TempResultado."No. Producto" := prm_Producto."No.";
-        TempResultado."Descripcion Producto" := CopyStr(prm_Producto.Description, 1, MaxStrLen(TempResultado."Descripcion Producto"));
         TempResultado."Cod. Variante" := prm_Stock."Cod. Variante";
         TempResultado."No. Lote" := prm_Stock."No. Lote";
         TempResultado."Ubicacion Propuesta" := prm_Bin;
@@ -396,16 +402,5 @@ codeunit 51106 "Carga Inicial SGA"
             TempResultado.Estado := TempResultado.Estado::"Sin Sitio";
         TempResultado.Motivo := CopyStr(prm_Motivo, 1, MaxStrLen(TempResultado.Motivo));
         TempResultado.Insert();
-    end;
-
-    local procedure YaTieneContenido(prm_Producto: Code[20]): Boolean
-    var
-        rContenido: Record "Contenido Ubicacion SGA";
-    begin
-        rContenido.SetCurrentKey("No. Producto", "Cod. Variante", "Cod. Almacen", "No. Lote");
-        rContenido.SetRange("No. Producto", prm_Producto);
-        rContenido.SetRange("Cod. Almacen", Almacen);
-
-        exit(not rContenido.IsEmpty());
     end;
 }

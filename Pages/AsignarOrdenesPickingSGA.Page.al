@@ -26,6 +26,7 @@ page 51124 "Asignar Ordenes Picking SGA"
                       where(Estado = filter("Pendiente Asignar" | Abierta | "En Proceso"));
     UsageCategory = Tasks;
     ApplicationArea = All;
+    CardPageId = "Ficha Orden Picking SGA";
     InsertAllowed = false;
     DeleteAllowed = false;
     AboutTitle = 'Repartir el picking';
@@ -83,8 +84,9 @@ page 51124 "Asignar Ordenes Picking SGA"
                 }
                 field(Prioridad; Rec.Prioridad)
                 {
-                    ToolTip = 'Cuanto mayor, antes le sale al preparador con "Siguiente orden". A igual prioridad, la más antigua primero.';
+                    ToolTip = 'Prioridad del pedido: cuanto mayor, antes sale con "Siguiente orden". Se cambia con "Subir prioridad" y "Bajar prioridad", que la aplican a todas las órdenes del pedido.';
                     ApplicationArea = All;
+                    Editable = false;
                 }
                 field("No. Lineas"; Rec."No. Lineas")
                 {
@@ -112,8 +114,9 @@ page 51124 "Asignar Ordenes Picking SGA"
                     ApplicationArea = All;
                     Editable = false;
                 }
-                field("Fecha Creacion"; Rec."Fecha Creacion")
+                field(FechaCreacion; Rec.SystemCreatedAt)
                 {
+                    Caption = 'Fecha creación';
                     ToolTip = 'Momento en que se envió el pedido a picking.';
                     ApplicationArea = All;
                     Editable = false;
@@ -182,15 +185,6 @@ page 51124 "Asignar Ordenes Picking SGA"
         }
         area(Navigation)
         {
-            action(VerOrden)
-            {
-                Caption = 'Ver orden';
-                ToolTip = 'Abre la ficha de la orden con sus paradas.';
-                ApplicationArea = All;
-                Image = Document;
-                RunObject = page "Ficha Orden Picking SGA";
-                RunPageLink = "No. Orden" = field("No. Orden");
-            }
             action(VerPedido)
             {
                 Caption = 'Ver pedido';

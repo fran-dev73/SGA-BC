@@ -10,8 +10,8 @@ using System.Utilities;
 /// diario de movimientos.
 ///
 /// La reconstrucción es la red de seguridad del módulo: deja el contenido exactamente como
-/// lo dictan los movimientos registrados. Las reservas de las órdenes abiertas no se
-/// conservan, porque las vuelve a fijar la gestión de órdenes.
+/// lo dictan los movimientos registrados. Las reservas de las órdenes abiertas se vuelven a
+/// fijar desde sus paradas, y los bloqueos de las líneas se conservan.
 /// </summary>
 report 51101 "Sincronizar Ubicaciones SGA"
 {
@@ -30,7 +30,7 @@ report 51101 "Sincronizar Ubicaciones SGA"
             var
                 cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
                 cContenido: Codeunit "Gestion Contenido SGA";
-                ConfirmarReconstruirQst: Label 'Se va a borrar el contenido por ubicación del almacén %1 y a reconstruirlo desde el diario de movimientos. Las reservas de las órdenes abiertas se perderán. ¿Desea continuar?', Comment = '%1 = almacén, o "todos" si no se ha filtrado';
+                ConfirmarReconstruirQst: Label 'Se va a borrar el contenido por ubicación del almacén %1 y a reconstruirlo desde el diario de movimientos. Las reservas de las órdenes abiertas se vuelven a calcular y los bloqueos se conservan. ¿Desea continuar?', Comment = '%1 = almacén, o "todos" si no se ha filtrado';
                 TodosAlmacenesLbl: Label 'todos los almacenes';
                 ProcesoFinalizadoMsg: Label 'Proceso finalizado.';
                 textoAlmacen: Text;

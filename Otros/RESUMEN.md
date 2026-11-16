@@ -26,7 +26,7 @@ SGA es el módulo de gestión de ubicaciones del almacén dentro de Business Cen
 | Recepción de compra | Tras registrar el albarán, *Ubicar recepciones* propone un hueco por línea y el operario confirma. |
 | Producción | *Imprimir y ubicar palés* ubica cada palé al imprimir su etiqueta; *Ubicar ensamblados* recoge lo que falte. |
 | Venta | Oficina envía el pedido a picking, el preparador recoge parada a parada y la cantidad a enviar y los lotes pasan solos al pedido. |
-| PDA | En la app móvil de BC, con el rol *Preparador SGA (PDA)*: lee la ubicación de la etiqueta del hueco, escanea el producto y la parada se confirma sola. |
+| PDA | En la app móvil de BC, con el rol *Preparador SGA (PDA)*: lee la ubicación de la etiqueta del hueco y la parada se confirma sola. |
 | Reparto del trabajo | Un responsable asigna órdenes y prioridades; los carretilleros reciben las reubicaciones y los preparadores los pedidos. |
 | Control | La conciliación compara cada día ubicaciones contra stock de BC; las diferencias se corrigen con recuento o regularización. |
 
@@ -55,7 +55,7 @@ SGA es el módulo de gestión de ubicaciones del almacén dentro de Business Cen
 - Carga inicial con simulación, *Pendiente de ubicar* e inicialización.
 - Entradas: recepciones de compra, ensamblados y palés de la línea.
 - Picking de venta completo: envío, asignación, prioridades, preparación, lectura de ubicación y paso al pedido.
-- Picking con PDA: escáner integrado en la app móvil de BC, comprobación del producto (GTIN, referencia o GS1-128 con lote) y rol propio.
+- Picking con PDA: escáner integrado en la app móvil de BC, confirmación de la parada al leer la ubicación y rol propio.
 - Reubicaciones y reparto entre preparadores y carretilleros.
 - Consultas, mapa, mapa 3D con traslados arrastrando, conciliación, recuento y análisis ABC.
 
@@ -63,7 +63,7 @@ SGA es el módulo de gestión de ubicaciones del almacén dentro de Business Cen
 
 - Registrar el envío de un pedido pasado desde picking con producto con lote, y con líneas en cajas (redondeos).
 - Envío parcial y nueva orden del mismo pedido.
-- PDA real: lectura por intent en el terminal (Zebra DataWedge u otro), GS1-128 de las etiquetas de producto y confirmación automática.
+- PDA real: lectura por intent en el terminal (Zebra DataWedge u otro), lectura de las etiquetas de ubicación y confirmación automática.
 - Almacenes con envío de almacén obligatorio: ahí el paso al pedido no sirve tal cual.
 - Que el palé de una tarea pase a su ensamblado registrado y que *Ubicar ensamblados* pida solo lo que falta.
 - Recepciones deshechas del todo o en parte.

@@ -1,6 +1,7 @@
 namespace AntonioNadal.SGA;
 
 using Microsoft.Inventory.Location;
+using System.Security.AccessControl;
 
 /// <summary>
 /// Table Calculo ABC SGA (ID 51112).
@@ -24,6 +25,7 @@ table 51112 "Calculo ABC SGA"
             ToolTip = 'Número del cálculo.';
             Caption = 'Nº';
             DataClassification = ToBeClassified;
+            AutoIncrement = true;
         }
         field(10; "Cod. Almacen"; Code[10])
         {
@@ -32,17 +34,13 @@ table 51112 "Calculo ABC SGA"
             DataClassification = ToBeClassified;
             TableRelation = Location;
         }
-        field(20; "Fecha Calculo"; DateTime)
-        {
-            ToolTip = 'Cuándo se hizo el cálculo.';
-            Caption = 'Calculado el';
-            DataClassification = ToBeClassified;
-        }
         field(21; Usuario; Code[50])
         {
             ToolTip = 'Quién lanzó el cálculo.';
             Caption = 'Usuario';
-            DataClassification = EndUserIdentifiableInformation;
+            Editable = false;
+            FieldClass = FlowField;
+            CalcFormula = lookup(User."User Name" where("User Security ID" = field(SystemCreatedBy)));
         }
         field(30; "Fecha Desde"; Date)
         {
@@ -210,7 +208,8 @@ table 51112 "Calculo ABC SGA"
         ResumenHuecosLbl: Label '%1 de %2 palés están en un hueco de su clase (%3 %). De los palés A, el %4 % está en huecos A. Huecos de picking y almacenamiento: %5.', Comment = '%1 = bien ubicados, %2 = palés, %3 = %, %4 = % A en A, %5 = huecos';
         ProductosSinUMPaleLbl: Label '%1 productos con ventas no tienen unidad de palé: quedan como C. Márquelos en la columna "Unidad de palé".', Comment = '%1 = nº productos';
     begin
-        prm_Info := StrSubstNo(InfoCalculoLbl, "No.", "Fecha Calculo", Usuario, "Fecha Desde", "Fecha Hasta", "Corte A", "Corte B");
+        CalcFields(Usuario);
+        prm_Info := StrSubstNo(InfoCalculoLbl, "No.", SystemCreatedAt, Usuario, "Fecha Desde", "Fecha Hasta", "Corte A", "Corte B");
         prm_Concentracion := StrSubstNo(ResumenConcentracionLbl, ProductosTop20(), Productos, "% Salidas Top 20", "Palets Salidos");
         prm_Clases := StrSubstNo(ResumenClasesLbl, "Productos A", "Palets A", "Productos B", "Productos C");
         prm_Huecos := StrSubstNo(ResumenHuecosLbl, "Palets Hueco Su Clase", "Palets en Almacen",

@@ -92,7 +92,7 @@ page 51122 "Mapa 3D Almacen SGA"
                 field(Resumen; Resumen)
                 {
                     Caption = 'Resumen';
-                    ToolTip = 'Cuántas ubicaciones se están dibujando y cómo están de ocupadas.';
+                    ToolTip = 'Cuántas ubicaciones tiene el almacén (o la zona elegida) y cómo están de ocupadas. No cambia al aislar un pasillo.';
                     ApplicationArea = All;
                     Editable = false;
                     MultiLine = true;
@@ -128,13 +128,21 @@ page 51122 "Mapa 3D Almacen SGA"
                 end;
 
                 trigger PasilloSeleccionado(prm_Pasillo: Text)
+                var
+                    anterior: Integer;
                 begin
                     // El lienzo ya ha aislado el pasillo por su cuenta, así que aquí solo se
                     // acompaña el filtro de la página: no se vuelve a dibujar, que tiraría
                     // el giro y el zoom que el operario tenga puestos. En blanco, todos.
+                    anterior := FiltroPasillo;
                     if not Evaluate(FiltroPasillo, prm_Pasillo) then
                         FiltroPasillo := 0;
-                    CalcularResumen();
+                    // Si el lienzo solo tenía un pasillo (se dibujó con el filtro puesto) y ahora
+                    // se piden todos, hay que leer el almacén entero: el lienzo no los tiene.
+                    if (FiltroPasillo = 0) and (anterior <> 0) then begin
+                        Refrescar();
+                        exit;
+                    end;
                     CurrPage.Update(false);
                 end;
             }
@@ -186,6 +194,8 @@ page 51122 "Mapa 3D Almacen SGA"
         Resumen: Text;
         ControlPreparado: Boolean;
         Preparada: Boolean;
+        // Cálculo ABC con el que se colorea por clase; 0, el último del almacén.
+        NoCalculoABC: Integer;
         CriterioInicial: Text;
         BusquedaInicial: Text;
 
@@ -203,13 +213,15 @@ page 51122 "Mapa 3D Almacen SGA"
 
     /// <summary>
     /// Abre el mapa de un almacén entero coloreado por un criterio ('estado', 'posicion', 'abc'
-    /// o 'caducidad') y con un producto o ubicación ya buscado. Lo usa el análisis ABC para ver
-    /// en qué huecos (A, B o C por su posición) está un producto.
+    /// o 'caducidad'), con las clases ABC del cálculo prm_NoCalculoABC (0 = el último) y un
+    /// producto ya buscado. Lo usa el análisis ABC para ver en qué huecos (A, B o C por su
+    /// posición) está un producto en el cálculo que se está mirando.
     /// </summary>
-    procedure Preparar(prm_Almacen: Code[10]; prm_Criterio: Text; prm_Busqueda: Text)
+    procedure Preparar(prm_Almacen: Code[10]; prm_NoCalculoABC: Integer; prm_Criterio: Text; prm_Busqueda: Text)
     begin
         FiltroAlmacen := prm_Almacen;
         FiltroZona := '';
+        NoCalculoABC := prm_NoCalculoABC;
         CriterioInicial := prm_Criterio;
         BusquedaInicial := prm_Busqueda;
         Preparada := true;
@@ -223,7 +235,7 @@ page 51122 "Mapa 3D Almacen SGA"
         if not ControlPreparado then
             exit;
 
-        datos := cMapa.DatosMapa3D(FiltroAlmacen, FiltroZona, FiltroPasillo);
+        datos := cMapa.DatosMapa3D(FiltroAlmacen, FiltroZona, FiltroPasillo, NoCalculoABC);
         CurrPage.Lienzo.Dibujar(datos);
         if Preparada then begin
             CurrPage.Lienzo.Preparar(CriterioInicial, BusquedaInicial);
@@ -273,7 +285,7 @@ page 51122 "Mapa 3D Almacen SGA"
             exit;
 
         // Sin perder la vista: el operario sigue en el mismo giro, zoom y pasillo.
-        CurrPage.Lienzo.Actualizar(cMapa.DatosMapa3D(FiltroAlmacen, FiltroZona, FiltroPasillo));
+        CurrPage.Lienzo.Actualizar(cMapa.DatosMapa3D(FiltroAlmacen, FiltroZona, FiltroPasillo, NoCalculoABC));
         CalcularResumen();
         CurrPage.Update(false);
         Message(TrasladadoMsg, prm_Origen, destino);
@@ -291,7 +303,7 @@ page 51122 "Mapa 3D Almacen SGA"
         if cContenido.VaciarUbicacionConDialogo(FiltroAlmacen, prm_CodBin) = 0 then
             exit;
 
-        CurrPage.Lienzo.Actualizar(cMapa.DatosMapa3D(FiltroAlmacen, FiltroZona, FiltroPasillo));
+        CurrPage.Lienzo.Actualizar(cMapa.DatosMapa3D(FiltroAlmacen, FiltroZona, FiltroPasillo, NoCalculoABC));
         CalcularResumen();
         CurrPage.Update(false);
     end;

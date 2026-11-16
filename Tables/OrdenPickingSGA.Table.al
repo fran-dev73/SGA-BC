@@ -68,7 +68,7 @@ table 51108 "Orden Picking SGA"
             Caption = 'Prioridad';
             DataClassification = ToBeClassified;
             MinValue = 0;
-            ToolTip = 'Cuanto mayor, antes le sale al preparador con "Siguiente orden". A igual prioridad, la más antigua primero.';
+            ToolTip = 'Prioridad del pedido: cuanto mayor, antes sale con "Siguiente orden". A igual prioridad, por nº de pedido; dentro del pedido, palés, luego cajas (las de más volumen antes) y luego sueltos.';
 
             trigger OnValidate()
             var
@@ -96,12 +96,6 @@ table 51108 "Orden Picking SGA"
             Editable = false;
             ToolTip = 'Fecha de envío del pedido de venta, copiada al crear la orden. Sirve para decidir qué preparar antes.';
         }
-        field(70; "Fecha Creacion"; DateTime)
-        {
-            Caption = 'Fecha creación';
-            DataClassification = ToBeClassified;
-            Editable = false;
-        }
         field(71; "Fecha Finalizacion"; DateTime)
         {
             Caption = 'Fecha finalización';
@@ -111,8 +105,10 @@ table 51108 "Orden Picking SGA"
         field(80; "Cod. Usuario Creacion"; Code[50])
         {
             Caption = 'Creada por';
-            DataClassification = EndUserIdentifiableInformation;
+            ToolTip = 'Usuario que creó la orden.';
             Editable = false;
+            FieldClass = FlowField;
+            CalcFormula = lookup(User."User Name" where("User Security ID" = field(SystemCreatedBy)));
         }
         field(90; "Fecha Paso a Documento"; DateTime)
         {
@@ -189,12 +185,6 @@ table 51108 "Orden Picking SGA"
         }
     }
 
-    trigger OnInsert()
-    begin
-        "Fecha Creacion" := CurrentDateTime();
-        "Cod. Usuario Creacion" := CopyStr(UserId(), 1, MaxStrLen("Cod. Usuario Creacion"));
-    end;
-
     trigger OnDelete()
     var
         rLinea: Record "Linea Orden Picking SGA";
@@ -225,14 +215,31 @@ table 51108 "Orden Picking SGA"
         rLinea.SetRange("No. Orden", "No. Orden");
         rLinea.SetFilter(Estado, '<>%1', rLinea.Estado::Cancelada);
         if rLinea.IsEmpty() then begin
-            Estado := EstadoSinEmpezar();
+            // Sin paradas, la orden aún se está creando. Con todas canceladas (Sin stock sin
+            // alternativa), ya no queda nada que hacer: terminada si algo se llegó a recoger,
+            // para que pase al pedido; si no, cancelada. Así no bloquea volver a enviar el pedido.
+            rLinea.SetRange(Estado);
+            if rLinea.IsEmpty() then
+                Estado := EstadoSinEmpezar()
+            else begin
+                rLinea.SetFilter("Cantidad Recogida", '>%1', 0);
+                if rLinea.IsEmpty() then
+                    Estado := Estado::Cancelada
+                else begin
+                    Estado := Estado::Finalizada;
+                    if "Fecha Finalizacion" = 0DT then
+                        "Fecha Finalizacion" := CurrentDateTime();
+                end;
+            end;
             exit;
         end;
 
         rLinea.FiltrarPendientes();
         hayPendientes := not rLinea.IsEmpty();
 
-        rLinea.SetRange(Estado, rLinea.Estado::Recogida);
+        // Empezada: alguna parada lleva algo recogido, entera o a medias.
+        rLinea.SetRange(Estado);
+        rLinea.SetFilter("Cantidad Recogida", '>%1', 0);
         hayRecogidas := not rLinea.IsEmpty();
 
         case true of

@@ -283,4 +283,27 @@ table 51102 "Contenido Ubicacion SGA"
         SetRange(Bloqueado, false);
         SetFilter("Cantidad Disponible", '>%1', 0);
     end;
+
+    /// <summary>
+    /// Si se puede coger de esta línea: su ubicación y la zona de la ubicación no están
+    /// bloqueadas (EsUtilizable) y, para un picking de venta, no es la ubicación de ajustes,
+    /// donde lo regularizado es una diferencia y no mercancía que se pueda recoger. Completa a
+    /// FiltrarDisponible, que solo puede filtrar por campos de la propia línea.
+    /// </summary>
+    procedure SePuedeCoger(prm_ParaPicking: Boolean): Boolean
+    var
+        rUbicacionSGA: Record "Ubicacion SGA";
+        rConfig: Record "Config. SGA";
+    begin
+        if not rUbicacionSGA.Get("Cod. Almacen", "Cod. Bin") then
+            exit(false);
+        if not rUbicacionSGA.EsUtilizable() then
+            exit(false);
+        if prm_ParaPicking then begin
+            rConfig.ObtenerConfig();
+            if (rConfig."Ubic. Ajustes" <> '') and ("Cod. Bin" = rConfig."Ubic. Ajustes") then
+                exit(false);
+        end;
+        exit(true);
+    end;
 }

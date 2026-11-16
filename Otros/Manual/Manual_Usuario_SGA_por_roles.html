@@ -146,7 +146,7 @@
 <tr><td>Reubicaciones</td><td>Fija, no se configura</td><td>El mismo hueco que se vació</td></tr>
 </tbody></table>
 <p>Si el almacén está casi lleno, todas las estrategias acaban en el primer hueco libre: cambiar de estrategia no gana sitio.</p>
-<p><strong>Huecos reservados.</strong> En <em>Ubicar recepciones</em>, <em>Ubicar ensamblados</em>, <em>Imprimir y ubicar palés</em> y <em>Ubicar producto</em>, el hueco que se propone queda <strong>reservado</strong> para esa línea: no se propone a nadie más hasta que se ubica.</p>
+<p><strong>Huecos reservados.</strong> En <em>Ubicar recepciones</em>, <em>Ubicar ensamblados</em> e <em>Imprimir y ubicar palés</em>, el hueco que se propone queda <strong>reservado</strong> para esa línea: no se propone a nadie más hasta que se ubica.</p>
 <ul>
 <li><strong>Se usa:</strong> al confirmar, la reserva se quita y el hueco queda ocupado.</li>
 <li><strong>No se usa:</strong> se suelta al pedir <strong>Otra ubicación</strong>, al escribir otro hueco, al pasar a otra tarea, al recargar la lista y al cerrar la pantalla.</li>
@@ -237,8 +237,8 @@
 <li>Vistas <strong>Sin asignar</strong> y <strong>Asignadas</strong>.</li>
 <li><strong>Asignar a</strong>: da las seleccionadas a un preparador (también se puede teclear en <em>Asignada a</em>).</li>
 <li><strong>Quitar asignación</strong>: las devuelve a la bolsa. Una orden empezada se puede reasignar, pero no dejar sin nadie.</li>
-<li><strong>Subir prioridad</strong> y <strong>Bajar prioridad</strong>: cuanto mayor la <em>Prioridad</em>, antes sale.</li>
-<li><strong>Ver orden</strong> y <strong>Ver pedido</strong>.</li>
+<li><strong>Subir prioridad</strong> y <strong>Bajar prioridad</strong>: cuanto mayor la <em>Prioridad</em>, antes sale. La prioridad es del pedido: cambian a la vez todas sus órdenes.</li>
+<li><strong>Ver pedido</strong>. La ficha de la orden se abre con <em>Ver</em> / <em>Editar</em> de la propia lista.</li>
 </ul>
 <p>Si la configuración exige asignación de picking:</p>
 <table><thead><tr><th></th><th>Desactivada</th><th>Activada</th></tr>
@@ -331,7 +331,7 @@
 <h4>Mapa 3D de almacén</h4>
 <ul>
 <li>Arriba, <em>Almacén</em>, <em>Zona</em> y <em>Pasillo</em>. En el lienzo hay tres vistas: <strong>3D</strong>, <strong>Planta</strong> y <strong>Frente</strong> (un pasillo de frente, la de trabajo).</li>
-<li><strong>Colorear por</strong>: <em>Estado</em>, <em>Rotación ABC</em> o <em>Caducidad</em>. Por estado, las reservadas para una entrada salen en turquesa.</li>
+<li><strong>Colorear por</strong>: <em>Estado</em>, <em>Posición ABC</em> (la clase de cada hueco por su posición), <em>Rotación ABC</em> (la clase del producto que hay dentro) o <em>Caducidad</em>. Por estado, las reservadas para una entrada salen en turquesa.</li>
 <li><strong>Buscar</strong>: un producto o una ubicación; las coincidencias se marcan en naranja.</li>
 <li>Con el ratón: pasar por encima enseña lo que hay; clic abre el contenido; doble clic aísla el pasillo; clic derecho vacía la ubicación; arrastrar una ubicación con contenido sobre otra la traslada, solo dentro de la misma zona.</li>
 </ul>
@@ -397,27 +397,27 @@
 <h3 id="s13">4.2 Preparar pedidos</h3>
 <ol>
 <li>Entra con el rol <strong>Preparador SGA (PDA)</strong> y pulsa <strong>Preparar pedidos SGA</strong>. Se abre la orden que te toca. Al terminarla carga la siguiente; si no hay más, ofrece <strong>BUSCAR SIGUIENTE ORDEN</strong>.</li>
-<li>Ve a la ubicación, coge el producto y <strong>escanéalo</strong>. Si no es el de la parada, lo dice al momento.</li>
-<li>Escanea el <strong>código de la ubicación</strong> de la etiqueta del hueco. Si no se lee, tecléalo.</li>
+<li>Ve a la ubicación y coge el producto.</li>
 <li>Si coges otra cantidad, cámbiala antes.</li>
+<li>Escanea el <strong>código de la ubicación</strong> de la etiqueta del hueco. Si no se lee, tecléalo.</li>
 <li>La parada se confirma sola y pasa a la siguiente.</li>
 </ol>
-<p>El cursor está siempre en la casilla que toca leer (ubicación o producto). La pantalla no abre el teclado del terminal hasta que tocas una casilla.</p>
+<p>El cursor está siempre en la casilla de la ubicación. La pantalla no abre el teclado del terminal hasta que tocas una casilla.</p>
 <div class="captura">
 <p><strong>[CAPTURA 30]</strong> Preparar picking SGA en la PDA: bloques <em>VAYA A</em>, <em>COJA</em> y <em>CONFIRME</em>. Datos de ejemplo: una parada de un pedido con playa.</p>
 </div>
 <div class="captura">
-<p><strong>[CAPTURA 31]</strong> Preparar picking SGA con una lectura incorrecta en rojo. Datos de ejemplo: escanear un producto que no es el de la parada.</p>
+<p><strong>[CAPTURA 31]</strong> Preparar picking SGA con una lectura incorrecta en rojo. Datos de ejemplo: escanear una etiqueta que no es de una ubicación del almacén.</p>
 </div>
 <p><strong>Cómo se lee cada parada:</strong></p>
 <ul>
 <li><strong>VAYA A</strong>: la ubicación, en grande. En un pedido, al lado, <strong>→ PLAYA</strong> y la playa donde dejar lo recogido. En una reubicación: <strong>DE</strong> origen <strong>→ A</strong> destino.</li>
 <li><strong>COJA</strong>: la cantidad, en la unidad del pedido. Debajo, la descripción del producto y, en pequeño, su código, el lote, la caducidad, el palé (SSCC) y la cantidad en unidades base.</li>
-<li><strong>CONFIRME</strong>: lo que falta para confirmar (<em>Ubicación</em>, <em>Producto</em>). En rojo, pendiente; en verde, hecho.</li>
+<li><strong>CONFIRME</strong>: lo que falta para confirmar (<em>Ubicación</em>). En rojo, pendiente; en verde, hecho.</li>
 </ul>
-<p><strong>Lecturas.</strong> Lee, en este orden, la <strong>ubicación</strong> de la etiqueta del hueco y, si se pide, el <strong>producto</strong> que coges. Cada lectura puede ser un escaneo o teclearse. Si una lectura no es correcta, la pantalla lo dice en rojo, con un pitido grave: vuelve a escanear o a teclear.</p>
+<p><strong>Lecturas.</strong> Lee la <strong>ubicación</strong> de la etiqueta del hueco del que recoges. Puede ser un escaneo o teclearse. Con una ubicación válida, la parada se confirma sola. Si lo leído no es una ubicación del almacén, la pantalla lo dice en rojo, con un pitido grave («<em>… no es una ubicación de este almacén. Escanee la etiqueta del hueco.</em>»): vuelve a escanear o a teclear.</p>
 <ul>
-<li>El producto se reconoce por su código de barras, su GTIN o su número de producto, y también por una etiqueta GS1-128 con (01) o (02). Si la etiqueta trae el lote (10), tiene que ser el de la parada.</li>
+<li>El producto <strong>no se lee</strong>: lo reconoces por la descripción que sale en <em>COJA</em>.</li>
 <li>El palé <strong>no se lee</strong>: se da por bueno que lo que coges es del palé de la parada (o del palé de ese hueco, si coges de otro).</li>
 </ul>
 <p><strong>Otros botones:</strong></p>
@@ -431,7 +431,6 @@
 </thead><tbody>
 <tr><td><strong>FIFO</strong> (por defecto)</td><td>Lo que entró antes</td></tr>
 <tr><td><strong>FEFO</strong></td><td>Lo que caduca antes</td></tr>
-<tr><td><strong>Lote exacto</strong></td><td>Como FEFO; la parada dice el lote concreto</td></tr>
 <tr><td><strong>Vaciar ubicación</strong></td><td>Por orden de código de ubicación, para ir dejando huecos vacíos</td></tr>
 </tbody></table>
 <h3 id="s14">4.3 Órdenes y reubicaciones (carretillero)</h3>
@@ -460,8 +459,9 @@
 <li>En el pedido, pestaña <strong>Almacén SGA</strong>, pulsa <strong>Enviar a SGA</strong>.</li>
 <li>SGA reparte el pedido en <strong>órdenes de picking de un palé como mucho</strong>, porque solo se prepara un palé a la vez:</li>
 </ol>
-<p>   - cada palé completo de una línea es una orden;    - las cajas y unidades sueltas de todas las líneas se juntan en órdenes que no pasan de un palé. Por ejemplo, medio palé de un producto y un cuarto de otro van en la misma orden.</p>
-<p>   Por ejemplo, 4 palés y 2 cajas son 5 órdenes.</p>
+<p>   - cada palé completo de una línea es una orden;    - lo pedido en <strong>cajas</strong> (la unidad de venta del producto) va en órdenes aparte, una por producto, con todas sus cajas aunque estén en varias líneas del pedido;    - las unidades sueltas de todas las líneas se juntan en órdenes que no pasan de un palé. Por ejemplo, medio palé de un producto y un cuarto de otro van en la misma orden.</p>
+<p>   Por ejemplo, 4 palés de un producto y 2 cajas de otro son 5 órdenes: 4 de palé y 1 de cajas.</p>
+<p>   Dentro del pedido se preparan primero los palés, luego las cajas (las de más volumen antes, para que queden abajo) y luego los sueltos.</p>
 <ol>
 <li>Busca de qué ubicación y lote coger cada cosa y lo <strong>reserva</strong>: otro pedido ya no lo ve disponible.</li>
 <li>Si el pedido ya se preparó en parte, solo manda lo que falta.</li>
@@ -499,8 +499,8 @@
 <p>Las páginas de configuración son:</p>
 <table><thead><tr><th>Página</th><th>Qué se configura</th></tr>
 </thead><tbody>
-<tr><td><strong>Configuración SGA</strong></td><td>Almacén y zona por defecto, fecha inicio SGA, ubicación de ajustes, estrategias de ubicación y de picking, análisis ABC, controles (capacidad, desvíos, escaneo, asignación de picking) y numeración</td></tr>
-<tr><td><strong>Zonas</strong></td><td>Agrupar ubicaciones por zona, grupo IIEE y prioridades de ubicación y de picking</td></tr>
+<tr><td><strong>Configuración SGA</strong></td><td>Almacén y zona por defecto, fecha inicio SGA, ubicación de ajustes, estrategias de ubicación y de picking, análisis ABC, controles (capacidad, desvíos, confirmar ubicación, asignación de picking) y numeración</td></tr>
+<tr><td><strong>Zonas</strong></td><td>Agrupar ubicaciones por zona y grupo IIEE, y dar la secuencia de picking inicial de sus ubicaciones</td></tr>
 <tr><td><strong>Ubicaciones del almacén</strong></td><td>Ubicaciones estándar sobre las que SGA añade sus datos (tipo, capacidad, mezclas, producto fijo)</td></tr>
 <tr><td><strong>Generar ubicaciones</strong></td><td>Crea la estructura del almacén a partir de los rangos de pasillo, estantería y altura</td></tr>
 <tr><td><strong>Sincronizar ubicaciones</strong></td><td>Da de alta en SGA las ubicaciones que todavía no tienen datos</td></tr>
@@ -530,11 +530,10 @@
 <tr><td>La orden terminó pero el pedido no tiene cantidad a enviar ni lotes</td><td>Pulsa <em>Pasar al pedido</em> en la orden.</td></tr>
 <tr><td><em>Siguiente orden</em>: no tiene órdenes asignadas</td><td>Se exige asignación: el responsable reparte en <em>Asignar órdenes de picking</em>.</td></tr>
 <tr><td>En la PDA no pasa nada al escanear</td><td>Revisa el perfil del lector (capítulo 4.1) y que la salida por teclado esté desactivada. Solo funciona en la app de Business Central.</td></tr>
-<tr><td><em>El código … no corresponde a ningún producto</em></td><td>Da de alta el código como referencia de tipo <em>Código de barras</em> del producto o en su GTIN.</td></tr>
 <tr><td>Un responsable no puede asignar</td><td>En <em>Configuración de usuarios</em>, marca <em>Responsable picking SGA</em>.</td></tr>
 <tr><td>Un picking vacío no tiene reubicación</td><td>Revisa que haya stock disponible en almacenamiento, una ubicación de picking con sitio y la serie de órdenes. Luego <em>Planificar reubicaciones</em>.</td></tr>
 <tr><td>El mapa 3D sale en blanco</td><td>Elige el almacén y vacía zona y pasillo. Los códigos deben seguir el formato <code>101-15-03</code>.</td></tr>
-<tr><td>La ubicación leída no existe en SGA</td><td>La etiqueta que se ha leído no es de una ubicación SGA del almacén. Lee la etiqueta del hueco que tienes delante.</td></tr>
+<tr><td><em>… no es una ubicación de este almacén</em></td><td>La etiqueta que se ha leído no es de una ubicación SGA del almacén. Lee la etiqueta del hueco que tienes delante.</td></tr>
 </tbody></table>
 <h2 class="seccion" id="s23">Anexo A. Lista de capturas</h2>
 <p>Cada captura se pega en el hueco de su número. Usa datos de la base de pruebas, nunca de clientes reales. Para los SSCC, usa uno que exista en la base de pruebas.</p>

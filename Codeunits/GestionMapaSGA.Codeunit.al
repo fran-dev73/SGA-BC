@@ -93,7 +93,9 @@ codeunit 51102 "Gestion Mapa SGA"
     ///   l = líneas de contenido, k = contenido (solo si tiene; ver ContenidoParaMapa),
     ///   y, solo si tiene contenido, de todas sus líneas: pp = productos (sin repetir, para
     ///   buscar), fc = caducidad más próxima (aaaa-mm-dd, vacía si ninguna lleva) y
-    ///   r = mejor clase ABC de sus productos en el último cálculo (1 A, 2 B, 3 C, 0 sin clase).
+    ///   r = mejor clase ABC de sus productos (1 A, 2 B, 3 C, 0 sin clase);
+    ///   ch = clase del hueco por su posición (1 A, 2 B, 3 C, 0 si no es hueco útil).
+    /// Las dos clases son del cálculo ABC prm_NoCalculoABC (0 = el último del almacén).
     /// Las claves son cortas porque el JSON viaja entero al navegador y un almacén grande
     /// son más de mil ubicaciones. Con prm_Pasillo distinto de 0, solo las de ese pasillo.
     ///
@@ -101,7 +103,7 @@ codeunit 51102 "Gestion Mapa SGA"
     /// hueco. No se puede medir sin capacidad declarada, ni si algún producto de dentro no tiene
     /// palé en su ficha: su contenido se contaría en unidades base como si cada una fuera un palé.
     /// </summary>
-    procedure DatosMapa3D(prm_Almacen: Code[10]; prm_Zona: Code[10]; prm_Pasillo: Integer): Text
+    procedure DatosMapa3D(prm_Almacen: Code[10]; prm_Zona: Code[10]; prm_Pasillo: Integer; prm_NoCalculoABC: Integer): Text
     var
         rUbicacionSGA: Record "Ubicacion SGA";
         cABC: Codeunit "Analisis ABC SGA";
@@ -132,8 +134,7 @@ codeunit 51102 "Gestion Mapa SGA"
             exit('[]');
 
         // La clase de cada producto y la de cada hueco por su posición se leen una vez para todo el mapa.
-        cABC.ClasesUltimoCalculo(prm_Almacen, clasesABC);
-        cABC.ClasesHuecosUltimoCalculo(prm_Almacen, clasesHueco);
+        cABC.ClasesDeCalculo(prm_Almacen, prm_NoCalculoABC, clasesABC, clasesHueco);
 
         repeat
             // Sin pasillo, estantería y altura no hay dónde colocar el cubo.
@@ -337,8 +338,8 @@ codeunit 51102 "Gestion Mapa SGA"
     /// </summary>
     local procedure EstadoNumerico(var prm_Ubicacion: Record "Ubicacion SGA"; prm_SinMedir: Boolean): Integer
     begin
-        // RecalcularOcupacion deja "Estado SGA" en Bloqueada cuando la ubicación lo está.
-        if prm_Ubicacion.Bloqueada then
+        // Bloqueada la ubicación o su zona entera: no admite movimientos (EsUtilizable).
+        if not prm_Ubicacion.EsUtilizable() then
             exit(3);
         if prm_SinMedir then
             exit(4);
@@ -380,7 +381,9 @@ codeunit 51102 "Gestion Mapa SGA"
     begin
         prm_Estilo := prm_Ubicacion.EstiloEstado();
 
-        if prm_Ubicacion.Bloqueada then begin
+        // Bloqueada la ubicación o su zona entera.
+        if not prm_Ubicacion.EsUtilizable() then begin
+            prm_Estilo := 'Unfavorable';
             prm_Resumen := 'BLOQ';
             exit;
         end;

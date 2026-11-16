@@ -204,6 +204,15 @@ table 51105 "Cue SGA"
                                                           Estado = filter("Pendiente Asignar" | Abierta),
                                                           Origen = filter(<> Reposicion)));
         }
+        field(63; "Reubicaciones Disponibles"; Integer)
+        {
+            Caption = 'Disponibles';
+            Editable = false;
+            FieldClass = FlowField;
+            CalcFormula = count("Orden Picking SGA" where("Cod. Usuario Asignado" = const(''),
+                                                          Estado = filter("Pendiente Asignar" | Abierta),
+                                                          Origen = const(Reposicion)));
+        }
         field(90; "Filtro Almacen"; Code[10])
         {
             Caption = 'Filtro almacén';

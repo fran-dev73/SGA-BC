@@ -31,6 +31,7 @@ var SGA3D = (function () {
     var vista = '3d';       // '3d', 'planta' o 'frente'
     var colorear = 'estado'; // 'estado', 'posicion', 'abc' o 'caducidad'
     var busqueda = '';      // texto buscado, en mayúsculas; vacío = no se busca
+    var busquedaExacta = false; // la búsqueda llegó de AL (Preparar): un producto exacto
 
     // Vista 3D
     var cubos = [];         // cubos ya proyectados, ordenados de atrás a adelante
@@ -49,7 +50,7 @@ var SGA3D = (function () {
     var pan2X = 0;
     var pan2Y = 0;
 
-    var modoArrastre = '';  // 'girar', 'mover', 'coger' o 'trasladar'
+    var modoArrastre = '';  // 'girar', 'mover', 'coger', 'trasladar' o 'barra'
     var ultimoX = 0;
     var ultimoY = 0;
     var hover = null;
@@ -250,6 +251,7 @@ var SGA3D = (function () {
 
         cont.querySelector('#sga3d-buscar').addEventListener('input', function (e) {
             busqueda = String(e.target.value || '').trim().toUpperCase();
+            busquedaExacta = false;
             mostrarInfo(hover);
             pintar();
         });
@@ -261,6 +263,21 @@ var SGA3D = (function () {
             ultimoY = e.clientY;
             inicioX = e.clientX;
             inicioY = e.clientY;
+
+            // La barra de desplazamiento de las vistas planas: arrastrar el tirador, o un clic en
+            // el carril para avanzar una pantalla hacia ese lado.
+            var b = enBarra(e);
+            if (b) {
+                seHaMovido = true;
+                e.preventDefault();
+                if (b.sobreTirador) {
+                    modoArrastre = 'barra';
+                    pintar();
+                } else {
+                    desplazarHorizontal(b.x < b.g.tirador.x ? -anchoLienzo() * 0.9 : anchoLienzo() * 0.9);
+                }
+                return;
+            }
 
             // Con Mayús se desplaza y con Alt se gira (en la 3D), pulse donde se pulse.
             if (e.shiftKey) { modoArrastre = 'mover'; return; }
@@ -332,7 +349,12 @@ var SGA3D = (function () {
                 ultimoY = e.clientY;
                 seHaMovido = true;
 
-                if (modoArrastre === 'mover') {
+                if (modoArrastre === 'barra') {
+                    // Mover el tirador dx píxeles mueve lo dibujado en la misma proporción que
+                    // el carril respecto a todo el ancho.
+                    var g = geometriaBarra();
+                    if (g) { desplazarHorizontal(dx * g.ext.ancho / g.carril.w); }
+                } else if (modoArrastre === 'mover') {
                     if (vista === '3d') { panX += dx; panY += dy; } else { pan2X += dx; pan2Y += dy; }
                     pintar();
                 } else {
@@ -364,9 +386,15 @@ var SGA3D = (function () {
             pintar();
         });
 
-        // La rueda acerca hacia donde apunta el ratón, no hacia el centro.
+        // La rueda acerca hacia donde apunta el ratón, no hacia el centro. En las vistas planas,
+        // Mayús + rueda o el desplazamiento lateral del touchpad mueven a izquierda y derecha.
         canvas.addEventListener('wheel', function (e) {
             e.preventDefault();
+            if (vista !== '3d' && (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY))) {
+                var paso = e.shiftKey && !e.deltaX ? e.deltaY : e.deltaX;
+                desplazarHorizontal(paso);
+                return;
+            }
             var r = canvas.getBoundingClientRect();
             zoomEn(e.deltaY < 0 ? 1.15 : 1 / 1.15, e.clientX - r.left, e.clientY - r.top);
         }, { passive: false });
@@ -678,8 +706,17 @@ var SGA3D = (function () {
     // lo buscado. Sin búsqueda, todas coinciden.
     function coincide(u) {
         if (!busqueda) { return true; }
-        if (String(u.b).toUpperCase().indexOf(busqueda) >= 0) { return true; }
         var i;
+        // Desde el análisis ABC se busca un producto concreto: solo su código exacto.
+        if (busquedaExacta) {
+            if (u.pp) {
+                for (i = 0; i < u.pp.length; i++) {
+                    if (String(u.pp[i]).toUpperCase() === busqueda) { return true; }
+                }
+            }
+            return false;
+        }
+        if (String(u.b).toUpperCase().indexOf(busqueda) >= 0) { return true; }
         if (u.pp) {
             for (i = 0; i < u.pp.length; i++) {
                 if (String(u.pp[i]).toUpperCase().indexOf(busqueda) >= 0) { return true; }
@@ -1162,6 +1199,75 @@ var SGA3D = (function () {
         return { x: anchoLienzo() / 2 + pan2X, y: altoLienzo() / 2 + pan2Y };
     }
 
+    // ------------------------------------------------ barra de desplazamiento horizontal
+    // En las vistas planas, con zoom, lo dibujado puede ser más ancho que el lienzo: abajo sale
+    // una barra para moverse a izquierda y derecha (arrastrándola, o con un clic en ella para
+    // avanzar una pantalla). Mayús + rueda o el desplazamiento lateral del touchpad hacen lo mismo.
+    var BARRA_ALTO = 12;
+    var BARRA_MARGEN = 6;
+
+    // Ancho de lo dibujado en pantalla (con el sitio de los rótulos de la izquierda) y dónde
+    // empieza. Null si no hay nada o si cabe entero: entonces no hay barra.
+    function extensionHorizontal() {
+        if (vista === '3d' || !rects.length) { return null; }
+        var minX = 1e9, maxX = -1e9;
+        for (var i = 0; i < rects.length; i++) {
+            if (rects[i].x < minX) { minX = rects[i].x; }
+            if (rects[i].x + rects[i].w > maxX) { maxX = rects[i].x + rects[i].w; }
+        }
+        minX -= 80;
+        var o = centroPlano();
+        var izq = o.x + minX * escala2;
+        var ancho = (maxX - minX) * escala2;
+        if (ancho <= anchoLienzo()) { return null; }
+        return { izq: izq, ancho: ancho };
+    }
+
+    // Geometría de la barra: el carril de lado a lado y el tirador, proporcional a lo que se ve.
+    function geometriaBarra() {
+        var ext = extensionHorizontal();
+        if (!ext) { return null; }
+        var w = anchoLienzo();
+        var carril = { x: BARRA_MARGEN, y: altoLienzo() - BARRA_ALTO - BARRA_MARGEN, w: w - 2 * BARRA_MARGEN, h: BARRA_ALTO };
+        var anchoTirador = Math.max(30, carril.w * w / ext.ancho);
+        var recorrido = ext.ancho - w;
+        var hecho = Math.max(0, Math.min(-ext.izq, recorrido));
+        var tirador = { x: carril.x + (carril.w - anchoTirador) * (recorrido > 0 ? hecho / recorrido : 0), y: carril.y, w: anchoTirador, h: BARRA_ALTO };
+        return { carril: carril, tirador: tirador, ext: ext };
+    }
+
+    function pintarBarra() {
+        var g = geometriaBarra();
+        if (!g) { return; }
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = 'rgba(31, 41, 55, 0.18)';
+        ctx.fillRect(g.carril.x, g.carril.y, g.carril.w, g.carril.h);
+        ctx.fillStyle = modoArrastre === 'barra' ? 'rgba(31, 41, 55, 0.75)' : 'rgba(31, 41, 55, 0.5)';
+        ctx.fillRect(g.tirador.x, g.tirador.y, g.tirador.w, g.tirador.h);
+    }
+
+    function enBarra(evento) {
+        var g = geometriaBarra();
+        if (!g) { return null; }
+        var r = canvas.getBoundingClientRect();
+        var x = evento.clientX - r.left;
+        var y = evento.clientY - r.top;
+        if (y < g.carril.y - 2 || y > g.carril.y + g.carril.h + 2) { return null; }
+        if (x < g.carril.x || x > g.carril.x + g.carril.w) { return null; }
+        return { g: g, x: x, sobreTirador: x >= g.tirador.x && x <= g.tirador.x + g.tirador.w };
+    }
+
+    // Desplaza lo dibujado dx píxeles de pantalla (positivo, hacia la derecha), sin pasarse de
+    // los bordes de lo dibujado.
+    function desplazarHorizontal(dx) {
+        var ext = extensionHorizontal();
+        if (!ext) { return; }
+        var nuevoIzq = Math.max(anchoLienzo() - ext.ancho, Math.min(0, ext.izq - dx));
+        pan2X += nuevoIzq - ext.izq;
+        mostrarFicha(null);
+        pintar();
+    }
+
     // Rectángulo en pantalla.
     function enPantalla(r) {
         var o = centroPlano();
@@ -1233,6 +1339,7 @@ var SGA3D = (function () {
 
         pintarRotulosPlano();
         pintarTraslado();
+        pintarBarra();
     }
 
     // Lo que se lee en una casilla del frente: arriba el código (o la columna, si no cabe) y la
@@ -1264,6 +1371,12 @@ var SGA3D = (function () {
                 ctx.textBaseline = 'bottom';
                 textoConHalo(dato, p.x + p.w / 2, p.y + p.h - 4, p.w - 8);
             }
+        } else if (colorear === 'posicion' && u.ch && p.h >= 48) {
+            // Por posición se ve también la clase de los huecos vacíos.
+            ctx.font = t + 'px Segoe UI, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            textoConHalo(datoCriterio(u), p.x + p.w / 2, p.y + p.h - 4, p.w - 8);
         }
     }
 
@@ -1408,6 +1521,7 @@ var SGA3D = (function () {
         // Rotación y caducidad más próxima de todo lo que hay, no solo de las líneas listadas.
         var resumen = [];
         if (u.z) { resumen.push('Zona ' + u.z); }
+        if (u.ch) { resumen.push('Hueco ' + 'ABC'.charAt(u.ch - 1)); }
         if (u.r) { resumen.push('Rotación ' + 'ABC'.charAt(u.r - 1)); }
         if (u.fc) { resumen.push('Caducidad más próxima ' + fechaCorta(u.fc)); }
         if (resumen.length) {
@@ -1573,6 +1687,7 @@ var SGA3D = (function () {
                 pintarLeyenda();
             }
             busqueda = String(texto || '').trim().toUpperCase();
+            busquedaExacta = busqueda !== '';
             if (caja) { caja.value = texto || ''; }
             mostrarInfo(null);
             pintar();

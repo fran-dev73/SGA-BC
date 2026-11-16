@@ -12,10 +12,9 @@ using System.Device;
 /// devuelve; la lógica es de Cod. "Gestion Picking SGA".
 ///
 /// En la app móvil de BC sobre un terminal con escáner, las lecturas llegan por el control
-/// BarcodeScannerProviderAddIn. Se escanee o se teclee, cada lectura es la ubicación de la que
-/// recoge o el producto, y se comprueba al momento. La ubicación se lee de la etiqueta del
-/// hueco. La parada se confirma sola cuando tiene ubicación y, si lo exige la configuración,
-/// producto (ParadaCompleta). Un error de lectura se avisa en la pantalla, con pitido, sin ventana.
+/// BarcodeScannerProviderAddIn. Se escanee o se teclee, la lectura es la ubicación de la que
+/// recoge, de la etiqueta del hueco, y se comprueba al momento. Con una ubicación válida la
+/// parada se confirma sola. Un error de lectura se avisa en la pantalla, con pitido, sin ventana.
 ///
 /// La confirmación es la que retira el stock de la ubicación y deja la huella en el diario
 /// de movimientos, con el documento origen y el usuario, para la trazabilidad inversa.
@@ -36,7 +35,7 @@ page 51121 "Preparar Picking SGA"
     LinksAllowed = false;
     // La barra de título de BC dice la orden; la pantalla propia no la repite.
     DataCaptionFields = "No. Orden";
-    SourceTableView = sorting("No. Orden", Estado, "Secuencia Picking");
+    SourceTableView = sorting("No. Orden", "Veces Saltada", "Secuencia Picking");
 
     layout
     {
@@ -106,7 +105,6 @@ page 51121 "Preparar Picking SGA"
         AvisoEsError: Boolean;
         Progreso: Text;
         LineaMostrada: Integer;
-        ProductoEscaneado: Text[100];
         EscanerDisponible: Boolean;
         PantallaLista: Boolean;
         HayParada: Boolean;
@@ -122,8 +120,7 @@ page 51121 "Preparar Picking SGA"
         if EnTurno then
             BuscarSiguienteOrden()
         else begin
-            Rec.FiltrarParaPreparar();
-            HayParada := Rec.FindFirst();
+            CargarParadas(CopyStr(Rec.GetFilter("No. Orden"), 1, MaxStrLen(Rec."No. Orden")));
             Preparar();
         end;
     end;
@@ -168,7 +165,6 @@ page 51121 "Preparar Picking SGA"
         MostrarBase := UMPedido <> Rec."Cod. Unidad Medida";
         CantidadRecogida := PendienteDocumento;
         UbicacionEscaneada := '';
-        ProductoEscaneado := '';
         Avisar('', false);
         CalcularProgreso();
         Pintar();
@@ -193,7 +189,6 @@ page 51121 "Preparar Picking SGA"
     /// </summary>
     local procedure Pintar()
     var
-        cPicking: Codeunit "Gestion Picking SGA";
         datos: JsonObject;
         BaseLbl: Label '%1 %2', Locked = true, Comment = '%1 = cantidad, %2 = unidad';
     begin
@@ -219,9 +214,7 @@ page 51121 "Preparar Picking SGA"
             datos.Add('cantidadBase', '');
         datos.Add('destino', Rec."Cod. Bin Destino");
         datos.Add('playa', Playa);
-        datos.Add('exigeProducto', cPicking.ExigeEscanearProducto());
         datos.Add('ubicacionLeida', UbicacionEscaneada);
-        datos.Add('productoLeido', ProductoEscaneado);
         datos.Add('cantidadRecogida', CantidadRecogida);
         datos.Add('aviso', Aviso);
         datos.Add('avisoError', AvisoEsError);
@@ -258,47 +251,37 @@ page 51121 "Preparar Picking SGA"
     end;
 
     /// <summary>
-    /// Lo escaneado o tecleado en cualquier casilla, o recibido del escáner de la app: la
-    /// ubicación de la que recoge o, si no es una ubicación, el producto, que se comprueba al
-    /// momento. Lo decide lo leído, no la casilla.
+    /// Lo escaneado o tecleado, o recibido del escáner de la app: la ubicación de la que recoge,
+    /// de la etiqueta del hueco. Si es válida, la parada se confirma sola.
     /// </summary>
     local procedure ProcesarLectura(prm_Lectura: Text)
     var
-        cLectura: Codeunit "Lectura Codigos SGA";
+        cLectura: Codeunit "Codigos Barras SGA";
         bin: Code[20];
+        NoEsUbicacionErr: Label '%1 no es una ubicación de este almacén. Escanee la etiqueta del hueco.', Comment = '%1 = lo leído';
     begin
         prm_Lectura := DelChr(prm_Lectura, '<>', ' ');
         if (prm_Lectura = '') or not HayParada then
             exit;
 
-        if cLectura.EsUbicacion(Rec."Cod. Almacen", prm_Lectura, bin) then begin
-            UbicacionEscaneada := bin;
-            ComprobarUbicacion();
-            // Un desvío no permitido no cuenta como leída: se vuelve a pedir la ubicación.
-            if AvisoEsError then
-                UbicacionEscaneada := '';
-        end else
-            if ProbarProducto(prm_Lectura) then begin
-                ProductoEscaneado := CopyStr(prm_Lectura, 1, MaxStrLen(ProductoEscaneado));
-                Avisar('', false);
-            end else begin
-                Avisar(GetLastErrorText(), true);
-                Pintar();
-                exit;
-            end;
+        if not cLectura.EsUbicacion(Rec."Cod. Almacen", prm_Lectura, bin) then begin
+            Avisar(StrSubstNo(NoEsUbicacionErr, prm_Lectura), true);
+            Pintar();
+            exit;
+        end;
 
-        if not AvisoEsError then
-            CurrPage.Pantalla.Senal('ok');
+        UbicacionEscaneada := bin;
+        ComprobarUbicacion();
+        // Un desvío no permitido no cuenta como leída: se vuelve a pedir la ubicación.
+        if AvisoEsError then begin
+            UbicacionEscaneada := '';
+            Pintar();
+            exit;
+        end;
+
+        CurrPage.Pantalla.Senal('ok');
         Pintar();
-        ConfirmarSiCompleta();
-    end;
-
-    [TryFunction]
-    local procedure ProbarProducto(prm_Lectura: Text)
-    var
-        cPicking: Codeunit "Gestion Picking SGA";
-    begin
-        cPicking.TestProductoLeido(Rec, prm_Lectura);
+        Confirmar();
     end;
 
     /// <summary>
@@ -334,19 +317,6 @@ page 51121 "Preparar Picking SGA"
         end;
     end;
 
-    /// <summary>
-    /// Confirma la parada en cuanto tiene todo lo que exige la configuración.
-    /// </summary>
-    local procedure ConfirmarSiCompleta()
-    var
-        cPicking: Codeunit "Gestion Picking SGA";
-    begin
-        if AvisoEsError then
-            exit;
-        if cPicking.ParadaCompleta(UbicacionEscaneada, ProductoEscaneado) then
-            Confirmar();
-    end;
-
     local procedure Confirmar()
     var
         cPicking: Codeunit "Gestion Picking SGA";
@@ -356,7 +326,7 @@ page 51121 "Preparar Picking SGA"
             Error(CantidadNoIndicadaErr);
 
         // El preparador habla en la UM del pedido; la parada, en base.
-        cPicking.ConfirmarLinea(Rec, UbicacionEscaneada, Rec.CantidadBaseDesdeDocumento(CantidadRecogida, PendienteDocumento), ProductoEscaneado);
+        cPicking.ConfirmarLinea(Rec, UbicacionEscaneada, Rec.CantidadBaseDesdeDocumento(CantidadRecogida, PendienteDocumento));
         CurrPage.Pantalla.Senal('ok');
 
         // Al quedar recogida sale del filtro de pendientes, así que se recarga la vista.
@@ -384,11 +354,11 @@ page 51121 "Preparar Picking SGA"
         bin := Rec."Cod. Bin Propuesto";
         retenida := cPicking.SaltarParada(Rec);
 
-        if Rec.Next() = 0 then
-            if not CargarParadas(Rec."No. Orden") then begin
-                TerminarOrden();
-                exit;
-            end;
+        // Al recargar, la saltada pasa detrás de las que no se han saltado.
+        if not CargarParadas(Rec."No. Orden") then begin
+            TerminarOrden();
+            exit;
+        end;
 
         Preparar();
         if retenida then begin
@@ -483,12 +453,13 @@ page 51121 "Preparar Picking SGA"
 
     /// <summary>
     /// Deja la vista en las paradas pendientes y no retenidas de la orden, en orden de
-    /// recorrido, con el cursor en la primera. Devuelve false si no queda ninguna.
+    /// recorrido, con el cursor en la primera. Las saltadas van al final: una parada saltada no
+    /// vuelve hasta terminar las que no lo están. Devuelve false si no queda ninguna.
     /// </summary>
     local procedure CargarParadas(prm_Orden: Code[20]): Boolean
     begin
         Rec.Reset();
-        Rec.SetCurrentKey("No. Orden", Estado, "Secuencia Picking");
+        Rec.SetCurrentKey("No. Orden", "Veces Saltada", "Secuencia Picking");
         Rec.SetRange("No. Orden", prm_Orden);
         Rec.FiltrarParaPreparar();
         HayParada := Rec.FindFirst();

@@ -566,10 +566,20 @@ page 51107 "Mapa Almacen SGA"
         rConfig: Record "Config. SGA";
         LeyendaLbl: Label 'Gris: vacía  |  Verde: con hueco  |  Naranja: llena  |  Rojo: bloqueada  |  Azul (RESERV): reservada para una entrada';
     begin
-        rConfig.ObtenerConfig();
-        FiltroAlmacen := rConfig."Almacen por Defecto";
+        // Abierto desde la ficha de un almacén (FijarAlmacen) se queda con ese; si no, el de
+        // por defecto de la configuración.
+        if FiltroAlmacen = '' then
+            FiltroAlmacen := rConfig.AlmacenODefecto('');
         Leyenda := LeyendaLbl;
         Construir();
+    end;
+
+    /// <summary>
+    /// Abre el mapa de un almacén concreto en vez del de por defecto.
+    /// </summary>
+    procedure FijarAlmacen(prm_Almacen: Code[10])
+    begin
+        FiltroAlmacen := prm_Almacen;
     end;
 
     local procedure Construir()

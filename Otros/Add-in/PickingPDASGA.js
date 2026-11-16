@@ -3,13 +3,11 @@
 // Solo pinta y recoge: AL manda la parada con Mostrar y aquí se devuelve lo que hace el
 // preparador con los eventos Lectura, Cantidad y Accion. Nada se valida aquí.
 //
-// Cada parada se confirma en un orden fijo, con una casilla por paso: ubicación y, si se
-// exige, producto. El foco va solo a la primera casilla pendiente, así que un
-// lector que escribe como un teclado deja cada lectura en su sitio. Si el preparador toca una
-// casilla para teclear, el foco se queda en ella hasta que la manda. Lo que se manda lo
-// clasifica AL por su contenido, no por la casilla. Con el escáner de la app de BC
-// (datos.escaner) las lecturas llegan a AL por su cuenta; las casillas tienen el foco igualmente,
-// pero con inputmode none para que Android no abra el teclado hasta que se toquen.
+// Cada parada se confirma leyendo la ubicación de la que se recoge, en su casilla. El foco va
+// a esa casilla, así que un lector que escribe como un teclado deja la lectura en su sitio.
+// Mientras el preparador teclea la cantidad, el foco se queda en ella. Con el escáner de la app
+// de BC (datos.escaner) las lecturas llegan a AL por su cuenta; la casilla tiene el foco
+// igualmente, pero con inputmode none para que Android no abra el teclado hasta que se toque.
 
 (function () {
     'use strict';
@@ -17,23 +15,18 @@
     var raiz = null;
     var datos = null;
     var cantidadSinEnviar = null;
-    var temporizadorCantidad = null;
+    var tecleandoCantidad = false;  // el preparador está escribiendo la cantidad: no se le quita el foco
     var audio = null;
-    // Casilla que el preparador ha tocado para teclear: el foco se queda en ella.
-    var campoManual = null;
 
     function invocar(evento, argumentos) {
         Microsoft.Dynamics.NAV.InvokeExtensibilityMethod(evento, argumentos || []);
     }
 
-    // La cantidad se manda con un poco de retraso para no llamar a AL en cada tecla, pero
-    // siempre antes que cualquier otra cosa: si no, una lectura que confirma la parada podría
-    // llegar a AL antes que la cantidad tecleada.
+    // La cantidad se manda a AL en cuanto cambia, sin esperar: la lectura del escáner de la app
+    // llega a AL por su cuenta, sin pasar por esta pantalla, y si la cantidad esperase podría
+    // confirmarse la parada con la cantidad anterior. Antes de cualquier otro evento de la
+    // pantalla también se manda lo que quede.
     function enviarCantidad() {
-        if (temporizadorCantidad) {
-            window.clearTimeout(temporizadorCantidad);
-            temporizadorCantidad = null;
-        }
         if (cantidadSinEnviar === null) { return; }
         var valor = cantidadSinEnviar;
         cantidadSinEnviar = null;
@@ -47,8 +40,7 @@
 
     function cantidadCambiada(valor) {
         cantidadSinEnviar = String(valor).replace(',', '.');
-        if (temporizadorCantidad) { window.clearTimeout(temporizadorCantidad); }
-        temporizadorCantidad = window.setTimeout(enviarCantidad, 400);
+        enviarCantidad();
     }
 
     function nodo(etiqueta, clase, texto) {
@@ -87,39 +79,27 @@
         return nodo('span', 'pk-paso' + (hecho ? ' pk-hecho' : ''), (hecho ? '✔ ' : '○ ') + texto);
     }
 
-    // Primera casilla pendiente, en el orden ubicación, producto. Con todo leído, la
-    // ubicación: una lectura nueva empieza otra vez por ahí.
-    function campoPendiente() {
-        if (!datos.ubicacionLeida) { return 'ubicacion'; }
-        if (datos.exigeProducto && !datos.productoLeido) { return 'producto'; }
-        return 'ubicacion';
-    }
-
-    // Casilla de lectura. Muestra lo ya leído; Intro manda lo tecleado como una lectura, salvo
-    // que la casilla traiga su propio Intro (alIntro).
-    function campoLectura(nombre, clase, marcador, valor, alIntro) {
-        var c = nodo('input', 'pk-campo ' + clase + (valor ? ' pk-leido' : ''));
+    // Casilla de la ubicación. Muestra lo ya leído; Intro manda lo tecleado como una lectura.
+    function campoUbicacion(valor) {
+        var c = nodo('input', 'pk-campo pk-lectura' + (valor ? ' pk-leido' : ''));
         c.type = 'text';
-        c.setAttribute('data-campo', nombre);
+        c.setAttribute('data-campo', 'ubicacion');
         c.setAttribute('autocomplete', 'off');
         c.setAttribute('autocapitalize', 'characters');
-        c.placeholder = marcador;
+        c.placeholder = 'Ubicación';
         c.value = valor || '';
         // Con el escáner de la app tiene el foco sin abrir el teclado; al tocarla, se abre.
         if (datos.escaner) { c.setAttribute('inputmode', 'none'); }
         c.addEventListener('pointerdown', function () {
-            campoManual = nombre;
             c.setAttribute('inputmode', 'text');
             // Lo ya leído se borra al tocarla, para teclear encima.
             if (c.value === (valor || '') && valor) { c.value = ''; }
         });
         c.addEventListener('keydown', function (e) {
             if (e.key !== 'Enter') { return; }
-            if (alIntro) { alIntro(); return; }
             if (c.value.trim() !== '' && c.value !== (valor || '')) {
                 var texto = c.value;
                 c.value = '';
-                campoManual = null;
                 enviar('Lectura', [texto]);
             }
         });
@@ -173,18 +153,11 @@
         // Lo que falta para confirmar, al lado del título.
         var confirmar = bloque('CONFIRME', 'pk-confirmar');
         confirmar.linea.appendChild(paso('Ubicación', datos.ubicacionLeida !== ''));
-        if (datos.exigeProducto) { confirmar.linea.appendChild(paso('Producto', datos.productoLeido !== '')); }
 
         // La ubicación es la que trae la etiqueta del hueco; se escanea o se teclea.
         var filaLectura = nodo('div', 'pk-fila');
-        filaLectura.appendChild(campoLectura('ubicacion', 'pk-lectura', 'Ubicación', datos.ubicacionLeida));
+        filaLectura.appendChild(campoUbicacion(datos.ubicacionLeida));
         confirmar.appendChild(filaLectura);
-
-        if (datos.exigeProducto) {
-            var filaProducto = nodo('div', 'pk-fila');
-            filaProducto.appendChild(campoLectura('producto', 'pk-lectura', 'Producto', datos.productoLeido));
-            confirmar.appendChild(filaProducto);
-        }
 
         // Cantidad con − y + y su unidad; Confirmar va debajo, a lo ancho.
         var filaCantidad = nodo('div', 'pk-fila');
@@ -195,10 +168,15 @@
         cantidad.setAttribute('data-campo', 'cantidad');
         cantidad.setAttribute('inputmode', 'decimal');
         cantidad.value = datos.cantidadRecogida;
-        cantidad.addEventListener('input', function () { cantidadCambiada(cantidad.value); });
+        cantidad.addEventListener('input', function () {
+            tecleandoCantidad = true;
+            cantidadCambiada(cantidad.value);
+        });
+        cantidad.addEventListener('blur', function () { tecleandoCantidad = false; });
         // Intro en la cantidad la manda y devuelve el foco a la lectura.
         cantidad.addEventListener('keydown', function (e) {
             if (e.key === 'Enter') {
+                tecleandoCantidad = false;
                 enviarCantidad();
                 enfocarLectura();
             }
@@ -234,9 +212,8 @@
         otros.appendChild(boton('Sin stock', 'pk-peligro', 'sinstock'));
         raiz.appendChild(otros);
 
-        // El foco va a la primera casilla pendiente. Solo se queda donde está mientras se teclea
-        // la cantidad, o en la casilla que el preparador ha tocado para teclear.
-        if (activo === 'cantidad' && temporizadorCantidad) {
+        // El foco va a la ubicación. Solo se queda en la cantidad mientras se teclea.
+        if (activo === 'cantidad' && tecleandoCantidad) {
             raiz.querySelector('[data-campo="cantidad"]').focus();
             return;
         }
@@ -244,12 +221,7 @@
     }
 
     function enfocarLectura() {
-        // La casilla tocada a mano deja de mandar en cuanto ya tiene su lectura (p. ej. llegó
-        // por el escáner de la app).
-        var leido = { ubicacion: datos.ubicacionLeida, producto: datos.productoLeido };
-        if (campoManual && leido[campoManual]) { campoManual = null; }
-        var nombre = campoManual || campoPendiente();
-        var campo = raiz.querySelector('[data-campo="' + nombre + '"]');
+        var campo = raiz.querySelector('[data-campo="ubicacion"]');
         if (campo) { campo.focus(); }
     }
 

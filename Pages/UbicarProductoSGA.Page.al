@@ -1,5 +1,6 @@
 namespace AntonioNadal.SGA;
 
+using Microsoft.Foundation.UOM;
 using Microsoft.Inventory.Item;
 using Microsoft.Inventory.Location;
 
@@ -127,8 +128,9 @@ page 51117 "Ubicar Producto SGA"
 
                     trigger OnValidate()
                     begin
+                        // Error estándar si el producto no tiene esa unidad.
                         if (UM <> '') and (Producto <> '') then
-                            cUM.TestUMProducto(Producto, UM);
+                            cUM.FactorUM(Producto, UM);
                         RecalcularPendiente();
                     end;
                 }
@@ -294,6 +296,7 @@ page 51117 "Ubicar Producto SGA"
         TempPlan: Record "Linea Ubicacion SGA";
         cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
         cUM: Codeunit "Unidades Producto SGA";
+        cUOMMgt: Codeunit "Unit of Measure Management";
         Almacen: Code[10];
         Producto: Code[20];
         DescripcionProducto: Text[100];
@@ -378,7 +381,7 @@ page 51117 "Ubicar Producto SGA"
         pendienteBase := cStock.PendienteDeUbicar(Almacen, Producto, Variante, Lote, stockBase, ubicadoBase);
 
         // El cálculo va en unidad base; se pasa a la UM elegida con su factor de conversión.
-        PendienteUbicar := Round(pendienteBase / cUM.FactorUM(Producto, UM), 0.00001);
+        PendienteUbicar := cUOMMgt.CalcQtyFromBase(pendienteBase, cUM.FactorUM(Producto, UM));
         DetalleDisponible := StrSubstNo(DetallePendienteLbl, stockBase, ubicadoBase, cUM.UMBase(Producto));
         DesglosePendiente := cUM.Desglose(Producto, pendienteBase);
         CalcularEquivalencia();
@@ -397,7 +400,7 @@ page 51117 "Ubicar Producto SGA"
         if (Producto = '') or (Cantidad <= 0) then
             exit;
 
-        cantidadBase := Round(Cantidad * cUM.FactorUM(Producto, UM), 0.00001);
+        cantidadBase := cUOMMgt.CalcBaseQty(Cantidad, cUM.FactorUM(Producto, UM));
         EquivaleBase := StrSubstNo(EquivalenciaLbl, cantidadBase, cUM.UMBase(Producto), cUM.Desglose(Producto, cantidadBase));
     end;
 
@@ -416,15 +419,20 @@ page 51117 "Ubicar Producto SGA"
     local procedure CalcularPropuesta()
     var
         rConfig: Record "Config. SGA";
+        cStock: Codeunit "Consulta Stock SGA";
         DatosIncompletosErr: Label 'Indique almacén, producto y cantidad antes de proponer una ubicación.';
+        LoteObligatorioErr: Label 'El producto %1 lleva lotes: indique el lote que va a ubicar.', Comment = '%1 = producto';
         UbicarLineaQst: Label '¿Ubicar %1 %2 de %3 en %4?', Comment = '%1 = cantidad, %2 = unidad, %3 = producto, %4 = ubicación';
     begin
         if (Almacen = '') or (Producto = '') or (Cantidad <= 0) then
             Error(DatosIncompletosErr);
+        // Con lotes de BC hay que saber de qué lote es: en blanco se mezclarían todos.
+        if (Lote = '') and cStock.LoteEstandar(Producto) then
+            Error(LoteObligatorioErr, Producto);
 
         rConfig.ObtenerConfig();
         cUbicaciones.ProponerReparto(rConfig."Estrategia Ubicacion", Almacen, Producto, Variante, Lote,
-                                     Round(Cantidad * cUM.FactorUM(Producto, UM), 0.00001), TempPlan);
+                                     cUOMMgt.CalcBaseQty(Cantidad, cUM.FactorUM(Producto, UM)), TempPlan);
 
         CurrPage.Plan.Page.Cargar(TempPlan);
         CurrPage.Update(false);

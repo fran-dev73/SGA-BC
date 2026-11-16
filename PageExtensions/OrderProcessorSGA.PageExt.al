@@ -86,6 +86,15 @@ pageextension 51103 "Order Processor SGA" extends "Order Processor Role Center"
                     Image = Warehouse;
                     RunObject = page "Asignar Ordenes Picking SGA";
                 }
+                action(ParadasRetenidasSGA)
+                {
+                    Caption = 'Paradas retenidas';
+                    ToolTip = 'Paradas de picking que el preparador ha saltado dos veces: qué impide recogerlas y buscar el producto en otra ubicación.';
+                    ApplicationArea = All;
+                    Image = Warehouse;
+                    RunObject = page "Paradas Picking SGA";
+                    RunPageView = where(Retenida = const(true), Estado = filter(Pendiente | Parcial));
+                }
                 action(ReubicacionesSGA)
                 {
                     Caption = 'Reubicaciones';

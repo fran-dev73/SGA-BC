@@ -11,50 +11,50 @@ La puerta de escritura es *Gestion Contenido SGA*; el motor de propuesta, *Gesti
 ```mermaid
 flowchart LR
     n1[["Analisis ABC SGA"]]
-    n8[["Gestion Ubicaciones SGA"]]
+    n9[["Gestion Ubicaciones SGA"]]
     n11[["Unidades Producto SGA"]]
     n2[["Carga Inicial SGA"]]
-    n3[["Consulta Stock SGA"]]
-    n4[["Gestion Contenido SGA"]]
+    n4[["Consulta Stock SGA"]]
+    n5[["Gestion Contenido SGA"]]
     n12[["Ventana Progreso SGA"]]
-    n5[["Gestion Entradas SGA"]]
-    n7[["Gestion Picking SGA"]]
+    n6[["Gestion Entradas SGA"]]
+    n8[["Gestion Picking SGA"]]
     n10[["Reubicaciones SGA"]]
-    n6[["Gestion Mapa SGA"]]
-    n9[["Lectura Codigos SGA"]]
-    n1 --> n8
+    n7[["Gestion Mapa SGA"]]
+    n3[["Codigos Barras SGA"]]
+    n1 --> n9
     n1 --> n11
-    n2 --> n3
     n2 --> n4
-    n2 --> n8
+    n2 --> n5
+    n2 --> n9
     n2 --> n11
     n2 --> n12
-    n3 --> n4
-    n3 --> n5
-    n3 --> n11
-    n3 --> n12
-    n4 --> n3
-    n4 --> n7
-    n4 --> n8
-    n4 --> n10
+    n4 --> n5
+    n4 --> n6
     n4 --> n11
-    n5 --> n3
+    n4 --> n12
     n5 --> n4
     n5 --> n8
+    n5 --> n9
+    n5 --> n10
     n5 --> n11
-    n6 --> n1
     n6 --> n4
-    n6 --> n8
+    n6 --> n5
+    n6 --> n9
     n6 --> n11
-    n7 --> n3
-    n7 --> n4
+    n7 --> n1
+    n7 --> n5
     n7 --> n9
     n7 --> n11
     n8 --> n4
+    n8 --> n5
     n8 --> n11
-    n8 --> n12
-    n10 --> n7
+    n9 --> n3
+    n9 --> n5
+    n9 --> n11
+    n9 --> n12
     n10 --> n8
+    n10 --> n9
     n10 --> n11
 ```
 
@@ -64,13 +64,13 @@ flowchart LR
 |---|---|---|
 | **Analisis ABC SGA** | Gestion Ubicaciones SGA, Unidades Producto SGA | Gestion Mapa SGA |
 | **Carga Inicial SGA** | Consulta Stock SGA, Gestion Contenido SGA, Gestion Ubicaciones SGA, Unidades Producto SGA, Ventana Progreso SGA | — |
+| **Codigos Barras SGA** | — | Gestion Ubicaciones SGA |
 | **Consulta Stock SGA** | Gestion Contenido SGA, Gestion Entradas SGA, Unidades Producto SGA, Ventana Progreso SGA | Carga Inicial SGA, Gestion Contenido SGA, Gestion Entradas SGA, Gestion Picking SGA |
 | **Gestion Contenido SGA** | Consulta Stock SGA, Gestion Picking SGA, Gestion Ubicaciones SGA, Reubicaciones SGA, Unidades Producto SGA | Carga Inicial SGA, Consulta Stock SGA, Gestion Entradas SGA, Gestion Mapa SGA, Gestion Picking SGA, Gestion Ubicaciones SGA |
 | **Gestion Entradas SGA** | Consulta Stock SGA, Gestion Contenido SGA, Gestion Ubicaciones SGA, Unidades Producto SGA | Consulta Stock SGA |
 | **Gestion Mapa SGA** | Analisis ABC SGA, Gestion Contenido SGA, Gestion Ubicaciones SGA, Unidades Producto SGA | — |
-| **Gestion Picking SGA** | Consulta Stock SGA, Gestion Contenido SGA, Lectura Codigos SGA, Unidades Producto SGA | Gestion Contenido SGA, Reubicaciones SGA |
-| **Gestion Ubicaciones SGA** | Gestion Contenido SGA, Unidades Producto SGA, Ventana Progreso SGA | Analisis ABC SGA, Carga Inicial SGA, Gestion Contenido SGA, Gestion Entradas SGA, Gestion Mapa SGA, Reubicaciones SGA |
-| **Lectura Codigos SGA** | — | Gestion Picking SGA |
+| **Gestion Picking SGA** | Consulta Stock SGA, Gestion Contenido SGA, Unidades Producto SGA | Gestion Contenido SGA, Reubicaciones SGA |
+| **Gestion Ubicaciones SGA** | Codigos Barras SGA, Gestion Contenido SGA, Unidades Producto SGA, Ventana Progreso SGA | Analisis ABC SGA, Carga Inicial SGA, Gestion Contenido SGA, Gestion Entradas SGA, Gestion Mapa SGA, Reubicaciones SGA |
 | **Reubicaciones SGA** | Gestion Picking SGA, Gestion Ubicaciones SGA, Unidades Producto SGA | Gestion Contenido SGA |
 | **Unidades Producto SGA** | — | Analisis ABC SGA, Carga Inicial SGA, Consulta Stock SGA, Gestion Contenido SGA, Gestion Entradas SGA, Gestion Mapa SGA, Gestion Picking SGA, Gestion Ubicaciones SGA, Reubicaciones SGA |
 | **Ventana Progreso SGA** | — | Carga Inicial SGA, Consulta Stock SGA, Gestion Ubicaciones SGA |
