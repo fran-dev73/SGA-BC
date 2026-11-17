@@ -43,6 +43,7 @@ codeunit 51101 "Gestion Ubicaciones SGA"
         pasillo: Integer;
         estanteria: Integer;
         altura: Integer;
+        secuencia: Integer;
     begin
         if prm_Almacen <> '' then
             rBin.SetRange("Location Code", prm_Almacen);
@@ -52,19 +53,12 @@ codeunit 51101 "Gestion Ubicaciones SGA"
 
         repeat
             if not rUbicacionSGA.Get(rBin."Location Code", rBin.Code) then begin
-                rUbicacionSGA.Init();
-                rUbicacionSGA."Cod. Almacen" := rBin."Location Code";
-                rUbicacionSGA."Cod. Bin" := rBin.Code;
-                rUbicacionSGA.Descripcion := CopyStr(rBin.Code, 1, MaxStrLen(rUbicacionSGA.Descripcion));
-                if rBin.Dedicated then
-                    rUbicacionSGA."Permite Mezcla Producto" := false
-                else
-                    rUbicacionSGA."Permite Mezcla Producto" := true;
-                rUbicacionSGA."Permite Mezcla Lote" := true;
                 // Con un código pasillo-estantería-altura, la ruta sale de él como al generarlas;
                 // si no, queda a 0 y la toma de su zona al asignársela.
+                secuencia := 0;
                 if TrocearCodigo(rBin.Code, pasillo, estanteria, altura) then
-                    rUbicacionSGA."Secuencia Picking" := SecuenciaDesde(pasillo, estanteria, altura);
+                    secuencia := SecuenciaDesde(pasillo, estanteria, altura);
+                NuevaUbicacionSGA(rUbicacionSGA, rBin."Location Code", rBin.Code, not rBin.Dedicated, secuencia);
                 rUbicacionSGA.Insert();
             end;
         until rBin.Next() = 0;
@@ -139,11 +133,7 @@ codeunit 51101 "Gestion Ubicaciones SGA"
                 hechas += 1;
             end else begin
                 prm_Omitidas += 1;
-                if prm_Omitidas <= 5 then begin
-                    if prm_Ejemplos <> '' then
-                        prm_Ejemplos += ', ';
-                    prm_Ejemplos += rUbicacionSGA."Cod. Bin";
-                end;
+                AnadirEjemplo(prm_Ejemplos, prm_Omitidas, rUbicacionSGA."Cod. Bin");
             end;
         until rUbicacionSGA.Next() = 0;
     end;
@@ -190,15 +180,13 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     var
         rUbicacionSGA: Record "Ubicacion SGA";
         zonaOrigen: Code[10];
+        zonaFinal: Code[10];
         OtraZonaErr: Label 'La ubicación %1 es de la zona "%2" y la %3 de la zona "%4". Los traslados entre zonas no se hacen desde el mapa: use Trasladar en Contenido de ubicaciones.', Comment = '%1 = origen, %2 = zona origen, %3 = destino, %4 = zona destino';
     begin
-        rUbicacionSGA.SetLoadFields("Cod. Zona SGA");
-        if rUbicacionSGA.Get(prm_Almacen, prm_Origen) then
-            zonaOrigen := rUbicacionSGA."Cod. Zona SGA";
-        Clear(rUbicacionSGA);
-        if rUbicacionSGA.Get(prm_Almacen, prm_Destino) then;
-        if rUbicacionSGA."Cod. Zona SGA" <> zonaOrigen then
-            Error(OtraZonaErr, prm_Origen, zonaOrigen, prm_Destino, rUbicacionSGA."Cod. Zona SGA");
+        zonaOrigen := rUbicacionSGA.ZonaDe(prm_Almacen, prm_Origen);
+        zonaFinal := rUbicacionSGA.ZonaDe(prm_Almacen, prm_Destino);
+        if zonaFinal <> zonaOrigen then
+            Error(OtraZonaErr, prm_Origen, zonaOrigen, prm_Destino, zonaFinal);
     end;
 
     /// <summary>
@@ -253,11 +241,7 @@ codeunit 51101 "Gestion Ubicaciones SGA"
                 prm_NoEliminadas += 1;
                 if prm_Motivo = '' then
                     prm_Motivo := GetLastErrorText();
-                if prm_NoEliminadas <= 5 then begin
-                    if prm_Ejemplos <> '' then
-                        prm_Ejemplos += ', ';
-                    prm_Ejemplos += codBin;
-                end;
+                AnadirEjemplo(prm_Ejemplos, prm_NoEliminadas, codBin);
             end;
         end;
         cVentana.Cerrar();
@@ -307,18 +291,12 @@ codeunit 51101 "Gestion Ubicaciones SGA"
                     end;
 
                     if not rUbicacionSGA.Get(prm_Almacen, codBin) then begin
-                        rUbicacionSGA.Init();
-                        rUbicacionSGA."Cod. Almacen" := prm_Almacen;
-                        rUbicacionSGA."Cod. Bin" := codBin;
-                        rUbicacionSGA.Descripcion := CopyStr(codBin, 1, MaxStrLen(rUbicacionSGA.Descripcion));
+                        // Nacen de un solo producto, como un hueco de palé. Las estanterías de
+                        // picking con varias referencias se marcan después.
+                        NuevaUbicacionSGA(rUbicacionSGA, prm_Almacen, codBin, false, SecuenciaDesde(pasillo, estanteria, altura));
                         rUbicacionSGA."Cod. Zona SGA" := prm_Zona;
                         rUbicacionSGA."Tipo Ubicacion" := prm_Tipo;
                         rUbicacionSGA."Capacidad Uds." := prm_Capacidad;
-                        rUbicacionSGA."Secuencia Picking" := SecuenciaDesde(pasillo, estanteria, altura);
-                        // Nacen de un solo producto, como un hueco de palé. Las estanterías de
-                        // picking con varias referencias se marcan después.
-                        rUbicacionSGA."Permite Mezcla Producto" := false;
-                        rUbicacionSGA."Permite Mezcla Lote" := true;
                         rUbicacionSGA.Insert();
                         creadas += 1;
                     end;
@@ -394,6 +372,34 @@ codeunit 51101 "Gestion Ubicaciones SGA"
         FormatoCerosTok: Label '<Integer,%1><Filler Character,0>', Locked = true, Comment = '%1 = nº de cifras';
     begin
         exit(Format(prm_Valor, 0, StrSubstNo(FormatoCerosTok, prm_Digitos)));
+    end;
+
+    /// <summary>
+    /// Añade un código a la lista de ejemplos de un aviso, separados por coma, hasta 5: prm_Cuantas
+    /// es cuántas van ya contando esta.
+    /// </summary>
+    local procedure AnadirEjemplo(var prm_Ejemplos: Text; prm_Cuantas: Integer; prm_Codigo: Code[20])
+    begin
+        if prm_Cuantas > 5 then
+            exit;
+        if prm_Ejemplos <> '' then
+            prm_Ejemplos += ', ';
+        prm_Ejemplos += prm_Codigo;
+    end;
+
+    /// <summary>
+    /// Deja preparada, sin insertar, la ficha SGA de una ubicación nueva: su descripción es el
+    /// código y admite mezcla de lotes. Quien llama completa el resto e inserta.
+    /// </summary>
+    local procedure NuevaUbicacionSGA(var prm_Ubicacion: Record "Ubicacion SGA"; prm_Almacen: Code[10]; prm_Bin: Code[20]; prm_PermiteMezclaProducto: Boolean; prm_Secuencia: Integer)
+    begin
+        prm_Ubicacion.Init();
+        prm_Ubicacion."Cod. Almacen" := prm_Almacen;
+        prm_Ubicacion."Cod. Bin" := prm_Bin;
+        prm_Ubicacion.Descripcion := CopyStr(prm_Bin, 1, MaxStrLen(prm_Ubicacion.Descripcion));
+        prm_Ubicacion."Permite Mezcla Producto" := prm_PermiteMezclaProducto;
+        prm_Ubicacion."Permite Mezcla Lote" := true;
+        prm_Ubicacion."Secuencia Picking" := prm_Secuencia;
     end;
 
     /// <summary>
@@ -579,8 +585,7 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     var
         rContenido: Record "Contenido Ubicacion SGA";
     begin
-        rContenido.SetRange("Cod. Almacen", prm_Ubicacion."Cod. Almacen");
-        rContenido.SetRange("Cod. Bin", prm_Ubicacion."Cod. Bin");
+        rContenido.FiltrarUbicacion(prm_Ubicacion."Cod. Almacen", prm_Ubicacion."Cod. Bin");
         rContenido.SetRange("No. Producto", prm_Producto);
         exit(not rContenido.IsEmpty());
     end;
@@ -638,17 +643,6 @@ codeunit 51101 "Gestion Ubicaciones SGA"
                     if codigo <> '' then
                         prm_Motivo := MotivoPrimeraVaciaTxt;
                 end;
-            prm_Estrategia::"Priorizar Consolidacion":
-                begin
-                    codigo := BuscarConsolidacion(prm_Almacen, prm_Producto, prm_Variante, prm_Lote, prm_Tipo, prm_Entrada, prm_Excluidas);
-                    if codigo <> '' then
-                        prm_Motivo := MotivoConsolidacionTxt
-                    else begin
-                        codigo := BuscarLibre(prm_Almacen, prm_Producto, prm_Lote, prm_Tipo, prm_Entrada, prm_Excluidas);
-                        if codigo <> '' then
-                            prm_Motivo := MotivoPrimeraLibreTxt;
-                    end;
-                end;
             prm_Estrategia::"Primera Libre por Ruta":
                 begin
                     codigo := BuscarLibre(prm_Almacen, prm_Producto, prm_Lote, prm_Tipo, prm_Entrada, prm_Excluidas);
@@ -657,19 +651,22 @@ codeunit 51101 "Gestion Ubicaciones SGA"
                 end;
             else begin
                 // Estándar: su casa, si no consolidar, si no el primer hueco por ruta.
-                codigo := BuscarFija(prm_Almacen, prm_Producto, prm_Lote, prm_Tipo, prm_Entrada, prm_Excluidas);
-                if codigo <> '' then
-                    prm_Motivo := MotivoFijaTxt
-                else begin
-                    codigo := BuscarConsolidacion(prm_Almacen, prm_Producto, prm_Variante, prm_Lote, prm_Tipo, prm_Entrada, prm_Excluidas);
-                    if codigo <> '' then
-                        prm_Motivo := MotivoConsolidacionTxt
-                    else begin
-                        codigo := BuscarLibre(prm_Almacen, prm_Producto, prm_Lote, prm_Tipo, prm_Entrada, prm_Excluidas);
-                        if codigo <> '' then
-                            prm_Motivo := MotivoPrimeraLibreTxt;
+                // Priorizar consolidación: lo mismo sin mirar su casa.
+                if prm_Estrategia <> prm_Estrategia::"Priorizar Consolidacion" then begin
+                    codigo := BuscarFija(prm_Almacen, prm_Producto, prm_Lote, prm_Tipo, prm_Entrada, prm_Excluidas);
+                    if codigo <> '' then begin
+                        prm_Motivo := MotivoFijaTxt;
+                        exit;
                     end;
                 end;
+                codigo := BuscarConsolidacion(prm_Almacen, prm_Producto, prm_Variante, prm_Lote, prm_Tipo, prm_Entrada, prm_Excluidas);
+                if codigo <> '' then begin
+                    prm_Motivo := MotivoConsolidacionTxt;
+                    exit;
+                end;
+                codigo := BuscarLibre(prm_Almacen, prm_Producto, prm_Lote, prm_Tipo, prm_Entrada, prm_Excluidas);
+                if codigo <> '' then
+                    prm_Motivo := MotivoPrimeraLibreTxt;
             end;
         end;
     end;
@@ -788,7 +785,7 @@ codeunit 51101 "Gestion Ubicaciones SGA"
             ssccs.Add(sscc);
             cContenido.FijarPropuesta(TempLinea."Ubicacion Propuesta");
             cContenido.RegistrarEntrada(prm_Almacen, TempLinea."Ubicacion Confirmada", prm_Producto, prm_Variante, prm_Lote,
-                                        sscc, TempLinea."Cod. Unidad Medida", TempLinea.Cantidad, "Origen Mov. SGA"::Manual, '', 0, UbicadoGuiadoLbl);
+                                        sscc, TempLinea."Cod. Unidad Medida", TempLinea.Cantidad, "Origen Mov. SGA"::Manual, '', UbicadoGuiadoLbl);
         end;
         for i := 1 to lineas.Count() do begin
             TempLinea.Get(lineas.Get(i));
@@ -922,14 +919,13 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     var
         rUbicacionSGA: Record "Ubicacion SGA";
         estanteria: Code[20];
+        codigo: Code[20];
     begin
         FiltrarCandidatas(rUbicacionSGA, prm_Almacen, prm_Tipo, prm_Excluidas);
         rUbicacionSGA.SetRange("Producto Fijo", prm_Producto);
-        if rUbicacionSGA.FindSet() then
-            repeat
-                if UbicacionAdmite(rUbicacionSGA, prm_Producto, prm_Lote, prm_Tipo, prm_Entrada) then
-                    exit(rUbicacionSGA."Cod. Bin");
-            until rUbicacionSGA.Next() = 0;
+        codigo := PrimeraQueAdmite(rUbicacionSGA, prm_Producto, prm_Lote, prm_Tipo, prm_Entrada);
+        if codigo <> '' then
+            exit(codigo);
 
         estanteria := EstanteriaProducto(prm_Almacen, prm_Producto);
         if estanteria = '' then
@@ -953,12 +949,20 @@ codeunit 51101 "Gestion Ubicaciones SGA"
         FiltrarCandidatas(rUbicacionSGA, prm_Almacen, prm_Tipo, prm_Excluidas);
         // El estado guardado lo deja al día cada movimiento: así no se lee el contenido de nadie.
         rUbicacionSGA.SetRange("Estado SGA", rUbicacionSGA."Estado SGA"::Vacia);
-        if rUbicacionSGA.FindSet() then
-            repeat
-                if UbicacionAdmite(rUbicacionSGA, prm_Producto, prm_Lote, prm_Tipo, prm_Entrada) then
-                    exit(rUbicacionSGA."Cod. Bin");
-            until rUbicacionSGA.Next() = 0;
+        exit(PrimeraQueAdmite(rUbicacionSGA, prm_Producto, prm_Lote, prm_Tipo, prm_Entrada));
+    end;
 
+    /// <summary>
+    /// La primera ubicación filtrada en prm_Ubicacion, por su orden, que admite la entrada. En
+    /// blanco si ninguna.
+    /// </summary>
+    local procedure PrimeraQueAdmite(var prm_Ubicacion: Record "Ubicacion SGA"; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_Tipo: Enum "Tipo Ubicacion SGA"; prm_Entrada: Decimal): Code[20]
+    begin
+        if prm_Ubicacion.FindSet() then
+            repeat
+                if UbicacionAdmite(prm_Ubicacion, prm_Producto, prm_Lote, prm_Tipo, prm_Entrada) then
+                    exit(prm_Ubicacion."Cod. Bin");
+            until prm_Ubicacion.Next() = 0;
         exit('');
     end;
 
@@ -1053,8 +1057,7 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     /// </summary>
     local procedure VaciaYAdmite(var prm_Ubicacion: Record "Ubicacion SGA"; prm_Producto: Code[20]; prm_Tipo: Enum "Tipo Ubicacion SGA"): Boolean
     begin
-        prm_Ubicacion.CalcFields("Lineas Contenido");
-        if prm_Ubicacion."Lineas Contenido" > 0 then
+        if not prm_Ubicacion.EstaVacia() then
             exit(false);
 
         exit(UbicacionAdmite(prm_Ubicacion, prm_Producto, '', prm_Tipo, 1));
@@ -1175,13 +1178,7 @@ codeunit 51101 "Gestion Ubicaciones SGA"
         rUbicacionSGA: Record "Ubicacion SGA";
     begin
         FiltrarCandidatas(rUbicacionSGA, prm_Almacen, prm_Tipo, prm_Excluidas);
-        if rUbicacionSGA.FindSet() then
-            repeat
-                if UbicacionAdmite(rUbicacionSGA, prm_Producto, prm_Lote, prm_Tipo, prm_Entrada) then
-                    exit(rUbicacionSGA."Cod. Bin");
-            until rUbicacionSGA.Next() = 0;
-
-        exit('');
+        exit(PrimeraQueAdmite(rUbicacionSGA, prm_Producto, prm_Lote, prm_Tipo, prm_Entrada));
     end;
 
     /// <summary>
@@ -1392,9 +1389,7 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     begin
         if (prm_Zona = '') or (prm_Ubicacion = '') then
             exit;
-        rUbicacionSGA.SetLoadFields("Cod. Zona SGA");
-        if rUbicacionSGA.Get(prm_Almacen, prm_Ubicacion) then;
-        if rUbicacionSGA."Cod. Zona SGA" <> prm_Zona then
+        if rUbicacionSGA.ZonaDe(prm_Almacen, prm_Ubicacion) <> prm_Zona then
             Error(FueraDeZonaErr, prm_Ubicacion, prm_Zona);
     end;
 
@@ -1449,12 +1444,13 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     procedure LiberarReservas(prm_Para: Text; prm_Salvo: Code[20])
     var
         rUbicacionSGA: Record "Ubicacion SGA";
+        rConfig: Record "Config. SGA";
     begin
         if prm_Para = '' then
             exit;
 
         rUbicacionSGA.SetCurrentKey("Reservada Por", "Sesion Reserva", "Reservada Para");
-        rUbicacionSGA.SetRange("Reservada Por", UserId());
+        rUbicacionSGA.SetRange("Reservada Por", rConfig.UsuarioActual());
         rUbicacionSGA.SetRange("Sesion Reserva", SessionId());
         rUbicacionSGA.SetRange("Reservada Para", CopyStr(prm_Para, 1, MaxStrLen(rUbicacionSGA."Reservada Para")));
         if prm_Salvo <> '' then

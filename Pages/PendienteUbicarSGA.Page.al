@@ -276,8 +276,7 @@ page 51131 "Pendiente Ubicar SGA"
     var
         rConfig: Record "Config. SGA";
     begin
-        rConfig.ObtenerConfig();
-        FiltroAlmacen := rConfig."Almacen por Defecto";
+        FiltroAlmacen := rConfig.AlmacenODefecto('');
         Recalcular();
     end;
 

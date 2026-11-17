@@ -288,11 +288,8 @@ page 51123 "Ubicar Entradas SGA"
                 trigger OnAction()
                 var
                     cEntradas: Codeunit "Gestion Entradas SGA";
-                    LineaYaUbicadaErr: Label 'Esta línea ya está ubicada.';
                 begin
-                    if Rec.Estado = Rec.Estado::Ubicado then
-                        Error(LineaYaUbicadaErr);
-
+                    TestLineaSinUbicar();
                     cEntradas.ProponerOtra(Rec);
                     CurrPage.Update(false);
                 end;
@@ -308,12 +305,10 @@ page 51123 "Ubicar Entradas SGA"
                 var
                     cEntradas: Codeunit "Gestion Entradas SGA";
                     LineaUbicadaMsg: Label 'Ubicado %1 de %2 en %3.', Comment = '%1 = cantidad, %2 = producto, %3 = ubicación';
-                    LineaYaUbicadaErr: Label 'Esta línea ya está ubicada.';
                     cantidad: Decimal;
                     ubicacion: Code[20];
                 begin
-                    if Rec.Estado = Rec.Estado::Ubicado then
-                        Error(LineaYaUbicadaErr);
+                    TestLineaSinUbicar();
                     cantidad := Rec.Cantidad;
                     ubicacion := Rec."Ubicacion Confirmada";
 
@@ -443,6 +438,17 @@ page 51123 "Ubicar Entradas SGA"
         cEntradas.LiberarReservasFilas(Rec);
     end;
 
+    /// <summary>
+    /// Error si la línea ya está ubicada: no hay nada que proponer ni que confirmar.
+    /// </summary>
+    local procedure TestLineaSinUbicar()
+    var
+        LineaYaUbicadaErr: Label 'Esta línea ya está ubicada.';
+    begin
+        if Rec.Estado = Rec.Estado::Ubicado then
+            Error(LineaYaUbicadaErr);
+    end;
+
     trigger OnOpenPage()
     var
         rConfig: Record "Config. SGA";
@@ -467,8 +473,7 @@ page 51123 "Ubicar Entradas SGA"
             FiltroFechaHasta := 0D;
             FiltroClase := FiltroClase::Todas;
         end else begin
-            rConfig.ObtenerConfig();
-            FiltroAlmacen := rConfig."Almacen por Defecto";
+            FiltroAlmacen := rConfig.AlmacenODefecto('');
             // Recepciones: todo lo pendiente de productos externos, sin límite de fecha.
             // Ensamblados: lo del día, de cualquier clase.
             if EsCompra then begin

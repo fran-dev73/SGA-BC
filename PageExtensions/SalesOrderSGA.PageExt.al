@@ -60,8 +60,9 @@ pageextension 51104 "Sales Order SGA" extends "Sales Order"
                         else
                             Message(OrdenesConFaltasMsg, creadas, faltas);
 
-                        rOrden.SetRange("No. Documento Origen", Rec."No.");
-                        rOrden.SetRange(Origen, rOrden.Origen::Venta);
+                        rOrden.FiltrarPedido(Rec."No.");
+                        // FiltrarPedido cambia la clave; la lista se abre con la de siempre.
+                        rOrden.SetCurrentKey("No. Orden");
                         Page.Run(Page::"Ordenes Picking SGA", rOrden);
                     end;
                 }

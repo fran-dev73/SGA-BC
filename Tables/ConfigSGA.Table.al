@@ -124,37 +124,6 @@ table 51104 "Config. SGA"
             TableRelation = "No. Series";
             ToolTip = 'Serie numérica de las órdenes de trabajo de almacén. La consume la gestión de órdenes de la Fase 2.';
         }
-        field(51; "Nos. SSCC"; Code[20])
-        {
-            Caption = 'Nºs SSCC';
-            DataClassification = ToBeClassified;
-            TableRelation = "No. Series";
-            ToolTip = 'Serie numérica de la que salen los SSCC nuevos de los palés que entran sin etiqueta. Solo dígitos. Si es la misma serie que usan las etiquetas de palé del resto del sistema, con el mismo prefijo y dígito de extensión, comparten contador y no se repite ningún SSCC.';
-        }
-        field(52; "Prefijo Empresa GS1"; Code[12])
-        {
-            Caption = 'Prefijo empresa GS1';
-            DataClassification = ToBeClassified;
-            ToolTip = 'Prefijo de empresa que asigna GS1 (entre 6 y 12 dígitos). Va en cada SSCC nuevo, detrás del dígito de extensión.';
-
-            trigger OnValidate()
-            var
-                PrefijoNoValidoErr: Label 'El prefijo de empresa GS1 tiene que ser de 6 a 12 dígitos.';
-            begin
-                if "Prefijo Empresa GS1" = '' then
-                    exit;
-                if (StrLen("Prefijo Empresa GS1") < 6) or (DelChr("Prefijo Empresa GS1", '=', '0123456789') <> '') then
-                    Error(PrefijoNoValidoErr);
-            end;
-        }
-        field(53; "Digito Extension SSCC"; Integer)
-        {
-            Caption = 'Dígito extensión SSCC';
-            DataClassification = ToBeClassified;
-            MinValue = 0;
-            MaxValue = 9;
-            ToolTip = 'Primer dígito de cada SSCC nuevo (0 a 9). Lo elige la empresa; con un dígito distinto del de las etiquetas de palé del resto del sistema, los SSCC de SGA nunca coinciden con ellas aunque las series vayan por separado.';
-        }
         field(70; "Fecha Inicio SGA"; Date)
         {
             Caption = 'Fecha inicio SGA';
@@ -208,6 +177,14 @@ table 51104 "Config. SGA"
             Init();
             Insert(true);
         end;
+    end;
+
+    /// <summary>
+    /// Usuario de la sesión tal como lo guardan los campos de usuario de SGA (Code[50]).
+    /// </summary>
+    procedure UsuarioActual() usuario: Code[50]
+    begin
+        usuario := CopyStr(UserId(), 1, MaxStrLen(usuario));
     end;
 
     /// <summary>

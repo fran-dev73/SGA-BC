@@ -61,8 +61,7 @@ codeunit 51113 "Reubicaciones SGA"
             until rContenido.Next() = 0;
 
         rContenido.SetRange("Tipo Ubicacion", rContenido."Tipo Ubicacion"::Almacenamiento);
-        rContenido.SetRange(Bloqueado, false);
-        rContenido.SetFilter("Cantidad Disponible", '>%1', 0);
+        rContenido.FiltrarCogible();
         if rContenido.FindSet() then
             repeat
                 clave := ClaveProducto(rContenido."No. Producto", rContenido."Cod. Variante");
@@ -90,8 +89,7 @@ codeunit 51113 "Reubicaciones SGA"
         if rUbicacionSGA."Tipo Ubicacion" <> rUbicacionSGA."Tipo Ubicacion"::Picking then
             exit;
 
-        rContenido.SetRange("Cod. Almacen", prm_Almacen);
-        rContenido.SetRange("Cod. Bin", prm_Ubicacion);
+        rContenido.FiltrarUbicacion(prm_Almacen, prm_Ubicacion);
         rContenido.SetRange("No. Producto", prm_Producto);
         rContenido.SetRange("Cod. Variante", prm_Variante);
         rContenido.SetFilter("Cantidad Base", '>%1', 0);

@@ -369,6 +369,14 @@ table 51109 "Linea Orden Picking SGA"
     end;
 
     /// <summary>
+    /// Deja solo las paradas no canceladas. No toca la clave ni el resto de filtros.
+    /// </summary>
+    procedure FiltrarNoCanceladas()
+    begin
+        SetFilter(Estado, '<>%1', Estado::Cancelada);
+    end;
+
+    /// <summary>
     /// Deja solo las paradas que le tocan al preparador: las pendientes que no están retenidas.
     /// Las retenidas siguen pendientes, pero las resuelve el jefe de almacén.
     /// </summary>

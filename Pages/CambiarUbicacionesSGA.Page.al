@@ -108,11 +108,7 @@ page 51126 "Cambiar Ubicaciones SGA"
                     var
                         rZona: Record "Zona SGA";
                     begin
-                        rZona.SetRange("Cod. Almacen", rSeleccion."Cod. Almacen");
-                        if Page.RunModal(0, rZona) <> Action::LookupOK then
-                            exit(false);
-                        Text := rZona.Code;
-                        exit(true);
+                        exit(rZona.BuscarZona(rSeleccion."Cod. Almacen", Text));
                     end;
 
                     trigger OnValidate()

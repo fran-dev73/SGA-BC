@@ -95,9 +95,7 @@ report 51101 "Sincronizar Ubicaciones SGA"
         var
             rConfig: Record "Config. SGA";
         begin
-            rConfig.ObtenerConfig();
-            if codAlmacen = '' then
-                codAlmacen := rConfig."Almacen por Defecto";
+            codAlmacen := rConfig.AlmacenODefecto(codAlmacen);
         end;
     }
 

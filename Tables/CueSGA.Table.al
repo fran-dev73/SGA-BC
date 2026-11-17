@@ -268,13 +268,12 @@ table 51105 "Cue SGA"
     procedure FiltrarCue()
     var
         rConfig: Record "Config. SGA";
-        cPicking: Codeunit "Gestion Picking SGA";
     begin
         rConfig.ObtenerConfig();
         if rConfig."Almacen por Defecto" <> '' then
             SetRange("Filtro Almacen", rConfig."Almacen por Defecto");
 
-        SetRange("Filtro Usuario", cPicking.UsuarioActual());
+        SetRange("Filtro Usuario", rConfig.UsuarioActual());
         SetRange("Filtro Fecha", WorkDate());
         SetRange("Filtro Momento", CreateDateTime(WorkDate(), 0T), CreateDateTime(WorkDate(), 235959.999T));
         // Sin fecha de envío no cuenta como vencida.

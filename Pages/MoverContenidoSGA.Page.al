@@ -90,11 +90,7 @@ page 51114 "Mover Contenido SGA"
                     var
                         rZona: Record "Zona SGA";
                     begin
-                        rZona.SetRange("Cod. Almacen", Almacen);
-                        if Page.RunModal(0, rZona) <> Action::LookupOK then
-                            exit(false);
-                        Text := rZona.Code;
-                        exit(true);
+                        exit(rZona.BuscarZona(Almacen, Text));
                     end;
 
                     trigger OnValidate()
@@ -262,9 +258,7 @@ page 51114 "Mover Contenido SGA"
         CantidadDisponible := rContenido."Cantidad Disponible";
         Cantidad := rContenido."Cantidad Disponible";
 
-        rUbicacionSGA.SetLoadFields("Cod. Zona SGA");
-        if rUbicacionSGA.Get(Almacen, UbicacionOrigen) then
-            ZonaOrigen := rUbicacionSGA."Cod. Zona SGA";
+        ZonaOrigen := rUbicacionSGA.ZonaDe(Almacen, UbicacionOrigen);
     end;
 
     /// <summary>

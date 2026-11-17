@@ -161,8 +161,7 @@ codeunit 51103 "Consulta Stock SGA"
         // pantallas lo seguirían pidiendo y, al ubicarlo, sobraría. Solo se lleva a ajustes el resto.
         // La fila es de la tabla real; el cálculo pide una temporal con el lote.
         TempLote := prm_Fila;
-        enDocumentos := PendienteEnDocumentos(cEntradas, TempEntradas, "Origen Mov. SGA"::Compra, prm_Fila."Cod. Almacen", TempLote) +
-                        PendienteEnDocumentos(cEntradas, TempEntradas, "Origen Mov. SGA"::Produccion, prm_Fila."Cod. Almacen", TempLote);
+        enDocumentos := PendienteEnDocumentosHasta(cEntradas, TempEntradas, prm_Fila."Cod. Almacen", TempLote, prm_Fila.Diferencia);
         aRegularizar := prm_Fila.Diferencia - enDocumentos;
         if aRegularizar <= 0 then begin
             Message(TodoEnDocumentosMsg, prm_Fila.Diferencia);
@@ -189,9 +188,10 @@ codeunit 51103 "Consulta Stock SGA"
 
     local procedure AcumularFila(var rStock: Record "Buffer Conciliacion SGA"; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Almacen: Code[10]; prm_Lote: Code[50]; prm_UMBase: Code[10]; prm_StockBC: Decimal; prm_StockSGA: Decimal)
     var
+        rConfig: Record "Config. SGA";
         usuario: Code[50];
     begin
-        usuario := CopyStr(UserId(), 1, MaxStrLen(rStock."Cod. Usuario"));
+        usuario := rConfig.UsuarioActual();
 
         if rStock.Get(usuario, prm_Producto, prm_Variante, prm_Almacen, prm_Lote) then begin
             rStock."Stock BC" := rStock."Stock BC" + prm_StockBC;
@@ -296,10 +296,7 @@ codeunit 51103 "Consulta Stock SGA"
                 if prm_Pendiente.Diferencia > 0 then begin
                     prm_Pendiente."Fecha Caducidad" := CaducidadLote(producto, TempStock."Cod. Variante", TempStock."No. Lote");
 
-                    cantidadDoc := PendienteEnDocumentos(cEntradas, TempEntradas, "Origen Mov. SGA"::Compra, prm_Almacen, TempStock) +
-                                   PendienteEnDocumentos(cEntradas, TempEntradas, "Origen Mov. SGA"::Produccion, prm_Almacen, TempStock);
-                    if cantidadDoc > prm_Pendiente.Diferencia then
-                        cantidadDoc := prm_Pendiente.Diferencia;
+                    cantidadDoc := PendienteEnDocumentosHasta(cEntradas, TempEntradas, prm_Almacen, TempStock, prm_Pendiente.Diferencia);
                     prm_Pendiente."En Documentos" := cantidadDoc;
                     prm_Pendiente."A Ubicar" := prm_Pendiente.Diferencia - cantidadDoc;
                     prm_Pendiente.Desglose := CopyStr(cUM.Desglose(producto, prm_Pendiente."A Ubicar"), 1, MaxStrLen(prm_Pendiente.Desglose));
@@ -371,6 +368,19 @@ codeunit 51103 "Consulta Stock SGA"
         rItemLedgEntry.SetRange("Lot No.", prm_Linea."No. Lote");
         rItemLedgEntry.SetRange(Open, true);
         Page.Run(Page::"Item Ledger Entries", rItemLedgEntry);
+    end;
+
+    /// <summary>
+    /// Lo que espera del lote en Ubicar recepciones y Ubicar ensamblados juntos, en unidad base,
+    /// sin pasar de prm_Tope.
+    /// </summary>
+    local procedure PendienteEnDocumentosHasta(var prm_Entradas: Codeunit "Gestion Entradas SGA"; var prm_Buffer: Record "Linea Ubicacion SGA" temporary; prm_Almacen: Code[10]; var prm_Lote: Record "Buffer Conciliacion SGA" temporary; prm_Tope: Decimal) enDocumentos: Decimal
+    begin
+        // Lo de los documentos nunca cuenta más que lo pendiente: el resto ya es stock de BC.
+        enDocumentos := PendienteEnDocumentos(prm_Entradas, prm_Buffer, "Origen Mov. SGA"::Compra, prm_Almacen, prm_Lote) +
+                        PendienteEnDocumentos(prm_Entradas, prm_Buffer, "Origen Mov. SGA"::Produccion, prm_Almacen, prm_Lote);
+        if enDocumentos > prm_Tope then
+            enDocumentos := prm_Tope;
     end;
 
     /// <summary>
@@ -463,10 +473,7 @@ codeunit 51103 "Consulta Stock SGA"
         TempLote."No. Producto" := prm_Producto;
         TempLote."Cod. Variante" := prm_Variante;
         TempLote."No. Lote" := loteBC;
-        enDocumentos := PendienteEnDocumentos(cEntradas, TempEntradas, "Origen Mov. SGA"::Compra, prm_Almacen, TempLote) +
-                        PendienteEnDocumentos(cEntradas, TempEntradas, "Origen Mov. SGA"::Produccion, prm_Almacen, TempLote);
-        if enDocumentos > pendiente then
-            enDocumentos := pendiente;
+        enDocumentos := PendienteEnDocumentosHasta(cEntradas, TempEntradas, prm_Almacen, TempLote, pendiente);
         exit(pendiente - enDocumentos);
     end;
 

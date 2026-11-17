@@ -73,9 +73,7 @@ report 51103 "Conciliacion SGA vs Stock"
         var
             rConfig: Record "Config. SGA";
         begin
-            rConfig.ObtenerConfig();
-            if codAlmacen = '' then
-                codAlmacen := rConfig."Almacen por Defecto";
+            codAlmacen := rConfig.AlmacenODefecto(codAlmacen);
             blnSoloDiferencias := true;
         end;
     }

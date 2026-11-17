@@ -68,9 +68,7 @@ report 51107 "Inicializar Contenido SGA"
         var
             rConfig: Record "Config. SGA";
         begin
-            rConfig.ObtenerConfig();
-            if codAlmacen = '' then
-                codAlmacen := rConfig."Almacen por Defecto";
+            codAlmacen := rConfig.AlmacenODefecto(codAlmacen);
         end;
     }
 

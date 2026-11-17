@@ -138,4 +138,19 @@ table 51100 "Zona SGA"
             exit(rZona."Ubicacion por Defecto");
         exit('');
     end;
+
+    /// <summary>
+    /// Lista de las zonas de un almacén para el OnLookup de un campo de zona que no es de
+    /// tabla. Deja en prm_Text la elegida; false si se cancela.
+    /// </summary>
+    procedure BuscarZona(prm_Almacen: Code[10]; var prm_Text: Text): Boolean
+    var
+        rZona: Record "Zona SGA";
+    begin
+        rZona.SetRange("Cod. Almacen", prm_Almacen);
+        if Page.RunModal(0, rZona) <> Action::LookupOK then
+            exit(false);
+        prm_Text := rZona.Code;
+        exit(true);
+    end;
 }

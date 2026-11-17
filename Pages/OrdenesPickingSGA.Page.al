@@ -163,9 +163,10 @@ page 51118 "Ordenes Picking SGA"
 
                 trigger OnAction()
                 var
+                    rConfig: Record "Config. SGA";
                     cPicking: Codeunit "Gestion Picking SGA";
                 begin
-                    cPicking.AsignarOrden(Rec, cPicking.UsuarioActual());
+                    cPicking.AsignarOrden(Rec, rConfig.UsuarioActual());
                     CurrPage.Update(false);
                 end;
             }

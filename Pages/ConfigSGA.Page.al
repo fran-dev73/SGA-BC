@@ -137,18 +137,6 @@ page 51106 "Config. SGA"
                     ToolTip = 'Serie numérica de las órdenes de trabajo de almacén. La consume la gestión de órdenes de la Fase 2.';
                     ApplicationArea = All;
                 }
-                field("Nos. SSCC"; Rec."Nos. SSCC")
-                {
-                    ApplicationArea = All;
-                }
-                field("Prefijo Empresa GS1"; Rec."Prefijo Empresa GS1")
-                {
-                    ApplicationArea = All;
-                }
-                field("Digito Extension SSCC"; Rec."Digito Extension SSCC")
-                {
-                    ApplicationArea = All;
-                }
             }
         }
     }

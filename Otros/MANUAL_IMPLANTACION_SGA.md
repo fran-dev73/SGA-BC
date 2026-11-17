@@ -24,7 +24,7 @@ SGA se apoya en el maestro de BC. Sin estos datos, la configuración de abajo no
 1. **Almacén.** Cada almacén que use SGA tiene marcada *Ubicación obligatoria*. SGA crea los huecos como ubicaciones (`Bin`) de BC, así que no hace falta darlos de alta antes en BC.
 2. **Productos con palé.** En la ficha del producto, *Cód. palé por defecto* con una unidad de medida de palé en su *Unidades de medida* y su factor (cuántas unidades base tiene el palé). Sin ese factor mayor que 1, el producto se cuenta como si no tuviera palé: no cabe en las ubicaciones con capacidad y la carga inicial no lo reparte por huecos.
 3. **Grupo IIEE** (si se usa). En la ficha de cada producto, su *Grupo IIEE*.
-4. **Series.** Una serie de números para *Nºs orden SGA* (apartado 2); sin ella no se puede enviar ningún pedido a SGA. Y otra, solo de dígitos, para *Nºs SSCC*, con el *Prefijo empresa GS1* y el *Dígito extensión SSCC*; sin ellos no se puede ubicar un palé que entra sin etiqueta.
+4. **Series.** Una serie de números para *Nºs orden SGA* (apartado 2); sin ella no se puede enviar ningún pedido a SGA. Los SSCC de los palés que entran sin etiqueta salen de las series de la *Configuración de inventario*, *Nº serie EAN-128 - IA00* (número de 9 dígitos) y *Nº serie ind. extensión IA00* (dígito de extensión), las mismas de las etiquetas de palé del resto del sistema; sin ellas no se puede ubicar un palé que entra sin etiqueta.
 5. **Usuarios.** Cada persona con su usuario de BC y su rol (apartado 1), antes de configurar la PDA.
 
 ## 1. Roles y permisos
@@ -45,7 +45,7 @@ Menú **Almacén SGA - Configuración** > **Configuración SGA**.
 | Estrategias | Estrategia de ubicación, de compras y de ensamblados; estrategia de picking (FIFO, FEFO o vaciar ubicación). Ver la tabla de estrategias en la guía de uso |
 | Análisis ABC | Días de ventas y cortes de las clases A y B |
 | Controles | Ver tabla siguiente |
-| Numeración | *Nºs orden SGA*: obligatoria para crear órdenes de picking y reubicaciones. *Nºs SSCC*, *Prefijo empresa GS1* y *Dígito extensión SSCC*: el SSCC de los palés que entran sin etiqueta (extensión + prefijo + número de la serie con ceros + dígito de control, 18 dígitos). Si se ponen la serie, el prefijo y el dígito de las etiquetas de palé que ya usa la empresa, comparten contador; con otro dígito de extensión, nunca coinciden con ellas |
+| Numeración | *Nºs orden SGA*: obligatoria para crear órdenes de picking y reubicaciones. Los SSCC no se configuran aquí: ver *Series* en *Antes de empezar* |
 
 | Control | Qué hace |
 |---|---|
@@ -114,7 +114,7 @@ La segunda ronda de picking no se programa: se lanza a mano desde **Órdenes de 
 
 Antes de dar el almacén por operativo:
 
-- [ ] Datos de BC listos: almacén con ubicación obligatoria, palés con factor, series *Nºs orden SGA* y *Nºs SSCC* con el prefijo GS1 (antes de empezar).
+- [ ] Datos de BC listos: almacén con ubicación obligatoria, palés con factor, serie *Nºs orden SGA* y series de SSCC de la configuración de inventario (antes de empezar).
 - [ ] Rol y permisos asignados a cada usuario (apartado 1).
 - [ ] Configuración SGA revisada, en especial estrategias, controles y numeración (apartado 2).
 - [ ] Zonas creadas, con su tipo y su grupo IIEE si procede (apartado 3).

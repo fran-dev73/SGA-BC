@@ -360,7 +360,6 @@ page 51127 "Ubicar Palets Linea SGA"
 
     var
         TempPaleActual: Record "Linea Ubicacion SGA" temporary;
-        cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
         TareaPale: Integer;
         HayPale: Boolean;
         Situacion: Text;
@@ -435,24 +434,19 @@ page 51127 "Ubicar Palets Linea SGA"
     /// <summary>
     /// Imprime la etiqueta del palé y lo ubica, con Cod. "Gestion Entradas SGA". Todo lo que
     /// puede impedir ubicarlo se comprueba antes de imprimir, para no dejar etiquetas de palés
-    /// sin ubicación: aquí, que haya palé y una ubicación válida; en el codeunit, lo de la
-    /// etiqueta.
+    /// sin ubicación: aquí, que haya palé; en el codeunit, la ubicación y la etiqueta.
     /// </summary>
     local procedure ImprimirYUbicarPale()
     var
         cEntradas: Codeunit "Gestion Entradas SGA";
         ubicacionPale: Code[20];
         cantidad: Decimal;
-        UbicacionNoIndicadaErr: Label 'Indique la ubicación en la que deja el palé.';
         UltimoPaleLbl: Label '%1 %2 en %3 (%4)', Comment = '%1 = cantidad, %2 = unidad, %3 = ubicación, %4 = hora';
     begin
         if Rec.Linea <> TareaPale then
             CargarPale();
         if not HayPale then
             Error(Situacion);
-        if TempPaleActual."Ubicacion Confirmada" = '' then
-            Error(UbicacionNoIndicadaErr);
-        cUbicaciones.ComprobarUbicacionExiste(TempPaleActual."Cod. Almacen", TempPaleActual."Ubicacion Confirmada");
 
         // Se guardan antes: al ubicar, la fila pasa a llevar lo que queda pendiente.
         ubicacionPale := TempPaleActual."Ubicacion Confirmada";

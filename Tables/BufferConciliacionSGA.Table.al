@@ -135,8 +135,10 @@ table 51107 "Buffer Conciliacion SGA"
     /// filtros, para que una página pueda llamarlo dentro de su FilterGroup.
     /// </summary>
     procedure FiltrarUsuarioActual()
+    var
+        rConfig: Record "Config. SGA";
     begin
-        SetRange("Cod. Usuario", CopyStr(UserId(), 1, MaxStrLen("Cod. Usuario")));
+        SetRange("Cod. Usuario", rConfig.UsuarioActual());
     end;
 
     /// <summary>

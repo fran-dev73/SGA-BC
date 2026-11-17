@@ -190,12 +190,9 @@ table 51108 "Orden Picking SGA"
         rLinea: Record "Linea Orden Picking SGA";
         OrdenConRecogidasErr: Label 'No se puede eliminar la orden %1 porque ya tiene líneas recogidas. Cancélela en su lugar.', Comment = '%1 = nº orden';
     begin
-        rLinea.SetRange("No. Orden", "No. Orden");
-        rLinea.SetFilter("Cantidad Recogida", '>%1', 0);
-        if not rLinea.IsEmpty() then
+        if TieneRecogido() then
             Error(OrdenConRecogidasErr, "No. Orden");
 
-        rLinea.Reset();
         rLinea.SetRange("No. Orden", "No. Orden");
         rLinea.DeleteAll(true);
     end;
@@ -213,7 +210,7 @@ table 51108 "Orden Picking SGA"
             exit;
 
         rLinea.SetRange("No. Orden", "No. Orden");
-        rLinea.SetFilter(Estado, '<>%1', rLinea.Estado::Cancelada);
+        rLinea.FiltrarNoCanceladas();
         if rLinea.IsEmpty() then begin
             // Sin paradas, la orden aún se está creando. Con todas canceladas (Sin stock sin
             // alternativa), ya no queda nada que hacer: terminada si algo se llegó a recoger,
@@ -221,16 +218,14 @@ table 51108 "Orden Picking SGA"
             rLinea.SetRange(Estado);
             if rLinea.IsEmpty() then
                 Estado := EstadoSinEmpezar()
-            else begin
-                rLinea.SetFilter("Cantidad Recogida", '>%1', 0);
-                if rLinea.IsEmpty() then
+            else
+                if not TieneRecogido() then
                     Estado := Estado::Cancelada
                 else begin
                     Estado := Estado::Finalizada;
                     if "Fecha Finalizacion" = 0DT then
                         "Fecha Finalizacion" := CurrentDateTime();
                 end;
-            end;
             exit;
         end;
 
@@ -238,9 +233,7 @@ table 51108 "Orden Picking SGA"
         hayPendientes := not rLinea.IsEmpty();
 
         // Empezada: alguna parada lleva algo recogido, entera o a medias.
-        rLinea.SetRange(Estado);
-        rLinea.SetFilter("Cantidad Recogida", '>%1', 0);
-        hayRecogidas := not rLinea.IsEmpty();
+        hayRecogidas := TieneRecogido();
 
         case true of
             not hayPendientes:
@@ -265,7 +258,7 @@ table 51108 "Orden Picking SGA"
         rLinea: Record "Linea Orden Picking SGA";
     begin
         rLinea.SetRange("No. Orden", "No. Orden");
-        rLinea.SetFilter(Estado, '<>%1', rLinea.Estado::Cancelada);
+        rLinea.FiltrarNoCanceladas();
         prm_Total := rLinea.Count();
 
         rLinea.SetRange(Estado, rLinea.Estado::Recogida);
@@ -305,6 +298,26 @@ table 51108 "Orden Picking SGA"
     procedure EstaViva(): Boolean
     begin
         exit(Estado in [Estado::"Pendiente Asignar", Estado::Abierta, Estado::"En Proceso"]);
+    end;
+
+    /// <summary>
+    /// Deja solo las órdenes sin empezar: pendientes de asignar o abiertas.
+    /// </summary>
+    procedure FiltrarSinEmpezar()
+    begin
+        SetFilter(Estado, '%1|%2', Estado::"Pendiente Asignar", Estado::Abierta);
+    end;
+
+    /// <summary>
+    /// Si alguna parada de la orden tiene algo recogido.
+    /// </summary>
+    procedure TieneRecogido(): Boolean
+    var
+        rLinea: Record "Linea Orden Picking SGA";
+    begin
+        rLinea.SetRange("No. Orden", "No. Orden");
+        rLinea.SetFilter("Cantidad Recogida", '>%1', 0);
+        exit(not rLinea.IsEmpty());
     end;
 
     /// <summary>

@@ -1,14 +1,14 @@
 namespace AntonioNadal.SGA;
 
 using Microsoft.Foundation.NoSeries;
+using Microsoft.Inventory.Setup;
 
 /// <summary>
 /// Codeunit Codigos Barras SGA (ID 51114).
 /// Todo lo de códigos de barras de SGA, sin depender del resto del proyecto:
 /// - Interpreta lo que lee el escáner: si es una ubicación o un palé (SSCC, solo o en el (00)
 ///   de una lectura GS1-128).
-/// - Da los SSCC nuevos (NuevoSSCC) con la serie, el prefijo de empresa GS1 y el dígito de
-///   extensión de la configuración de SGA.
+/// - Da los SSCC nuevos (NuevoSSCC) con las series de SSCC de la configuración de inventario.
 /// </summary>
 codeunit 51114 "Codigos Barras SGA"
 {
@@ -77,35 +77,28 @@ codeunit 51114 "Codigos Barras SGA"
     end;
 
     /// <summary>
-    /// Un SSCC nuevo para un palé que no lo trae. Son 18 dígitos: el dígito de extensión, el
-    /// prefijo de empresa GS1, el siguiente número de la serie de SSCC (rellenado con ceros
-    /// hasta completar 17) y el dígito de control. La serie es una serie estándar de BC: si es
-    /// la misma que usan las etiquetas de palé del resto del sistema, con el mismo prefijo y
-    /// dígito de extensión, los dos comparten contador y no se repite ningún SSCC.
+    /// Un SSCC nuevo para un palé que no lo trae. Son 18 dígitos: el dígito de extensión (último
+    /// nº usado de "Nº serie ind. extensión IA00"), el prefijo de empresa GS1, el siguiente
+    /// número de "Nº serie EAN-128 - IA00" (9 dígitos) y el dígito de control. Las dos series
+    /// son las de la configuración de inventario que usan las etiquetas de palé del resto del
+    /// sistema: comparten contador con ellas y no se repite ningún SSCC.
     /// </summary>
     procedure NuevoSSCC(): Code[20]
     var
-        rConfig: Record "Config. SGA";
+        rInvtSetup: Record "Inventory Setup";
         cSerie: Codeunit "No. Series";
-        numero: Text;
         base: Text;
-        largoReferencia: Integer;
-        SerieNoNumericaErr: Label 'La serie de SSCC %1 ha dado el número %2, que no es solo de dígitos. Revise la serie en la configuración de SGA.', Comment = '%1 = serie, %2 = número';
-        SerieLargaErr: Label 'El número %1 de la serie de SSCC %2 no cabe: con el prefijo de empresa GS1 %3, como mucho tiene %4 dígitos.', Comment = '%1 = número, %2 = serie, %3 = prefijo, %4 = dígitos';
+        PrefijoEmpresaGS1Tok: Label '8414037', Locked = true;
+        SSCCMalFormadoErr: Label 'Las series de SSCC de la configuración de inventario (%1 y %2) dan %3, que no son los 17 dígitos de un SSCC sin el de control: la extensión tiene que ser un dígito y el número, de 9.', Comment = '%1 = serie de extensión, %2 = serie de número, %3 = lo que dan';
     begin
-        rConfig.ObtenerConfig();
-        rConfig.TestField("Nos. SSCC");
-        rConfig.TestField("Prefijo Empresa GS1");
+        rInvtSetup.SetLoadFields("No. Serie EAN-128 - IA00", "No. Serie Ind. Extension IA00");
+        rInvtSetup.Get();
+        rInvtSetup.TestField("No. Serie EAN-128 - IA00");
+        rInvtSetup.TestField("No. Serie Ind. Extension IA00");
 
-        numero := cSerie.GetNextNo(rConfig."Nos. SSCC");
-        if not SoloDigitos(numero) then
-            Error(SerieNoNumericaErr, rConfig."Nos. SSCC", numero);
-
-        largoReferencia := 16 - StrLen(rConfig."Prefijo Empresa GS1");
-        if StrLen(numero) > largoReferencia then
-            Error(SerieLargaErr, numero, rConfig."Nos. SSCC", rConfig."Prefijo Empresa GS1", largoReferencia);
-
-        base := Format(rConfig."Digito Extension SSCC") + rConfig."Prefijo Empresa GS1" + PadStr('', largoReferencia - StrLen(numero), '0') + numero;
+        base := cSerie.GetLastNoUsed(rInvtSetup."No. Serie Ind. Extension IA00") + PrefijoEmpresaGS1Tok + cSerie.GetNextNo(rInvtSetup."No. Serie EAN-128 - IA00");
+        if (StrLen(base) <> 17) or not SoloDigitos(base) then
+            Error(SSCCMalFormadoErr, rInvtSetup."No. Serie Ind. Extension IA00", rInvtSetup."No. Serie EAN-128 - IA00", base);
         exit(CopyStr(base + Format(DigitoControl(base)), 1, 20));
     end;
 

@@ -253,8 +253,7 @@ page 51128 "Analisis ABC SGA"
             exit;
         end;
 
-        rConfig.ObtenerConfig();
-        FiltroAlmacen := rConfig."Almacen por Defecto";
+        FiltroAlmacen := rConfig.AlmacenODefecto('');
         MostrarCalculo(rCalculo.UltimoDelAlmacen(FiltroAlmacen));
     end;
 

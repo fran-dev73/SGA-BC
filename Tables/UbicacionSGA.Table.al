@@ -289,10 +289,12 @@ table 51101 "Ubicacion SGA"
     /// otra fila de la misma pantalla. Con prm_Para en blanco, cualquier reserva es de otro.
     /// </summary>
     procedure ReservadaParaOtro(prm_Para: Text): Boolean
+    var
+        rConfig: Record "Config. SGA";
     begin
         if "Reservada Por" = '' then
             exit(false);
-        exit(("Reservada Por" <> UserId()) or ("Sesion Reserva" <> SessionId()) or ("Reservada Para" <> prm_Para));
+        exit(("Reservada Por" <> rConfig.UsuarioActual()) or ("Sesion Reserva" <> SessionId()) or ("Reservada Para" <> prm_Para));
     end;
 
     /// <summary>
@@ -300,12 +302,14 @@ table 51101 "Ubicacion SGA"
     /// reservada para otro.
     /// </summary>
     procedure Reservar(prm_Para: Text): Boolean
+    var
+        rConfig: Record "Config. SGA";
     begin
         if ReservadaParaOtro(prm_Para) then
             exit(false);
 
         "Reservada Para" := CopyStr(prm_Para, 1, MaxStrLen("Reservada Para"));
-        "Reservada Por" := CopyStr(UserId(), 1, MaxStrLen("Reservada Por"));
+        "Reservada Por" := rConfig.UsuarioActual();
         "Fecha Reserva" := CurrentDateTime();
         "Sesion Reserva" := SessionId();
         Modify();
@@ -345,8 +349,7 @@ table 51101 "Ubicacion SGA"
         rContenido: Record "Contenido Ubicacion SGA";
         UbicacionConContenidoErr: Label 'No se pueden eliminar los datos SGA de la ubicación %1 porque todavía tiene contenido.', Comment = '%1 = ubicación';
     begin
-        rContenido.SetRange("Cod. Almacen", "Cod. Almacen");
-        rContenido.SetRange("Cod. Bin", "Cod. Bin");
+        rContenido.FiltrarUbicacion("Cod. Almacen", "Cod. Bin");
         if not rContenido.IsEmpty() then
             Error(UbicacionConContenidoErr, "Cod. Bin");
     end;
@@ -398,8 +401,7 @@ table 51101 "Ubicacion SGA"
         factor: Decimal;
         total: Decimal;
     begin
-        rContenido.SetRange("Cod. Almacen", "Cod. Almacen");
-        rContenido.SetRange("Cod. Bin", "Cod. Bin");
+        rContenido.FiltrarUbicacion("Cod. Almacen", "Cod. Bin");
         // Una línea en negativo (con "Permitir cantidad negativa") no libera sitio.
         rContenido.SetFilter("Cantidad Base", '>%1', 0);
         rContenido.SetLoadFields("No. Producto", "Cantidad Base");
@@ -492,8 +494,7 @@ table 51101 "Ubicacion SGA"
     local procedure ComprobarMezcla(prm_Producto: Code[20]; prm_Lote: Code[50]; prm_LeerLinea: Boolean; var prm_Contenido: Record "Contenido Ubicacion SGA"): Integer
     begin
         prm_Contenido.Reset();
-        prm_Contenido.SetRange("Cod. Almacen", "Cod. Almacen");
-        prm_Contenido.SetRange("Cod. Bin", "Cod. Bin");
+        prm_Contenido.FiltrarUbicacion("Cod. Almacen", "Cod. Bin");
         // Si hay que nombrar la línea que choca, solo hacen falta su producto y su lote.
         if prm_LeerLinea then
             prm_Contenido.SetLoadFields("No. Producto", "No. Lote");
@@ -533,14 +534,26 @@ table 51101 "Ubicacion SGA"
     end;
 
     /// <summary>
+    /// Zona SGA de una ubicación. En blanco si la ubicación no existe o no tiene zona.
+    /// </summary>
+    procedure ZonaDe(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]): Code[10]
+    var
+        rUbicacionSGA: Record "Ubicacion SGA";
+    begin
+        rUbicacionSGA.SetLoadFields("Cod. Zona SGA");
+        if rUbicacionSGA.Get(prm_Almacen, prm_Ubicacion) then
+            exit(rUbicacionSGA."Cod. Zona SGA");
+        exit('');
+    end;
+
+    /// <summary>
     /// Si la ubicación no tiene nada dentro. Solo una ubicación vacía se puede reconfigurar.
     /// </summary>
     procedure EstaVacia(): Boolean
     var
         rContenido: Record "Contenido Ubicacion SGA";
     begin
-        rContenido.SetRange("Cod. Almacen", "Cod. Almacen");
-        rContenido.SetRange("Cod. Bin", "Cod. Bin");
+        rContenido.FiltrarUbicacion("Cod. Almacen", "Cod. Bin");
         exit(rContenido.IsEmpty());
     end;
 

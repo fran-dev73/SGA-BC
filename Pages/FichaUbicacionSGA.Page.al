@@ -221,8 +221,7 @@ page 51101 "Ficha Ubicacion SGA"
                     cContenido: Codeunit "Gestion Contenido SGA";
                     UbicacionVaciaErr: Label 'La ubicación %1 está vacía.', Comment = '%1 = ubicación';
                 begin
-                    Rec.CalcFields("Lineas Contenido");
-                    if Rec."Lineas Contenido" = 0 then
+                    if Rec.EstaVacia() then
                         Error(UbicacionVaciaErr, Rec."Cod. Bin");
                     if cContenido.VaciarUbicacionConDialogo(Rec."Cod. Almacen", Rec."Cod. Bin") > 0 then
                         CurrPage.Update(false);

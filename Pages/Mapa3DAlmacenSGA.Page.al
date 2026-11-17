@@ -59,11 +59,7 @@ page 51122 "Mapa 3D Almacen SGA"
                     var
                         rZona: Record "Zona SGA";
                     begin
-                        rZona.SetRange("Cod. Almacen", FiltroAlmacen);
-                        if Page.RunModal(0, rZona) <> Action::LookupOK then
-                            exit(false);
-                        Text := rZona.Code;
-                        exit(true);
+                        exit(rZona.BuscarZona(FiltroAlmacen, Text));
                     end;
 
                     trigger OnValidate()
@@ -265,8 +261,7 @@ page 51122 "Mapa 3D Almacen SGA"
     begin
         cUbicaciones.TestMismaZona(FiltroAlmacen, prm_Origen, prm_Destino);
 
-        rContenido.SetRange("Cod. Almacen", FiltroAlmacen);
-        rContenido.SetRange("Cod. Bin", prm_Origen);
+        rContenido.FiltrarUbicacion(FiltroAlmacen, prm_Origen);
         if rContenido.IsEmpty() then
             Error(SinContenidoTrasladarErr, prm_Origen);
 

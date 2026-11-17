@@ -42,7 +42,7 @@ report 51100 "Generar Ubicaciones SGA"
                 CreadasMsg: Label 'Proceso terminado. Se han creado %1 ubicaciones.', Comment = '%1 = nº creadas';
                 CreadasYExistentesMsg: Label 'Proceso terminado. Se han creado %1 ubicaciones; otras %2 ya existían y no se han tocado.', Comment = '%1 = nº creadas, %2 = nº que ya existían';
                 TodasExistianMsg: Label 'Proceso terminado. No se ha creado ninguna ubicación: las %1 ya existían.', Comment = '%1 = nº revisadas';
-                AlmacenObligatorioErr: Label 'Debe indicar el almacén.';
+                AlmacenObligatorioErr: Label 'Indique el almacén.';
                 RangoErr: Label 'El %1 desde (%2) no puede ser mayor que el hasta (%3).', Comment = '%1 = pasillo, estantería o altura, %2 = desde, %3 = hasta';
                 PasilloLbl: Label 'pasillo';
                 EstanteriaLbl: Label 'estantería';
@@ -125,11 +125,7 @@ report 51100 "Generar Ubicaciones SGA"
                         var
                             rZona: Record "Zona SGA";
                         begin
-                            rZona.SetRange("Cod. Almacen", codAlmacen);
-                            if Page.RunModal(0, rZona) <> Action::LookupOK then
-                                exit(false);
-                            Text := rZona.Code;
-                            exit(true);
+                            exit(rZona.BuscarZona(codAlmacen, Text));
                         end;
 
                         trigger OnValidate()
@@ -229,9 +225,7 @@ report 51100 "Generar Ubicaciones SGA"
         var
             rConfig: Record "Config. SGA";
         begin
-            rConfig.ObtenerConfig();
-            if codAlmacen = '' then
-                codAlmacen := rConfig."Almacen por Defecto";
+            codAlmacen := rConfig.AlmacenODefecto(codAlmacen);
 
             if intPasilloDesde = 0 then
                 intPasilloDesde := 1;

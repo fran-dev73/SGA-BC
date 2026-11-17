@@ -321,10 +321,8 @@ page 51117 "Ubicar Producto SGA"
             UM := cUM.UMBase(Producto);
             Cantidad := CantidadPreparada;
             RecalcularPendiente();
-        end else begin
-            rConfig.ObtenerConfig();
-            Almacen := rConfig."Almacen por Defecto";
-        end;
+        end else
+            Almacen := rConfig.AlmacenODefecto('');
         CurrPage.Plan.Page.Cargar(TempPlan);
     end;
 

@@ -226,8 +226,7 @@ codeunit 51102 "Gestion Mapa SGA"
         prm_Caducidad := 0D;
         prm_ClaseABC := 0;
         medirEnPales := prm_Ubicacion."Capacidad Uds." > 0;
-        rContenido.SetRange("Cod. Almacen", prm_Ubicacion."Cod. Almacen");
-        rContenido.SetRange("Cod. Bin", prm_Ubicacion."Cod. Bin");
+        rContenido.FiltrarUbicacion(prm_Ubicacion."Cod. Almacen", prm_Ubicacion."Cod. Bin");
         if rContenido.FindSet() then
             repeat
                 if medirEnPales and (prm_MotivoSinMedir = '') then begin
@@ -394,8 +393,7 @@ codeunit 51102 "Gestion Mapa SGA"
                 prm_Resumen := '-';
             1:
                 begin
-                    rContenido.SetRange("Cod. Almacen", prm_Ubicacion."Cod. Almacen");
-                    rContenido.SetRange("Cod. Bin", prm_Ubicacion."Cod. Bin");
+                    rContenido.FiltrarUbicacion(prm_Ubicacion."Cod. Almacen", prm_Ubicacion."Cod. Bin");
                     rContenido.SetLoadFields("No. Producto");
                     rContenido.FindFirst();
                     prm_Resumen := rContenido."No. Producto";

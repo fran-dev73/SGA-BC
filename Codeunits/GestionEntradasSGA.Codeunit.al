@@ -45,13 +45,13 @@ codeunit 51105 "Gestion Entradas SGA"
     /// dos fechas puede ir en blanco: sin fechas se mira todo.
     /// prm_Clase filtra por la "Clase de articulo" de la ficha del producto (su valor de opción);
     /// -1 = todas. prm_Producto deja solo ese producto; en blanco, todos.
-    /// Devuelve cuántas filas ha cargado. prm_Buffer queda sin filtros y ordenado por documento.
+    /// prm_Buffer queda sin filtros y ordenado por documento.
     /// </summary>
-    procedure CargarEntradas(var prm_Buffer: Record "Linea Ubicacion SGA" temporary; prm_Origen: Enum "Origen Mov. SGA"; prm_FechaDesde: Date; prm_FechaHasta: Date; prm_Almacen: Code[10]; prm_SoloPendientes: Boolean; prm_Clase: Integer; prm_Producto: Code[20]): Integer
+    procedure CargarEntradas(var prm_Buffer: Record "Linea Ubicacion SGA" temporary; prm_Origen: Enum "Origen Mov. SGA"; prm_FechaDesde: Date; prm_FechaHasta: Date; prm_Almacen: Code[10]; prm_SoloPendientes: Boolean; prm_Clase: Integer; prm_Producto: Code[20])
     begin
         FiltrarLote := false;
         CualquierLote := false;
-        exit(Cargar(prm_Buffer, prm_Origen, prm_FechaDesde, prm_FechaHasta, prm_Almacen, prm_SoloPendientes, prm_Clase, prm_Producto));
+        Cargar(prm_Buffer, prm_Origen, prm_FechaDesde, prm_FechaHasta, prm_Almacen, prm_SoloPendientes, prm_Clase, prm_Producto);
     end;
 
     /// <summary>
@@ -59,7 +59,7 @@ codeunit 51105 "Gestion Entradas SGA"
     /// sin clase y sin más límite de fechas que el inicio de SGA. Es lo que usa "Pendiente de ubicar" para saber cuánto de un lote
     /// espera en estas pantallas: filtrar por el lote evita repasar toda la historia del producto.
     /// </summary>
-    procedure CargarEntradasLote(var prm_Buffer: Record "Linea Ubicacion SGA" temporary; prm_Origen: Enum "Origen Mov. SGA"; prm_Almacen: Code[10]; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50]): Integer
+    procedure CargarEntradasLote(var prm_Buffer: Record "Linea Ubicacion SGA" temporary; prm_Origen: Enum "Origen Mov. SGA"; prm_Almacen: Code[10]; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50])
     begin
         FiltrarLote := true;
         VarianteFiltro := prm_Variante;
@@ -67,14 +67,14 @@ codeunit 51105 "Gestion Entradas SGA"
         // Un producto sin lotes de BC se cuadra por el total (su stock de BC no lleva lote): con
         // el lote en blanco cuentan todos sus lotes propios.
         CualquierLote := (prm_Lote = '') and not cStock.LoteEstandar(prm_Producto);
-        exit(Cargar(prm_Buffer, prm_Origen, 0D, 0D, prm_Almacen, true, -1, prm_Producto));
+        Cargar(prm_Buffer, prm_Origen, 0D, 0D, prm_Almacen, true, -1, prm_Producto);
     end;
 
     /// <summary>
     /// Las entradas anteriores a "Fecha Inicio SGA" no se cargan nunca, se pidan las fechas que
     /// se pidan: lo que trajeron ya es stock de BC y lo coloca la carga inicial.
     /// </summary>
-    local procedure Cargar(var prm_Buffer: Record "Linea Ubicacion SGA" temporary; prm_Origen: Enum "Origen Mov. SGA"; prm_FechaDesde: Date; prm_FechaHasta: Date; prm_Almacen: Code[10]; prm_SoloPendientes: Boolean; prm_Clase: Integer; prm_Producto: Code[20]): Integer
+    local procedure Cargar(var prm_Buffer: Record "Linea Ubicacion SGA" temporary; prm_Origen: Enum "Origen Mov. SGA"; prm_FechaDesde: Date; prm_FechaHasta: Date; prm_Almacen: Code[10]; prm_SoloPendientes: Boolean; prm_Clase: Integer; prm_Producto: Code[20])
     var
         rConfig: Record "Config. SGA";
         OrigenNoUbicableErr: Label 'Solo se pueden ubicar entradas de compra o de producción.';
@@ -97,13 +97,13 @@ codeunit 51105 "Gestion Entradas SGA"
 
         // Hasta una fecha anterior al inicio de SGA no hay nada que ubicar.
         if (FechaHasta <> 0D) and (FechaHasta < FechaDesde) then
-            exit(0);
+            exit;
 
         case prm_Origen of
             prm_Origen::Produccion:
-                exit(CargarEnsamblados(prm_Buffer, prm_Almacen, prm_SoloPendientes));
+                CargarEnsamblados(prm_Buffer, prm_Almacen, prm_SoloPendientes);
             prm_Origen::Compra:
-                exit(CargarRecepciones(prm_Buffer, prm_Almacen, prm_SoloPendientes));
+                CargarRecepciones(prm_Buffer, prm_Almacen, prm_SoloPendientes);
             else
                 Error(OrigenNoUbicableErr);
         end;
@@ -142,7 +142,7 @@ codeunit 51105 "Gestion Entradas SGA"
     /// (los da LotesEnsamblado). Las elaboraciones quedan fuera: su salida es granel a depósito,
     /// no va a hueco.
     /// </summary>
-    local procedure CargarEnsamblados(var prm_Buffer: Record "Linea Ubicacion SGA" temporary; prm_Almacen: Code[10]; prm_SoloPendientes: Boolean): Integer
+    local procedure CargarEnsamblados(var prm_Buffer: Record "Linea Ubicacion SGA" temporary; prm_Almacen: Code[10]; prm_SoloPendientes: Boolean)
     var
         rCabEns: Record "Posted Assembly Header";
         rItem: Record Item;
@@ -168,13 +168,13 @@ codeunit 51105 "Gestion Entradas SGA"
                 // El lote estándar no está en la cabecera: se buscan los ensamblados que lo sacaron.
                 filtroEnsamblados := EnsambladosDelLote();
                 if filtroEnsamblados = '' then
-                    exit(0);
+                    exit;
                 rCabEns.SetFilter("No.", filtroEnsamblados);
             end else
                 if not CualquierLote then begin
                     // Un lote más largo que el del ensamblado no puede ser de ningún ensamblado.
                     if StrLen(LoteFiltro) > MaxStrLen(rCabEns.Lote) then
-                        exit(0);
+                        exit;
                     rCabEns.SetRange(Lote, LoteFiltro);
                 end;
         end;
@@ -182,7 +182,7 @@ codeunit 51105 "Gestion Entradas SGA"
         // (Pag-Ext50105), así que casi todos se registran en blanco y filtrar por él dejaba la
         // lista siempre vacía. Se compara más abajo, ya con el almacén de la fila resuelto.
         if not rCabEns.FindSet() then
-            exit(0);
+            exit;
 
         repeat
             if not rItem.Get(rCabEns."Item No.") then
@@ -227,8 +227,6 @@ codeunit 51105 "Gestion Entradas SGA"
                 end;
             end;
         until rCabEns.Next() = 0;
-
-        exit(cargadas);
     end;
 
     /// <summary>
@@ -321,7 +319,7 @@ codeunit 51105 "Gestion Entradas SGA"
     /// recepción genera un movimiento negativo en el mismo albarán, y al sumar por documento
     /// lo deshecho se descuenta solo.
     /// </summary>
-    local procedure CargarRecepciones(var prm_Buffer: Record "Linea Ubicacion SGA" temporary; prm_Almacen: Code[10]; prm_SoloPendientes: Boolean): Integer
+    local procedure CargarRecepciones(var prm_Buffer: Record "Linea Ubicacion SGA" temporary; prm_Almacen: Code[10]; prm_SoloPendientes: Boolean)
     var
         rItemLedgEntry: Record "Item Ledger Entry";
         rItem: Record Item;
@@ -330,7 +328,6 @@ codeunit 51105 "Gestion Entradas SGA"
         um: Code[10];
         factor: Decimal;
         siguienteLinea: Integer;
-        cargadas: Integer;
     begin
         rItemLedgEntry.SetRange("Entry Type", rItemLedgEntry."Entry Type"::Purchase);
         rItemLedgEntry.SetRange("Document Type", rItemLedgEntry."Document Type"::"Purchase Receipt");
@@ -350,7 +347,7 @@ codeunit 51105 "Gestion Entradas SGA"
             rItemLedgEntry.SetRange("Lot No.", LoteFiltro);
         end;
         if not rItemLedgEntry.FindSet() then
-            exit(0);
+            exit;
 
         // Primera pasada: acumular por fila (documento, producto, variante, lote y UM). Se busca
         // en una copia para no dejar filtros en prm_Buffer, que es la lista de la página. Las
@@ -410,14 +407,10 @@ codeunit 51105 "Gestion Entradas SGA"
                     CalcularPendiente(TempFila);
                     if prm_SoloPendientes and (TempFila.Estado = TempFila.Estado::Ubicado) then
                         TempFila.Delete()
-                    else begin
+                    else
                         TempFila.Modify();
-                        cargadas += 1;
-                    end;
                 end;
             until TempFila.Next() = 0;
-
-        exit(cargadas);
     end;
 
     /// <summary>
@@ -497,7 +490,6 @@ codeunit 51105 "Gestion Entradas SGA"
     var
         rMovimiento: Record "Movimiento Ubicacion SGA";
         cContenido: Codeunit "Gestion Contenido SGA";
-        factorPale: Decimal;
         paleEnUMFila: Decimal;
         MasDeUnPaleErr: Label 'Se ubica de palé en palé, cada uno con su SSCC: como mucho %1 %2 de %3 cada vez.', Comment = '%1 = cantidad de un palé, %2 = unidad, %3 = producto';
         descripcion: Text;
@@ -523,12 +515,9 @@ codeunit 51105 "Gestion Entradas SGA"
         if prm_Fila.Cantidad > prm_Fila.Pendiente() then
             Error(CantidadExcedePendienteErr, prm_Fila.Pendiente(), prm_Fila."No. Producto");
         // Cada palé entra con su SSCC: no más de un palé por vez.
-        factorPale := cUM.FactorPale(prm_Fila."No. Producto");
-        if factorPale > 1 then begin
-            paleEnUMFila := cUOMMgt.CalcQtyFromBase(factorPale, cUM.FactorUM(prm_Fila."No. Producto", prm_Fila."Cod. Unidad Medida"));
+        if UnPaleEnUMFila(prm_Fila, paleEnUMFila) then
             if prm_Fila.Cantidad > paleEnUMFila then
                 Error(MasDeUnPaleErr, paleEnUMFila, prm_Fila."Cod. Unidad Medida", prm_Fila."No. Producto");
-        end;
 
         if prm_Fila.Origen = prm_Fila.Origen::Compra then
             descripcion := StrSubstNo(RecepcionLbl, prm_Fila."No. Documento")
@@ -541,7 +530,7 @@ codeunit 51105 "Gestion Entradas SGA"
         cContenido.RegistrarEntrada(prm_Fila."Cod. Almacen", prm_Fila."Ubicacion Confirmada",
                                     prm_Fila."No. Producto", prm_Fila."Cod. Variante", prm_Fila."No. Lote",
                                     prm_Fila.SSCCPale(), prm_Fila."Cod. Unidad Medida", prm_Fila.Cantidad,
-                                    prm_Fila.Origen, prm_Fila."No. Documento", 0, descripcion);
+                                    prm_Fila.Origen, prm_Fila."No. Documento", descripcion);
         cUbicaciones.LiberarReservas(prm_Fila.ReservaFila(), '');
 
         CalcularPendiente(prm_Fila);
@@ -772,8 +761,8 @@ codeunit 51105 "Gestion Entradas SGA"
 
     /// <summary>
     /// Imprime la etiqueta del palé de una tarea y lo ubica (prm_Pale, el que ha preparado
-    /// PrepararPaleTarea, con la ubicación ya comprobada por quien llama). Lo que impide sacar la
-    /// etiqueta se comprueba antes de imprimir, para no dejar etiquetas de palés sin ubicación.
+    /// PrepararPaleTarea). La ubicación y lo que impide sacar la etiqueta se comprueban antes de
+    /// imprimir, para no dejar etiquetas de palés sin ubicación.
     ///
     /// En Sandbox no se toca BarTender (su carpeta FTP es la de producción): la etiqueta sale con
     /// el report A5, directa a la impresora que tenga asignada en Selección de impresoras.
@@ -790,7 +779,12 @@ codeunit 51105 "Gestion Entradas SGA"
     var
         EnvironmentInformation: Codeunit "Environment Information";
         cContenido: Codeunit "Gestion Contenido SGA";
+        UbicacionNoIndicadaErr: Label 'Indique la ubicación en la que deja el palé.';
     begin
+        // La ubicación, lo primero: que esté indicada y exista en BC.
+        if prm_Pale."Ubicacion Confirmada" = '' then
+            Error(UbicacionNoIndicadaErr);
+        cUbicaciones.ComprobarUbicacionExiste(prm_Pale."Cod. Almacen", prm_Pale."Ubicacion Confirmada");
         ComprobarEtiqueta(prm_Tarea);
         // Antes de imprimir, que el hueco admita el palé con las mismas reglas que al ubicar:
         // si no, saldría una etiqueta para un palé que luego no se puede colocar ahí.
@@ -1061,21 +1055,31 @@ codeunit 51105 "Gestion Entradas SGA"
     local procedure CalcularPendiente(var prm_Fila: Record "Linea Ubicacion SGA" temporary)
     var
         paleEnUMFila: Decimal;
-        factorPale: Decimal;
     begin
         prm_Fila."Cantidad Ya Ubicada" := YaUbicadaFila(prm_Fila);
         prm_Fila.Cantidad := prm_Fila.Pendiente();
-        // FactorPale es 1 si el producto no tiene palé: entonces no se limita a un palé.
-        factorPale := cUM.FactorPale(prm_Fila."No. Producto");
-        if factorPale > 1 then begin
-            paleEnUMFila := cUOMMgt.CalcQtyFromBase(factorPale, cUM.FactorUM(prm_Fila."No. Producto", prm_Fila."Cod. Unidad Medida"));
+        if UnPaleEnUMFila(prm_Fila, paleEnUMFila) then
             if prm_Fila.Cantidad > paleEnUMFila then
                 prm_Fila.Cantidad := paleEnUMFila;
-        end;
         if prm_Fila.Cantidad <= 0 then
             prm_Fila.Estado := prm_Fila.Estado::Ubicado
         else
             prm_Fila.Estado := prm_Fila.Estado::Pendiente;
+    end;
+
+    /// <summary>
+    /// Un palé del producto expresado en la unidad de la fila, en prm_PaleEnUM. False si el
+    /// producto no tiene palé (FactorPale da 1): entonces no se limita a un palé.
+    /// </summary>
+    local procedure UnPaleEnUMFila(var prm_Fila: Record "Linea Ubicacion SGA" temporary; var prm_PaleEnUM: Decimal): Boolean
+    var
+        factorPale: Decimal;
+    begin
+        factorPale := cUM.FactorPale(prm_Fila."No. Producto");
+        if factorPale <= 1 then
+            exit(false);
+        prm_PaleEnUM := cUOMMgt.CalcQtyFromBase(factorPale, cUM.FactorUM(prm_Fila."No. Producto", prm_Fila."Cod. Unidad Medida"));
+        exit(true);
     end;
 
     /// <summary>

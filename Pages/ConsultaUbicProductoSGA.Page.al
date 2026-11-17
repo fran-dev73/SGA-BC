@@ -239,10 +239,8 @@ page 51108 "Consulta Ubic. Producto SGA"
         FiltroLote := CopyStr(Rec.GetFilter("No. Lote"), 1, MaxStrLen(FiltroLote));
         FiltroSSCC := CopyStr(Rec.GetFilter(SSCC), 1, MaxStrLen(FiltroSSCC));
 
-        if (FiltroAlmacen = '') and (FiltroSSCC = '') then begin
-            rConfig.ObtenerConfig();
-            FiltroAlmacen := rConfig."Almacen por Defecto";
-        end;
+        if FiltroSSCC = '' then
+            FiltroAlmacen := rConfig.AlmacenODefecto(FiltroAlmacen);
 
         SoloDisponible := FiltroSSCC = '';
         AplicarFiltros();
@@ -277,10 +275,9 @@ page 51108 "Consulta Ubic. Producto SGA"
         else
             Rec.SetRange(SSCC);
 
-        if SoloDisponible then begin
-            Rec.SetRange(Bloqueado, false);
-            Rec.SetFilter("Cantidad Disponible", '>%1', 0);
-        end else begin
+        if SoloDisponible then
+            Rec.FiltrarCogible()
+        else begin
             Rec.SetRange(Bloqueado);
             Rec.SetRange("Cantidad Disponible");
         end;

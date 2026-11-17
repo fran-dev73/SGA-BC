@@ -280,8 +280,25 @@ table 51102 "Contenido Ubicacion SGA"
         SetRange("Cod. Almacen", prm_Almacen);
         SetRange("No. Producto", prm_Producto);
         SetRange("Cod. Variante", prm_Variante);
+        FiltrarCogible();
+    end;
+
+    /// <summary>
+    /// Deja solo las líneas que se pueden coger: sin bloquear y con algo disponible.
+    /// </summary>
+    procedure FiltrarCogible()
+    begin
         SetRange(Bloqueado, false);
         SetFilter("Cantidad Disponible", '>%1', 0);
+    end;
+
+    /// <summary>
+    /// Deja solo el contenido de una ubicación.
+    /// </summary>
+    procedure FiltrarUbicacion(prm_Almacen: Code[10]; prm_Ubicacion: Code[20])
+    begin
+        SetRange("Cod. Almacen", prm_Almacen);
+        SetRange("Cod. Bin", prm_Ubicacion);
     end;
 
     /// <summary>
