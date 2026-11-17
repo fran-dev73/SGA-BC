@@ -37,7 +37,7 @@ SGA es el módulo de gestión de ubicaciones del almacén dentro de Business Cen
 - La capacidad se mide en **palés**, con el palé por defecto de cada producto. Una cantidad se reparte en palés completos, cada uno a su hueco, y un resto.
 - **Todo palé lleva su SSCC**: el de su etiqueta (proveedor o producción) o uno nuevo si no la trae. Las cajas sueltas siguen siendo de su palé aunque cambien de hueco.
 - Dentro de cada tipo, el orden lo da la **estrategia** de la configuración. Para producción, el **primer hueco vacío** siguiendo el recorrido; para compras, la casa del producto, si no junto a lo que ya hay y si no el primer hueco libre.
-- Al recoger se coge primero lo que antes caduca (FEFO, configurable), palés enteros de almacenamiento si el pedido llega a un palé, y lo demás de picking.
+- Al recoger se coge primero lo que antes caduca, y lo que no tiene caducidad al final (FEFO, configurable), palés enteros de almacenamiento si el pedido llega a un palé, y lo demás de picking.
 
 ## Cómo se repone el picking
 

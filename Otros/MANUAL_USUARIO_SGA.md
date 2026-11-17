@@ -97,7 +97,7 @@ Ni el producto ni el palé se leen: solo la ubicación. Si lo leído no es una u
 
 Al terminar sale *Orden terminada*, la playa en la que dejarla y que lo recogido ya está en el pedido. Si quedan paradas retenidas, dice que la orden está recorrida y cuántas quedan para el responsable. Si dice que no se ha podido pasar al pedido, avisa a oficina: no se pierde nada.
 
-**En qué orden sale.** De un pedido salen primero los palés, luego las cajas (las de más volumen antes, para que queden abajo) y por último los sueltos. Se recoge primero de palés completos de almacenamiento, luego de picking y lo que falte de las demás ubicaciones (menos la de ajustes). Dentro de cada paso manda la estrategia de picking: lo que entró antes (FIFO), lo que antes caduca (FEFO) o por orden de ubicación, para ir vaciando huecos.
+**En qué orden sale.** De un pedido salen primero los palés, luego las cajas (las de más volumen antes, para que queden abajo) y por último los sueltos. Se recoge primero de palés completos de almacenamiento, luego de picking y lo que falte de las demás ubicaciones (menos la de ajustes). Dentro de cada paso manda la estrategia de picking: lo que entró antes (FIFO), lo que antes caduca, y lo que no tiene caducidad al final (FEFO) o por orden de ubicación, para ir vaciando huecos.
 
 ### Preparar el terminal (una vez)
 

@@ -25,7 +25,8 @@ SGA se apoya en el maestro de BC. Sin estos datos, la configuración de abajo no
 2. **Productos con palé.** En la ficha del producto, *Cód. palé por defecto* con una unidad de medida de palé en su *Unidades de medida* y su factor (cuántas unidades base tiene el palé). Sin ese factor mayor que 1, el producto se cuenta como si no tuviera palé: no cabe en las ubicaciones con capacidad y la carga inicial no lo reparte por huecos.
 3. **Grupo IIEE** (si se usa). En la ficha de cada producto, su *Grupo IIEE*.
 4. **Series.** Una serie de números para *Nºs orden SGA* (apartado 2); sin ella no se puede enviar ningún pedido a SGA. Los SSCC de los palés que entran sin etiqueta salen de las series de la *Configuración de inventario*, *Nº serie EAN-128 - IA00* (número de 9 dígitos) y *Nº serie ind. extensión IA00* (dígito de extensión), las mismas de las etiquetas de palé del resto del sistema; sin ellas no se puede ubicar un palé que entra sin etiqueta.
-5. **Usuarios.** Cada persona con su usuario de BC y su rol (apartado 1), antes de configurar la PDA.
+5. **Lotes de BC (opcional).** Para tener trazabilidad por lote en los albaranes y facturas de venta, el producto fabricado necesita un código de seguimiento con *Seguimiento específico de lote* (y, si se quiere caducidad, *Usar fechas de caducidad* y la *Fórmula de caducidad* en su ficha). Con eso, el *Lote* del ensamblado pasa solo al seguimiento de BC y el picking lo escribe en el pedido. BC no deja cambiar el código de seguimiento de un producto que ya tiene movimientos.
+6. **Usuarios.** Cada persona con su usuario de BC y su rol (apartado 1), antes de configurar la PDA.
 
 ## 1. Roles y permisos
 

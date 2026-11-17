@@ -539,9 +539,9 @@ codeunit 51104 "Gestion Picking SGA"
 
     /// <summary>
     /// Acota el contenido ya filtrado a las ubicaciones de una pasada (1 almacenamiento, 2
-    /// picking, 3 el resto), lo ordena por la estrategia y se sitúa en el primero.
+    /// picking, 3 el resto) y a un tramo de la estrategia, lo ordena y se sitúa en el primero.
     /// </summary>
-    local procedure BuscarEnPasada(var prm_Contenido: Record "Contenido Ubicacion SGA"; prm_Pasada: Integer; prm_Estrategia: Enum "Estrategia Picking SGA"): Boolean
+    local procedure BuscarEnPasada(var prm_Contenido: Record "Contenido Ubicacion SGA"; prm_Pasada: Integer; prm_Estrategia: Enum "Estrategia Picking SGA"; prm_Tramo: Integer): Boolean
     begin
         case prm_Pasada of
             1:
@@ -552,7 +552,8 @@ codeunit 51104 "Gestion Picking SGA"
                 prm_Contenido.SetFilter("Tipo Ubicacion", '<>%1', prm_Contenido."Tipo Ubicacion"::Picking);
         end;
         prm_Contenido.SetAutoCalcFields("Secuencia Picking");
-        OrdenarPorEstrategia(prm_Contenido, prm_Estrategia);
+        if not OrdenarPorEstrategia(prm_Contenido, prm_Estrategia, prm_Tramo) then
+            exit(false);
         exit(prm_Contenido.FindSet());
     end;
 
@@ -570,38 +571,36 @@ codeunit 51104 "Gestion Picking SGA"
         rContenido: Record "Contenido Ubicacion SGA";
         yaCogido: Decimal;
         coger: Decimal;
+        tramo: Integer;
     begin
-        if prm_Pendiente <= 0 then
-            exit;
-
         rContenido.FiltrarDisponible(prm_Plantilla."Cod. Almacen", prm_Plantilla."No. Producto");
         // Al sustituir una parada, su ubicación (vacía) no se vuelve a proponer.
         if prm_Plantilla."Cod. Bin Propuesto" <> '' then
             rContenido.SetFilter("Cod. Bin", '<>%1', prm_Plantilla."Cod. Bin Propuesto");
-        if not BuscarEnPasada(rContenido, prm_Pasada, prm_Estrategia) then
-            exit;
 
-        repeat
-            if not prm_Cogido.Get(rContenido.GetPosition(), yaCogido) then
-                yaCogido := 0;
-            coger := rContenido."Cantidad Disponible" - yaCogido;
-            if coger > prm_Pendiente then
-                coger := prm_Pendiente;
-            // En la primera pasada de un pedido, solo palés enteros (sin factor, sin redondeo).
-            if (prm_Pasada = 1) and (prm_FactorPale > 0) then
-                coger := Round(coger / prm_FactorPale, 1, '<') * prm_FactorPale;
+        for tramo := 1 to 2 do
+            if (prm_Pendiente > 0) and BuscarEnPasada(rContenido, prm_Pasada, prm_Estrategia, tramo) then
+                repeat
+                    if not prm_Cogido.Get(rContenido.GetPosition(), yaCogido) then
+                        yaCogido := 0;
+                    coger := rContenido."Cantidad Disponible" - yaCogido;
+                    if coger > prm_Pendiente then
+                        coger := prm_Pendiente;
+                    // En la primera pasada de un pedido, solo palés enteros (sin factor, sin redondeo).
+                    if (prm_Pasada = 1) and (prm_FactorPale > 0) then
+                        coger := Round(coger / prm_FactorPale, 1, '<') * prm_FactorPale;
 
-            // Una reubicación (con destino) puede salir de la ubicación de ajustes; un picking no.
-            if (coger > 0) and rContenido.SePuedeCoger(prm_Plantilla."Cod. Bin Destino" = '') then begin
-                InsertarParada(prm_Orden, rContenido, coger, prm_Plantilla."Cod. Bin Destino", prm_Plantilla."No. Linea Origen", prm_Plantilla."No. Documento Origen",
-                               prm_Plantilla."UM Documento", prm_Plantilla."Ctdad. por UM Documento", prm_NoLinea);
-                prm_Cogido.Set(rContenido.GetPosition(), yaCogido + coger);
-                prm_Pendiente -= coger;
-                if prm_Ubicaciones <> '' then
-                    prm_Ubicaciones += ', ';
-                prm_Ubicaciones += rContenido."Cod. Bin";
-            end;
-        until (rContenido.Next() = 0) or (prm_Pendiente <= 0);
+                    // Una reubicación (con destino) puede salir de la ubicación de ajustes; un picking no.
+                    if (coger > 0) and rContenido.SePuedeCoger(prm_Plantilla."Cod. Bin Destino" = '') then begin
+                        InsertarParada(prm_Orden, rContenido, coger, prm_Plantilla."Cod. Bin Destino", prm_Plantilla."No. Linea Origen", prm_Plantilla."No. Documento Origen",
+                                       prm_Plantilla."UM Documento", prm_Plantilla."Ctdad. por UM Documento", prm_NoLinea);
+                        prm_Cogido.Set(rContenido.GetPosition(), yaCogido + coger);
+                        prm_Pendiente -= coger;
+                        if prm_Ubicaciones <> '' then
+                            prm_Ubicaciones += ', ';
+                        prm_Ubicaciones += rContenido."Cod. Bin";
+                    end;
+                until (rContenido.Next() = 0) or (prm_Pendiente <= 0);
     end;
 
     /// <summary>
@@ -679,19 +678,35 @@ codeunit 51104 "Gestion Picking SGA"
     end;
 
     /// <summary>
-    /// Fija el orden en que se recorre el contenido según la estrategia configurada. Al
-    /// preparador se le dice el lote concreto de cada parada. Las reubicaciones eligen con el mismo orden qué traer de almacenamiento.
+    /// Fija el orden en que se recorre el contenido según la estrategia configurada, en tramos
+    /// que se recorren uno detrás de otro (1 y 2). Devuelve false si la estrategia no tiene ese
+    /// tramo. FIFO y Vaciar ubicación van en un tramo. FEFO va en dos: primero lo que tiene
+    /// caducidad, de la más próxima a la más lejana, y después lo que no la tiene (por la
+    /// clave, la fecha en blanco iría delante de todas). Al preparador se le dice el lote
+    /// concreto de cada parada. Las reubicaciones eligen con el mismo orden qué traer de
+    /// almacenamiento.
     /// </summary>
-    procedure OrdenarPorEstrategia(var prm_Contenido: Record "Contenido Ubicacion SGA"; prm_Estrategia: Enum "Estrategia Picking SGA")
+    procedure OrdenarPorEstrategia(var prm_Contenido: Record "Contenido Ubicacion SGA"; prm_Estrategia: Enum "Estrategia Picking SGA"; prm_Tramo: Integer): Boolean
     begin
         case prm_Estrategia of
             prm_Estrategia::FIFO:
                 prm_Contenido.SetCurrentKey("Cod. Almacen", "No. Producto", "Fecha Ultima Entrada");
             prm_Estrategia::"Vaciar Ubicacion":
                 prm_Contenido.SetCurrentKey("Cod. Almacen", "Cod. Bin");
-            else
+            else begin
                 prm_Contenido.SetCurrentKey("Cod. Almacen", "No. Producto", Bloqueado, "Fecha Caducidad", "Cod. Bin");
+                case prm_Tramo of
+                    1:
+                        prm_Contenido.SetFilter("Fecha Caducidad", '<>%1', 0D);
+                    2:
+                        prm_Contenido.SetRange("Fecha Caducidad", 0D);
+                    else
+                        exit(false);
+                end;
+                exit(true);
+            end;
         end;
+        exit(prm_Tramo = 1);
     end;
 
     /// <summary>

@@ -150,18 +150,20 @@ codeunit 51113 "Reubicaciones SGA"
     var
         rConfig: Record "Config. SGA";
         cPicking: Codeunit "Gestion Picking SGA";
+        tramo: Integer;
     begin
         rConfig.ObtenerConfig();
         prm_Contenido.Reset();
         prm_Contenido.FiltrarDisponible(prm_Almacen, prm_Producto);
         prm_Contenido.SetRange("Tipo Ubicacion", prm_Contenido."Tipo Ubicacion"::Almacenamiento);
-        cPicking.OrdenarPorEstrategia(prm_Contenido, rConfig."Estrategia Picking");
         // El primero que se pueda coger: no de una ubicación o zona bloqueada.
-        if prm_Contenido.FindSet() then
-            repeat
-                if prm_Contenido.SePuedeCoger(false) then
-                    exit(true);
-            until prm_Contenido.Next() = 0;
+        for tramo := 1 to 2 do
+            if cPicking.OrdenarPorEstrategia(prm_Contenido, rConfig."Estrategia Picking", tramo) then
+                if prm_Contenido.FindSet() then
+                    repeat
+                        if prm_Contenido.SePuedeCoger(false) then
+                            exit(true);
+                    until prm_Contenido.Next() = 0;
         exit(false);
     end;
 
