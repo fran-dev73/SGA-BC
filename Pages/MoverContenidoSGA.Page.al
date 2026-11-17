@@ -186,7 +186,6 @@ page 51114 "Mover Contenido SGA"
         CantidadDisponible: Decimal;
         Cantidad: Decimal;
         Motivo: Text[100];
-        Variante: Code[10];
         UM: Code[10];
         ZonaOrigen: Code[10];
         ZonaDestino: Code[10];
@@ -236,7 +235,7 @@ page 51114 "Mover Contenido SGA"
         if ZonaDestino = '' then
             exit;
 
-        UbicacionDestino := cUbicaciones.ProponerEnZona(Almacen, ZonaDestino, UbicacionOrigen, Producto, Variante, Lote,
+        UbicacionDestino := cUbicaciones.ProponerEnZona(Almacen, ZonaDestino, UbicacionOrigen, Producto, Lote,
                                                         UM, Cantidad, MotivoPropuesta);
         DestinoPropuesto := UbicacionDestino <> '';
     end;
@@ -251,7 +250,6 @@ page 51114 "Mover Contenido SGA"
         Almacen := rContenido."Cod. Almacen";
         UbicacionOrigen := rContenido."Cod. Bin";
         Producto := rContenido."No. Producto";
-        Variante := rContenido."Cod. Variante";
         Lote := rContenido."No. Lote";
         SSCC := rContenido.SSCC;
         UM := rContenido."Cod. Unidad Medida";

@@ -28,8 +28,9 @@ page 51104 "Movs. Ubicacion SGA"
                     ToolTip = 'Número correlativo del movimiento.';
                     ApplicationArea = All;
                 }
-                field("Fecha-Hora Registro"; Rec."Fecha-Hora Registro")
+                field(FechaHoraRegistro; Rec.SystemCreatedAt)
                 {
+                    Caption = 'Fecha-hora registro';
                     ToolTip = 'Momento exacto en que se registró el movimiento.';
                     ApplicationArea = All;
                 }
@@ -67,12 +68,6 @@ page 51104 "Movs. Ubicacion SGA"
                 {
                     ToolTip = 'Descripción del producto movido.';
                     ApplicationArea = All;
-                }
-                field("Cod. Variante"; Rec."Cod. Variante")
-                {
-                    ToolTip = 'Variante del producto.';
-                    ApplicationArea = All;
-                    Visible = false;
                 }
                 field("No. Lote"; Rec."No. Lote")
                 {

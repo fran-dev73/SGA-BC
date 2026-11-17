@@ -1,8 +1,10 @@
 namespace AntonioNadal.SGA;
 
+using AntonioNadal.Produccion;
 using Microsoft.Inventory.Ledger;
 using Microsoft.Inventory.Tracking;
 using Microsoft.Sales.Document;
+using Microsoft.Warehouse.Structure;
 using System.Security.User;
 
 /// <summary>
@@ -43,6 +45,12 @@ permissionset 51100 "PermissionSet-SGA"
         tabledata "Reservation Entry" = RIMD,
         // Para saber si el usuario es responsable de picking.
         tabledata "User Setup" = R,
+        // Generar y eliminar ubicaciones crean y borran las de BC (al borrar, BC borra su contenido).
+        tabledata Bin = RIMD,
+        tabledata "Bin Content" = RD,
+        // Imprimir y ubicar anota en la tarea las etiquetas impresas y prepara los datos de la etiqueta.
+        tabledata "Tareas Produccion" = RM,
+        tabledata "Datos Reports Temporales" = RIMD,
         codeunit "Gestion Contenido SGA" = X,
         codeunit "Gestion Ubicaciones SGA" = X,
         codeunit "Gestion Mapa SGA" = X,

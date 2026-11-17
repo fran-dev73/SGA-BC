@@ -139,8 +139,9 @@ page 51124 "Asignar Ordenes Picking SGA"
                 trigger OnAction()
                 var
                     rUsuario: Record User;
+                    cUserSelection: Codeunit "User Selection";
                 begin
-                    if Page.RunModal(Page::"User Lookup", rUsuario) <> Action::LookupOK then
+                    if not cUserSelection.Open(rUsuario) then
                         exit;
 
                     AsignarSeleccion(CopyStr(rUsuario."User Name", 1, MaxStrLen(Rec."Cod. Usuario Asignado")));

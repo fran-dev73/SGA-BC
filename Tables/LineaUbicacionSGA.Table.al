@@ -11,7 +11,7 @@ using Microsoft.Warehouse.Structure;
 /// - Manual: el reparto de "Ubicar producto" (cada palé y el resto).
 /// - "Carga Inicial": el resultado de la carga inicial y de "Ubicar seleccionadas".
 /// - Compra y Produccion: lo que ha entrado en "Ubicar entradas" (un ensamblado, o un producto,
-///   variante, lote y unidad de un albarán de compra) y el palé de una tarea en "Imprimir y
+///   lote y unidad de un albarán de compra) y el palé de una tarea en "Imprimir y
 ///   ubicar palés". Estas líneas llevan además el documento, la cantidad que entró y la ya
 ///   ubicada; Cantidad es lo que se va a ubicar ahora.
 ///
@@ -86,12 +86,6 @@ table 51114 "Linea Ubicacion SGA"
             Editable = false;
             FieldClass = FlowField;
             CalcFormula = lookup(Item.Description where("No." = field("No. Producto")));
-        }
-        field(26; "Cod. Variante"; Code[10])
-        {
-            Caption = 'Cód. variante';
-            ToolTip = 'Variante del producto.';
-            DataClassification = ToBeClassified;
         }
         field(27; "No. Lote"; Code[50])
         {
@@ -211,10 +205,10 @@ table 51114 "Linea Ubicacion SGA"
         {
             Clustered = true;
         }
-        // Una entrada por documento, producto, variante, lote y unidad: un albarán de compra
-        // puede traer el mismo producto en varios lotes y unidades, y cada combinación va a su
-        // hueco. La unicidad la asegura quien carga (Cod. "Gestion Entradas SGA").
-        key(Documento; Origen, "No. Documento", "No. Producto", "Cod. Variante", "No. Lote", "Cod. Unidad Medida")
+        // Una entrada por documento, producto, lote y unidad: un albarán de compra puede traer el
+        // mismo producto en varios lotes y unidades, y cada combinación va a su hueco. La
+        // unicidad la asegura quien carga (Cod. "Gestion Entradas SGA").
+        key(Documento; Origen, "No. Documento", "No. Producto", "No. Lote", "Cod. Unidad Medida")
         {
         }
     }

@@ -15,7 +15,7 @@ page 51109 "Ubicaciones Producto FactBox"
     InsertAllowed = false;
     DeleteAllowed = false;
     ModifyAllowed = false;
-    SourceTableView = sorting("Cod. Almacen", "No. Producto", "Cod. Variante", Bloqueado, "Fecha Caducidad", "Cod. Bin");
+    SourceTableView = sorting("Cod. Almacen", "No. Producto", Bloqueado, "Fecha Caducidad", "Cod. Bin");
 
     layout
     {

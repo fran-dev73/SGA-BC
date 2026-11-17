@@ -1,5 +1,7 @@
 namespace AntonioNadal.SGA;
 
+using System.Utilities;
+
 /// <summary>
 /// Page Contenido Ubicaciones SGA (ID 51103).
 /// Vista transversal del contenido de todas las ubicaciones: permite responder
@@ -53,11 +55,6 @@ page 51103 "Contenido Ubicaciones SGA"
                 field(Descripcion; Rec.Descripcion)
                 {
                     ToolTip = 'Descripción del producto.';
-                    ApplicationArea = All;
-                }
-                field("Cod. Variante"; Rec."Cod. Variante")
-                {
-                    ToolTip = 'Variante del producto.';
                     ApplicationArea = All;
                 }
                 field("No. Lote"; Rec."No. Lote")
@@ -205,12 +202,13 @@ page 51103 "Contenido Ubicaciones SGA"
             action(VerMovimientos)
             {
                 Caption = 'Movimientos';
-                ToolTip = 'Muestra los movimientos de ubicación de este producto y lote.';
+                ToolTip = 'Muestra los movimientos de ubicación de este producto y lote en este almacén.';
                 ApplicationArea = All;
                 Image = Entries;
                 RunObject = page "Movs. Ubicacion SGA";
                 RunPageLink = "No. Producto" = field("No. Producto"),
-                              "No. Lote" = field("No. Lote");
+                              "No. Lote" = field("No. Lote"),
+                              "Cod. Almacen" = field("Cod. Almacen");
             }
             action(VerMovimientosPale)
             {
@@ -294,6 +292,7 @@ page 51103 "Contenido Ubicaciones SGA"
         rContenido: Record "Contenido Ubicacion SGA";
         rLinea: Record "Contenido Ubicacion SGA";
         cContenido: Codeunit "Gestion Contenido SGA";
+        cConfirmMgt: Codeunit "Confirm Management";
         lineas: Integer;
         DesubicarLineasQst: Label 'Se van a quitar de su ubicación %1 líneas de contenido. La mercancía queda pendiente de ubicar (el stock de BC no cambia). ¿Continuar?', Comment = '%1 = número de líneas';
         LineaDesubicadaMsg: Label 'Se ha quitado %1 %2 de %3 de la ubicación %4. Queda pendiente de ubicar.', Comment = '%1 = cantidad, %2 = unidad, %3 = producto, %4 = ubicación';
@@ -304,7 +303,7 @@ page 51103 "Contenido Ubicaciones SGA"
         if lineas = 0 then
             exit;
 
-        if not Confirm(DesubicarLineasQst, false, lineas) then
+        if not cConfirmMgt.GetResponseOrDefault(StrSubstNo(DesubicarLineasQst, lineas), false) then
             exit;
 
         // El mensaje de una sola línea cuenta lo que se ha quitado: se lee antes, porque al
@@ -336,7 +335,7 @@ page 51103 "Contenido Ubicaciones SGA"
             exit;
 
         noMovimiento := cContenido.RegistrarRecuento(Rec."Cod. Almacen", Rec."Cod. Bin", Rec."No. Producto",
-                                                     Rec."Cod. Variante", Rec."No. Lote", Rec.SSCC,
+                                                     Rec."No. Lote", Rec.SSCC,
                                                      pagRecontar.ObtenerCantidadContada(),
                                                      pagRecontar.ObtenerMotivo());
         if noMovimiento = 0 then

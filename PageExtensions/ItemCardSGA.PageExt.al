@@ -42,7 +42,7 @@ pageextension 51100 "Item Card SGA" extends "Item Card"
                     var
                         cStock: Codeunit "Consulta Stock SGA";
                     begin
-                        cStock.ConsultarUbicacionesProducto(Rec."No.", '', '', '');
+                        cStock.ConsultarUbicacionesProducto(Rec."No.", '', '');
                     end;
                 }
                 action(MovsUbicacionSGA)

@@ -284,6 +284,13 @@ table 51101 "Ubicacion SGA"
         RecalcularOcupacion();
     end;
 
+    trigger OnRename()
+    var
+        RenombrarUbicacionErr: Label 'No se puede cambiar el almacén ni el código de una ubicación: su contenido y sus movimientos se quedarían con el código anterior.';
+    begin
+        Error(RenombrarUbicacionErr);
+    end;
+
     /// <summary>
     /// Si la ubicación está reservada para otra entrada: de otro usuario, de otra sesión o para
     /// otra fila de la misma pantalla. Con prm_Para en blanco, cualquier reserva es de otro.
@@ -363,11 +370,12 @@ table 51101 "Ubicacion SGA"
         ocupado: Decimal;
     begin
         CalcFields("Cantidad Base", "Lineas Contenido");
-        ocupado := OcupadoEnPales();
 
-        if "Capacidad Uds." > 0 then
-            "% Ocupacion" := Round(ocupado / "Capacidad Uds." * 100, 0.01)
-        else
+        // Lo ocupado en palés solo se calcula contra una capacidad declarada.
+        if "Capacidad Uds." > 0 then begin
+            ocupado := OcupadoEnPales();
+            "% Ocupacion" := Round(ocupado / "Capacidad Uds." * 100, 0.01);
+        end else
             if "Cantidad Base" > 0 then
                 "% Ocupacion" := 100
             else
@@ -470,6 +478,14 @@ table 51101 "Ubicacion SGA"
     end;
 
     /// <summary>
+    /// Si la ubicación está reservada ("Producto fijo") a un producto distinto de prm_Producto.
+    /// </summary>
+    procedure FijaParaOtroProducto(prm_Producto: Code[20]): Boolean
+    begin
+        exit(("Producto Fijo" <> '') and ("Producto Fijo" <> prm_Producto));
+    end;
+
+    /// <summary>
     /// Qué contenido del hueco impide dejar en él prm_Producto con lote prm_Lote: 0 si nada,
     /// 5 si hay otro producto y el hueco no acepta mezcla de productos, 6 si hay otro lote y no
     /// acepta mezcla de lotes (los mismos códigos que el motivo de rechazo de la propuesta).
@@ -525,15 +541,6 @@ table 51101 "Ubicacion SGA"
     end;
 
     /// <summary>
-    /// Si la ubicación tiene tipo (Almacenamiento o Picking). Solo esas se proponen y se
-    /// clasifican; las que no tienen tipo (muelles, ajustes…) quedan fuera.
-    /// </summary>
-    procedure TieneTipo(): Boolean
-    begin
-        exit("Tipo Ubicacion" <> "Tipo Ubicacion"::" ");
-    end;
-
-    /// <summary>
     /// Zona SGA de una ubicación. En blanco si la ubicación no existe o no tiene zona.
     /// </summary>
     procedure ZonaDe(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]): Code[10]
@@ -581,6 +588,7 @@ table 51101 "Ubicacion SGA"
         if Bloqueada then
             exit(false);
 
+        rZona.SetLoadFields(Bloqueada);
         if "Cod. Zona SGA" <> '' then
             if rZona.Get("Cod. Almacen", "Cod. Zona SGA") then
                 if rZona.Bloqueada then

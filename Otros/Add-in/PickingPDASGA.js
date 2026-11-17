@@ -14,7 +14,6 @@
 
     var raiz = null;
     var datos = null;
-    var cantidadSinEnviar = null;
     var tecleandoCantidad = false;  // el preparador está escribiendo la cantidad: no se le quita el foco
     var audio = null;
 
@@ -24,23 +23,9 @@
 
     // La cantidad se manda a AL en cuanto cambia, sin esperar: la lectura del escáner de la app
     // llega a AL por su cuenta, sin pasar por esta pantalla, y si la cantidad esperase podría
-    // confirmarse la parada con la cantidad anterior. Antes de cualquier otro evento de la
-    // pantalla también se manda lo que quede.
-    function enviarCantidad() {
-        if (cantidadSinEnviar === null) { return; }
-        var valor = cantidadSinEnviar;
-        cantidadSinEnviar = null;
-        invocar('Cantidad', [valor]);
-    }
-
-    function enviar(evento, argumentos) {
-        enviarCantidad();
-        invocar(evento, argumentos);
-    }
-
+    // confirmarse la parada con la cantidad anterior.
     function cantidadCambiada(valor) {
-        cantidadSinEnviar = String(valor).replace(',', '.');
-        enviarCantidad();
+        invocar('Cantidad', [String(valor).replace(',', '.')]);
     }
 
     function nodo(etiqueta, clase, texto) {
@@ -53,7 +38,7 @@
     function boton(texto, clase, accion) {
         var b = nodo('button', 'pk-btn ' + clase, texto);
         b.type = 'button';
-        b.addEventListener('click', function () { enviar('Accion', [accion]); });
+        b.addEventListener('click', function () { invocar('Accion', [accion]); });
         return b;
     }
 
@@ -100,7 +85,7 @@
             if (c.value.trim() !== '' && c.value !== (valor || '')) {
                 var texto = c.value;
                 c.value = '';
-                enviar('Lectura', [texto]);
+                invocar('Lectura', [texto]);
             }
         });
         return c;
@@ -173,11 +158,10 @@
             cantidadCambiada(cantidad.value);
         });
         cantidad.addEventListener('blur', function () { tecleandoCantidad = false; });
-        // Intro en la cantidad la manda y devuelve el foco a la lectura.
+        // Intro en la cantidad (ya enviada al teclearla) devuelve el foco a la lectura.
         cantidad.addEventListener('keydown', function (e) {
             if (e.key === 'Enter') {
                 tecleandoCantidad = false;
-                enviarCantidad();
                 enfocarLectura();
             }
         });

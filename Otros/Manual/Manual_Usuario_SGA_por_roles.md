@@ -312,7 +312,7 @@ El diario de todo: quién movió qué, cuándo y de dónde a dónde. Vistas **Tr
 
 Compara lo que dice Business Central con lo que hay en las ubicaciones.
 
-1. En el informe **Conciliar con el stock** (grupo *Informes*), elige *Almacén* y *Mostrar solo diferencias*.
+1. En el informe **Conciliar con el stock** (grupo *Informes*), elige *Almacén*. Salen solo las diferencias; marca *Mostrar también las que cuadran* para verlo todo.
 2. El último resultado se vuelve a abrir en **Conciliación con el stock** (grupo *Consultas*). Vistas **Stock sin ubicar** (Business Central tiene más que las ubicaciones) y **Sobra en ubicaciones** (las ubicaciones tienen más que Business Central).
 3. Lo que falta, mejor ubicarlo en su sitio. Si no, **Regularizar en ubicación de ajustes** lo deja en la ubicación de ajustes, sin SSCC: es una diferencia, no un palé. Lo que sobra no se regulariza: se recuenta.
 4. **Volver a conciliar** para comprobar.

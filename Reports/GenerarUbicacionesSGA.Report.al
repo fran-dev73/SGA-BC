@@ -34,6 +34,7 @@ report 51100 "Generar Ubicaciones SGA"
             var
                 rZona: Record "Zona SGA";
                 cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
+                cConfirmMgt: Codeunit "Confirm Management";
                 combinaciones: Integer;
                 creadas: Integer;
                 alturas: List of [Integer];
@@ -66,10 +67,10 @@ report 51100 "Generar Ubicaciones SGA"
 
                 if GuiAllowed() then
                     if codZona = '' then begin
-                        if not Confirm(ConfirmarGenerarQst, false, combinaciones, codAlmacen, ListaAlturas(alturas)) then
+                        if not cConfirmMgt.GetResponseOrDefault(StrSubstNo(ConfirmarGenerarQst, combinaciones, codAlmacen, ListaAlturas(alturas)), false) then
                             exit;
                     end else
-                        if not Confirm(ConfirmarGenerarZonaQst, false, combinaciones, codAlmacen, ListaAlturas(alturas), codZona) then
+                        if not cConfirmMgt.GetResponseOrDefault(StrSubstNo(ConfirmarGenerarZonaQst, combinaciones, codAlmacen, ListaAlturas(alturas), codZona), false) then
                             exit;
 
                 creadas := cUbicaciones.GenerarUbicaciones(codAlmacen, intPasilloDesde, intPasilloHasta,

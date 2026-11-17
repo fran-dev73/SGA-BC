@@ -1,6 +1,7 @@
 namespace AntonioNadal.SGA;
 
 using System.Device;
+using System.Utilities;
 
 /// <summary>
 /// Page Preparar Picking SGA (ID 51121).
@@ -35,7 +36,6 @@ page 51121 "Preparar Picking SGA"
     LinksAllowed = false;
     // La barra de título de BC dice la orden; la pantalla propia no la repite.
     DataCaptionFields = "No. Orden";
-    SourceTableView = sorting("No. Orden", "Veces Saltada", "Secuencia Picking");
 
     layout
     {
@@ -135,7 +135,7 @@ page 51121 "Preparar Picking SGA"
         cPicking: Codeunit "Gestion Picking SGA";
     begin
         if cPicking.SiguienteOrdenPreparar(rOrden, MotivoSinParadas) then
-            HayParada := CargarParadas(rOrden."No. Orden")
+            CargarParadas(rOrden."No. Orden")
         else
             HayParada := false;
         Preparar();
@@ -320,12 +320,8 @@ page 51121 "Preparar Picking SGA"
     local procedure Confirmar()
     var
         cPicking: Codeunit "Gestion Picking SGA";
-        CantidadNoIndicadaErr: Label 'Indique la cantidad recogida.';
     begin
-        if CantidadRecogida <= 0 then
-            Error(CantidadNoIndicadaErr);
-
-        // El preparador habla en la UM del pedido; la parada, en base.
+        // La cantidad la comprueba ConfirmarLinea. El preparador habla en la UM del pedido; la parada, en base.
         cPicking.ConfirmarLinea(Rec, UbicacionEscaneada, Rec.CantidadBaseDesdeDocumento(CantidadRecogida, PendienteDocumento));
         CurrPage.Pantalla.Senal('ok');
 
@@ -374,11 +370,12 @@ page 51121 "Preparar Picking SGA"
     local procedure MarcarSinStock()
     var
         cPicking: Codeunit "Gestion Picking SGA";
+        cConfirmMgt: Codeunit "Confirm Management";
         resultado: Text;
         cubierta: Boolean;
         SinStockQst: Label '¿Buscar en otra ubicación?';
     begin
-        if not Confirm(SinStockQst, true) then
+        if not cConfirmMgt.GetResponseOrDefault(SinStockQst, true) then
             exit;
 
         resultado := cPicking.SustituirParadaSinStock(Rec, cubierta);

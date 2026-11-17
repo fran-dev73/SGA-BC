@@ -321,7 +321,7 @@ Después pulsa **Volver a conciliar**.
 **Solución**:
 1. Indica un *Almacén* (en blanco concilia todos).
 2. Filtra los productos: por nº, categoría o grupo contable de inventario.
-3. Marca *Mostrar solo diferencias*.
+3. Deja sin marcar *Mostrar también las que cuadran*.
 
 ---
 

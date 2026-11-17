@@ -3,6 +3,7 @@ namespace AntonioNadal.SGA;
 using Microsoft.Foundation.UOM;
 using Microsoft.Inventory.Item;
 using Microsoft.Inventory.Location;
+using System.Utilities;
 
 /// <summary>
 /// Page Ubicar Producto SGA (ID 51117).
@@ -67,27 +68,6 @@ page 51117 "Ubicar Producto SGA"
                     ToolTip = 'Descripción del producto seleccionado.';
                     ApplicationArea = All;
                     Editable = false;
-                }
-                field(Variante; Variante)
-                {
-                    Caption = 'Variante';
-                    ToolTip = 'Variante del producto, si la maneja.';
-                    ApplicationArea = All;
-                    TableRelation = "Item Variant".Code;
-
-                    trigger OnValidate()
-                    var
-                        rVariante: Record "Item Variant";
-                        VarianteNoDelProductoErr: Label 'La variante %1 no es del producto %2.', Comment = '%1 = variante, %2 = producto';
-                    begin
-                        // El filtro por producto no cabe en el TableRelation porque la página
-                        // no tiene tabla de origen, así que se comprueba aquí.
-                        if (Variante <> '') and (Producto <> '') then
-                            if not rVariante.Get(Producto, Variante) then
-                                Error(VarianteNoDelProductoErr, Variante, Producto);
-                        RecalcularPendiente();
-                        LimpiarPropuesta();
-                    end;
                 }
                 field(Lote; Lote)
                 {
@@ -300,7 +280,6 @@ page 51117 "Ubicar Producto SGA"
         Almacen: Code[10];
         Producto: Code[20];
         DescripcionProducto: Text[100];
-        Variante: Code[10];
         Lote: Code[50];
         UM: Code[10];
         Cantidad: Decimal;
@@ -318,7 +297,6 @@ page 51117 "Ubicar Producto SGA"
         if Preparada then begin
             // Viene con los datos puestos (desde "Pendiente de ubicar"): se respetan.
             CargarProducto();
-            UM := cUM.UMBase(Producto);
             Cantidad := CantidadPreparada;
             RecalcularPendiente();
         end else
@@ -327,14 +305,13 @@ page 51117 "Ubicar Producto SGA"
     end;
 
     /// <summary>
-    /// Abre la página con lo que hay que ubicar ya indicado: almacén, producto, variante, lote,
-    /// caducidad y cantidad en unidad base. El operario solo tiene que pulsar "Proponer".
+    /// Abre la página con lo que hay que ubicar ya indicado: almacén, producto, lote y cantidad
+    /// en unidad base. El operario solo tiene que pulsar "Proponer".
     /// </summary>
-    procedure Preparar(prm_Almacen: Code[10]; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50]; prm_CantidadBase: Decimal)
+    procedure Preparar(prm_Almacen: Code[10]; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_CantidadBase: Decimal)
     begin
         Almacen := prm_Almacen;
         Producto := prm_Producto;
-        Variante := prm_Variante;
         Lote := prm_Lote;
         CantidadPreparada := prm_CantidadBase;
         Preparada := true;
@@ -376,7 +353,7 @@ page 51117 "Ubicar Producto SGA"
         if (Producto = '') or (Almacen = '') then
             exit;
 
-        pendienteBase := cStock.PendienteDeUbicar(Almacen, Producto, Variante, Lote, stockBase, ubicadoBase);
+        pendienteBase := cStock.PendienteDeUbicar(Almacen, Producto, Lote, stockBase, ubicadoBase);
 
         // El cálculo va en unidad base; se pasa a la UM elegida con su factor de conversión.
         PendienteUbicar := cUOMMgt.CalcQtyFromBase(pendienteBase, cUM.FactorUM(Producto, UM));
@@ -418,6 +395,7 @@ page 51117 "Ubicar Producto SGA"
     var
         rConfig: Record "Config. SGA";
         cStock: Codeunit "Consulta Stock SGA";
+        cConfirmMgt: Codeunit "Confirm Management";
         DatosIncompletosErr: Label 'Indique almacén, producto y cantidad antes de proponer una ubicación.';
         LoteObligatorioErr: Label 'El producto %1 lleva lotes: indique el lote que va a ubicar.', Comment = '%1 = producto';
         UbicarLineaQst: Label '¿Ubicar %1 %2 de %3 en %4?', Comment = '%1 = cantidad, %2 = unidad, %3 = producto, %4 = ubicación';
@@ -429,7 +407,7 @@ page 51117 "Ubicar Producto SGA"
             Error(LoteObligatorioErr, Producto);
 
         rConfig.ObtenerConfig();
-        cUbicaciones.ProponerReparto(rConfig."Estrategia Ubicacion", Almacen, Producto, Variante, Lote,
+        cUbicaciones.ProponerReparto(rConfig."Estrategia Ubicacion", Almacen, Producto, Lote,
                                      cUOMMgt.CalcBaseQty(Cantidad, cUM.FactorUM(Producto, UM)), TempPlan);
 
         CurrPage.Plan.Page.Cargar(TempPlan);
@@ -440,7 +418,7 @@ page 51117 "Ubicar Producto SGA"
         if TempPlan.Count() = 1 then begin
             TempPlan.FindFirst();
             if TempPlan.Estado = TempPlan.Estado::Pendiente then
-                if Confirm(UbicarLineaQst, true, TempPlan.Cantidad, TempPlan."Cod. Unidad Medida", Producto, TempPlan."Ubicacion Propuesta") then
+                if cConfirmMgt.GetResponseOrDefault(StrSubstNo(UbicarLineaQst, TempPlan.Cantidad, TempPlan."Cod. Unidad Medida", Producto, TempPlan."Ubicacion Propuesta"), true) then
                     ConfirmarLineas(TempPlan.Linea);
         end;
     end;
@@ -454,7 +432,7 @@ page 51117 "Ubicar Producto SGA"
     var
         restoBase: Decimal;
     begin
-        restoBase := cUbicaciones.ConfirmarReparto(TempPlan, prm_Linea, Almacen, Producto, Variante, Lote);
+        restoBase := cUbicaciones.ConfirmarReparto(TempPlan, prm_Linea, Almacen, Producto, Lote);
 
         UM := cUM.UMBase(Producto);
         Cantidad := restoBase;

@@ -1,7 +1,6 @@
 namespace AntonioNadal.SGA;
 
 using Microsoft.Foundation.NoSeries;
-using Microsoft.Foundation.UOM;
 using Microsoft.Inventory.Location;
 using Microsoft.Warehouse.Structure;
 
@@ -65,6 +64,7 @@ table 51104 "Config. SGA"
         {
             Caption = 'Estrategia ubicación';
             DataClassification = ToBeClassified;
+            ToolTip = 'Política con la que se decide dónde colocar la mercancía que entra. Se aplica primero en las ubicaciones de almacenamiento y, si no queda sitio, en las de picking.';
         }
         field(34; "Estrategia Ubic. Ensamblados"; Enum "Estrategia Ubicacion SGA")
         {
@@ -83,6 +83,7 @@ table 51104 "Config. SGA"
         {
             Caption = 'Estrategia picking';
             DataClassification = ToBeClassified;
+            ToolTip = 'Orden en que se coge el stock (FEFO, FIFO…), dentro de cada paso del picking: palés completos de almacenamiento, picking y lo que falte de almacenamiento. Es también el orden con que las reubicaciones eligen qué traer de almacenamiento.';
         }
         field(40; "Control Capacidad"; Enum "Control Capacidad SGA")
         {
@@ -122,7 +123,7 @@ table 51104 "Config. SGA"
             Caption = 'Nºs orden SGA';
             DataClassification = ToBeClassified;
             TableRelation = "No. Series";
-            ToolTip = 'Serie numérica de las órdenes de trabajo de almacén. La consume la gestión de órdenes de la Fase 2.';
+            ToolTip = 'Serie numérica de las órdenes de picking y de reubicación.';
         }
         field(70; "Fecha Inicio SGA"; Date)
         {

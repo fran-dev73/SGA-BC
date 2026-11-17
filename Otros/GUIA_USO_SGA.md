@@ -342,7 +342,7 @@ El diario de todo: quién movió qué, cuándo y de dónde a dónde. Vistas **Tr
 
 ### Conciliación con el stock
 
-1. Menú *Informes* > **Conciliar con el stock**: elige *Almacén* y *Mostrar solo diferencias*.
+1. Menú *Informes* > **Conciliar con el stock**: elige *Almacén*. Salen solo las diferencias; marca *Mostrar también las que cuadran* para verlo todo.
 2. El último resultado se vuelve a abrir en *Consultas* > **Conciliación con el stock**. Vistas **Stock sin ubicar** (BC tiene más que las ubicaciones) y **Sobra en ubicaciones** (las ubicaciones tienen más que BC).
 3. Lo que falta, mejor ubicarlo en su sitio. Si no, **Regularizar en ubicación de ajustes** lo deja en la ubicación de ajustes, sin SSCC: es una diferencia, no un palé, y el picking no coge de ella. No se regulariza lo que espera en *Ubicar recepciones* o *Ubicar ensamblados* (se ubica desde allí), y solo se regulariza en el almacén por defecto, que es el de la ubicación de ajustes. Lo que sobra no se regulariza: se recuenta. **Volver a conciliar** para comprobar.
 

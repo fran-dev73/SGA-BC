@@ -42,8 +42,6 @@ codeunit 51114 "Codigos Barras SGA"
     procedure LeerSSCC(prm_Lectura: Text; var prm_SSCC: Code[20]): Boolean
     var
         codigo: Text;
-        gtin: Text;
-        lote: Code[50];
         sscc: Text;
     begin
         Clear(prm_SSCC);
@@ -51,7 +49,7 @@ codeunit 51114 "Codigos Barras SGA"
         if (StrLen(codigo) = 18) and SoloDigitos(codigo) then
             sscc := codigo
         else
-            if not LeerGS1(codigo, gtin, lote, sscc) then
+            if not LeerGS1(codigo, sscc) then
                 exit(false);
 
         if not SSCCValido(sscc) then
@@ -132,22 +130,21 @@ codeunit 51114 "Codigos Barras SGA"
     end;
 
     /// <summary>
-    /// Saca el SSCC de (00), el GTIN de (01) o (02) y el lote de (10) de una lectura GS1-128, tal
-    /// como la manda el escáner (separador GS) o con los AI entre paréntesis. Devuelve false si
-    /// no lo es. Se deja de leer en el primer AI que no se conoce: lo que interesa suele ir delante.
+    /// Saca el SSCC (00) de una lectura GS1-128, tal como la manda el escáner (separador GS) o
+    /// con los AI entre paréntesis. Los demás AI conocidos se saltan por su longitud. Devuelve
+    /// false si no trae SSCC. Se deja de leer en el primer AI que no se conoce: lo que interesa
+    /// suele ir delante.
     /// </summary>
-    local procedure LeerGS1(prm_Codigo: Text; var prm_Gtin: Text; var prm_Lote: Code[50]; var prm_SSCC: Text): Boolean
+    local procedure LeerGS1(prm_Codigo: Text; var prm_SSCC: Text): Boolean
     var
         texto: Text;
         ai: Text;
-        valor: Text;
         separador: Text[1];
         pos: Integer;
         largoAI: Integer;
         largoValor: Integer;
         finValor: Integer;
     begin
-        Clear(prm_Gtin);
         Clear(prm_SSCC);
         separador[1] := 29;
         texto := prm_Codigo;
@@ -193,20 +190,12 @@ codeunit 51114 "Codigos Barras SGA"
                     else
                         largoValor := finValor - 1;
                 end;
-                valor := CopyStr(texto, pos, largoValor);
+                if ai = '00' then
+                    prm_SSCC := CopyStr(texto, pos, largoValor);
                 pos += largoValor;
-
-                case ai of
-                    '00':
-                        prm_SSCC := valor;
-                    '01', '02':
-                        prm_Gtin := valor;
-                    '10':
-                        prm_Lote := CopyStr(valor, 1, MaxStrLen(prm_Lote));
-                end;
             end;
 
-        exit((prm_Gtin <> '') or (prm_Lote <> '') or (prm_SSCC <> ''));
+        exit(prm_SSCC <> '');
     end;
 
     /// <summary>

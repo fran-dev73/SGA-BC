@@ -249,7 +249,7 @@ page 51118 "Ordenes Picking SGA"
         view(SinPasarAlPedido)
         {
             Caption = 'Terminadas sin pasar al pedido';
-            Filters = where(Estado = const(Finalizada), "Fecha Paso a Documento" = const(0DT));
+            Filters = where(Estado = const(Finalizada), Origen = const(Venta), "Fecha Paso a Documento" = const(0DT));
         }
     }
 

@@ -2,6 +2,7 @@ namespace AntonioNadal.SGA;
 
 using Microsoft.Foundation.UOM;
 using Microsoft.Inventory.Item;
+using System.Utilities;
 
 /// <summary>
 /// Codeunit Gestion Contenido SGA (ID 51100).
@@ -53,7 +54,7 @@ codeunit 51100 "Gestion Contenido SGA"
     /// <summary>
     /// Deja mercancía en una ubicación. Toda entrada lleva el SSCC de su palé (TestSSCCEntrada).
     /// </summary>
-    procedure RegistrarEntrada(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50]; prm_SSCC: Code[20]; prm_UM: Code[10]; prm_Cantidad: Decimal; prm_Origen: Enum "Origen Mov. SGA"; prm_NoDocumento: Code[20]; prm_Descripcion: Text)
+    procedure RegistrarEntrada(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_SSCC: Code[20]; prm_UM: Code[10]; prm_Cantidad: Decimal; prm_Origen: Enum "Origen Mov. SGA"; prm_NoDocumento: Code[20]; prm_Descripcion: Text)
     var
         CantidadEntradaNoPositivaErr: Label 'La cantidad de una entrada debe ser mayor que cero.';
     begin
@@ -63,24 +64,24 @@ codeunit 51100 "Gestion Contenido SGA"
 
         // Las entradas van por documento, no por línea: el nº de línea origen queda a 0.
         AplicarMovimiento("Tipo Mov. Ubicacion SGA"::Entrada, prm_Origen, prm_Almacen, '', prm_Ubicacion,
-                          prm_Producto, prm_Variante, prm_Lote, prm_SSCC, prm_UM, prm_Cantidad,
+                          prm_Producto, prm_Lote, prm_SSCC, prm_UM, prm_Cantidad,
                           prm_NoDocumento, 0, prm_Descripcion);
     end;
 
     /// <summary>
-    /// Retira mercancía de una ubicación. Devuelve el nº de movimiento registrado. Con el SSCC en
-    /// blanco sale de un palé del lote que haya en la ubicación (SSCCEnUbicacion).
+    /// Retira mercancía de una ubicación. Con el SSCC en blanco sale de un palé del lote que haya
+    /// en la ubicación (SSCCEnUbicacion).
     /// </summary>
-    procedure RegistrarSalida(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50]; prm_SSCC: Code[20]; prm_UM: Code[10]; prm_Cantidad: Decimal; prm_Origen: Enum "Origen Mov. SGA"; prm_NoDocumento: Code[20]; prm_NoLinea: Integer; prm_Descripcion: Text): Integer
+    procedure RegistrarSalida(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_SSCC: Code[20]; prm_UM: Code[10]; prm_Cantidad: Decimal; prm_Origen: Enum "Origen Mov. SGA"; prm_NoDocumento: Code[20]; prm_NoLinea: Integer; prm_Descripcion: Text)
     var
         CantidadSalidaNoPositivaErr: Label 'La cantidad de una salida debe ser mayor que cero.';
     begin
         if prm_Cantidad <= 0 then
             Error(CantidadSalidaNoPositivaErr);
 
-        exit(AplicarMovimiento("Tipo Mov. Ubicacion SGA"::Salida, prm_Origen, prm_Almacen, prm_Ubicacion, '',
-                               prm_Producto, prm_Variante, prm_Lote, prm_SSCC, prm_UM, prm_Cantidad,
-                               prm_NoDocumento, prm_NoLinea, prm_Descripcion));
+        AplicarMovimiento("Tipo Mov. Ubicacion SGA"::Salida, prm_Origen, prm_Almacen, prm_Ubicacion, '',
+                          prm_Producto, prm_Lote, prm_SSCC, prm_UM, prm_Cantidad,
+                          prm_NoDocumento, prm_NoLinea, prm_Descripcion);
     end;
 
     /// <summary>
@@ -88,13 +89,12 @@ codeunit 51100 "Gestion Contenido SGA"
     /// palé o restos de uno, así que es el suyo; el SSCC sirve para localizar, no se lee al
     /// sacar. En blanco si en la ubicación no hay nada del lote.
     /// </summary>
-    procedure SSCCEnUbicacion(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50]): Code[20]
+    procedure SSCCEnUbicacion(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]; prm_Producto: Code[20]; prm_Lote: Code[50]): Code[20]
     var
         rContenido: Record "Contenido Ubicacion SGA";
     begin
         rContenido.FiltrarUbicacion(prm_Almacen, prm_Ubicacion);
         rContenido.SetRange("No. Producto", prm_Producto);
-        rContenido.SetRange("Cod. Variante", prm_Variante);
         rContenido.SetRange("No. Lote", prm_Lote);
         rContenido.SetLoadFields(SSCC);
         if rContenido.FindFirst() then
@@ -137,10 +137,10 @@ codeunit 51100 "Gestion Contenido SGA"
         // deja a cero con un recuento.
         if prm_Contenido."Cantidad Base" < 0 then
             RegistrarRecuento(prm_Contenido."Cod. Almacen", prm_Contenido."Cod. Bin", prm_Contenido."No. Producto",
-                              prm_Contenido."Cod. Variante", prm_Contenido."No. Lote", prm_Contenido.SSCC, 0, DesubicadoLbl)
+                              prm_Contenido."No. Lote", prm_Contenido.SSCC, 0, DesubicadoLbl)
         else
             RegistrarSalida(prm_Contenido."Cod. Almacen", prm_Contenido."Cod. Bin", prm_Contenido."No. Producto",
-                            prm_Contenido."Cod. Variante", prm_Contenido."No. Lote", prm_Contenido.SSCC,
+                            prm_Contenido."No. Lote", prm_Contenido.SSCC,
                             prm_Contenido."Cod. Unidad Medida", prm_Contenido."Cantidad Base", "Origen Mov. SGA"::Manual, '', 0, DesubicadoLbl);
     end;
 
@@ -186,12 +186,14 @@ codeunit 51100 "Gestion Contenido SGA"
     end;
 
     /// <summary>
-    /// VaciarUbicacion desde una pantalla: enseña qué hay, pide confirmación y avisa de cuántas
-    /// líneas quedan sin ubicar. Devuelve 0 si no había nada o no se confirma.
+    /// Vacía una ubicación desde una pantalla: enseña qué hay, pide confirmación, saca todo su
+    /// contenido (todo o nada) y avisa de cuántas líneas quedan sin ubicar. Devuelve 0 si no
+    /// había nada o no se confirma.
     /// </summary>
     procedure VaciarUbicacionConDialogo(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]) lineas: Integer
     var
         rContenido: Record "Contenido Ubicacion SGA";
+        cConfirmMgt: Codeunit "Confirm Management";
         detalle: Text;
         LineaDetalleLbl: Label '\  · %1 %2 de %3 (lote %4)', Comment = '%1 = cantidad, %2 = unidad, %3 = producto, %4 = lote';
         VaciarUbicacionQst: Label 'Vaciar la ubicación %1:%2\\Todo queda sin ubicar, pendiente de volver a ubicar. El stock de BC no cambia. ¿Continuar?', Comment = '%1 = ubicación, %2 = lista del contenido';
@@ -206,29 +208,14 @@ codeunit 51100 "Gestion Contenido SGA"
                                   rContenido."No. Producto", rContenido."No. Lote");
         until rContenido.Next() = 0;
 
-        if not Confirm(VaciarUbicacionQst, false, prm_Ubicacion, detalle) then
+        if not cConfirmMgt.GetResponseOrDefault(StrSubstNo(VaciarUbicacionQst, prm_Ubicacion, detalle), false) then
             exit(0);
 
-        lineas := VaciarUbicacion(prm_Almacen, prm_Ubicacion);
+        // Todo o nada: DesubicarLineas no saca ninguna si alguna está reservada. Se leen ya
+        // todos los campos, que hacen falta para sacarlas.
+        rContenido.SetLoadFields();
+        lineas := DesubicarLineas(rContenido);
         Message(UbicacionVaciadaMsg, prm_Ubicacion, lineas);
-    end;
-
-    /// <summary>
-    /// Vacía una ubicación: saca todo su contenido y lo deja sin ubicar. Todo o nada: si una
-    /// línea está reservada, no se saca ninguna. Devuelve cuántas líneas ha sacado.
-    /// </summary>
-    procedure VaciarUbicacion(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]): Integer
-    var
-        rContenido: Record "Contenido Ubicacion SGA";
-        UbicacionReservadaErr: Label 'La ubicación %1 tiene contenido reservado por órdenes de picking. Cancele antes esas órdenes o paradas.', Comment = '%1 = ubicación';
-    begin
-        rContenido.FiltrarUbicacion(prm_Almacen, prm_Ubicacion);
-        rContenido.SetFilter("Cantidad Reservada", '>%1', 0);
-        if not rContenido.IsEmpty() then
-            Error(UbicacionReservadaErr, prm_Ubicacion);
-        rContenido.SetRange("Cantidad Reservada");
-
-        exit(DesubicarLineas(rContenido));
     end;
 
     /// <summary>
@@ -281,7 +268,7 @@ codeunit 51100 "Gestion Contenido SGA"
             descripcion := prm_DescripcionPorDefecto;
 
         exit(RegistrarTraslado(prm_Contenido."Cod. Almacen", prm_Contenido."Cod. Bin", prm_Destino,
-                               prm_Contenido."No. Producto", prm_Contenido."Cod. Variante", prm_Contenido."No. Lote",
+                               prm_Contenido."No. Producto", prm_Contenido."No. Lote",
                                prm_Contenido.SSCC, prm_Contenido."Cod. Unidad Medida", pMover.ObtenerCantidad(),
                                "Origen Mov. SGA"::Manual, '', 0, descripcion));
     end;
@@ -291,7 +278,7 @@ codeunit 51100 "Gestion Contenido SGA"
     /// No afecta al stock total ni genera movimiento de producto. Lo trasladado sigue siendo del
     /// mismo palé: lleva su SSCC también en el destino.
     /// </summary>
-    procedure RegistrarTraslado(prm_Almacen: Code[10]; prm_UbicacionOrigen: Code[20]; prm_UbicacionDestino: Code[20]; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50]; prm_SSCC: Code[20]; prm_UM: Code[10]; prm_Cantidad: Decimal; prm_Origen: Enum "Origen Mov. SGA"; prm_NoDocumento: Code[20]; prm_NoLinea: Integer; prm_Descripcion: Text): Integer
+    procedure RegistrarTraslado(prm_Almacen: Code[10]; prm_UbicacionOrigen: Code[20]; prm_UbicacionDestino: Code[20]; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_SSCC: Code[20]; prm_UM: Code[10]; prm_Cantidad: Decimal; prm_Origen: Enum "Origen Mov. SGA"; prm_NoDocumento: Code[20]; prm_NoLinea: Integer; prm_Descripcion: Text): Integer
     var
         CantidadTrasladoNoPositivaErr: Label 'La cantidad de un traslado debe ser mayor que cero.';
         MismaUbicacionTrasladoErr: Label 'La ubicación de origen y la de destino de un traslado no pueden ser la misma.';
@@ -306,7 +293,7 @@ codeunit 51100 "Gestion Contenido SGA"
 
         exit(AplicarMovimiento("Tipo Mov. Ubicacion SGA"::Traslado, prm_Origen, prm_Almacen,
                                prm_UbicacionOrigen, prm_UbicacionDestino,
-                               prm_Producto, prm_Variante, prm_Lote, prm_SSCC, prm_UM, prm_Cantidad,
+                               prm_Producto, prm_Lote, prm_SSCC, prm_UM, prm_Cantidad,
                                prm_NoDocumento, prm_NoLinea, prm_Descripcion));
     end;
 
@@ -314,15 +301,15 @@ codeunit 51100 "Gestion Contenido SGA"
     /// Mete en la ubicación de ajustes lo que BC tiene y SGA no tiene ubicado (Regularizar de la
     /// conciliación). Entra sin SSCC: la ubicación de ajustes no guarda palés, guarda diferencias.
     /// </summary>
-    procedure RegistrarAjuste(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50]; prm_UM: Code[10]; prm_Cantidad: Decimal; prm_Descripcion: Text): Integer
+    procedure RegistrarAjuste(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_UM: Code[10]; prm_Cantidad: Decimal; prm_Descripcion: Text)
     var
         AjusteNoPositivoErr: Label 'La cantidad a regularizar debe ser mayor que cero.';
     begin
         if prm_Cantidad <= 0 then
             Error(AjusteNoPositivoErr);
 
-        exit(AplicarMovimiento("Tipo Mov. Ubicacion SGA"::Ajuste, "Origen Mov. SGA"::Manual, prm_Almacen, '', prm_Ubicacion,
-                               prm_Producto, prm_Variante, prm_Lote, '', prm_UM, prm_Cantidad, '', 0, prm_Descripcion));
+        AplicarMovimiento("Tipo Mov. Ubicacion SGA"::Ajuste, "Origen Mov. SGA"::Manual, prm_Almacen, '', prm_Ubicacion,
+                          prm_Producto, prm_Lote, '', prm_UM, prm_Cantidad, '', 0, prm_Descripcion);
     end;
 
     /// <summary>
@@ -330,7 +317,7 @@ codeunit 51100 "Gestion Contenido SGA"
     /// comprobar capacidad ni reglas de mezcla, porque refleja lo que ya hay físicamente.
     /// No lleva SSCC.
     /// </summary>
-    procedure RegistrarCargaInicial(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50]; prm_UM: Code[10]; prm_Cantidad: Decimal; prm_Descripcion: Text)
+    procedure RegistrarCargaInicial(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_UM: Code[10]; prm_Cantidad: Decimal; prm_Descripcion: Text)
     var
         CantidadCargaInicialNoPositivaErr: Label 'La cantidad de la carga inicial debe ser mayor que cero.';
     begin
@@ -338,7 +325,7 @@ codeunit 51100 "Gestion Contenido SGA"
             Error(CantidadCargaInicialNoPositivaErr);
 
         AplicarMovimiento("Tipo Mov. Ubicacion SGA"::"Carga Inicial", "Origen Mov. SGA"::"Carga Inicial",
-                          prm_Almacen, '', prm_Ubicacion, prm_Producto, prm_Variante, prm_Lote, '', prm_UM,
+                          prm_Almacen, '', prm_Ubicacion, prm_Producto, prm_Lote, '', prm_UM,
                           prm_Cantidad, '', 0, prm_Descripcion);
     end;
 
@@ -347,7 +334,7 @@ codeunit 51100 "Gestion Contenido SGA"
     /// diferencia como recuento. La cantidad se indica en unidades base. Devuelve 0 si no había
     /// diferencia.
     /// </summary>
-    procedure RegistrarRecuento(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50]; prm_SSCC: Code[20]; prm_CantidadContada: Decimal; prm_Descripcion: Text) noMovimiento: Integer
+    procedure RegistrarRecuento(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_SSCC: Code[20]; prm_CantidadContada: Decimal; prm_Descripcion: Text) noMovimiento: Integer
     var
         rContenido: Record "Contenido Ubicacion SGA";
         cPicking: Codeunit "Gestion Picking SGA";
@@ -357,31 +344,31 @@ codeunit 51100 "Gestion Contenido SGA"
     begin
         umBase := cUM.UMBase(prm_Producto);
 
-        if rContenido.Get(prm_Almacen, prm_Ubicacion, prm_Producto, prm_Variante, prm_Lote, umBase, prm_SSCC) then
+        if rContenido.Get(prm_Almacen, prm_Ubicacion, prm_Producto, prm_Lote, umBase, prm_SSCC) then
             cantidadActual := rContenido."Cantidad Base";
 
         diferencia := Round(prm_CantidadContada - cantidadActual, 0.00001);
         if diferencia = 0 then
             exit(0);
 
-        noMovimiento := AplicarRecuento(prm_Almacen, prm_Ubicacion, prm_Producto, prm_Variante, prm_Lote, prm_SSCC, umBase,
+        noMovimiento := AplicarRecuento(prm_Almacen, prm_Ubicacion, prm_Producto, prm_Lote, prm_SSCC, umBase,
                                         diferencia, prm_Descripcion);
         // Si queda menos de lo reservado, la reserva se recorta a lo que hay ahora.
-        cPicking.RecalcularReserva(prm_Almacen, prm_Ubicacion, prm_Producto, prm_Variante, prm_Lote, prm_SSCC);
+        cPicking.RecalcularReserva(prm_Almacen, prm_Ubicacion, prm_Producto, prm_Lote, prm_SSCC);
         exit(noMovimiento);
     end;
 
     /// <summary>
     /// La diferencia de un recuento sobre una ubicación: positiva entra en ella, negativa sale de ella.
     /// </summary>
-    local procedure AplicarRecuento(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50]; prm_SSCC: Code[20]; prm_UM: Code[10]; prm_Diferencia: Decimal; prm_Descripcion: Text): Integer
+    local procedure AplicarRecuento(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_SSCC: Code[20]; prm_UM: Code[10]; prm_Diferencia: Decimal; prm_Descripcion: Text): Integer
     begin
         if prm_Diferencia > 0 then
             exit(AplicarMovimiento("Tipo Mov. Ubicacion SGA"::Recuento, "Origen Mov. SGA"::Recuento, prm_Almacen, '', prm_Ubicacion,
-                                   prm_Producto, prm_Variante, prm_Lote, prm_SSCC, prm_UM, prm_Diferencia, '', 0, prm_Descripcion));
+                                   prm_Producto, prm_Lote, prm_SSCC, prm_UM, prm_Diferencia, '', 0, prm_Descripcion));
 
         exit(AplicarMovimiento("Tipo Mov. Ubicacion SGA"::Recuento, "Origen Mov. SGA"::Recuento, prm_Almacen, prm_Ubicacion, '',
-                               prm_Producto, prm_Variante, prm_Lote, prm_SSCC, prm_UM, -prm_Diferencia, '', 0, prm_Descripcion));
+                               prm_Producto, prm_Lote, prm_SSCC, prm_UM, -prm_Diferencia, '', 0, prm_Descripcion));
     end;
 
     /// <summary>
@@ -405,22 +392,25 @@ codeunit 51100 "Gestion Contenido SGA"
         if (rContenido."Cantidad Base" = 0) and (rContenido."Cantidad Reservada" = 0) then begin
             rContenido.Delete(true);
             // La línea seguía viva solo por su reserva: sin ella, la ubicación puede quedar vacía.
-            RecalcularEstadoUbicacion(rContenido."Cod. Almacen", rContenido."Cod. Bin");
+            RecalcularEstadoUbicacion(rContenido."Cod. Almacen", rContenido."Cod. Bin", false);
         end else
             rContenido.Modify(true);
     end;
 
     /// <summary>
-    /// Vuelve a calcular el estado y la ocupación de una ubicación, sin tocar su fecha de último
-    /// movimiento (no ha habido movimiento: ha cambiado lo que se da por contenido).
+    /// Vuelve a calcular el estado y la ocupación de una ubicación. Con prm_HayMovimiento anota
+    /// además la fecha de último movimiento; sin él (ha cambiado lo que se da por contenido, no
+    /// ha habido movimiento), no la toca.
     /// </summary>
-    local procedure RecalcularEstadoUbicacion(prm_Almacen: Code[10]; prm_Ubicacion: Code[20])
+    local procedure RecalcularEstadoUbicacion(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]; prm_HayMovimiento: Boolean)
     var
         rUbicacionSGA: Record "Ubicacion SGA";
     begin
         if not rUbicacionSGA.Get(prm_Almacen, prm_Ubicacion) then
             exit;
         rUbicacionSGA.RecalcularOcupacion();
+        if prm_HayMovimiento then
+            rUbicacionSGA."Fecha Ultimo Movimiento" := CurrentDateTime();
         // RecalcularOcupacion cambia el estado y el % de ocupación; el analizador no lo ve.
 #pragma warning disable AA0214
         rUbicacionSGA.Modify(false);
@@ -473,7 +463,7 @@ codeunit 51100 "Gestion Contenido SGA"
         if TempBloqueadas.FindSet() then
             repeat
                 if rContenido.Get(TempBloqueadas."Cod. Almacen", TempBloqueadas."Cod. Bin", TempBloqueadas."No. Producto",
-                                  TempBloqueadas."Cod. Variante", TempBloqueadas."No. Lote", TempBloqueadas."Cod. Unidad Medida",
+                                  TempBloqueadas."No. Lote", TempBloqueadas."Cod. Unidad Medida",
                                   TempBloqueadas.SSCC)
                 then begin
                     rContenido.Bloqueado := true;
@@ -560,7 +550,7 @@ codeunit 51100 "Gestion Contenido SGA"
     /// <summary>
     /// Lo que sale de una ubicación sin decir de qué palé sale de uno del lote (SSCCEnUbicacion).
     /// </summary>
-    local procedure AplicarMovimiento(prm_Tipo: Enum "Tipo Mov. Ubicacion SGA"; prm_Origen: Enum "Origen Mov. SGA"; prm_Almacen: Code[10]; prm_UbicacionOrigen: Code[20]; prm_UbicacionDestino: Code[20]; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50]; prm_SSCC: Code[20]; prm_UM: Code[10]; prm_Cantidad: Decimal; prm_NoDocumento: Code[20]; prm_NoLinea: Integer; prm_Descripcion: Text) noMovimiento: Integer
+    local procedure AplicarMovimiento(prm_Tipo: Enum "Tipo Mov. Ubicacion SGA"; prm_Origen: Enum "Origen Mov. SGA"; prm_Almacen: Code[10]; prm_UbicacionOrigen: Code[20]; prm_UbicacionDestino: Code[20]; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_SSCC: Code[20]; prm_UM: Code[10]; prm_Cantidad: Decimal; prm_NoDocumento: Code[20]; prm_NoLinea: Integer; prm_Descripcion: Text) noMovimiento: Integer
     var
         rItem: Record Item;
         cReubicaciones: Codeunit "Reubicaciones SGA";
@@ -593,33 +583,33 @@ codeunit 51100 "Gestion Contenido SGA"
             umUsada := umBase;
         factor := cUOMMgt.GetQtyPerUnitOfMeasure(rItem, umUsada);
         cantidadBase := cUOMMgt.CalcBaseQty(prm_Cantidad, factor);
-        caducidad := cStock.CaducidadLote(prm_Producto, prm_Variante, prm_Lote);
+        caducidad := cStock.CaducidadLote(prm_Producto, prm_Lote);
         if (prm_SSCC = '') and (prm_UbicacionOrigen <> '') then
-            prm_SSCC := SSCCEnUbicacion(prm_Almacen, prm_UbicacionOrigen, prm_Producto, prm_Variante, prm_Lote);
+            prm_SSCC := SSCCEnUbicacion(prm_Almacen, prm_UbicacionOrigen, prm_Producto, prm_Lote);
 
         // Salida primero: si no hay existencias en el origen no llego a tocar el destino.
         if prm_UbicacionOrigen <> '' then
-            AplicarDelta(prm_Almacen, prm_UbicacionOrigen, prm_Producto, prm_Variante, prm_Lote, prm_SSCC, umBase,
+            AplicarDelta(prm_Almacen, prm_UbicacionOrigen, prm_Producto, prm_Lote, prm_SSCC, umBase,
                          -cantidadBase, caducidad, false);
 
         // La carga inicial, un recuento al alza y un ajuste reflejan mercancía que ya está ahí:
         // no se comprueba si la ubicación la admite (capacidad, mezcla, bloqueo, reserva).
         if prm_UbicacionDestino <> '' then
-            AplicarDelta(prm_Almacen, prm_UbicacionDestino, prm_Producto, prm_Variante, prm_Lote, prm_SSCC, umBase,
+            AplicarDelta(prm_Almacen, prm_UbicacionDestino, prm_Producto, prm_Lote, prm_SSCC, umBase,
                          cantidadBase, caducidad,
                          not (prm_Tipo in ["Tipo Mov. Ubicacion SGA"::"Carga Inicial", "Tipo Mov. Ubicacion SGA"::Recuento, "Tipo Mov. Ubicacion SGA"::Ajuste]));
 
         noMovimiento := InsertarMovimiento(prm_Tipo, prm_Origen, prm_Almacen, prm_UbicacionOrigen, prm_UbicacionDestino,
-                                           prm_Producto, prm_Variante, prm_Lote, prm_SSCC, caducidad, umUsada, factor,
+                                           prm_Producto, prm_Lote, prm_SSCC, caducidad, umUsada,
                                            prm_Cantidad, cantidadBase, prm_NoDocumento, prm_NoLinea, prm_Descripcion);
 
         // Una ubicación de picking que se queda a cero de un producto pide reposición, sea cual
         // sea el movimiento que la vacía: picking, traslado, vaciado o ajuste.
         if prm_UbicacionOrigen <> '' then
-            cReubicaciones.ReubicarSiSeVacia(prm_Almacen, prm_UbicacionOrigen, prm_Producto, prm_Variante);
+            cReubicaciones.ReubicarSiSeVacia(prm_Almacen, prm_UbicacionOrigen, prm_Producto);
     end;
 
-    local procedure AplicarDelta(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50]; prm_SSCC: Code[20]; prm_UMBase: Code[10]; prm_DeltaBase: Decimal; prm_Caducidad: Date; prm_ValidarEntrada: Boolean)
+    local procedure AplicarDelta(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_SSCC: Code[20]; prm_UMBase: Code[10]; prm_DeltaBase: Decimal; prm_Caducidad: Date; prm_ValidarEntrada: Boolean)
     var
         rContenido: Record "Contenido Ubicacion SGA";
         rUbicacionSGA: Record "Ubicacion SGA";
@@ -628,16 +618,12 @@ codeunit 51100 "Gestion Contenido SGA"
         ExistenciasInsuficientesErr: Label 'En la ubicación %1 solo hay %2 unidades de %3 (lote %4) y se intentan retirar %5.', Comment = '%1 = ubicación, %2 = cantidad disponible, %3 = producto, %4 = lote, %5 = cantidad a retirar';
         SinExistenciasErr: Label 'En la ubicación %1 no hay existencias de %2 (lote %3, SSCC %4).', Comment = '%1 = ubicación, %2 = producto, %3 = lote, %4 = SSCC';
     begin
-        // Una ubicación creada en BC por fuera se da de alta en SGA la primera vez que se usa.
-        if not rUbicacionSGA.Get(prm_Almacen, prm_Ubicacion) then begin
-            cUbicaciones.SincronizarTopologia(prm_Almacen);
-            rUbicacionSGA.Get(prm_Almacen, prm_Ubicacion);
-        end;
+        LeerUbicacionSGA(prm_Almacen, prm_Ubicacion, rUbicacionSGA);
 
         if prm_ValidarEntrada and (prm_DeltaBase > 0) then
             TestUbicacionAdmite(rUbicacionSGA, prm_Producto, prm_Lote, prm_DeltaBase);
 
-        existe := rContenido.Get(prm_Almacen, prm_Ubicacion, prm_Producto, prm_Variante, prm_Lote, prm_UMBase, prm_SSCC);
+        existe := rContenido.Get(prm_Almacen, prm_Ubicacion, prm_Producto, prm_Lote, prm_UMBase, prm_SSCC);
 
         if not existe then begin
             if prm_DeltaBase < 0 then begin
@@ -646,7 +632,7 @@ codeunit 51100 "Gestion Contenido SGA"
                     Error(SinExistenciasErr, prm_Ubicacion, prm_Producto, prm_Lote, prm_SSCC);
             end;
 
-            NuevaLineaContenido(rContenido, prm_Almacen, prm_Ubicacion, prm_Producto, prm_Variante, prm_Lote, prm_SSCC, prm_UMBase);
+            NuevaLineaContenido(rContenido, prm_Almacen, prm_Ubicacion, prm_Producto, prm_Lote, prm_SSCC, prm_UMBase);
         end;
 
         if (prm_DeltaBase < 0) and (rContenido."Cantidad Base" + prm_DeltaBase < 0) then begin
@@ -655,17 +641,7 @@ codeunit 51100 "Gestion Contenido SGA"
                 Error(ExistenciasInsuficientesErr, prm_Ubicacion, rContenido."Cantidad Base", prm_Producto, prm_Lote, -prm_DeltaBase);
         end;
 
-        rContenido."Cantidad Base" := rContenido."Cantidad Base" + prm_DeltaBase;
-        if prm_Caducidad <> 0D then
-            rContenido."Fecha Caducidad" := prm_Caducidad;
-
-        if prm_DeltaBase > 0 then
-            rContenido."Fecha Ultima Entrada" := CurrentDateTime()
-        else
-            rContenido."Fecha Ultima Salida" := CurrentDateTime();
-
-        rContenido.ActualizarCantidades();
-        rContenido.AutorizarEscritura();
+        SumarALinea(rContenido, prm_DeltaBase, prm_Caducidad, CurrentDateTime());
 
         case true of
             (rContenido."Cantidad Base" = 0) and (rContenido."Cantidad Reservada" = 0) and existe:
@@ -676,7 +652,27 @@ codeunit 51100 "Gestion Contenido SGA"
                 rContenido.Insert(true);
         end;
 
-        RefrescarUbicacion(rUbicacionSGA);
+        RecalcularEstadoUbicacion(prm_Almacen, prm_Ubicacion, true);
+    end;
+
+    /// <summary>
+    /// Suma prm_DeltaBase a una línea de contenido (leída o nueva, sin guardar): cantidad,
+    /// caducidad si llega, fecha de última entrada o salida y cantidades derivadas. Quien llama
+    /// la guarda.
+    /// </summary>
+    local procedure SumarALinea(var prm_Contenido: Record "Contenido Ubicacion SGA"; prm_DeltaBase: Decimal; prm_Caducidad: Date; prm_Momento: DateTime)
+    begin
+        prm_Contenido."Cantidad Base" := prm_Contenido."Cantidad Base" + prm_DeltaBase;
+        if prm_Caducidad <> 0D then
+            prm_Contenido."Fecha Caducidad" := prm_Caducidad;
+
+        if prm_DeltaBase > 0 then
+            prm_Contenido."Fecha Ultima Entrada" := prm_Momento
+        else
+            prm_Contenido."Fecha Ultima Salida" := prm_Momento;
+
+        prm_Contenido.ActualizarCantidades();
+        prm_Contenido.AutorizarEscritura();
     end;
 
     local procedure AcumularSinValidar(var rMovimiento: Record "Movimiento Ubicacion SGA"; prm_Ubicacion: Code[20]; prm_DeltaBase: Decimal)
@@ -688,23 +684,13 @@ codeunit 51100 "Gestion Contenido SGA"
         umBase := cUM.UMBase(rMovimiento."No. Producto");
 
         existe := rContenido.Get(rMovimiento."Cod. Almacen", prm_Ubicacion, rMovimiento."No. Producto",
-                                 rMovimiento."Cod. Variante", rMovimiento."No. Lote", umBase, rMovimiento.SSCC);
+                                 rMovimiento."No. Lote", umBase, rMovimiento.SSCC);
 
         if not existe then
             NuevaLineaContenido(rContenido, rMovimiento."Cod. Almacen", prm_Ubicacion, rMovimiento."No. Producto",
-                                rMovimiento."Cod. Variante", rMovimiento."No. Lote", rMovimiento.SSCC, umBase);
+                                rMovimiento."No. Lote", rMovimiento.SSCC, umBase);
 
-        rContenido."Cantidad Base" := rContenido."Cantidad Base" + prm_DeltaBase;
-        if rMovimiento."Fecha Caducidad" <> 0D then
-            rContenido."Fecha Caducidad" := rMovimiento."Fecha Caducidad";
-
-        if prm_DeltaBase > 0 then
-            rContenido."Fecha Ultima Entrada" := rMovimiento."Fecha-Hora Registro"
-        else
-            rContenido."Fecha Ultima Salida" := rMovimiento."Fecha-Hora Registro";
-
-        rContenido.ActualizarCantidades();
-        rContenido.AutorizarEscritura();
+        SumarALinea(rContenido, prm_DeltaBase, rMovimiento."Fecha Caducidad", rMovimiento.SystemCreatedAt);
 
         if existe then
             rContenido.Modify(false)
@@ -715,13 +701,12 @@ codeunit 51100 "Gestion Contenido SGA"
     /// <summary>
     /// Línea de contenido nueva, sin insertar y a cero, en la unidad base del producto.
     /// </summary>
-    local procedure NuevaLineaContenido(var rContenido: Record "Contenido Ubicacion SGA"; prm_Almacen: Code[10]; prm_Ubicacion: Code[20]; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50]; prm_SSCC: Code[20]; prm_UMBase: Code[10])
+    local procedure NuevaLineaContenido(var rContenido: Record "Contenido Ubicacion SGA"; prm_Almacen: Code[10]; prm_Ubicacion: Code[20]; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_SSCC: Code[20]; prm_UMBase: Code[10])
     begin
         rContenido.Init();
         rContenido."Cod. Almacen" := prm_Almacen;
         rContenido."Cod. Bin" := prm_Ubicacion;
         rContenido."No. Producto" := prm_Producto;
-        rContenido."Cod. Variante" := prm_Variante;
         rContenido."No. Lote" := prm_Lote;
         rContenido.SSCC := prm_SSCC;
         rContenido."Cod. Unidad Medida" := prm_UMBase;
@@ -748,18 +733,29 @@ codeunit 51100 "Gestion Contenido SGA"
     procedure TestEntradaAdmitida(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_UM: Code[10]; prm_Cantidad: Decimal; prm_Para: Text; prm_Propuesta: Code[20])
     var
         rUbicacionSGA: Record "Ubicacion SGA";
-        UbicacionNoExisteErr: Label 'La ubicación %1 no existe en el almacén %2.', Comment = '%1 = ubicación, %2 = almacén';
     begin
-        if not rUbicacionSGA.Get(prm_Almacen, prm_Ubicacion) then
-            Error(UbicacionNoExisteErr, prm_Ubicacion, prm_Almacen);
+        LeerUbicacionSGA(prm_Almacen, prm_Ubicacion, rUbicacionSGA);
         FijarReserva(prm_Para);
         FijarPropuesta(prm_Propuesta);
         TestUbicacionAdmite(rUbicacionSGA, prm_Producto, prm_Lote, cUOMMgt.CalcBaseQty(prm_Cantidad, cUM.FactorUM(prm_Producto, prm_UM)));
     end;
 
+    /// <summary>
+    /// La ficha SGA de una ubicación. Una ubicación creada en BC por fuera se da de alta en SGA
+    /// la primera vez que se usa; si tampoco existe en BC, error.
+    /// </summary>
+    local procedure LeerUbicacionSGA(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]; var prm_UbicacionSGA: Record "Ubicacion SGA")
+    begin
+        if prm_UbicacionSGA.Get(prm_Almacen, prm_Ubicacion) then
+            exit;
+        cUbicaciones.SincronizarTopologia(prm_Almacen);
+        prm_UbicacionSGA.Get(prm_Almacen, prm_Ubicacion);
+    end;
+
     local procedure TestUbicacionAdmite(var rUbicacionSGA: Record "Ubicacion SGA"; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_CantidadBase: Decimal)
     var
         rContenido: Record "Contenido Ubicacion SGA";
+        cConfirmMgt: Codeunit "Confirm Management";
         ocupado: Decimal;
         entrada: Decimal;
         grupoIIEE: Code[20];
@@ -778,7 +774,7 @@ codeunit 51100 "Gestion Contenido SGA"
         if rUbicacionSGA.ReservadaParaOtro(ParaReserva) then
             Error(UbicacionReservadaErr, rUbicacionSGA."Cod. Bin", rUbicacionSGA."Reservada Para", rUbicacionSGA."Reservada Por");
 
-        if (rUbicacionSGA."Producto Fijo" <> '') and (rUbicacionSGA."Producto Fijo" <> prm_Producto) then
+        if rUbicacionSGA.FijaParaOtroProducto(prm_Producto) then
             Error(UbicacionProductoFijoErr, rUbicacionSGA."Cod. Bin", rUbicacionSGA."Producto Fijo");
 
         case rUbicacionSGA.ContenidoQueImpideMezcla(prm_Producto, prm_Lote, rContenido) of
@@ -792,7 +788,7 @@ codeunit 51100 "Gestion Contenido SGA"
         // operario (en el hueco propuesto la propuesta ya lo dice). Sin interfaz se deja pasar.
         if GuiAllowed() and (rUbicacionSGA."Cod. Bin" <> UbicacionPropuesta) then
             if cUbicaciones.FueraDeZonasGrupoIIEE(rUbicacionSGA, prm_Producto, grupoIIEE) then
-                if not Confirm(FueraZonaGrupoQst, false, rUbicacionSGA."Cod. Bin", prm_Producto, grupoIIEE) then
+                if not cConfirmMgt.GetResponseOrDefault(StrSubstNo(FueraZonaGrupoQst, rUbicacionSGA."Cod. Bin", prm_Producto, grupoIIEE), false) then
                     Error('');
 
         if rUbicacionSGA."Capacidad Uds." <= 0 then
@@ -815,11 +811,11 @@ codeunit 51100 "Gestion Contenido SGA"
         if not GuiAllowed() then
             exit;
 
-        if not Confirm(SuperaCapacidadQst, false, rUbicacionSGA."Cod. Bin", ocupado + entrada, rUbicacionSGA."Capacidad Uds.") then
+        if not cConfirmMgt.GetResponseOrDefault(StrSubstNo(SuperaCapacidadQst, rUbicacionSGA."Cod. Bin", ocupado + entrada, rUbicacionSGA."Capacidad Uds."), false) then
             Error('');
     end;
 
-    local procedure InsertarMovimiento(prm_Tipo: Enum "Tipo Mov. Ubicacion SGA"; prm_Origen: Enum "Origen Mov. SGA"; prm_Almacen: Code[10]; prm_UbicacionOrigen: Code[20]; prm_UbicacionDestino: Code[20]; prm_Producto: Code[20]; prm_Variante: Code[10]; prm_Lote: Code[50]; prm_SSCC: Code[20]; prm_Caducidad: Date; prm_UM: Code[10]; prm_Factor: Decimal; prm_Cantidad: Decimal; prm_CantidadBase: Decimal; prm_NoDocumento: Code[20]; prm_NoLinea: Integer; prm_Descripcion: Text): Integer
+    local procedure InsertarMovimiento(prm_Tipo: Enum "Tipo Mov. Ubicacion SGA"; prm_Origen: Enum "Origen Mov. SGA"; prm_Almacen: Code[10]; prm_UbicacionOrigen: Code[20]; prm_UbicacionDestino: Code[20]; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_SSCC: Code[20]; prm_Caducidad: Date; prm_UM: Code[10]; prm_Cantidad: Decimal; prm_CantidadBase: Decimal; prm_NoDocumento: Code[20]; prm_NoLinea: Integer; prm_Descripcion: Text): Integer
     var
         rMovimiento: Record "Movimiento Ubicacion SGA";
         rConfig: Record "Config. SGA";
@@ -831,18 +827,15 @@ codeunit 51100 "Gestion Contenido SGA"
         rMovimiento."Cod. Bin Origen" := prm_UbicacionOrigen;
         rMovimiento."Cod. Bin Destino" := prm_UbicacionDestino;
         rMovimiento."No. Producto" := prm_Producto;
-        rMovimiento."Cod. Variante" := prm_Variante;
         rMovimiento."No. Lote" := prm_Lote;
         rMovimiento.SSCC := prm_SSCC;
         rMovimiento."Fecha Caducidad" := prm_Caducidad;
         rMovimiento."Cod. Unidad Medida" := prm_UM;
-        rMovimiento."Ctdad. por Unidad Medida" := prm_Factor;
         rMovimiento.Cantidad := prm_Cantidad;
         rMovimiento."Cantidad Base" := prm_CantidadBase;
         rMovimiento."No. Documento Origen" := prm_NoDocumento;
         rMovimiento."No. Linea Origen" := prm_NoLinea;
         rMovimiento."Fecha Registro" := WorkDate();
-        rMovimiento."Fecha-Hora Registro" := CurrentDateTime();
         rMovimiento."Cod. Usuario" := rConfig.UsuarioActual();
         rMovimiento.Descripcion := CopyStr(prm_Descripcion, 1, MaxStrLen(rMovimiento.Descripcion));
         rMovimiento.AutorizarEscritura();
@@ -851,13 +844,4 @@ codeunit 51100 "Gestion Contenido SGA"
         exit(rMovimiento."No. Movimiento");
     end;
 
-    local procedure RefrescarUbicacion(var rUbicacionSGA: Record "Ubicacion SGA")
-    begin
-        if not rUbicacionSGA.Get(rUbicacionSGA."Cod. Almacen", rUbicacionSGA."Cod. Bin") then
-            exit;
-
-        rUbicacionSGA.RecalcularOcupacion();
-        rUbicacionSGA."Fecha Ultimo Movimiento" := CurrentDateTime();
-        rUbicacionSGA.Modify(false);
-    end;
 }

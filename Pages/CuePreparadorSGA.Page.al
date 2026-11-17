@@ -25,19 +25,16 @@ page 51135 "Cue Preparador SGA"
                 {
                     ToolTip = 'Órdenes de picking asignadas a usted que quedan por terminar.';
                     ApplicationArea = All;
-                    DrillDownPageId = "Ordenes Picking SGA";
                 }
                 field("Mis Reubicaciones"; Rec."Mis Reubicaciones")
                 {
                     ToolTip = 'Reubicaciones asignadas a usted que quedan por terminar.';
                     ApplicationArea = All;
-                    DrillDownPageId = "Ordenes Picking SGA";
                 }
                 field("Ordenes Disponibles"; Rec."Ordenes Disponibles")
                 {
                     ToolTip = 'Órdenes de picking sin asignar que puede coger con Preparar pedidos.';
                     ApplicationArea = All;
-                    DrillDownPageId = "Ordenes Picking SGA";
                     Visible = (not ExigeAsignacion) and (not Carretillero);
                 }
                 // Al carretillero "Siguiente orden" solo le da reubicaciones: se le cuentan esas.
@@ -45,7 +42,6 @@ page 51135 "Cue Preparador SGA"
                 {
                     ToolTip = 'Reubicaciones sin asignar que puede coger con Siguiente orden.';
                     ApplicationArea = All;
-                    DrillDownPageId = "Ordenes Picking SGA";
                     Visible = (not ExigeAsignacion) and Carretillero;
                 }
             }

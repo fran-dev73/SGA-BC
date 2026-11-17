@@ -9,8 +9,6 @@ namespace AntonioNadal.SGA;
 /// </summary>
 codeunit 51111 "Ventana Progreso SGA"
 {
-    Access = Public;
-
     /// <summary>
     /// Abre la ventana con prm_Titulo encima. prm_Total es cuántas veces se llamará a Avanzar;
     /// si aún no se sabe, 0 y luego FijarTotal.

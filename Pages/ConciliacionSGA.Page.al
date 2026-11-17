@@ -1,7 +1,5 @@
 namespace AntonioNadal.SGA;
 
-using Microsoft.Inventory.Ledger;
-
 /// <summary>
 /// Page Conciliacion SGA (ID 51113).
 /// Resultado de la última conciliación: qué stock de BC no está ubicado en ninguna parte
@@ -36,12 +34,6 @@ page 51113 "Conciliacion SGA"
                 }
                 field(Descripcion; Rec.Descripcion)
                 {
-                    ToolTip = 'Descripción del producto.';
-                    ApplicationArea = All;
-                }
-                field("Cod. Variante"; Rec."Cod. Variante")
-                {
-                    ToolTip = 'Variante del producto.';
                     ApplicationArea = All;
                 }
                 field("Cod. Almacen"; Rec."Cod. Almacen")
@@ -56,23 +48,19 @@ page 51113 "Conciliacion SGA"
                 }
                 field("Stock BC"; Rec."Stock BC")
                 {
-                    ToolTip = 'Existencias según los movimientos de producto, en unidades base.';
                     ApplicationArea = All;
                 }
                 field("Stock SGA"; Rec."Stock SGA")
                 {
-                    ToolTip = 'Suma del contenido de todas las ubicaciones, en unidades base.';
                     ApplicationArea = All;
                 }
                 field(Diferencia; Rec.Diferencia)
                 {
-                    ToolTip = 'Stock BC menos stock SGA. Positivo significa que hay stock sin ubicar.';
                     ApplicationArea = All;
                     StyleExpr = EstiloFila;
                 }
                 field("Unidad Medida Base"; Rec."Unidad Medida Base")
                 {
-                    ToolTip = 'Unidad de medida base del producto.';
                     ApplicationArea = All;
                 }
             }
@@ -122,7 +110,7 @@ page 51113 "Conciliacion SGA"
             action(VerMovsProducto)
             {
                 Caption = 'Movs. producto';
-                ToolTip = 'Abre los movimientos de producto de BC que forman el stock BC de la línea: abiertos, del mismo producto, variante, lote y almacén.';
+                ToolTip = 'Abre los movimientos de producto de BC que forman el stock BC de la línea: abiertos, del mismo producto, lote y almacén.';
                 ApplicationArea = All;
                 Image = Entries;
 

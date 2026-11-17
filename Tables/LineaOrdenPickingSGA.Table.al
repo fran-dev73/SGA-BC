@@ -51,11 +51,6 @@ table 51109 "Linea Orden Picking SGA"
             Caption = 'Descripción';
             DataClassification = ToBeClassified;
         }
-        field(32; "Cod. Variante"; Code[10])
-        {
-            Caption = 'Cód. variante';
-            DataClassification = ToBeClassified;
-        }
         field(33; "No. Lote"; Code[50])
         {
             Caption = 'Nº lote';

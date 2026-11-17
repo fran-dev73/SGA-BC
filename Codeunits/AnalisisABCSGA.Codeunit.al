@@ -133,6 +133,8 @@ codeunit 51107 "Analisis ABC SGA"
         rMovProducto.SetRange("Entry Type", rMovProducto."Entry Type"::Sale);
         rMovProducto.SetRange("Posting Date", prm_Calculo."Fecha Desde", prm_Calculo."Fecha Hasta");
         rMovProducto.SetRange("Location Code", prm_Calculo."Cod. Almacen");
+        // Un envío directo no pasa por el almacén.
+        rMovProducto.SetRange("Drop Shipment", false);
         rMovProducto.SetLoadFields("Item No.", Quantity);
         if rMovProducto.FindSet() then
             repeat
@@ -148,10 +150,18 @@ codeunit 51107 "Analisis ABC SGA"
 
     local procedure AnotarVentas(var prm_Calculo: Record "Calculo ABC SGA"; prm_Producto: Code[20]; prm_CantidadBase: Decimal)
     var
+        rItem: Record Item;
         rLinea: Record "Clasificacion ABC SGA";
         cUM: Codeunit "Unidades Producto SGA";
     begin
         if prm_CantidadBase <= 0 then
+            exit;
+
+        // Solo lo que ocupa hueco: un producto que no es de inventario no se ubica.
+        rItem.SetLoadFields(Type);
+        if not rItem.Get(prm_Producto) then
+            exit;
+        if not rItem.IsInventoriableType() then
             exit;
 
         NuevaLinea(prm_Calculo, prm_Producto, rLinea);
@@ -173,6 +183,7 @@ codeunit 51107 "Analisis ABC SGA"
         prm_Linea."No. Calculo" := prm_Calculo."No.";
         prm_Linea."No. Producto" := prm_Producto;
         prm_Linea."Cod. Almacen" := prm_Calculo."Cod. Almacen";
+        rItem.SetLoadFields(Description);
         if rItem.Get(prm_Producto) then
             prm_Linea.Descripcion := rItem.Description;
     end;
@@ -187,28 +198,37 @@ codeunit 51107 "Analisis ABC SGA"
         rContenido: Record "Contenido Ubicacion SGA";
         rUbicacion: Record "Ubicacion SGA";
         rLinea: Record "Clasificacion ABC SGA";
+        huecosUtiles: Dictionary of [Code[20], Boolean];
         clave: Text;
     begin
+        // Los huecos útiles, de una vez: no se lee la ubicación de cada línea de contenido.
+        FiltrarHuecosUtiles(rUbicacion, prm_Calculo."Cod. Almacen");
+        rUbicacion.SetLoadFields("Cod. Bin");
+        if rUbicacion.FindSet() then
+            repeat
+                huecosUtiles.Add(rUbicacion."Cod. Bin", true);
+            until rUbicacion.Next() = 0;
+
         rContenido.SetCurrentKey("Cod. Almacen", "Cod. Bin");
         rContenido.SetRange("Cod. Almacen", prm_Calculo."Cod. Almacen");
         rContenido.SetFilter("Cantidad Base", '>0');
+        rContenido.SetLoadFields("No. Producto", "Cod. Bin");
         if not rContenido.FindSet() then
             exit;
 
         repeat
             clave := rContenido."No. Producto" + '|' + rContenido."Cod. Bin";
             if not prm_PalesProductoHueco.ContainsKey(clave) then
-                if rUbicacion.Get(rContenido."Cod. Almacen", rContenido."Cod. Bin") then
-                    if EsHuecoUtil(rUbicacion) then begin
-                        prm_PalesProductoHueco.Add(clave, true);
+                if huecosUtiles.ContainsKey(rContenido."Cod. Bin") then begin
+                    prm_PalesProductoHueco.Add(clave, true);
 
-                        if not rLinea.Get(prm_Calculo."No.", rContenido."No. Producto") then begin
-                            NuevaLinea(prm_Calculo, rContenido."No. Producto", rLinea);
-                            rLinea.Insert();
-                        end;
-                        rLinea."Palets en Almacen" += 1;
-                        rLinea.Modify();
+                    if not rLinea.Get(prm_Calculo."No.", rContenido."No. Producto") then begin
+                        NuevaLinea(prm_Calculo, rContenido."No. Producto", rLinea);
+                        rLinea.Insert();
                     end;
+                    rLinea."Palets en Almacen" += 1;
+                    rLinea.Modify();
+                end;
         until rContenido.Next() = 0;
     end;
 
@@ -292,16 +312,15 @@ codeunit 51107 "Analisis ABC SGA"
         palesB: Integer;
         n: Integer;
     begin
-        rUbicacion.SetRange("Cod. Almacen", prm_Calculo."Cod. Almacen");
+        FiltrarHuecosUtiles(rUbicacion, prm_Calculo."Cod. Almacen");
+        rUbicacion.SetLoadFields("Secuencia Picking");
         if rUbicacion.FindSet() then
             repeat
-                if EsHuecoUtil(rUbicacion) then begin
-                    TempOrden := rUbicacion;
-                    // La secuencia de un código generado llega a 9.999.999 (pasillo 999): cabe
-                    // entera detrás de la altura, que no pasa de 100.
-                    TempOrden."Secuencia Picking" := NivelHueco(rUbicacion."Cod. Bin") * 10000000 + Minimo(rUbicacion."Secuencia Picking", 9999999);
-                    TempOrden.Insert();
-                end;
+                TempOrden := rUbicacion;
+                // La secuencia de un código generado llega a 9.999.999 (pasillo 999): cabe
+                // entera detrás de la altura, que no pasa de 100.
+                TempOrden."Secuencia Picking" := NivelHueco(rUbicacion."Cod. Bin") * 10000000 + Minimo(rUbicacion."Secuencia Picking", 9999999);
+                TempOrden.Insert();
             until rUbicacion.Next() = 0;
         prm_Calculo."Huecos Utiles" := TempOrden.Count();
 
@@ -378,9 +397,11 @@ codeunit 51107 "Analisis ABC SGA"
         rAnterior.SetCurrentKey("Cod. Almacen", "No.");
         rAnterior.SetRange("Cod. Almacen", prm_Calculo."Cod. Almacen");
         rAnterior.SetFilter("No.", '<%1', prm_Calculo."No.");
+        rAnterior.SetLoadFields("No.");
         if not rAnterior.FindLast() then
             exit;
 
+        rLineaAnterior.SetLoadFields(Clase);
         rLinea.SetRange("No. Calculo", prm_Calculo."No.");
         if rLinea.FindSet() then
             repeat
@@ -393,13 +414,15 @@ codeunit 51107 "Analisis ABC SGA"
     end;
 
     /// <summary>
-    /// Hueco en el que se guarda stock: con tipo (picking o almacenamiento) y no bloqueado. Las
-    /// ubicaciones sin tipo (muelles, ajustes…) no se clasifican.
+    /// Los huecos útiles del almacén, en los que se guarda stock: con tipo (picking o
+    /// almacenamiento) y no bloqueados. Las ubicaciones sin tipo (muelles, ajustes…) no se
+    /// clasifican. Solo cuenta el bloqueo del propio hueco, no el de su zona.
     /// </summary>
-    local procedure EsHuecoUtil(prm_Ubicacion: Record "Ubicacion SGA"): Boolean
+    local procedure FiltrarHuecosUtiles(var prm_Ubicacion: Record "Ubicacion SGA"; prm_Almacen: Code[10])
     begin
-        // Solo cuenta el bloqueo del propio hueco, no el de su zona.
-        exit((not prm_Ubicacion.Bloqueada) and prm_Ubicacion.TieneTipo());
+        prm_Ubicacion.SetRange("Cod. Almacen", prm_Almacen);
+        prm_Ubicacion.SetRange(Bloqueada, false);
+        prm_Ubicacion.SetFilter("Tipo Ubicacion", '<>%1', prm_Ubicacion."Tipo Ubicacion"::" ");
     end;
 
     /// <summary>

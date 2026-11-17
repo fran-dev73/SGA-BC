@@ -71,14 +71,6 @@ page 51131 "Pendiente Ubicar SGA"
                 {
                     ApplicationArea = All;
                     Caption = 'Descripción';
-                    ToolTip = 'Descripción del producto.';
-                }
-                field("Cod. Variante"; Rec."Cod. Variante")
-                {
-                    ApplicationArea = All;
-                    Caption = 'Variante';
-                    ToolTip = 'Variante del producto.';
-                    Visible = false;
                 }
                 field("No. Lote"; Rec."No. Lote")
                 {
@@ -141,14 +133,13 @@ page 51131 "Pendiente Ubicar SGA"
                     var
                         cStock: Codeunit "Consulta Stock SGA";
                     begin
-                        cStock.ConsultarUbicacionesProducto(Rec."No. Producto", Rec."Cod. Variante", Rec."Cod. Almacen", Rec."No. Lote");
+                        cStock.ConsultarUbicacionesProducto(Rec."No. Producto", Rec."Cod. Almacen", Rec."No. Lote");
                     end;
                 }
                 field("Unidad Medida Base"; Rec."Unidad Medida Base")
                 {
                     ApplicationArea = All;
                     Caption = 'Unidad base';
-                    ToolTip = 'Unidad en la que van las cantidades de la línea.';
                 }
                 field("Cod. Almacen"; Rec."Cod. Almacen")
                 {
@@ -179,7 +170,7 @@ page 51131 "Pendiente Ubicar SGA"
                 begin
                     if Rec."A Ubicar" <= 0 then
                         Error(SoloEnDocumentosErr);
-                    pUbicar.Preparar(Rec."Cod. Almacen", Rec."No. Producto", Rec."Cod. Variante", Rec."No. Lote", Rec."A Ubicar");
+                    pUbicar.Preparar(Rec."Cod. Almacen", Rec."No. Producto", Rec."No. Lote", Rec."A Ubicar");
                     pUbicar.RunModal();
                     Recalcular();
                 end;

@@ -33,11 +33,6 @@ page 51102 "Contenido Ubicacion Subpag"
                     ToolTip = 'Descripción del producto.';
                     ApplicationArea = All;
                 }
-                field("Cod. Variante"; Rec."Cod. Variante")
-                {
-                    ToolTip = 'Variante del producto.';
-                    ApplicationArea = All;
-                }
                 field("No. Lote"; Rec."No. Lote")
                 {
                     ToolTip = 'Lote al que corresponde la cantidad.';

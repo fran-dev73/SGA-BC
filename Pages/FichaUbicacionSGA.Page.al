@@ -75,7 +75,7 @@ page 51101 "Ficha Ubicacion SGA"
                 }
                 field("Lineas Contenido"; Rec."Lineas Contenido")
                 {
-                    ToolTip = 'Número de combinaciones producto-lote distintas que hay en la ubicación.';
+                    ToolTip = 'Número de líneas de contenido de la ubicación: una por producto, lote y palé.';
                     ApplicationArea = All;
                 }
                 field("Fecha Ultimo Movimiento"; Rec."Fecha Ultimo Movimiento")

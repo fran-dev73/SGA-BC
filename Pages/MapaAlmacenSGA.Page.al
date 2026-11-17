@@ -41,8 +41,14 @@ page 51107 "Mapa Almacen SGA"
                     TableRelation = Location;
 
                     trigger OnValidate()
+                    var
+                        pMapa: Page "Mapa Almacen SGA";
                     begin
-                        Construir();
+                        // Las columnas visibles y el aviso dependen del almacén y BC solo los
+                        // fija al abrir la página: otro almacén se abre en otra.
+                        pMapa.FijarAlmacen(FiltroAlmacen);
+                        pMapa.Run();
+                        CurrPage.Close();
                     end;
                 }
                 field(FiltroPasillo; FiltroPasillo)
@@ -56,7 +62,7 @@ page 51107 "Mapa Almacen SGA"
 
                     trigger OnValidate()
                     begin
-                        Construir();
+                        FiltrarPasillo();
                     end;
                 }
                 field(Leyenda; Leyenda)
@@ -592,15 +598,6 @@ page 51107 "Mapa Almacen SGA"
 
         columnaMaxima := cMapa.ConstruirMapa(Rec, FiltroAlmacen);
 
-        // El alzado se consigue filtrando la vista: el buffer ya está construido, así que
-        // quedarse con un pasillo es solo acotar las filas que se pintan.
-        Rec.FilterGroup(2);
-        if FiltroPasillo <> 0 then
-            Rec.SetRange(Pasillo, FiltroPasillo)
-        else
-            Rec.SetRange(Pasillo);
-        Rec.FilterGroup(0);
-
         // El aviso se decide contra el tope de la rejilla, antes de recortar por lo que hay.
         HayAviso := columnaMaxima > limiteRejilla;
         if HayAviso then
@@ -614,6 +611,21 @@ page 51107 "Mapa Almacen SGA"
             ColumnasVisibles := columnaMaxima;
 
         FijarVisibilidad();
+        FiltrarPasillo();
+    end;
+
+    /// <summary>
+    /// El alzado se consigue filtrando la vista: el buffer ya está construido, así que quedarse
+    /// con un pasillo es solo acotar las filas que se pintan.
+    /// </summary>
+    local procedure FiltrarPasillo()
+    begin
+        Rec.FilterGroup(2);
+        if FiltroPasillo <> 0 then
+            Rec.SetRange(Pasillo, FiltroPasillo)
+        else
+            Rec.SetRange(Pasillo);
+        Rec.FilterGroup(0);
 
         if Rec.FindFirst() then;
         CurrPage.Update(false);

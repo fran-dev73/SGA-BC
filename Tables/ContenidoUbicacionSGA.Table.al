@@ -6,7 +6,7 @@ using Microsoft.Warehouse.Structure;
 
 /// <summary>
 /// Table Contenido Ubicacion SGA (ID 51102).
-/// Estado actual del almacén: qué producto, variante, lote y unidad de medida hay
+/// Estado actual del almacén: qué producto, lote y unidad de medida hay
 /// ahora mismo en cada ubicación, de qué palé (SSCC) y en qué cantidad. Dos palés del mismo
 /// lote en un hueco son dos líneas.
 ///
@@ -43,12 +43,6 @@ table 51102 "Contenido Ubicacion SGA"
             Caption = 'Nº producto';
             DataClassification = ToBeClassified;
             TableRelation = Item;
-        }
-        field(40; "Cod. Variante"; Code[10])
-        {
-            Caption = 'Cód. variante';
-            DataClassification = ToBeClassified;
-            TableRelation = "Item Variant".Code where("Item No." = field("No. Producto"));
         }
         field(50; "No. Lote"; Code[50])
         {
@@ -156,7 +150,7 @@ table 51102 "Contenido Ubicacion SGA"
 
     keys
     {
-        key(PK; "Cod. Almacen", "Cod. Bin", "No. Producto", "Cod. Variante", "No. Lote", "Cod. Unidad Medida", SSCC)
+        key(PK; "Cod. Almacen", "Cod. Bin", "No. Producto", "No. Lote", "Cod. Unidad Medida", SSCC)
         {
             Clustered = true;
         }
@@ -167,11 +161,11 @@ table 51102 "Contenido Ubicacion SGA"
         {
             SumIndexFields = "Cantidad Base";
         }
-        key(Producto; "No. Producto", "Cod. Variante", "Cod. Almacen", "No. Lote")
+        key(Producto; "No. Producto", "Cod. Almacen", "No. Lote")
         {
             SumIndexFields = "Cantidad Base";
         }
-        key(FEFO; "Cod. Almacen", "No. Producto", "Cod. Variante", Bloqueado, "Fecha Caducidad", "Cod. Bin")
+        key(FEFO; "Cod. Almacen", "No. Producto", Bloqueado, "Fecha Caducidad", "Cod. Bin")
         {
         }
         key(Lote; "No. Lote", "No. Producto", "Cod. Almacen")
@@ -275,11 +269,10 @@ table 51102 "Contenido Ubicacion SGA"
     /// Deja solo el contenido que se puede coger de un producto en un almacén: sin bloquear y
     /// con algo disponible. Es el filtro de partida del picking y de las reubicaciones.
     /// </summary>
-    procedure FiltrarDisponible(prm_Almacen: Code[10]; prm_Producto: Code[20]; prm_Variante: Code[10])
+    procedure FiltrarDisponible(prm_Almacen: Code[10]; prm_Producto: Code[20])
     begin
         SetRange("Cod. Almacen", prm_Almacen);
         SetRange("No. Producto", prm_Producto);
-        SetRange("Cod. Variante", prm_Variante);
         FiltrarCogible();
     end;
 
@@ -312,6 +305,7 @@ table 51102 "Contenido Ubicacion SGA"
         rUbicacionSGA: Record "Ubicacion SGA";
         rConfig: Record "Config. SGA";
     begin
+        rUbicacionSGA.SetLoadFields(Bloqueada, "Cod. Zona SGA");
         if not rUbicacionSGA.Get("Cod. Almacen", "Cod. Bin") then
             exit(false);
         if not rUbicacionSGA.EsUtilizable() then

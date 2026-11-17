@@ -2,6 +2,7 @@ namespace AntonioNadal.SGA;
 
 using Microsoft.Inventory.Location;
 using System.Security.AccessControl;
+using System.Security.User;
 
 /// <summary>
 /// Table Orden Picking SGA (ID 51108).
@@ -59,7 +60,10 @@ table 51108 "Orden Picking SGA"
             ToolTip = 'Preparador que tiene asignada la orden.';
 
             trigger OnValidate()
+            var
+                cUserSelection: Codeunit "User Selection";
             begin
+                cUserSelection.ValidateUserName("Cod. Usuario Asignado");
                 ValidarAsignacion();
             end;
         }

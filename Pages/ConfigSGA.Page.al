@@ -25,12 +25,10 @@ page 51106 "Config. SGA"
 
                 field("Almacen por Defecto"; Rec."Almacen por Defecto")
                 {
-                    ToolTip = 'Almacén que se propone en las consultas y el mapa, y sobre el que se resuelven las ubicaciones por defecto de esta configuración.';
                     ApplicationArea = All;
                 }
                 field("Zona por Defecto"; Rec."Zona por Defecto")
                 {
-                    ToolTip = 'Zona que se propone en las consultas y el mapa, y sobre la que se resuelven las ubicaciones por defecto de esta configuración.';
                     ApplicationArea = All;
                 }
                 field("Fecha Inicio SGA"; Rec."Fecha Inicio SGA")
@@ -44,7 +42,6 @@ page 51106 "Config. SGA"
 
                 field("Ubic. Ajustes"; Rec."Ubic. Ajustes")
                 {
-                    ToolTip = 'Ubicación contrapartida de los ajustes y descuadres detectados en la conciliación.';
                     ApplicationArea = All;
                 }
             }
@@ -54,22 +51,18 @@ page 51106 "Config. SGA"
 
                 field("Estrategia Ubicacion"; Rec."Estrategia Ubicacion")
                 {
-                    ToolTip = 'Política con la que se decide dónde colocar la mercancía que entra. Se aplica primero en las ubicaciones de almacenamiento y, si no queda sitio, en las de picking.';
                     ApplicationArea = All;
                 }
                 field("Estrategia Ubic. Ensamblados"; Rec."Estrategia Ubic. Ensamblados")
                 {
-                    ToolTip = 'Política para lo que sale de un ensamblado. Por defecto solo huecos vacíos, para que lo producido no se mezcle. Cámbielo a cualquier otra si prefiere consolidar.';
                     ApplicationArea = All;
                 }
                 field("Estrategia Ubic. Compras"; Rec."Estrategia Ubic. Compras")
                 {
-                    ToolTip = 'Política para lo que llega en una recepción de compra. Por defecto la estándar: la casa del producto, si no consolidar y si no el primer hueco libre.';
                     ApplicationArea = All;
                 }
                 field("Estrategia Picking"; Rec."Estrategia Picking")
                 {
-                    ToolTip = 'Orden en que se coge el stock (FEFO, FIFO…), dentro de cada paso del picking: palés completos de almacenamiento, picking y lo que falte de almacenamiento. Es también el orden con que las reubicaciones eligen qué traer de almacenamiento.';
                     ApplicationArea = All;
                 }
             }
@@ -104,27 +97,22 @@ page 51106 "Config. SGA"
 
                 field("Control Capacidad"; Rec."Control Capacidad")
                 {
-                    ToolTip = 'Qué hacer cuando una entrada supera la capacidad de una ubicación que tiene "Control capacidad" = Según configuración: bloquearla, o avisar y dejar seguir si se confirma. Cada ubicación puede llevar el suyo. La capacidad se controla siempre.';
                     ApplicationArea = All;
                 }
                 field("Permitir Cantidad Negativa"; Rec."Permitir Cantidad Negativa")
                 {
-                    ToolTip = 'Si está activo, se admite sacar de una ubicación más de lo que consta. Solo para arranques con datos incompletos.';
                     ApplicationArea = All;
                 }
                 field("Exigir Confirmar Ubicacion"; Rec."Exigir Confirmar Ubicacion")
                 {
-                    ToolTip = 'En Ubicar producto, obliga a escanear la etiqueta del hueco en el que se deja cada línea antes de confirmarla. El picking siempre lee la ubicación de la que recoge en la etiqueta del hueco.';
                     ApplicationArea = All;
                 }
                 field("Permitir Desvio Ubicacion"; Rec."Permitir Desvio Ubicacion")
                 {
-                    ToolTip = 'Permite al operario dejar o coger la mercancía en una ubicación distinta de la sugerida, quedando registrado el desvío.';
                     ApplicationArea = All;
                 }
                 field("Exigir Asignacion Picking"; Rec."Exigir Asignacion Picking")
                 {
-                    ToolTip = 'Si está activo, las órdenes de picking nacen pendientes de asignar y solo las puede preparar el preparador al que un responsable se las asigne en "Asignar órdenes de picking". Si no, cada preparador coge la siguiente sin asignar.';
                     ApplicationArea = All;
                 }
             }
@@ -134,7 +122,6 @@ page 51106 "Config. SGA"
 
                 field("Nos. Orden SGA"; Rec."Nos. Orden SGA")
                 {
-                    ToolTip = 'Serie numérica de las órdenes de trabajo de almacén. La consume la gestión de órdenes de la Fase 2.';
                     ApplicationArea = All;
                 }
             }

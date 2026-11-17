@@ -21,7 +21,7 @@ page 51108 "Consulta Ubic. Producto SGA"
     InsertAllowed = false;
     DeleteAllowed = false;
     ModifyAllowed = false;
-    SourceTableView = sorting("Cod. Almacen", "No. Producto", "Cod. Variante", Bloqueado, "Fecha Caducidad", "Cod. Bin");
+    SourceTableView = sorting("Cod. Almacen", "No. Producto", Bloqueado, "Fecha Caducidad", "Cod. Bin");
 
     layout
     {
@@ -155,18 +155,15 @@ page 51108 "Consulta Ubic. Producto SGA"
                 }
                 field("Fecha Caducidad"; Rec."Fecha Caducidad")
                 {
-                    ToolTip = 'Caducidad del lote. Con estrategia FEFO se sirve primero el más próximo a caducar.';
                     ApplicationArea = All;
                     StyleExpr = EstiloFila;
                 }
                 field("Cantidad Base"; Rec."Cantidad Base")
                 {
-                    ToolTip = 'Unidades base que hay en esta ubicación.';
                     ApplicationArea = All;
                 }
                 field("Cantidad Disponible"; Rec."Cantidad Disponible")
                 {
-                    ToolTip = 'Unidades libres para recoger.';
                     ApplicationArea = All;
                 }
                 field(Bloqueado; Rec.Bloqueado)

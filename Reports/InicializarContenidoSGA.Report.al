@@ -2,6 +2,7 @@ namespace AntonioNadal.SGA;
 
 using Microsoft.Inventory.Item;
 using Microsoft.Inventory.Location;
+using System.Utilities;
 
 /// <summary>
 /// Report Inicializar Contenido SGA (ID 51107).
@@ -80,6 +81,7 @@ report 51107 "Inicializar Contenido SGA"
     var
         cContenido: Codeunit "Gestion Contenido SGA";
         cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
+        cConfirmMgt: Codeunit "Confirm Management";
         alcance: Text;
         ejemplos: Text;
         motivo: Text;
@@ -101,10 +103,10 @@ report 51107 "Inicializar Contenido SGA"
             alcance := TodosProductosLbl;
         if GuiAllowed() then
             if blnEliminarUbicaciones then begin
-                if not Confirm(EliminarUbicacionesQst, false, codAlmacen) then
+                if not cConfirmMgt.GetResponseOrDefault(StrSubstNo(EliminarUbicacionesQst, codAlmacen), false) then
                     exit;
             end else
-                if not Confirm(InicializarQst, false, codAlmacen, alcance) then
+                if not cConfirmMgt.GetResponseOrDefault(StrSubstNo(InicializarQst, codAlmacen, alcance), false) then
                     exit;
 
         cContenido.Inicializar(codAlmacen, Producto.GetView());

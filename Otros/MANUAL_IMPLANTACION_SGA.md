@@ -50,7 +50,7 @@ Menú **Almacén SGA - Configuración** > **Configuración SGA**.
 | Control | Qué hace |
 |---|---|
 | Control capacidad | Avisar o Bloquear cuando una ubicación se pasa de su capacidad |
-| Permitir desvío ubicación | Admite recoger de un hueco distinto del propuesto |
+| Permitir desvío ubicación | Admite recoger de un hueco distinto del propuesto, y dejar en uno distinto del propuesto al ubicar (Ubicar producto, Ubicar recepciones y ensamblados, Imprimir y ubicar) |
 | Exigir confirmar ubicación | En *Ubicar producto*, obliga a escanear la etiqueta del hueco en el que se deja cada línea (columna *Ubicación leída*) |
 | Exigir asignación de picking | Las órdenes nacen pendientes de asignar y las reparte un responsable |
 | Permitir cantidad negativa | Solo para arranques |

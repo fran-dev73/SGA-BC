@@ -1,5 +1,7 @@
 namespace AntonioNadal.SGA;
 
+using System.Utilities;
+
 /// <summary>
 /// Page Lineas Orden Picking Subpag (ID 51120).
 /// Paradas de una orden de picking, en el orden en que hay que recorrerlas.
@@ -9,8 +11,6 @@ page 51120 "Lineas Orden Picking Subpag"
     Caption = 'Paradas SGA';
     PageType = ListPart;
     SourceTable = "Linea Orden Picking SGA";
-    AutoSplitKey = false;
-    DelayedInsert = false;
     InsertAllowed = false;
     DeleteAllowed = false;
     ModifyAllowed = false;
@@ -151,9 +151,10 @@ page 51120 "Lineas Orden Picking Subpag"
                 trigger OnAction()
                 var
                     cPicking: Codeunit "Gestion Picking SGA";
+                    cConfirmMgt: Codeunit "Confirm Management";
                     CancelarParadaQst: Label '¿Cancelar la parada de %1 en %2?', Comment = '%1 = producto, %2 = ubicación';
                 begin
-                    if not Confirm(CancelarParadaQst, false, Rec."No. Producto", Rec."Cod. Bin Propuesto") then
+                    if not cConfirmMgt.GetResponseOrDefault(StrSubstNo(CancelarParadaQst, Rec."No. Producto", Rec."Cod. Bin Propuesto"), false) then
                         exit;
                     cPicking.CancelarLinea(Rec);
                     CurrPage.Update(false);

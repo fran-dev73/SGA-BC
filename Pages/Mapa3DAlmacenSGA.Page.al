@@ -262,10 +262,11 @@ page 51122 "Mapa 3D Almacen SGA"
         cUbicaciones.TestMismaZona(FiltroAlmacen, prm_Origen, prm_Destino);
 
         rContenido.FiltrarUbicacion(FiltroAlmacen, prm_Origen);
-        if rContenido.IsEmpty() then
+        if not rContenido.FindSet() then
             Error(SinContenidoTrasladarErr, prm_Origen);
 
-        if rContenido.Count() > 1 then begin
+        // Con más de una línea, el operario elige cuál; con una, es esa.
+        if rContenido.Next() <> 0 then begin
             pContenido.SetTableView(rContenido);
             pContenido.LookupMode(true);
             if pContenido.RunModal() <> Action::LookupOK then

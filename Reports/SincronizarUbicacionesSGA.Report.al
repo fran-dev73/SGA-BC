@@ -30,6 +30,7 @@ report 51101 "Sincronizar Ubicaciones SGA"
             var
                 cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
                 cContenido: Codeunit "Gestion Contenido SGA";
+                cConfirmMgt: Codeunit "Confirm Management";
                 ConfirmarReconstruirQst: Label 'Se va a borrar el contenido por ubicación del almacén %1 y a reconstruirlo desde el diario de movimientos. Las reservas de las órdenes abiertas se vuelven a calcular y los bloqueos se conservan. ¿Desea continuar?', Comment = '%1 = almacén, o "todos" si no se ha filtrado';
                 TodosAlmacenesLbl: Label 'todos los almacenes';
                 ProcesoFinalizadoMsg: Label 'Proceso finalizado.';
@@ -50,7 +51,7 @@ report 51101 "Sincronizar Ubicaciones SGA"
                     textoAlmacen := TodosAlmacenesLbl;
 
                 if GuiAllowed() then
-                    if not Confirm(ConfirmarReconstruirQst, false, textoAlmacen) then
+                    if not cConfirmMgt.GetResponseOrDefault(StrSubstNo(ConfirmarReconstruirQst, textoAlmacen), false) then
                         exit;
 
                 // ReconstruirContenido ya recalcula los estados de las ubicaciones al terminar.

@@ -1,5 +1,7 @@
 namespace AntonioNadal.SGA;
 
+using System.Utilities;
+
 /// <summary>
 /// Page Paradas Picking SGA (ID 51134).
 /// Paradas de picking de todas las órdenes, para que el jefe de almacén vea lo que necesita
@@ -136,10 +138,11 @@ page 51134 "Paradas Picking SGA"
                 trigger OnAction()
                 var
                     cPicking: Codeunit "Gestion Picking SGA";
+                    cConfirmMgt: Codeunit "Confirm Management";
                     cubierta: Boolean;
                     BuscarOtraUbicacionQst: Label '¿Cancelar la parada de %1 en %2 y buscar el producto en otra ubicación?', Comment = '%1 = producto, %2 = ubicación';
                 begin
-                    if not Confirm(BuscarOtraUbicacionQst, false, Rec."No. Producto", Rec."Cod. Bin Propuesto") then
+                    if not cConfirmMgt.GetResponseOrDefault(StrSubstNo(BuscarOtraUbicacionQst, Rec."No. Producto", Rec."Cod. Bin Propuesto"), false) then
                         exit;
 
                     Message(cPicking.SustituirParadaSinStock(Rec, cubierta));

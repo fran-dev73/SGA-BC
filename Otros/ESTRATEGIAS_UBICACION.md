@@ -43,7 +43,7 @@ Así se llaman en *Configuración SGA* y así se comportan en el código (`Propo
 
 | Estrategia | Orden de búsqueda |
 |---|---|
-| **Estándar** | 1. Ubicación fija del producto. 2. Consolidar: un hueco que ya tenga ese producto y variante. 3. Primer hueco con sitio en la ruta. |
+| **Estándar** | 1. Ubicación fija del producto. 2. Consolidar: un hueco que ya tenga ese producto. 3. Primer hueco con sitio en la ruta. |
 | **Priorizar consolidación** | 1. Consolidar. 2. Primer hueco con sitio en la ruta. |
 | **Solo ubicación fija** | Solo la ubicación fija del producto. Si no tiene, o no cabe, *No se puede ubicar*. |
 | **Primera libre por ruta** | Primer hueco con sitio en la ruta. |

@@ -59,10 +59,10 @@ report 51103 "Conciliacion SGA vs Stock"
                         ApplicationArea = All;
                         TableRelation = Location;
                     }
-                    field(SoloDiferencias; blnSoloDiferencias)
+                    field(MostrarCuadradas; blnMostrarCuadradas)
                     {
-                        Caption = 'Mostrar solo diferencias';
-                        ToolTip = 'Descarta del resultado las combinaciones producto-lote que ya cuadran.';
+                        Caption = 'Mostrar también las que cuadran';
+                        ToolTip = 'Incluye en el resultado las combinaciones producto-lote que ya cuadran. Desmarcado, solo salen las diferencias.';
                         ApplicationArea = All;
                     }
                 }
@@ -74,7 +74,6 @@ report 51103 "Conciliacion SGA vs Stock"
             rConfig: Record "Config. SGA";
         begin
             codAlmacen := rConfig.AlmacenODefecto(codAlmacen);
-            blnSoloDiferencias := true;
         end;
     }
 
@@ -82,7 +81,8 @@ report 51103 "Conciliacion SGA vs Stock"
         rBuffer: Record "Buffer Conciliacion SGA";
         cStock: Codeunit "Consulta Stock SGA";
         codAlmacen: Code[10];
-        blnSoloDiferencias: Boolean;
+        // En negativo para que, sin nada guardado (SaveValues), salgan solo las diferencias.
+        blnMostrarCuadradas: Boolean;
         ProductosRevisados: Integer;
 
     trigger OnPostReport()
@@ -90,7 +90,7 @@ report 51103 "Conciliacion SGA vs Stock"
         pagConciliacion: Page "Conciliacion SGA";
         SinDiferenciasMsg: Label 'Se han revisado %1 productos y no hay ninguna diferencia entre el stock de BC y el contenido de las ubicaciones.', Comment = '%1 = productos revisados';
     begin
-        cStock.ClasificarYFiltrar(rBuffer, blnSoloDiferencias);
+        cStock.ClasificarYFiltrar(rBuffer, not blnMostrarCuadradas);
 
         if rBuffer.IsEmpty() then begin
             if GuiAllowed() then

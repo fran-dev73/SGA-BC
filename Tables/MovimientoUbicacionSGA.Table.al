@@ -66,12 +66,6 @@ table 51103 "Movimiento Ubicacion SGA"
             TableRelation = Item;
             Editable = false;
         }
-        field(41; "Cod. Variante"; Code[10])
-        {
-            Caption = 'Cód. variante';
-            DataClassification = ToBeClassified;
-            Editable = false;
-        }
         field(42; "No. Lote"; Code[50])
         {
             Caption = 'Nº lote';
@@ -95,13 +89,6 @@ table 51103 "Movimiento Ubicacion SGA"
         {
             Caption = 'Cód. unidad medida';
             DataClassification = ToBeClassified;
-            Editable = false;
-        }
-        field(51; "Ctdad. por Unidad Medida"; Decimal)
-        {
-            Caption = 'Ctdad. por unidad medida';
-            DataClassification = ToBeClassified;
-            DecimalPlaces = 0 : 5;
             Editable = false;
         }
         field(60; Cantidad; Decimal)
@@ -136,12 +123,6 @@ table 51103 "Movimiento Ubicacion SGA"
             DataClassification = ToBeClassified;
             Editable = false;
         }
-        field(82; "Fecha-Hora Registro"; DateTime)
-        {
-            Caption = 'Fecha-hora registro';
-            DataClassification = ToBeClassified;
-            Editable = false;
-        }
         field(90; "Cod. Usuario"; Code[50])
         {
             Caption = 'Cód. usuario';
@@ -170,7 +151,7 @@ table 51103 "Movimiento Ubicacion SGA"
         {
             Clustered = true;
         }
-        key(Producto; "No. Producto", "Cod. Variante", "No. Lote", "Fecha Registro")
+        key(Producto; "No. Producto", "No. Lote", "Fecha Registro")
         {
         }
         key(UbicDestino; "Cod. Almacen", "Cod. Bin Destino", "Fecha Registro")
@@ -179,16 +160,10 @@ table 51103 "Movimiento Ubicacion SGA"
         key(UbicOrigen; "Cod. Almacen", "Cod. Bin Origen", "Fecha Registro")
         {
         }
-        key(Cronologia; "Fecha-Hora Registro", "No. Movimiento")
-        {
-        }
         key(Documento; Origen, "No. Documento Origen", "No. Linea Origen")
         {
         }
-        key(Usuario; "Cod. Usuario", "Fecha Registro")
-        {
-        }
-        key(Pale; SSCC, "Fecha-Hora Registro")
+        key(Pale; SSCC, SystemCreatedAt)
         {
         }
     }

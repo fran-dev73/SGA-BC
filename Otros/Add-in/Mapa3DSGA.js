@@ -187,9 +187,9 @@ var SGA3D = (function () {
             '    <button type="button" class="sga3d-btn" data-accion="vista" data-vista="planta">Planta</button>' +
             '    <button type="button" class="sga3d-btn" data-accion="vista" data-vista="frente">Frente</button>' +
             '  </span>' +
-            '  <span class="sga3d-sel">Estantería:' +
+            '  <span class="sga3d-sel">Pasillo:' +
             '    <button type="button" class="sga3d-btn sga3d-mini" data-accion="anterior">&lt;</button>' +
-            '    <select class="sga3d-combo" id="sga3d-pasillo"><option value="">Todas</option></select>' +
+            '    <select class="sga3d-combo" id="sga3d-pasillo"><option value="">Todos</option></select>' +
             '    <button type="button" class="sga3d-btn sga3d-mini" data-accion="siguiente">&gt;</button>' +
             '  </span>' +
             '  <span class="sga3d-sel">Colorear por:' +

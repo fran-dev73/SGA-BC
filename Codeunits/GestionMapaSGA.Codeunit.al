@@ -377,6 +377,7 @@ codeunit 51102 "Gestion Mapa SGA"
     local procedure Pintar(var prm_Ubicacion: Record "Ubicacion SGA"; var prm_Resumen: Text; var prm_Estilo: Text)
     var
         rContenido: Record "Contenido Ubicacion SGA";
+        LineasLbl: Label '%1 lín.', Comment = '%1 = nº de líneas de contenido (producto, lote y palé)';
     begin
         prm_Estilo := prm_Ubicacion.EstiloEstado();
 
@@ -399,7 +400,8 @@ codeunit 51102 "Gestion Mapa SGA"
                     prm_Resumen := rContenido."No. Producto";
                 end;
             else
-                prm_Resumen := Format(prm_Ubicacion."Lineas Contenido") + ' prod';
+                // Una línea por producto, lote y palé: no son productos distintos.
+                prm_Resumen := StrSubstNo(LineasLbl, prm_Ubicacion."Lineas Contenido");
         end;
 
         // Reservada para una entrada que aún no se ha ubicado: su propio color.

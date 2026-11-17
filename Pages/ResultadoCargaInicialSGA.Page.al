@@ -34,12 +34,6 @@ page 51125 "Resultado Carga Inicial SGA"
                     ToolTip = 'Descripción del producto.';
                     ApplicationArea = All;
                 }
-                field("Cod. Variante"; Rec."Cod. Variante")
-                {
-                    ToolTip = 'Variante del producto.';
-                    ApplicationArea = All;
-                    Visible = false;
-                }
                 field("No. Lote"; Rec."No. Lote")
                 {
                     ToolTip = 'Lote.';

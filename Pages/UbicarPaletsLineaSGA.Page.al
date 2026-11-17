@@ -1,6 +1,7 @@
 namespace AntonioNadal.SGA;
 
 using AntonioNadal.Produccion;
+using System.Utilities;
 
 /// <summary>
 /// Page Ubicar Palets Linea SGA (ID 51127).
@@ -65,7 +66,7 @@ page 51127 "Ubicar Palets Linea SGA"
                 field(CantidadPale; TempPaleActual.Cantidad)
                 {
                     Caption = 'Cantidad del palé';
-                    ToolTip = 'Lo que se ubica con este palé, en la unidad del ensamblado. El último puede ir incompleto.';
+                    ToolTip = 'Lo que se ubica con este palé, en su unidad. El último puede ir incompleto.';
                     ApplicationArea = All;
                     Editable = false;
                     DecimalPlaces = 0 : 5;
@@ -73,7 +74,7 @@ page 51127 "Ubicar Palets Linea SGA"
                 field(UnidadPale; TempPaleActual."Cod. Unidad Medida")
                 {
                     Caption = 'Unidad';
-                    ToolTip = 'Unidad del ensamblado, que es en la que se ubica.';
+                    ToolTip = 'Unidad en la que se ubica: la de palé si es completo; si es el último incompleto, cajas si son cajas exactas y si no unidades.';
                     ApplicationArea = All;
                     Editable = false;
                 }
@@ -327,9 +328,10 @@ page 51127 "Ubicar Palets Linea SGA"
                 trigger OnAction()
                 var
                     cEntradas: Codeunit "Gestion Entradas SGA";
+                    cConfirmMgt: Codeunit "Confirm Management";
                     AjustarEtiquetasQst: Label 'Esta acción iguala las etiquetas solicitadas con las impresas. ¿Continuar?';
                 begin
-                    if not Confirm(AjustarEtiquetasQst, false) then
+                    if not cConfirmMgt.GetResponseOrDefault(AjustarEtiquetasQst, false) then
                         exit;
 
                     cEntradas.AjustarEtiquetasImpresas(Rec);
@@ -412,8 +414,8 @@ page 51127 "Ubicar Palets Linea SGA"
         TareaPale := Rec.Linea;
         HayPale := cEntradas.PrepararPaleTarea(Rec, TempPaleActual, aviso);
 
-        // Con hueco propuesto, el aviso solo informa (botellas que no llegan a una caja).
-        if HayPale and ((aviso = '') or (TempPaleActual."Ubicacion Propuesta" <> '')) then begin
+        // Con palé, el aviso solo llega si no hay hueco propuesto: se enseña como problema.
+        if HayPale and (aviso = '') then begin
             if TempPaleActual."Cod. Unidad Medida" = Rec."Cod. Pale Defecto" then
                 tipoPale := PaleCompletoLbl
             else
@@ -421,10 +423,6 @@ page 51127 "Ubicar Palets Linea SGA"
             Situacion := StrSubstNo(SituacionPaleLbl, tipoPale, TempPaleActual."Cantidad Ya Ubicada", TempPaleActual."Cantidad Entrada",
                                     TempPaleActual."Cod. Unidad Medida", TempPaleActual."No. Documento");
             EstiloSituacion := 'Standard';
-            if aviso <> '' then begin
-                Situacion += ' ' + aviso;
-                EstiloSituacion := 'Ambiguous';
-            end;
         end else begin
             Situacion := aviso;
             EstiloSituacion := 'Unfavorable';

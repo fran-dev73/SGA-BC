@@ -3,6 +3,7 @@ namespace AntonioNadal.SGA;
 using Microsoft.Inventory.Item;
 using Microsoft.Inventory.Location;
 using Microsoft.Warehouse.Structure;
+using System.Utilities;
 
 /// <summary>
 /// Report Carga Inicial Contenido SGA (ID 51102).
@@ -139,13 +140,14 @@ report 51102 "Carga Inicial Contenido SGA"
     var
         TempResultado: Record "Linea Ubicacion SGA" temporary;
         cCarga: Codeunit "Carga Inicial SGA";
+        cConfirmMgt: Codeunit "Confirm Management";
         pResultado: Page "Resultado Carga Inicial SGA";
         textoError: Text;
         ConfirmarCargaQst: Label 'Se va a crear el contenido inicial de las ubicaciones del almacén %1 a partir del stock actual. ¿Desea continuar?', Comment = '%1 = almacén';
         ProcesoFinalizadoMsg: Label 'Proceso finalizado.';
     begin
         if (not blnSimular) and GuiAllowed() then
-            if not Confirm(ConfirmarCargaQst, false, codAlmacen) then
+            if not cConfirmMgt.GetResponseOrDefault(StrSubstNo(ConfirmarCargaQst, codAlmacen), false) then
                 exit;
 
         cCarga.Configurar(codAlmacen, optDestino, UbicacionIndicadaEfectiva(), blnSimular, Producto.GetView());

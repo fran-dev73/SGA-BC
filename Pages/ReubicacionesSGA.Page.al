@@ -1,5 +1,7 @@
 namespace AntonioNadal.SGA;
 
+using System.Utilities;
+
 /// <summary>
 /// Page Reubicaciones SGA (ID 51132).
 /// Las reubicaciones de almacenamiento a picking: las paradas de las órdenes de origen
@@ -140,9 +142,10 @@ page 51132 "Reubicaciones SGA"
                 trigger OnAction()
                 var
                     cPicking: Codeunit "Gestion Picking SGA";
+                    cConfirmMgt: Codeunit "Confirm Management";
                     CancelarQst: Label '¿Cancelar la reubicación de %1 de %2 a %3?', Comment = '%1 = producto, %2 = ubicación origen, %3 = ubicación destino';
                 begin
-                    if not Confirm(CancelarQst, false, Rec."No. Producto", Rec."Cod. Bin Propuesto", Rec."Cod. Bin Destino") then
+                    if not cConfirmMgt.GetResponseOrDefault(StrSubstNo(CancelarQst, Rec."No. Producto", Rec."Cod. Bin Propuesto", Rec."Cod. Bin Destino"), false) then
                         exit;
                     cPicking.CancelarLinea(Rec);
                     CurrPage.Update(false);

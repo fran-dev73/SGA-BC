@@ -6,7 +6,7 @@ using Microsoft.Inventory.Location;
 /// <summary>
 /// Table Buffer Conciliacion SGA (ID 51107).
 /// Resultado de la última conciliación entre el stock de BC (movs. de producto) y el
-/// contenido por ubicación de SGA, por producto, variante, almacén y lote.
+/// contenido por ubicación de SGA, por producto, almacén y lote.
 ///
 /// No es temporal a propósito: el informe la rellena y la página "Conciliacion SGA" la
 /// consulta después. Las filas se guardan por usuario, así que dos personas pueden
@@ -33,11 +33,6 @@ table 51107 "Buffer Conciliacion SGA"
             Caption = 'Nº producto';
             DataClassification = ToBeClassified;
             TableRelation = Item;
-        }
-        field(20; "Cod. Variante"; Code[10])
-        {
-            Caption = 'Cód. variante';
-            DataClassification = ToBeClassified;
         }
         field(30; "Cod. Almacen"; Code[10])
         {
@@ -75,10 +70,12 @@ table 51107 "Buffer Conciliacion SGA"
         {
             Caption = 'Unidad medida base';
             DataClassification = ToBeClassified;
+            ToolTip = 'Unidad de medida base del producto, la de todas las cantidades de la línea.';
         }
         field(80; Descripcion; Text[100])
         {
             Caption = 'Descripción';
+            ToolTip = 'Descripción del producto.';
             Editable = false;
             FieldClass = FlowField;
             CalcFormula = lookup(Item.Description where("No." = field("No. Producto")));
@@ -113,7 +110,7 @@ table 51107 "Buffer Conciliacion SGA"
 
     keys
     {
-        key(PK; "Cod. Usuario", "No. Producto", "Cod. Variante", "Cod. Almacen", "No. Lote")
+        key(PK; "Cod. Usuario", "No. Producto", "Cod. Almacen", "No. Lote")
         {
             Clustered = true;
         }

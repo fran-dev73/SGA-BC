@@ -22,8 +22,9 @@ page 51110 "Movs. Ubicacion FactBox"
         {
             repeater(General)
             {
-                field("Fecha-Hora Registro"; Rec."Fecha-Hora Registro")
+                field(FechaHoraRegistro; Rec.SystemCreatedAt)
                 {
+                    Caption = 'Fecha-hora registro';
                     ToolTip = 'Momento exacto en que se registró el movimiento.';
                     ApplicationArea = All;
                 }

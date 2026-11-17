@@ -28,7 +28,7 @@ pageextension 51101 "Item List SGA" extends "Item List"
                     var
                         cStock: Codeunit "Consulta Stock SGA";
                     begin
-                        cStock.ConsultarUbicacionesProducto(Rec."No.", '', '', '');
+                        cStock.ConsultarUbicacionesProducto(Rec."No.", '', '');
                     end;
                 }
             }

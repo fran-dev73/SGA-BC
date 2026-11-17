@@ -1,5 +1,7 @@
 namespace AntonioNadal.SGA;
 
+using System.Utilities;
+
 /// <summary>
 /// Page Ubicaciones SGA (ID 51100).
 /// Lista de trabajo de las ubicaciones: cuántas hay, en qué estado están, cuánto tienen
@@ -67,7 +69,7 @@ page 51100 "Ubicaciones SGA"
                 }
                 field("Lineas Contenido"; Rec."Lineas Contenido")
                 {
-                    ToolTip = 'Número de combinaciones producto-lote distintas que hay en la ubicación.';
+                    ToolTip = 'Número de líneas de contenido de la ubicación: una por producto, lote y palé.';
                     ApplicationArea = All;
                     DrillDown = true;
                 }
@@ -262,10 +264,11 @@ page 51100 "Ubicaciones SGA"
                 var
                     rSeleccion: Record "Ubicacion SGA";
                     cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
+                    cConfirmMgt: Codeunit "Confirm Management";
                     LiberarReservaQst: Label 'Se quitará la reserva de las ubicaciones seleccionadas. Si alguien está ubicando en ellas, se le podrán proponer a otro.\¿Desea continuar?';
                     ReservasLiberadasMsg: Label 'Se ha quitado la reserva de %1 ubicaciones.', Comment = '%1 = número de ubicaciones';
                 begin
-                    if not Confirm(LiberarReservaQst, false) then
+                    if not cConfirmMgt.GetResponseOrDefault(LiberarReservaQst, false) then
                         exit;
 
                     CurrPage.SetSelectionFilter(rSeleccion);

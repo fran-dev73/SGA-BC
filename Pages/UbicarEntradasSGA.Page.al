@@ -2,6 +2,7 @@ namespace AntonioNadal.SGA;
 
 using Microsoft.Inventory.Item;
 using Microsoft.Inventory.Location;
+using System.Utilities;
 
 /// <summary>
 /// Page Ubicar Entradas SGA (ID 51123).
@@ -26,7 +27,7 @@ page 51123 "Ubicar Entradas SGA"
     UsageCategory = Tasks;
     ApplicationArea = All;
     SourceTable = "Linea Ubicacion SGA";
-    SourceTableView = sorting(Origen, "No. Documento", "No. Producto", "Cod. Variante", "No. Lote", "Cod. Unidad Medida");
+    SourceTableView = sorting(Origen, "No. Documento", "No. Producto", "No. Lote", "Cod. Unidad Medida");
     SourceTableTemporary = true;
     InsertAllowed = false;
     DeleteAllowed = false;
@@ -156,13 +157,6 @@ page 51123 "Ubicar Entradas SGA"
                     ApplicationArea = All;
                     Editable = false;
                 }
-                field("Cod. Variante"; Rec."Cod. Variante")
-                {
-                    ToolTip = 'Variante del producto.';
-                    ApplicationArea = All;
-                    Editable = false;
-                    Visible = false;
-                }
                 field("No. Lote"; Rec."No. Lote")
                 {
                     ToolTip = 'Lote con el que se ha registrado la entrada.';
@@ -257,19 +251,19 @@ page 51123 "Ubicar Entradas SGA"
                     UbicacionesPropuestasMsg: Label 'Se han propuesto %1 ubicaciones.', Comment = '%1 = número de propuestas';
                     NingunaPropuestaMsg: Label 'No se ha podido proponer ninguna ubicación: la columna "Por qué ahí" de cada línea dice el motivo.';
                     NadaQueProponerMsg: Label 'No hay líneas pendientes sin ubicación propuesta.';
-                    sinPropuesta: Integer;
+                    haySinPropuesta: Boolean;
                 begin
                     TempFila.Copy(Rec, true);
                     TempFila.Reset();
                     TempFila.SetFilter(Estado, '<>%1', TempFila.Estado::Ubicado);
                     TempFila.SetRange("Ubicacion Propuesta", '');
-                    sinPropuesta := TempFila.Count();
+                    haySinPropuesta := not TempFila.IsEmpty();
 
                     propuestas := cEntradas.ProponerParaTodos(Rec);
                     ActualizarResumen();
                     CurrPage.Update(false);
 
-                    if sinPropuesta = 0 then
+                    if not haySinPropuesta then
                         Message(NadaQueProponerMsg)
                     else
                         if propuestas = 0 then
@@ -329,12 +323,13 @@ page 51123 "Ubicar Entradas SGA"
                 trigger OnAction()
                 var
                     cEntradas: Codeunit "Gestion Entradas SGA";
+                    cConfirmMgt: Codeunit "Confirm Management";
                     hechas: Integer;
                     ConfirmarTodasQst: Label 'Se van a ubicar todas las líneas que tengan ubicación confirmada. ¿Continuar?';
                     LineasUbicadasMsg: Label 'Se han ubicado %1 líneas.', Comment = '%1 = número de líneas';
                     NingunaLineaListaMsg: Label 'No hay ninguna línea lista para ubicar.';
                 begin
-                    if not Confirm(ConfirmarTodasQst, false) then
+                    if not cConfirmMgt.GetResponseOrDefault(ConfirmarTodasQst, false) then
                         exit;
 
                     hechas := cEntradas.ConfirmarTodas(Rec);
@@ -389,7 +384,12 @@ page 51123 "Ubicar Entradas SGA"
                     rMov: Record "Movimiento Ubicacion SGA";
                 begin
                     rMov.SetRange(Origen, Rec.Origen);
-                    rMov.SetRange("No. Documento Origen", Rec."No. Documento");
+                    // Los palés ubicados al imprimir su etiqueta van con el otro nº del
+                    // ensamblado (Documento Relacionado), y también cuentan como ya ubicados.
+                    if Rec."Documento Relacionado" <> '' then
+                        rMov.SetFilter("No. Documento Origen", '%1|%2', Rec."No. Documento", Rec."Documento Relacionado")
+                    else
+                        rMov.SetRange("No. Documento Origen", Rec."No. Documento");
                     Page.Run(Page::"Movs. Ubicacion SGA", rMov);
                 end;
             }
@@ -467,22 +467,16 @@ page 51123 "Ubicar Entradas SGA"
         else
             CurrPage.Caption := CaptionEnsambladosLbl;
 
-        // Preparada: todo lo pendiente del producto, sin fechas ni clase.
-        if Preparada then begin
-            FiltroFechaDesde := 0D;
-            FiltroFechaHasta := 0D;
-            FiltroClase := FiltroClase::Todas;
-        end else begin
+        // Preparada: todo lo pendiente del producto, sin fechas ni clase (los filtros vacíos con
+        // que nace la página). Si no, recepciones: todo lo pendiente de productos externos, sin
+        // límite de fecha; ensamblados: lo del día, de cualquier clase.
+        if not Preparada then begin
             FiltroAlmacen := rConfig.AlmacenODefecto('');
-            // Recepciones: todo lo pendiente de productos externos, sin límite de fecha.
-            // Ensamblados: lo del día, de cualquier clase.
-            if EsCompra then begin
-                FiltroFechaDesde := 0D;
-                FiltroClase := FiltroClase::"Prod. Externo";
-            end else begin
+            if EsCompra then
+                FiltroClase := FiltroClase::"Prod. Externo"
+            else begin
                 FiltroFechaDesde := WorkDate();
                 FiltroFechaHasta := WorkDate();
-                FiltroClase := FiltroClase::Todas;
             end;
         end;
         SoloPendientes := true;

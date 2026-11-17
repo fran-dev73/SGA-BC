@@ -26,7 +26,6 @@ codeunit 51108 "Unidades Producto SGA"
     procedure FactorUM(prm_Producto: Code[20]; prm_UM: Code[10]): Decimal
     var
         rItem: Record Item;
-        cUOMMgt: Codeunit "Unit of Measure Management";
     begin
         // En blanco el estándar también da 1; así no se lee la ficha ni falla sin producto.
         if prm_UM = '' then
@@ -77,21 +76,11 @@ codeunit 51108 "Unidades Producto SGA"
     /// </summary>
     procedure UMPale(prm_Producto: Code[20]): Code[10]
     var
-        rItem: Record Item;
-        rItemUM: Record "Item Unit of Measure";
+        codPale: Code[10];
+        factor: Decimal;
     begin
-        rItem.SetLoadFields("Cod. Pale por Defecto");
-        if not rItem.Get(prm_Producto) then
-            exit('');
-        if rItem."Cod. Pale por Defecto" = '' then
-            exit('');
-        // Sin palé válido no es un error: el producto se cuenta en unidades base.
-        rItemUM.SetLoadFields("Qty. per Unit of Measure");
-        if not rItemUM.Get(prm_Producto, rItem."Cod. Pale por Defecto") then
-            exit('');
-        if rItemUM."Qty. per Unit of Measure" <= 1 then
-            exit('');
-        exit(rItem."Cod. Pale por Defecto");
+        LeerPale(prm_Producto, codPale, factor);
+        exit(codPale);
     end;
 
     /// <summary>
@@ -100,9 +89,40 @@ codeunit 51108 "Unidades Producto SGA"
     /// muchas cantidades del mismo producto lo lee una vez.
     /// </summary>
     procedure FactorPale(prm_Producto: Code[20]): Decimal
+    var
+        codPale: Code[10];
+        factor: Decimal;
     begin
-        // Sin palé, UMPale va en blanco y FactorUM da uno.
-        exit(FactorUM(prm_Producto, UMPale(prm_Producto)));
+        if LeerPale(prm_Producto, codPale, factor) then
+            exit(factor);
+        exit(1);
+    end;
+
+    /// <summary>
+    /// El palé del producto y su factor, leídos una vez: la unidad "Cod. Pale por Defecto" de la
+    /// ficha si existe y lleva más de una unidad base. False, en blanco, si no.
+    /// </summary>
+    local procedure LeerPale(prm_Producto: Code[20]; var prm_UMPale: Code[10]; var prm_FactorPale: Decimal): Boolean
+    var
+        rItem: Record Item;
+        rItemUM: Record "Item Unit of Measure";
+    begin
+        prm_UMPale := '';
+        prm_FactorPale := 0;
+        rItem.SetLoadFields("Cod. Pale por Defecto");
+        if not rItem.Get(prm_Producto) then
+            exit(false);
+        if rItem."Cod. Pale por Defecto" = '' then
+            exit(false);
+        // Sin palé válido no es un error: el producto se cuenta en unidades base.
+        rItemUM.SetLoadFields("Qty. per Unit of Measure");
+        if not rItemUM.Get(prm_Producto, rItem."Cod. Pale por Defecto") then
+            exit(false);
+        if rItemUM."Qty. per Unit of Measure" <= 1 then
+            exit(false);
+        prm_UMPale := rItem."Cod. Pale por Defecto";
+        prm_FactorPale := rItemUM."Qty. per Unit of Measure";
+        exit(true);
     end;
 
     /// <summary>
@@ -318,6 +338,8 @@ codeunit 51108 "Unidades Producto SGA"
     end;
 
     var
+        // Global para aprovechar su caché: guarda la última unidad leída de un producto.
+        cUOMMgt: Codeunit "Unit of Measure Management";
         // Caché de LeerUMBase: unidad base de cada producto ya leído.
         UMBasesLeidas: Dictionary of [Code[20], Code[10]];
 }

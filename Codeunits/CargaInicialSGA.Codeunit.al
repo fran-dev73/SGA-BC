@@ -221,9 +221,9 @@ codeunit 51106 "Carga Inicial SGA"
     var
         TempLineas: Record "Buffer Conciliacion SGA" temporary;
     begin
+        // Las líneas son ya de un solo almacén: el de la carga.
         TempLineas.Copy(TempPendientes, true);
         TempLineas.Reset();
-        TempLineas.SetRange("Cod. Almacen", Almacen);
         TempLineas.SetRange("No. Producto", prm_Producto);
         TempLineas.SetFilter("A Ubicar", '>0');
         if TempLineas.FindSet() then
@@ -239,10 +239,8 @@ codeunit 51106 "Carga Inicial SGA"
         TempStock: Record "Buffer Conciliacion SGA" temporary;
         ProductoBloqueadoLbl: Label 'Producto bloqueado.';
     begin
+        // CopiarPendientes solo trae líneas con algo que repartir.
         CopiarPendientes(prm_Producto."No.", TempStock);
-
-        TempStock.Reset();
-        TempStock.SetFilter("Stock BC", '>%1', 0);
         if not TempStock.FindSet() then
             exit;
 
@@ -328,7 +326,7 @@ codeunit 51106 "Carga Inicial SGA"
                     // El motivo recorre todos los huecos y depende del producto (su palé, su
                     // picking): se calcula una vez por producto, no en cada lote.
                     if ProductoMotivoSinHueco <> prm_Producto."No." then begin
-                        MotivoSinHuecoPale := CopyStr(cUbicaciones.ExplicarSinHuecoLote(Almacen, prm_Producto."No.", prm_Stock."No. Lote", umPale, 1), 1, MaxStrLen(MotivoSinHuecoPale));
+                        MotivoSinHuecoPale := CopyStr(cUbicaciones.ExplicarSinHuecoLote(Almacen, prm_Producto."No.", prm_Stock."No. Lote", umPale, 1, true), 1, MaxStrLen(MotivoSinHuecoPale));
                         ProductoMotivoSinHueco := prm_Producto."No.";
                     end;
                     AnotarNoCargado(prm_Producto, prm_Stock, umPale, pales - i, (pales - i) * TempTrozo."Cantidad Base", MotivoSinHuecoPale);
@@ -346,7 +344,7 @@ codeunit 51106 "Carga Inicial SGA"
             exit;
 
         hueco := cUbicaciones.ProponerUbicacionCon("Estrategia Ubicacion SGA"::"Priorizar Consolidacion", '', Almacen,
-                                                   prm_Producto."No.", prm_Stock."Cod. Variante", prm_Stock."No. Lote",
+                                                   prm_Producto."No.", prm_Stock."No. Lote",
                                                    TempTrozo."Cod. Unidad Medida", TempTrozo.Cantidad, motivo);
         // Sin hueco, el motivo ya trae la causa.
         if hueco = '' then
@@ -363,7 +361,7 @@ codeunit 51106 "Carga Inicial SGA"
         descripcion := DescripcionMovimiento;
         if descripcion = '' then
             descripcion := DescripcionCargaInicialLbl;
-        cContenido.RegistrarCargaInicial(Almacen, prm_Bin, prm_Producto."No.", prm_Stock."Cod. Variante", prm_Stock."No. Lote",
+        cContenido.RegistrarCargaInicial(Almacen, prm_Bin, prm_Producto."No.", prm_Stock."No. Lote",
                                          prm_UM, prm_Cantidad, descripcion);
 
         Anotar(prm_Producto, prm_Stock, prm_Bin, prm_UM, prm_Cantidad, prm_CantidadBase, true, prm_Motivo);
@@ -389,7 +387,6 @@ codeunit 51106 "Carga Inicial SGA"
         TempResultado.Origen := TempResultado.Origen::"Carga Inicial";
         TempResultado."Cod. Almacen" := Almacen;
         TempResultado."No. Producto" := prm_Producto."No.";
-        TempResultado."Cod. Variante" := prm_Stock."Cod. Variante";
         TempResultado."No. Lote" := prm_Stock."No. Lote";
         TempResultado."Ubicacion Propuesta" := prm_Bin;
         TempResultado."Ubicacion Confirmada" := prm_Bin;

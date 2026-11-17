@@ -39,6 +39,13 @@ table 51100 "Zona SGA"
             Caption = 'Tipo ubicación';
             DataClassification = ToBeClassified;
             ToolTip = 'Tipo que se propone por defecto a las ubicaciones que se creen en esta zona.';
+
+            trigger OnValidate()
+            begin
+                // Las ubicaciones de una playa van sin tipo, para que nunca se propongan.
+                if Playa then
+                    TestField("Tipo Ubicacion", "Tipo Ubicacion"::" ");
+            end;
         }
         field(55; "Grupo IIEE"; Code[20])
         {
