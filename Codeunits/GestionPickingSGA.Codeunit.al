@@ -18,7 +18,7 @@ using System.Utilities;
 ///
 /// Las órdenes sirven también para las reubicaciones de almacenamiento a picking (origen
 /// Reposicion, AnadirReubicacion): la parada lleva una ubicación destino y, al confirmarla, lo
-/// recogido se traslada allí en vez de salir. Qué reubicar lo decide Cod. "Reubicaciones SGA".
+/// recogido se traslada allí en vez de salir. Qué reubicar lo decide Cod. "Reposiciones SGA".
 ///
 /// Las paradas guardan las cantidades en unidad de medida base, igual que el resto del módulo.
 /// La UM de la línea del pedido viaja en la parada solo para enseñársela al preparador.
@@ -76,7 +76,7 @@ codeunit 51104 "Gestion Picking SGA"
         ocupadoSueltos: Decimal;
         PedidoSinPendienteErr: Label 'El pedido %1 no tiene nada pendiente de preparar: lo que queda por servir ya está recogido.', Comment = '%1 = nº pedido';
         DescripcionSueltosLbl: Label 'Pedido %1 · sueltos', Comment = '%1 = nº pedido';
-        SinParadasErr: Label 'No se ha podido generar ninguna parada: no hay contenido ubicado disponible de los productos del pedido.';
+        SinParadasErr: Label 'No se ha podido generar ninguna línea: no hay contenido ubicado disponible de los productos del pedido.';
     begin
         ComprobarPedidoParaEnviar(prm_NoPedido, rCabVenta);
 
@@ -223,11 +223,16 @@ codeunit 51104 "Gestion Picking SGA"
     local procedure NuevaOrden(var prm_CabVenta: Record "Sales Header"; prm_Almacen: Code[10]; prm_Descripcion: Text[100]; var prm_Orden: Record "Orden Picking SGA")
     var
         rAnterior: Record "Orden Picking SGA";
+        rConfig: Record "Config. SGA";
     begin
         InicializarOrden(prm_Almacen, prm_Orden.Origen::Venta, prm_Descripcion, prm_Orden);
         prm_Orden."No. Documento Origen" := prm_CabVenta."No.";
         prm_Orden."Nombre Cliente" := prm_CabVenta."Sell-to Customer Name";
         prm_Orden."Fecha Envio" := prm_CabVenta."Shipment Date";
+        // La playa por defecto es la del almacén de la configuración.
+        rConfig.ObtenerConfig();
+        if rConfig."Almacen por Defecto" = prm_Almacen then
+            prm_Orden.Playa := rConfig."Playa por Defecto";
         // La prioridad es del pedido: las órdenes de una segunda ronda heredan la que tenga.
         rAnterior.FiltrarPedido(prm_CabVenta."No.");
         rAnterior.SetLoadFields(Prioridad);
@@ -245,7 +250,7 @@ codeunit 51104 "Gestion Picking SGA"
     var
         rConfig: Record "Config. SGA";
         cNoSeries: Codeunit "No. Series";
-        SerieOrdenSinConfigurarErr: Label 'Configure la serie "Nos. orden SGA" en la configuración de SGA: sin ella no se pueden crear órdenes de picking ni de reubicación.';
+        SerieOrdenSinConfigurarErr: Label 'Configure la serie "Nos. orden SGA" en la configuración de SGA: sin ella no se pueden crear órdenes de picking ni de reposición.';
     begin
         rConfig.ObtenerConfig();
         if rConfig."Nos. Orden SGA" = '' then
@@ -644,7 +649,7 @@ codeunit 51104 "Gestion Picking SGA"
     /// Planifica una reubicación: una parada que recoge prm_Cantidad (en base) de la línea de
     /// contenido y la deja en la ubicación prm_Destino. Va a la orden de reubicaciones del
     /// almacén que aún no ha empezado nadie (la crea si no hay), y reserva lo que va a coger, como
-    /// cualquier parada. Lo que decide qué reubicar y adónde es Cod. "Reubicaciones SGA".
+    /// cualquier parada. Lo que decide qué reubicar y adónde es Cod. "Reposiciones SGA".
     /// </summary>
     procedure AnadirReubicacion(var prm_Contenido: Record "Contenido Ubicacion SGA"; prm_Cantidad: Decimal; prm_Destino: Code[20])
     var
@@ -652,7 +657,7 @@ codeunit 51104 "Gestion Picking SGA"
         cUM: Codeunit "Unidades Producto SGA";
         noLinea: Integer;
         umPale: Code[10];
-        DescripcionReubicacionesLbl: Label 'Reubicaciones a picking';
+        DescripcionReubicacionesLbl: Label 'Reposición de picking';
     begin
         rOrden.SetCurrentKey("Cod. Almacen", Estado);
         rOrden.SetRange("Cod. Almacen", prm_Contenido."Cod. Almacen");
@@ -726,11 +731,11 @@ codeunit 51104 "Gestion Picking SGA"
         sscc: Code[20];
         CantidadNoPositivaErr: Label 'La cantidad recogida debe ser mayor que cero.';
         LineaCanceladaErr: Label 'La línea está cancelada.';
-        CantidadExcedePendienteErr: Label 'No puede recoger %1: quedan %2 pendientes en esta parada.', Comment = '%1 = cantidad indicada, %2 = cantidad pendiente';
+        CantidadExcedePendienteErr: Label 'No puede recoger %1: quedan %2 pendientes en esta línea.', Comment = '%1 = cantidad indicada, %2 = cantidad pendiente';
         DesvioNoPermitidoErr: Label 'La configuración no permite recoger de una ubicación distinta de la propuesta (%1).', Comment = '%1 = ubicación propuesta';
         UbicacionNoEscaneadaErr: Label 'Escanee o teclee la ubicación de la que ha recogido.';
         DescripcionSalidaLbl: Label 'Picking %1 del documento %2', Comment = '%1 = nº orden, %2 = documento origen';
-        DescripcionReubicacionLbl: Label 'Reubicación a picking, orden %1', Comment = '%1 = nº orden';
+        DescripcionReubicacionLbl: Label 'Reposición de picking, orden %1', Comment = '%1 = nº orden';
     begin
         if prm_Cantidad <= 0 then
             Error(CantidadNoPositivaErr);
@@ -823,7 +828,7 @@ codeunit 51104 "Gestion Picking SGA"
     /// </summary>
     local procedure CancelarParada(var prm_Linea: Record "Linea Orden Picking SGA")
     var
-        ParadaNoPendienteErr: Label 'La parada de %1 en %2 ya está %3: solo se cancela una parada pendiente o a medias.', Comment = '%1 = producto, %2 = ubicación, %3 = estado';
+        ParadaNoPendienteErr: Label 'La línea de %1 en %2 ya está %3: solo se cancela una línea pendiente o a medias.', Comment = '%1 = producto, %2 = ubicación, %3 = estado';
     begin
         if not (prm_Linea.Estado in [prm_Linea.Estado::Pendiente, prm_Linea.Estado::Parcial]) then
             Error(ParadaNoPendienteErr, prm_Linea."No. Producto", prm_Linea."Cod. Bin Propuesto", prm_Linea.Estado);
@@ -856,7 +861,7 @@ codeunit 51104 "Gestion Picking SGA"
         ubicaciones: Text;
         OtraUbicacionTxt: Label 'No estaba en %1. Se recoge de otra ubicación: %2.', Comment = '%1 = ubicación vacía, %2 = ubicaciones nuevas';
         ParteTxt: Label 'No estaba en %1. Se recoge de otra ubicación (%2), pero no hay para todo: faltan %3 %4.', Comment = '%1 = ubicación vacía, %2 = ubicaciones nuevas, %3 = cantidad que falta, %4 = unidad';
-        NingunaTxt: Label 'No estaba en %1 y no hay %2 en ninguna otra ubicación: la parada queda cancelada.', Comment = '%1 = ubicación vacía, %2 = producto';
+        NingunaTxt: Label 'No estaba en %1 y no hay %2 en ninguna otra ubicación: la línea queda cancelada.', Comment = '%1 = ubicación vacía, %2 = producto';
     begin
         pendiente := prm_Linea."Cantidad Pendiente";
         // El estado de la orden se recalcula al final, con las paradas nuevas ya dentro: si se
@@ -925,8 +930,8 @@ codeunit 51104 "Gestion Picking SGA"
         cConfirmMgt: Codeunit "Confirm Management";
         hayRecogido: Boolean;
         OrdenTerminadaErr: Label 'La orden %1 ya está %2: no se puede cancelar.', Comment = '%1 = nº orden, %2 = estado';
-        CancelarOrdenQst: Label '¿Cancelar la orden %1 y todas sus paradas pendientes?', Comment = '%1 = nº orden';
-        CancelarConRecogidoQst: Label 'La orden %1 ya tiene paradas recogidas: esa mercancía ya no está en sus ubicaciones y se pasa al pedido. Las paradas pendientes se cancelan. ¿Continuar?', Comment = '%1 = nº orden';
+        CancelarOrdenQst: Label '¿Cancelar la orden %1 y todas sus líneas pendientes?', Comment = '%1 = nº orden';
+        CancelarConRecogidoQst: Label 'La orden %1 ya tiene líneas recogidas: esa mercancía ya no está en sus ubicaciones y se pasa al pedido. Las líneas pendientes se cancelan. ¿Continuar?', Comment = '%1 = nº orden';
     begin
         if not prm_Orden.EstaViva() then
             Error(OrdenTerminadaErr, prm_Orden."No. Orden", prm_Orden.Estado);
@@ -1194,6 +1199,48 @@ codeunit 51104 "Gestion Picking SGA"
             until prm_Orden.Next() = 0;
     end;
 
+    /// <summary>
+    /// Pide una playa del almacén de la primera orden del conjunto recibido y la pone en las
+    /// órdenes de venta de ese almacén que aún no se han empezado. Las demás se quedan como
+    /// están y el mensaje dice cuántas.
+    /// </summary>
+    procedure CambiarPlaya(var prm_Orden: Record "Orden Picking SGA")
+    var
+        rZona: Record "Zona SGA";
+        total: Integer;
+        cambiadas: Integer;
+        resultado: Text;
+        SinPlayasErr: Label 'El almacén %1 no tiene ninguna zona marcada como playa.', Comment = '%1 = almacén';
+        PlayaCambiadaMsg: Label 'Playa %1 puesta en %2 órdenes.', Comment = '%1 = playa, %2 = número de órdenes';
+        OrdenesSinCambiarMsg: Label '%1 órdenes no se han cambiado: ya están empezadas, terminadas o canceladas, o no son de venta del almacén %2.', Comment = '%1 = número de órdenes, %2 = almacén';
+    begin
+        if not prm_Orden.FindFirst() then
+            exit;
+        total := prm_Orden.Count();
+
+        rZona.SetRange("Cod. Almacen", prm_Orden."Cod. Almacen");
+        rZona.SetRange(Playa, true);
+        if rZona.IsEmpty() then
+            Error(SinPlayasErr, prm_Orden."Cod. Almacen");
+        if Page.RunModal(0, rZona) <> Action::LookupOK then
+            exit;
+
+        prm_Orden.SetRange("Cod. Almacen", rZona."Cod. Almacen");
+        prm_Orden.SetRange(Origen, prm_Orden.Origen::Venta);
+        prm_Orden.FiltrarSinEmpezar();
+        if prm_Orden.FindSet(true) then
+            repeat
+                prm_Orden.Playa := rZona.Code;
+                prm_Orden.Modify(true);
+                cambiadas += 1;
+            until prm_Orden.Next() = 0;
+
+        resultado := StrSubstNo(PlayaCambiadaMsg, rZona.Code, cambiadas);
+        if cambiadas < total then
+            resultado += ' ' + StrSubstNo(OrdenesSinCambiarMsg, total - cambiadas, rZona."Cod. Almacen");
+        Message(resultado);
+    end;
+
     local procedure AplicarDelta(var prm_Orden: Record "Orden Picking SGA"; prm_Delta: Integer)
     begin
         if prm_Orden.Prioridad + prm_Delta < 0 then
@@ -1264,7 +1311,7 @@ codeunit 51104 "Gestion Picking SGA"
     procedure AbrirPreparacion(var prm_Orden: Record "Orden Picking SGA")
     var
         rLinea: Record "Linea Orden Picking SGA";
-        SinParadasPendientesErr: Label 'La orden %1 no tiene paradas pendientes.', Comment = '%1 = nº orden';
+        SinParadasPendientesErr: Label 'La orden %1 no tiene líneas pendientes.', Comment = '%1 = nº orden';
     begin
         // Las retenidas no se preparan: sin otras, la pantalla saldría vacía.
         if not prm_Orden.TieneParadasParaPreparar() then

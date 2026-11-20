@@ -30,7 +30,6 @@ codeunit 51100 "Gestion Contenido SGA"
         cUM: Codeunit "Unidades Producto SGA";
         cUOMMgt: Codeunit "Unit of Measure Management";
         ParaReserva: Text;
-        UbicacionPropuesta: Code[20];
 
     /// <summary>
     /// Entrada para la que se registra a partir de ahora: puede usar los huecos reservados para
@@ -39,16 +38,6 @@ codeunit 51100 "Gestion Contenido SGA"
     procedure FijarReserva(prm_Para: Text)
     begin
         ParaReserva := prm_Para;
-    end;
-
-    /// <summary>
-    /// Ubicación que propuso el sistema para la próxima entrada. Si se registra ahí, no se pregunta
-    /// por estar fuera de las zonas de su grupo IIEE: la propuesta ya lo ha decidido y lo dice
-    /// en su motivo. Se pregunta solo cuando el operario elige otro hueco.
-    /// </summary>
-    procedure FijarPropuesta(prm_Ubicacion: Code[20])
-    begin
-        UbicacionPropuesta := prm_Ubicacion;
     end;
 
     /// <summary>
@@ -227,7 +216,7 @@ codeunit 51100 "Gestion Contenido SGA"
     procedure AlternarBloqueo(var prm_Contenido: Record "Contenido Ubicacion SGA")
     var
         BloqueadoPorLbl: Label 'Bloqueado por %1 el %2', Comment = '%1 = usuario, %2 = fecha';
-        ReservadoNoBloquearErr: Label 'No se puede bloquear: %1 de %2 (lote %3) en %4 están reservados por órdenes de picking. Cancele o busque en otra ubicación esas paradas antes de bloquear.', Comment = '%1 = cantidad reservada, %2 = producto, %3 = lote, %4 = ubicación';
+        ReservadoNoBloquearErr: Label 'No se puede bloquear: %1 de %2 (lote %3) en %4 están reservados por órdenes de picking. Cancele o busque en otra ubicación esas líneas antes de bloquear.', Comment = '%1 = cantidad reservada, %2 = producto, %3 = lote, %4 = ubicación';
     begin
         if (not prm_Contenido.Bloqueado) and (prm_Contenido."Cantidad Reservada" > 0) then
             Error(ReservadoNoBloquearErr, prm_Contenido."Cantidad Reservada", prm_Contenido."No. Producto",
@@ -541,7 +530,7 @@ codeunit 51100 "Gestion Contenido SGA"
     /// </summary>
     local procedure ComprobarSinReserva(var prm_Contenido: Record "Contenido Ubicacion SGA")
     var
-        LineaReservadaErr: Label 'La línea de %1 en %2 tiene %3 reservadas por una orden de picking. Cancele antes la orden o la parada.', Comment = '%1 = producto, %2 = ubicación, %3 = cantidad reservada';
+        LineaReservadaErr: Label 'La línea de %1 en %2 tiene %3 reservadas por una orden de picking. Cancele antes la orden o la línea de picking.', Comment = '%1 = producto, %2 = ubicación, %3 = cantidad reservada';
     begin
         if prm_Contenido."Cantidad Reservada" > 0 then
             Error(LineaReservadaErr, prm_Contenido."No. Producto", prm_Contenido."Cod. Bin", prm_Contenido."Cantidad Reservada");
@@ -553,7 +542,7 @@ codeunit 51100 "Gestion Contenido SGA"
     local procedure AplicarMovimiento(prm_Tipo: Enum "Tipo Mov. Ubicacion SGA"; prm_Origen: Enum "Origen Mov. SGA"; prm_Almacen: Code[10]; prm_UbicacionOrigen: Code[20]; prm_UbicacionDestino: Code[20]; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_SSCC: Code[20]; prm_UM: Code[10]; prm_Cantidad: Decimal; prm_NoDocumento: Code[20]; prm_NoLinea: Integer; prm_Descripcion: Text) noMovimiento: Integer
     var
         rItem: Record Item;
-        cReubicaciones: Codeunit "Reubicaciones SGA";
+        cReposiciones: Codeunit "Reposiciones SGA";
         umUsada: Code[10];
         umBase: Code[10];
         factor: Decimal;
@@ -606,7 +595,7 @@ codeunit 51100 "Gestion Contenido SGA"
         // Una ubicación de picking que se queda a cero de un producto pide reposición, sea cual
         // sea el movimiento que la vacía: picking, traslado, vaciado o ajuste.
         if prm_UbicacionOrigen <> '' then
-            cReubicaciones.ReubicarSiSeVacia(prm_Almacen, prm_UbicacionOrigen, prm_Producto);
+            cReposiciones.ReubicarSiSeVacia(prm_Almacen, prm_UbicacionOrigen, prm_Producto);
     end;
 
     local procedure AplicarDelta(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_SSCC: Code[20]; prm_UMBase: Code[10]; prm_DeltaBase: Decimal; prm_Caducidad: Date; prm_ValidarEntrada: Boolean)
@@ -726,17 +715,16 @@ codeunit 51100 "Gestion Contenido SGA"
 
     /// <summary>
     /// Comprueba, sin registrar nada, que una entrada cabría en la ubicación con las mismas
-    /// reglas que al registrarla (bloqueo, reserva, producto fijo, mezcla, zona IIEE, capacidad).
+    /// reglas que al registrarla (bloqueo, reserva, producto fijo, mezcla, capacidad).
     /// La usa "Imprimir y ubicar" antes de imprimir, para no dejar un palé etiquetado sin hueco.
     /// prm_Para es la entrada para la que se puede usar un hueco reservado.
     /// </summary>
-    procedure TestEntradaAdmitida(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_UM: Code[10]; prm_Cantidad: Decimal; prm_Para: Text; prm_Propuesta: Code[20])
+    procedure TestEntradaAdmitida(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_UM: Code[10]; prm_Cantidad: Decimal; prm_Para: Text)
     var
         rUbicacionSGA: Record "Ubicacion SGA";
     begin
         LeerUbicacionSGA(prm_Almacen, prm_Ubicacion, rUbicacionSGA);
         FijarReserva(prm_Para);
-        FijarPropuesta(prm_Propuesta);
         TestUbicacionAdmite(rUbicacionSGA, prm_Producto, prm_Lote, cUOMMgt.CalcBaseQty(prm_Cantidad, cUM.FactorUM(prm_Producto, prm_UM)));
     end;
 
@@ -758,8 +746,6 @@ codeunit 51100 "Gestion Contenido SGA"
         cConfirmMgt: Codeunit "Confirm Management";
         ocupado: Decimal;
         entrada: Decimal;
-        grupoIIEE: Code[20];
-        FueraZonaGrupoQst: Label 'La ubicación %1 no está en ninguna zona del grupo IIEE del producto %2 (%3). ¿Desea dejarlo ahí de todos modos?', Comment = '%1 = ubicación, %2 = producto, %3 = grupo IIEE';
         UbicacionBloqueadaErr: Label 'La ubicación %1 está bloqueada: %2', Comment = '%1 = ubicación, %2 = motivo de bloqueo';
         UbicacionProductoFijoErr: Label 'La ubicación %1 está reservada para el producto %2.', Comment = '%1 = ubicación, %2 = producto fijo';
         MezclaProductoErr: Label 'La ubicación %1 no permite mezclar productos y ya contiene %2.', Comment = '%1 = ubicación, %2 = producto que ya contiene';
@@ -783,13 +769,6 @@ codeunit 51100 "Gestion Contenido SGA"
             6:
                 Error(MezclaLoteErr, rUbicacionSGA."Cod. Bin", rContenido."No. Lote");
         end;
-
-        // Fuera de las zonas de su grupo IIEE se puede dejar, pero avisando si lo ha elegido el
-        // operario (en el hueco propuesto la propuesta ya lo dice). Sin interfaz se deja pasar.
-        if GuiAllowed() and (rUbicacionSGA."Cod. Bin" <> UbicacionPropuesta) then
-            if cUbicaciones.FueraDeZonasGrupoIIEE(rUbicacionSGA, prm_Producto, grupoIIEE) then
-                if not cConfirmMgt.GetResponseOrDefault(StrSubstNo(FueraZonaGrupoQst, rUbicacionSGA."Cod. Bin", prm_Producto, grupoIIEE), false) then
-                    Error('');
 
         if rUbicacionSGA."Capacidad Uds." <= 0 then
             exit;

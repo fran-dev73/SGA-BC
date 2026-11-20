@@ -41,6 +41,16 @@ table 51101 "Ubicacion SGA"
             DataClassification = ToBeClassified;
             NotBlank = true;
             TableRelation = Bin.Code where("Location Code" = field("Cod. Almacen"));
+            // El alta a mano escribe un código nuevo: su Bin lo crea OnInsert (CompletarAlta).
+            ValidateTableRelation = false;
+
+            trigger OnValidate()
+            var
+                cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
+            begin
+                // Al teclearlo (alta a mano), con el formato y los rangos de Generar ubicaciones.
+                cUbicaciones.ComprobarCodigoUbicacion("Cod. Bin");
+            end;
         }
         field(30; Descripcion; Text[50])
         {
@@ -58,13 +68,12 @@ table 51101 "Ubicacion SGA"
                 rZona: Record "Zona SGA";
             begin
                 TestVacia();
-                // Al asignar zona hereda tipo y ruta si la ubicación aún no los tiene.
+                rZona.ComprobarAdmiteUbicaciones("Cod. Almacen", "Cod. Zona SGA");
+                // Al asignar zona hereda la ruta si la ubicación aún no la tiene.
                 if "Cod. Zona SGA" = '' then
                     exit;
                 if not rZona.Get("Cod. Almacen", "Cod. Zona SGA") then
                     exit;
-                if "Tipo Ubicacion" = "Tipo Ubicacion"::" " then
-                    "Tipo Ubicacion" := rZona."Tipo Ubicacion";
                 if "Secuencia Picking" = 0 then
                     "Secuencia Picking" := rZona."Prioridad Picking";
             end;
@@ -73,7 +82,7 @@ table 51101 "Ubicacion SGA"
         {
             Caption = 'Tipo ubicación';
             DataClassification = ToBeClassified;
-            ToolTip = 'Almacenamiento: reserva, es la primera que se busca al ubicar. Picking: de donde se prepara; se busca al ubicar si no queda sitio en almacenamiento y se repone desde almacenamiento con las reubicaciones. En blanco (muelles, ajustes…): no se propone ni se repone.';
+            ToolTip = 'Almacenamiento: reserva, es la primera que se busca al ubicar. Picking: de donde se prepara; se busca al ubicar si no queda sitio en almacenamiento y se repone desde almacenamiento con las reposiciones. En blanco (muelles, ajustes…): no se propone ni se repone.';
 
             trigger OnValidate()
             begin
@@ -154,6 +163,20 @@ table 51101 "Ubicacion SGA"
             trigger OnValidate()
             begin
                 TestVacia();
+            end;
+        }
+        field(92; Fondo; Boolean)
+        {
+            Caption = 'Fondo de pasillo';
+            DataClassification = ToBeClassified;
+            ToolTip = 'Ubicación a nivel de suelo al fondo del pasillo, con sitio para varios palés. Su posición (pasillo y estantería del código) no tiene alturas: no se puede marcar si ya las hay, ni crearlas mientras esté marcada.';
+
+            trigger OnValidate()
+            var
+                cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
+            begin
+                if Fondo then
+                    cUbicaciones.ComprobarPuedeSerFondo("Cod. Almacen", "Cod. Bin");
             end;
         }
         field(100; "Producto Fijo"; Code[20])
@@ -274,13 +297,11 @@ table 51101 "Ubicacion SGA"
 
     trigger OnInsert()
     var
-        rBin: Record Bin;
-        BinNoExisteErr: Label 'La ubicación %1 no existe en el almacén %2.', Comment = '%1 = ubicación, %2 = almacén';
+        cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
     begin
-        // Se valida contra Bin y no contra la topología propia: SGA es aditivo sobre la
-        // topología estándar, y es de Bin de donde SincronizarTopologia lee las ubicaciones.
-        if not rBin.Get("Cod. Almacen", "Cod. Bin") then
-            Error(BinNoExisteErr, "Cod. Bin", "Cod. Almacen");
+        // SGA es aditivo sobre la topología estándar: sin su Bin no hay ubicación. El alta a mano
+        // (Nueva ubicación SGA) lo crea aquí; los demás caminos ya lo traen creado.
+        cUbicaciones.CompletarAlta(Rec);
         RecalcularOcupacion();
     end;
 
@@ -354,11 +375,16 @@ table 51101 "Ubicacion SGA"
     trigger OnDelete()
     var
         rContenido: Record "Contenido Ubicacion SGA";
+        rBin: Record Bin;
         UbicacionConContenidoErr: Label 'No se pueden eliminar los datos SGA de la ubicación %1 porque todavía tiene contenido.', Comment = '%1 = ubicación';
     begin
         rContenido.FiltrarUbicacion("Cod. Almacen", "Cod. Bin");
         if not rContenido.IsEmpty() then
             Error(UbicacionConContenidoErr, "Cod. Bin");
+        // Una ubicación es su Bin más sus datos SGA: se eliminan juntos. Las comprobaciones del
+        // estándar (stock de BC en la ubicación…) siguen valiendo y paran el borrado.
+        if rBin.Get("Cod. Almacen", "Cod. Bin") then
+            rBin.Delete(true);
     end;
 
     /// <summary>

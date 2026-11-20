@@ -44,6 +44,10 @@ page 51106 "Config. SGA"
                 {
                     ApplicationArea = All;
                 }
+                field("Playa por Defecto"; Rec."Playa por Defecto")
+                {
+                    ApplicationArea = All;
+                }
             }
             group(Estrategias)
             {

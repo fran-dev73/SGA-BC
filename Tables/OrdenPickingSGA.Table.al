@@ -100,6 +100,24 @@ table 51108 "Orden Picking SGA"
             Editable = false;
             ToolTip = 'Fecha de envío del pedido de venta, copiada al crear la orden. Sirve para decidir qué preparar antes.';
         }
+        field(63; Playa; Code[10])
+        {
+            Caption = 'Playa';
+            DataClassification = ToBeClassified;
+            Editable = false;
+            TableRelation = "Zona SGA".Code where("Cod. Almacen" = field("Cod. Almacen"),
+                                                  Playa = const(true));
+            ToolTip = 'Playa donde se deja lo preparado. Nace con la playa por defecto de la configuración y se cambia con Cambiar playa mientras la orden no se ha empezado. La PDA la indica en cada línea y al terminar.';
+        }
+        field(64; "Descripcion Playa"; Text[50])
+        {
+            Caption = 'Descripción playa';
+            Editable = false;
+            FieldClass = FlowField;
+            CalcFormula = lookup("Zona SGA".Descripcion where("Cod. Almacen" = field("Cod. Almacen"),
+                                                              Code = field(Playa)));
+            ToolTip = 'Descripción de la playa de la orden.';
+        }
         field(71; "Fecha Finalizacion"; DateTime)
         {
             Caption = 'Fecha finalización';
@@ -149,13 +167,13 @@ table 51108 "Orden Picking SGA"
         }
         field(103; "Paradas Retenidas"; Integer)
         {
-            Caption = 'Paradas retenidas';
+            Caption = 'Líneas retenidas';
             Editable = false;
             FieldClass = FlowField;
             CalcFormula = count("Linea Orden Picking SGA" where("No. Orden" = field("No. Orden"),
                                                                 Retenida = const(true),
                                                                 Estado = filter(Pendiente | Parcial)));
-            ToolTip = 'Paradas que el preparador ha saltado dos veces y esperan al jefe de almacén. Mientras haya alguna, la orden no se termina.';
+            ToolTip = 'Líneas que el preparador ha saltado dos veces y esperan al jefe de almacén. Mientras haya alguna, la orden no se termina.';
         }
     }
 

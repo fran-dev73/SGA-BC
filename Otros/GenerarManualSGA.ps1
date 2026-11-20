@@ -1,9 +1,9 @@
-# Genera el PDF de un documento SGA, junto al md con el mismo nombre. Sin parámetros, la guía de
-# uso. Ejemplo: -Documento ARQUITECTURA -Titulo 'Arquitectura de SGA' -Eyebrow 'Documentación técnica'
+# Genera el PDF de un documento SGA, junto al md con el mismo nombre. Sin parámetros, el manual de
+# usuario. Ejemplo: -Documento DOCUMENTACION_TECNICA_SGA -Titulo 'Documentación técnica de SGA' -Eyebrow 'Documentación técnica'
 param(
-    [string]$Documento = 'GUIA_USO_SGA',
-    [string]$Titulo = 'Guía de uso de SGA',
-    [string]$Eyebrow = 'Guía de uso · Business Central'
+    [string]$Documento = 'MANUAL_USUARIO_SGA',
+    [string]$Titulo = 'Manual de usuario de SGA',
+    [string]$Eyebrow = 'Manual de usuario · Business Central'
 )
 
 $ErrorActionPreference = 'Stop'

@@ -50,9 +50,9 @@ page 51111 "Cue SGA"
                 }
                 field("Paradas Retenidas"; Rec."Paradas Retenidas")
                 {
-                    ToolTip = 'Paradas de picking que el preparador ha saltado dos veces y esperan a que el jefe de almacén las resuelva.';
+                    ToolTip = 'Líneas de picking que el preparador ha saltado dos veces y esperan a que el jefe de almacén las resuelva.';
                     ApplicationArea = All;
-                    DrillDownPageId = "Paradas Picking SGA";
+                    DrillDownPageId = "Lineas Picking SGA";
                     Style = Unfavorable;
                 }
                 field("Ordenes Sin Pasar Pedido"; Rec."Ordenes Sin Pasar Pedido")
@@ -66,7 +66,7 @@ page 51111 "Cue SGA"
                 {
                     ToolTip = 'Movimientos de almacenamiento a picking que quedan por hacer.';
                     ApplicationArea = All;
-                    DrillDownPageId = "Reubicaciones SGA";
+                    DrillDownPageId = "Reposiciones SGA";
                 }
                 field("Ordenes Terminadas Hoy"; Rec."Ordenes Terminadas Hoy")
                 {
@@ -77,9 +77,9 @@ page 51111 "Cue SGA"
                 }
                 field("Desvios Hoy"; Rec."Desvios Hoy")
                 {
-                    ToolTip = 'Paradas confirmadas hoy en una ubicación distinta de la propuesta.';
+                    ToolTip = 'Líneas confirmadas hoy en una ubicación distinta de la propuesta.';
                     ApplicationArea = All;
-                    DrillDownPageId = "Paradas Picking SGA";
+                    DrillDownPageId = "Lineas Picking SGA";
                     Style = Ambiguous;
                 }
             }

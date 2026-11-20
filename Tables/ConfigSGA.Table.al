@@ -35,14 +35,17 @@ table 51104 "Config. SGA"
                 rZona: Record "Zona SGA";
                 rBin: Record Bin;
             begin
-                // La zona y la ubicación de ajustes son de un almacén: si no son del nuevo, se
-                // vacían para que no queden apuntando al anterior.
+                // La zona, la ubicación de ajustes y la playa son de un almacén: si no son del
+                // nuevo, se vacían para que no queden apuntando al anterior.
                 if "Zona por Defecto" <> '' then
                     if not rZona.Get("Almacen por Defecto", "Zona por Defecto") then
                         "Zona por Defecto" := '';
                 if "Ubic. Ajustes" <> '' then
                     if not rBin.Get("Almacen por Defecto", "Ubic. Ajustes") then
                         "Ubic. Ajustes" := '';
+                if "Playa por Defecto" <> '' then
+                    if not rZona.Get("Almacen por Defecto", "Playa por Defecto") then
+                        "Playa por Defecto" := '';
             end;
         }
         field(12; "Zona por Defecto"; Code[10])
@@ -59,6 +62,14 @@ table 51104 "Config. SGA"
             DataClassification = ToBeClassified;
             TableRelation = Bin.Code where("Location Code" = field("Almacen por Defecto"));
             ToolTip = 'Ubicación contrapartida de los ajustes y descuadres detectados en la conciliación.';
+        }
+        field(25; "Playa por Defecto"; Code[10])
+        {
+            Caption = 'Playa por defecto';
+            DataClassification = ToBeClassified;
+            TableRelation = "Zona SGA".Code where("Cod. Almacen" = field("Almacen por Defecto"),
+                                                  Playa = const(true));
+            ToolTip = 'Playa (zona marcada Playa) con la que nacen las órdenes de picking de venta del almacén por defecto. La PDA la indica en cada línea y al terminar. Se cambia por orden con Cambiar playa antes de empezar a prepararla.';
         }
         field(30; "Estrategia Ubicacion"; Enum "Estrategia Ubicacion SGA")
         {
@@ -83,7 +94,7 @@ table 51104 "Config. SGA"
         {
             Caption = 'Estrategia picking';
             DataClassification = ToBeClassified;
-            ToolTip = 'Orden en que se coge el stock (FEFO, FIFO…), dentro de cada paso del picking: palés completos de almacenamiento, picking y lo que falte de almacenamiento. Es también el orden con que las reubicaciones eligen qué traer de almacenamiento.';
+            ToolTip = 'Orden en que se coge el stock (FEFO, FIFO…), dentro de cada paso del picking: palés completos de almacenamiento, picking y lo que falte de almacenamiento. Es también el orden con que las reposiciones eligen qué traer de almacenamiento.';
         }
         field(40; "Control Capacidad"; Enum "Control Capacidad SGA")
         {
@@ -123,7 +134,7 @@ table 51104 "Config. SGA"
             Caption = 'Nºs orden SGA';
             DataClassification = ToBeClassified;
             TableRelation = "No. Series";
-            ToolTip = 'Serie numérica de las órdenes de picking y de reubicación.';
+            ToolTip = 'Serie numérica de las órdenes de picking y de reposición.';
         }
         field(70; "Fecha Inicio SGA"; Date)
         {

@@ -93,7 +93,7 @@ table 51105 "Cue SGA"
         }
         field(40; "Paradas Retenidas"; Integer)
         {
-            Caption = 'Paradas retenidas';
+            Caption = 'Líneas retenidas';
             Editable = false;
             FieldClass = FlowField;
             CalcFormula = count("Linea Orden Picking SGA" where(Retenida = const(true),
@@ -160,7 +160,7 @@ table 51105 "Cue SGA"
         }
         field(47; "Reubicaciones Pendientes"; Integer)
         {
-            Caption = 'Reubicaciones pendientes';
+            Caption = 'Reposiciones pendientes';
             Editable = false;
             FieldClass = FlowField;
             CalcFormula = count("Linea Orden Picking SGA" where("Cod. Almacen" = field("Filtro Almacen"),
@@ -188,7 +188,7 @@ table 51105 "Cue SGA"
         }
         field(61; "Mis Reubicaciones"; Integer)
         {
-            Caption = 'Mis reubicaciones';
+            Caption = 'Mis reposiciones';
             Editable = false;
             FieldClass = FlowField;
             CalcFormula = count("Orden Picking SGA" where("Cod. Usuario Asignado" = field("Filtro Usuario"),

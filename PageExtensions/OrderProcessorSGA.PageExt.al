@@ -88,20 +88,20 @@ pageextension 51103 "Order Processor SGA" extends "Order Processor Role Center"
                 }
                 action(ParadasRetenidasSGA)
                 {
-                    Caption = 'Paradas retenidas';
-                    ToolTip = 'Paradas de picking que el preparador ha saltado dos veces: qué impide recogerlas y buscar el producto en otra ubicación.';
+                    Caption = 'Líneas retenidas';
+                    ToolTip = 'Líneas de picking que el preparador ha saltado dos veces: qué impide recogerlas y buscar el producto en otra ubicación.';
                     ApplicationArea = All;
                     Image = Warehouse;
-                    RunObject = page "Paradas Picking SGA";
+                    RunObject = page "Lineas Picking SGA";
                     RunPageView = where(Retenida = const(true), Estado = filter(Pendiente | Parcial));
                 }
                 action(ReubicacionesSGA)
                 {
-                    Caption = 'Reubicaciones';
+                    Caption = 'Reposiciones';
                     ToolTip = 'Lo que hay que llevar de almacenamiento a picking: planificarlo, verlo y prepararlo.';
                     ApplicationArea = All;
                     Image = Warehouse;
-                    RunObject = page "Reubicaciones SGA";
+                    RunObject = page "Reposiciones SGA";
                 }
                 action(DondeEstaSGA)
                 {
@@ -164,10 +164,11 @@ pageextension 51103 "Order Processor SGA" extends "Order Processor Role Center"
                 action(UbicacionesSGA)
                 {
                     Caption = 'Ubicaciones SGA';
-                    ToolTip = 'Ubicaciones del almacén, con su estado y su ocupación.';
+                    ToolTip = 'Ubicaciones del almacén, con su estado y su ocupación. Solo consulta: se crean, cambian y eliminan desde Configuración.';
                     ApplicationArea = All;
                     Image = BinContent;
                     RunObject = page "Ubicaciones SGA";
+                    RunPageMode = View;
                 }
                 action(ContenidoUbicacionesSGA)
                 {
@@ -255,10 +256,10 @@ pageextension 51103 "Order Processor SGA" extends "Order Processor Role Center"
                 action(UbicacionesEstandar)
                 {
                     Caption = 'Ubicaciones del almacén';
-                    ToolTip = 'Ubicaciones estándar (bins) sobre las que SGA añade sus datos de gestión.';
+                    ToolTip = 'Crear, configurar y eliminar ubicaciones a mano. Al crear o eliminar una, se crea o elimina también en BC.';
                     ApplicationArea = All;
                     Image = BinContent;
-                    RunObject = page "Bin List";
+                    RunObject = page "Ubicaciones SGA";
                 }
                 action(GenerarUbicacionesSGA)
                 {

@@ -23,7 +23,7 @@ tableextension 51100 "User Setup SGA" extends "User Setup"
         {
             Caption = 'Carretillero SGA';
             DataClassification = ToBeClassified;
-            ToolTip = 'Con "Siguiente orden" recibe las reubicaciones de almacenamiento a picking y no los pedidos; sin marcar, al revés. Lo que un responsable le asigna le llega siempre, sea lo que sea.';
+            ToolTip = 'Con "Siguiente orden" recibe las reposiciones de almacenamiento a picking y no los pedidos; sin marcar, al revés. Lo que un responsable le asigna le llega siempre, sea lo que sea.';
         }
     }
 }

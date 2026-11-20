@@ -8,7 +8,7 @@ using System.Utilities;
 /// </summary>
 page 51120 "Lineas Orden Picking Subpag"
 {
-    Caption = 'Paradas SGA';
+    Caption = 'Líneas SGA';
     PageType = ListPart;
     SourceTable = "Linea Orden Picking SGA";
     InsertAllowed = false;
@@ -25,7 +25,7 @@ page 51120 "Lineas Orden Picking Subpag"
             {
                 field("Secuencia Picking"; Rec."Secuencia Picking")
                 {
-                    ToolTip = 'Orden de recorrido físico de la parada.';
+                    ToolTip = 'Orden de recorrido físico de la línea.';
                     ApplicationArea = All;
                 }
                 field("Cod. Bin Propuesto"; Rec."Cod. Bin Propuesto")
@@ -69,7 +69,7 @@ page 51120 "Lineas Orden Picking Subpag"
                 }
                 field("Cantidad a Recoger"; Rec."Cantidad a Recoger")
                 {
-                    ToolTip = 'Cantidad que hay que recoger en esta parada.';
+                    ToolTip = 'Cantidad que hay que recoger en esta línea.';
                     ApplicationArea = All;
                 }
                 field("Cantidad Recogida"; Rec."Cantidad Recogida")
@@ -85,7 +85,7 @@ page 51120 "Lineas Orden Picking Subpag"
                 field("Cod. Unidad Medida"; Rec."Cod. Unidad Medida")
                 {
                     Caption = 'UM base';
-                    ToolTip = 'Unidad de medida base, en la que van las cantidades de la parada.';
+                    ToolTip = 'Unidad de medida base, en la que van las cantidades de la línea.';
                     ApplicationArea = All;
                 }
                 field(PendienteDocumento; Rec.EnUMDocumento(Rec."Cantidad Pendiente"))
@@ -104,7 +104,7 @@ page 51120 "Lineas Orden Picking Subpag"
                 }
                 field(Estado; Rec.Estado)
                 {
-                    ToolTip = 'Situación de la parada.';
+                    ToolTip = 'Situación de la línea.';
                     ApplicationArea = All;
                     StyleExpr = EstiloFila;
                 }
@@ -125,12 +125,12 @@ page 51120 "Lineas Orden Picking Subpag"
                 }
                 field("Cod. Usuario Confirmacion"; Rec."Cod. Usuario Confirmacion")
                 {
-                    ToolTip = 'Preparador que confirmó la parada.';
+                    ToolTip = 'Preparador que confirmó la línea.';
                     ApplicationArea = All;
                 }
                 field("Fecha Confirmacion"; Rec."Fecha Confirmacion")
                 {
-                    ToolTip = 'Momento en que se confirmó la parada.';
+                    ToolTip = 'Momento en que se confirmó la línea.';
                     ApplicationArea = All;
                 }
             }
@@ -143,8 +143,8 @@ page 51120 "Lineas Orden Picking Subpag"
         {
             action(CancelarParada)
             {
-                Caption = 'Cancelar parada';
-                ToolTip = 'Marca la parada como cancelada. Lo ya recogido no se deshace.';
+                Caption = 'Cancelar línea';
+                ToolTip = 'Marca la línea como cancelada. Lo ya recogido no se deshace.';
                 ApplicationArea = All;
                 Image = Cancel;
 
@@ -152,7 +152,7 @@ page 51120 "Lineas Orden Picking Subpag"
                 var
                     cPicking: Codeunit "Gestion Picking SGA";
                     cConfirmMgt: Codeunit "Confirm Management";
-                    CancelarParadaQst: Label '¿Cancelar la parada de %1 en %2?', Comment = '%1 = producto, %2 = ubicación';
+                    CancelarParadaQst: Label '¿Cancelar la línea de %1 en %2?', Comment = '%1 = producto, %2 = ubicación';
                 begin
                     if not cConfirmMgt.GetResponseOrDefault(StrSubstNo(CancelarParadaQst, Rec."No. Producto", Rec."Cod. Bin Propuesto"), false) then
                         exit;

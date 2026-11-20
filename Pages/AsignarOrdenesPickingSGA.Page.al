@@ -82,6 +82,14 @@ page 51124 "Asignar Ordenes Picking SGA"
                     ApplicationArea = All;
                     Style = Strong;
                 }
+                field(Playa; Rec.Playa)
+                {
+                    ApplicationArea = All;
+                }
+                field("Descripcion Playa"; Rec."Descripcion Playa")
+                {
+                    ApplicationArea = All;
+                }
                 field(Prioridad; Rec.Prioridad)
                 {
                     ToolTip = 'Prioridad del pedido: cuanto mayor, antes sale con "Siguiente orden". Se cambia con "Subir prioridad" y "Bajar prioridad", que la aplican a todas las órdenes del pedido.';
@@ -90,15 +98,15 @@ page 51124 "Asignar Ordenes Picking SGA"
                 }
                 field("No. Lineas"; Rec."No. Lineas")
                 {
-                    Caption = 'Paradas';
-                    ToolTip = 'Número de paradas del recorrido.';
+                    Caption = 'Líneas';
+                    ToolTip = 'Número de líneas del recorrido.';
                     ApplicationArea = All;
                     Editable = false;
                 }
                 field("Lineas Pendientes"; Rec."Lineas Pendientes")
                 {
-                    Caption = 'Paradas pendientes';
-                    ToolTip = 'Paradas que quedan por recoger.';
+                    Caption = 'Líneas pendientes';
+                    ToolTip = 'Líneas que quedan por recoger.';
                     ApplicationArea = All;
                     Editable = false;
                 }
@@ -183,6 +191,23 @@ page 51124 "Asignar Ordenes Picking SGA"
                     CambiarPrioridad(-1);
                 end;
             }
+            action(CambiarPlaya)
+            {
+                Caption = 'Cambiar playa';
+                ToolTip = 'Pone la playa que elija en las órdenes seleccionadas que aún no se han empezado a preparar.';
+                ApplicationArea = All;
+                Image = Change;
+
+                trigger OnAction()
+                var
+                    rOrden: Record "Orden Picking SGA";
+                    cPicking: Codeunit "Gestion Picking SGA";
+                begin
+                    CurrPage.SetSelectionFilter(rOrden);
+                    cPicking.CambiarPlaya(rOrden);
+                    CurrPage.Update(false);
+                end;
+            }
         }
         area(Navigation)
         {
@@ -212,6 +237,9 @@ page 51124 "Asignar Ordenes Picking SGA"
                 {
                 }
                 actionref(BajarPrioridad_Promoted; BajarPrioridad)
+                {
+                }
+                actionref(CambiarPlaya_Promoted; CambiarPlaya)
                 {
                 }
             }

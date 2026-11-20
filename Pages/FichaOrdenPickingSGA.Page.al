@@ -79,6 +79,14 @@ page 51119 "Ficha Orden Picking SGA"
                     ToolTip = 'Fecha de envío del pedido de venta.';
                     ApplicationArea = All;
                 }
+                field(Playa; Rec.Playa)
+                {
+                    ApplicationArea = All;
+                }
+                field("Descripcion Playa"; Rec."Descripcion Playa")
+                {
+                    ApplicationArea = All;
+                }
             }
             group(Seguimiento)
             {
@@ -86,13 +94,13 @@ page 51119 "Ficha Orden Picking SGA"
 
                 field("No. Lineas"; Rec."No. Lineas")
                 {
-                    ToolTip = 'Número de paradas del recorrido.';
+                    ToolTip = 'Número de líneas del recorrido.';
                     ApplicationArea = All;
                     Editable = false;
                 }
                 field("Lineas Pendientes"; Rec."Lineas Pendientes")
                 {
-                    ToolTip = 'Paradas que quedan por recoger.';
+                    ToolTip = 'Líneas que quedan por recoger.';
                     ApplicationArea = All;
                     Editable = false;
                 }
@@ -122,7 +130,7 @@ page 51119 "Ficha Orden Picking SGA"
             }
             part(Paradas; "Lineas Orden Picking Subpag")
             {
-                Caption = 'Paradas';
+                Caption = 'Líneas';
                 ApplicationArea = All;
                 SubPageLink = "No. Orden" = field("No. Orden");
                 UpdatePropagation = Both;
@@ -137,7 +145,7 @@ page 51119 "Ficha Orden Picking SGA"
             action(Preparar)
             {
                 Caption = 'Preparar';
-                ToolTip = 'Abre la pantalla que guía al preparador parada a parada.';
+                ToolTip = 'Abre la pantalla que guía al preparador línea a línea.';
                 ApplicationArea = All;
                 Image = Warehouse;
 
@@ -170,7 +178,7 @@ page 51119 "Ficha Orden Picking SGA"
             action(CancelarOrden)
             {
                 Caption = 'Cancelar orden';
-                ToolTip = 'Cancela la orden y todas sus paradas pendientes.';
+                ToolTip = 'Cancela la orden y todas sus líneas pendientes.';
                 ApplicationArea = All;
                 Image = Cancel;
 

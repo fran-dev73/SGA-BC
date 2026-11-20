@@ -3,7 +3,7 @@ namespace AntonioNadal.SGA;
 using System.Utilities;
 
 /// <summary>
-/// Page Paradas Picking SGA (ID 51134).
+/// Page Lineas Picking SGA (ID 51134).
 /// Paradas de picking de todas las órdenes, para que el jefe de almacén vea lo que necesita
 /// atención. Se abre desde las pilas, con su filtro:
 ///   - Retenidas: el preparador las ha saltado dos veces porque algo impide recogerlas.
@@ -11,9 +11,9 @@ using System.Utilities;
 ///     ubicación.
 ///   - Desvíos: recogidas de una ubicación distinta de la propuesta.
 /// </summary>
-page 51134 "Paradas Picking SGA"
+page 51134 "Lineas Picking SGA"
 {
-    Caption = 'Paradas de picking SGA';
+    Caption = 'Líneas de picking SGA';
     PageType = List;
     SourceTable = "Linea Orden Picking SGA";
     UsageCategory = Lists;
@@ -31,7 +31,7 @@ page 51134 "Paradas Picking SGA"
             {
                 field("No. Orden"; Rec."No. Orden")
                 {
-                    ToolTip = 'Orden de picking de la parada.';
+                    ToolTip = 'Orden de picking de la línea.';
                     ApplicationArea = All;
                 }
                 field("No. Documento Origen"; Rec."No. Documento Origen")
@@ -40,7 +40,7 @@ page 51134 "Paradas Picking SGA"
                 }
                 field("Cod. Almacen"; Rec."Cod. Almacen")
                 {
-                    ToolTip = 'Almacén de la parada.';
+                    ToolTip = 'Almacén de la línea.';
                     ApplicationArea = All;
                 }
                 field("Cod. Bin Propuesto"; Rec."Cod. Bin Propuesto")
@@ -80,12 +80,12 @@ page 51134 "Paradas Picking SGA"
                 field("Cod. Unidad Medida"; Rec."Cod. Unidad Medida")
                 {
                     Caption = 'UM base';
-                    ToolTip = 'Unidad de medida base, en la que van las cantidades de la parada.';
+                    ToolTip = 'Unidad de medida base, en la que van las cantidades de la línea.';
                     ApplicationArea = All;
                 }
                 field(Estado; Rec.Estado)
                 {
-                    ToolTip = 'Situación de la parada.';
+                    ToolTip = 'Situación de la línea.';
                     ApplicationArea = All;
                     StyleExpr = EstiloFila;
                 }
@@ -111,12 +111,12 @@ page 51134 "Paradas Picking SGA"
                 }
                 field("Cod. Usuario Confirmacion"; Rec."Cod. Usuario Confirmacion")
                 {
-                    ToolTip = 'Preparador que confirmó la parada.';
+                    ToolTip = 'Preparador que confirmó la línea.';
                     ApplicationArea = All;
                 }
                 field("Fecha Confirmacion"; Rec."Fecha Confirmacion")
                 {
-                    ToolTip = 'Momento en que se confirmó la parada.';
+                    ToolTip = 'Momento en que se confirmó la línea.';
                     ApplicationArea = All;
                 }
             }
@@ -130,7 +130,7 @@ page 51134 "Paradas Picking SGA"
             action(BuscarOtraUbicacion)
             {
                 Caption = 'Buscar en otra ubicación';
-                ToolTip = 'Para una parada retenida: la cancela y crea paradas nuevas para lo que faltaba en otras ubicaciones con stock del producto, como el botón Sin stock de la PDA. Las nuevas vuelven al recorrido del preparador de la orden.';
+                ToolTip = 'Para una línea retenida: la cancela y crea líneas nuevas para lo que faltaba en otras ubicaciones con stock del producto, como el botón Sin stock de la PDA. Las nuevas vuelven al recorrido del preparador de la orden.';
                 ApplicationArea = All;
                 Image = Reuse;
                 Enabled = EsRetenidaPendiente;
@@ -140,7 +140,7 @@ page 51134 "Paradas Picking SGA"
                     cPicking: Codeunit "Gestion Picking SGA";
                     cConfirmMgt: Codeunit "Confirm Management";
                     cubierta: Boolean;
-                    BuscarOtraUbicacionQst: Label '¿Cancelar la parada de %1 en %2 y buscar el producto en otra ubicación?', Comment = '%1 = producto, %2 = ubicación';
+                    BuscarOtraUbicacionQst: Label '¿Cancelar la línea de %1 en %2 y buscar el producto en otra ubicación?', Comment = '%1 = producto, %2 = ubicación';
                 begin
                     if not cConfirmMgt.GetResponseOrDefault(StrSubstNo(BuscarOtraUbicacionQst, Rec."No. Producto", Rec."Cod. Bin Propuesto"), false) then
                         exit;
@@ -155,7 +155,7 @@ page 51134 "Paradas Picking SGA"
             action(VerOrden)
             {
                 Caption = 'Orden de picking';
-                ToolTip = 'Abre la orden de picking de la parada.';
+                ToolTip = 'Abre la orden de picking de la línea.';
                 ApplicationArea = All;
                 Image = Document;
                 RunObject = page "Ficha Orden Picking SGA";
@@ -164,7 +164,7 @@ page 51134 "Paradas Picking SGA"
             action(VerContenido)
             {
                 Caption = 'Contenido de la ubicación';
-                ToolTip = 'Muestra qué hay en la ubicación propuesta de la parada según SGA.';
+                ToolTip = 'Muestra qué hay en la ubicación propuesta de la línea según SGA.';
                 ApplicationArea = All;
                 Image = ItemLines;
                 RunObject = page "Contenido Ubicaciones SGA";

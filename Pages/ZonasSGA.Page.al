@@ -34,15 +34,6 @@ page 51105 "Zonas SGA"
                     ToolTip = 'Descripción de la zona.';
                     ApplicationArea = All;
                 }
-                field("Tipo Ubicacion"; Rec."Tipo Ubicacion")
-                {
-                    ToolTip = 'Tipo que se propone por defecto a las ubicaciones de esta zona.';
-                    ApplicationArea = All;
-                }
-                field("Grupo IIEE"; Rec."Grupo IIEE")
-                {
-                    ApplicationArea = All;
-                }
                 field("Prioridad Picking"; Rec."Prioridad Picking")
                 {
                     ToolTip = 'Secuencia de picking que toma una ubicación al asignarle esta zona, si aún no tiene la suya. Menor valor, antes en el recorrido.';
@@ -54,10 +45,6 @@ page 51105 "Zonas SGA"
                     ApplicationArea = All;
                 }
                 field(Playa; Rec.Playa)
-                {
-                    ApplicationArea = All;
-                }
-                field("Ubicacion por Defecto"; Rec."Ubicacion por Defecto")
                 {
                     ApplicationArea = All;
                 }

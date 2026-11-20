@@ -27,9 +27,13 @@ codeunit 51111 "Ventana Progreso SGA"
         Ventana.Open(prm_Titulo + ControlesTok);
     end;
 
+    /// <summary>
+    /// Empieza una tanda de prm_Total llamadas a Avanzar: la barra vuelve a cero.
+    /// </summary>
     procedure FijarTotal(prm_Total: Integer)
     begin
         Total := prm_Total;
+        Hechos := 0;
     end;
 
     /// <summary>

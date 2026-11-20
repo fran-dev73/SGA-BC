@@ -508,7 +508,6 @@ codeunit 51105 "Gestion Entradas SGA"
 
         // Puede entrar en el hueco reservado para la fila; ya ocupado, la reserva sobra.
         cContenido.FijarReserva(prm_Fila.ReservaFila());
-        cContenido.FijarPropuesta(prm_Fila."Ubicacion Propuesta");
         cContenido.RegistrarEntrada(prm_Fila."Cod. Almacen", prm_Fila."Ubicacion Confirmada",
                                     prm_Fila."No. Producto", prm_Fila."No. Lote",
                                     prm_Fila.SSCCPale(), prm_Fila."Cod. Unidad Medida", prm_Fila.Cantidad,
@@ -840,8 +839,7 @@ codeunit 51105 "Gestion Entradas SGA"
         // Antes de imprimir, que el hueco admita el palé con las mismas reglas que al ubicar:
         // si no, saldría una etiqueta para un palé que luego no se puede colocar ahí.
         cContenido.TestEntradaAdmitida(prm_Pale."Cod. Almacen", prm_Pale."Ubicacion Confirmada", prm_Pale."No. Producto",
-                                       prm_Pale."No. Lote", prm_Pale."Cod. Unidad Medida", prm_Pale.Cantidad, prm_Pale.ReservaFila(),
-                                       prm_Pale."Ubicacion Propuesta");
+                                       prm_Pale."No. Lote", prm_Pale."Cod. Unidad Medida", prm_Pale.Cantidad, prm_Pale.ReservaFila());
 
         if EnvironmentInformation.IsSandbox() then
             ImprimirEtiquetaA5(prm_Tarea)

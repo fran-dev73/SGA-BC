@@ -110,7 +110,7 @@ page 51121 "Preparar Picking SGA"
         HayParada: Boolean;
         EnTurno: Boolean;
         MotivoSinParadas: Text;
-        Playa: Code[20];
+        Playa: Code[10];
 
     trigger OnOpenPage()
     begin
@@ -153,13 +153,16 @@ page 51121 "Preparar Picking SGA"
     /// </summary>
     local procedure Preparar()
     var
-        rZona: Record "Zona SGA";
+        rOrden: Record "Orden Picking SGA";
     begin
         LineaMostrada := Rec."No. Linea";
-        // Lo de un pedido se deja en la playa; una reubicación lleva su propio destino.
+        // Lo de un pedido se deja en la playa de su orden; una reubicación lleva su propio destino.
         Playa := '';
-        if HayParada and (Rec."Cod. Bin Destino" = '') then
-            Playa := rZona.PlayaPorDefecto(Rec."Cod. Almacen");
+        if HayParada and (Rec."Cod. Bin Destino" = '') then begin
+            rOrden.SetLoadFields(Playa);
+            if rOrden.Get(Rec."No. Orden") then
+                Playa := rOrden.Playa;
+        end;
         PendienteDocumento := Rec.EnUMDocumento(Rec."Cantidad Pendiente");
         UMPedido := Rec.UMVisible();
         MostrarBase := UMPedido <> Rec."Cod. Unidad Medida";
@@ -175,7 +178,7 @@ page 51121 "Preparar Picking SGA"
         rOrden: Record "Orden Picking SGA";
         total: Integer;
         hechas: Integer;
-        ProgresoLbl: Label '%1 de %2 paradas', Comment = '%1 = paradas hechas, %2 = total de paradas';
+        ProgresoLbl: Label '%1 de %2 líneas', Comment = '%1 = líneas hechas, %2 = total de líneas';
     begin
         // Sin leer la orden: Progreso solo necesita el número, y con la pantalla vacía no lo hay.
         rOrden."No. Orden" := Rec."No. Orden";
@@ -345,7 +348,7 @@ page 51121 "Preparar Picking SGA"
         cPicking: Codeunit "Gestion Picking SGA";
         bin: Code[20];
         retenida: Boolean;
-        ParadaRetenidaMsg: Label 'La parada de %1 queda retenida para el jefe de almacén.', Comment = '%1 = ubicación';
+        ParadaRetenidaMsg: Label 'La línea de %1 queda retenida para el jefe de almacén.', Comment = '%1 = ubicación';
     begin
         bin := Rec."Cod. Bin Propuesto";
         retenida := cPicking.SaltarParada(Rec);
@@ -404,13 +407,11 @@ page 51121 "Preparar Picking SGA"
     local procedure TerminarOrden()
     var
         rOrden: Record "Orden Picking SGA";
-        rZona: Record "Zona SGA";
-        playaOrden: Code[20];
         resultado: Text;
         fallo: Boolean;
         OrdenTerminadaMsg: Label 'Orden %1 terminada.', Comment = '%1 = nº orden';
-        DejarEnPlayaMsg: Label 'Déjela en la playa %1.', Comment = '%1 = ubicación de la playa';
-        OrdenConRetenidasMsg: Label 'Orden %1 recorrida. %2 paradas quedan retenidas para el jefe de almacén.', Comment = '%1 = nº orden, %2 = número de paradas retenidas';
+        DejarEnPlayaMsg: Label 'Déjela en la playa %1.', Comment = '%1 = playa (zona)';
+        OrdenConRetenidasMsg: Label 'Orden %1 recorrida. %2 líneas quedan retenidas para el jefe de almacén.', Comment = '%1 = nº orden, %2 = número de líneas retenidas';
         PasadaAlPedidoMsg: Label 'Lo recogido ya está en el pedido %1.', Comment = '%1 = nº pedido';
         SinPasarAlPedidoMsg: Label 'No se ha podido pasar al pedido %1: %2 Avise a oficina para que lo pase desde la orden.', Comment = '%1 = nº pedido, %2 = error';
     begin
@@ -422,9 +423,8 @@ page 51121 "Preparar Picking SGA"
             if rOrden."Paradas Retenidas" > 0 then
                 resultado := StrSubstNo(OrdenConRetenidasMsg, rOrden."No. Orden", rOrden."Paradas Retenidas");
             if rOrden.Origen = rOrden.Origen::Venta then begin
-                playaOrden := rZona.PlayaPorDefecto(rOrden."Cod. Almacen");
-                if playaOrden <> '' then
-                    resultado += ' ' + StrSubstNo(DejarEnPlayaMsg, playaOrden);
+                if rOrden.Playa <> '' then
+                    resultado += ' ' + StrSubstNo(DejarEnPlayaMsg, rOrden.Playa);
                 if Codeunit.Run(Codeunit::"Gestion Picking SGA", rOrden) then
                     resultado += ' ' + StrSubstNo(PasadaAlPedidoMsg, rOrden."No. Documento Origen")
                 else begin

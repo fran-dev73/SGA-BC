@@ -1,5 +1,6 @@
 namespace AntonioNadal.SGA;
 
+using Microsoft.Inventory.Item;
 using Microsoft.Inventory.Ledger;
 using Microsoft.Inventory.Location;
 
@@ -9,7 +10,8 @@ using Microsoft.Inventory.Location;
 /// mano (abre "Ubicar producto" con todo puesto) o varios a la vez (reparto por huecos libres,
 /// como la carga inicial, con el resultado y el motivo de lo que no quepa).
 ///
-/// Se calcula al abrir, sin lanzar la conciliación. De lo sin ubicar separa lo que está
+/// No se calcula al abrir ni al cambiar la cabecera: se ponen almacén, productos y clase de
+/// artículo y se pulsa Calcular. Sin productos ni clase revisa todo el almacén, tras confirmarlo. No lanza la conciliación. De lo sin ubicar separa lo que está
 /// pendiente en "Ubicar recepciones" o "Ubicar ensamblados": eso no se ubica desde aquí, para que
 /// esas pantallas no lo vuelvan a pedir (ver CargarPendienteUbicar de "Consulta Stock SGA").
 /// </summary>
@@ -39,13 +41,47 @@ page 51131 "Pendiente Ubicar SGA"
                 field(FiltroAlmacen; FiltroAlmacen)
                 {
                     Caption = 'Almacén';
-                    ToolTip = 'Almacén cuyo stock sin ubicar se enseña.';
+                    ToolTip = 'Almacén cuyo stock sin ubicar se revisa.';
                     ApplicationArea = All;
                     TableRelation = Location;
 
                     trigger OnValidate()
                     begin
-                        Recalcular();
+                        FiltroCambiado();
+                    end;
+                }
+                field(FiltroProductos; FiltroProductos)
+                {
+                    Caption = 'Productos';
+                    ToolTip = 'Productos que se revisan: uno, un filtro (1000..1999|2500) o varios marcados en la lista al pulsar la flecha.';
+                    ApplicationArea = All;
+
+                    trigger OnLookup(var Text: Text): Boolean
+                    var
+                        pProductos: Page "Item List";
+                    begin
+                        pProductos.LookupMode(true);
+                        if pProductos.RunModal() <> Action::LookupOK then
+                            exit(false);
+                        Text := pProductos.GetSelectionFilter();
+                        exit(true);
+                    end;
+
+                    trigger OnValidate()
+                    begin
+                        FiltroCambiado();
+                    end;
+                }
+                field(FiltroClase; FiltroClase)
+                {
+                    Caption = 'Clase de artículo';
+                    ToolTip = 'Solo los productos de esta clase (campo "Clase de artículo" de la ficha del producto). Todas para no filtrar por clase.';
+                    ApplicationArea = All;
+                    OptionCaption = 'Todas,Mat. prima,Granel,Prod. propio,Prod. externo';
+
+                    trigger OnValidate()
+                    begin
+                        FiltroCambiado();
                     end;
                 }
                 field(Resumen; Resumen)
@@ -108,7 +144,7 @@ page 51131 "Pendiente Ubicar SGA"
                 {
                     ApplicationArea = All;
                     Caption = 'Sin ubicar';
-                    ToolTip = 'Stock de BC que no está en ninguna ubicación: Stock BC menos Ubicado.';
+                    ToolTip = 'Stock de BC que no está en ninguna ubicación: Stock BC menos Ubicado, sin pasar de lo que el lote ha recibido desde la fecha de inicio de SGA.';
                 }
                 field("Stock BC"; Rec."Stock BC")
                 {
@@ -189,13 +225,21 @@ page 51131 "Pendiente Ubicar SGA"
             }
             action(Actualizar)
             {
-                Caption = 'Actualizar';
-                ToolTip = 'Vuelve a calcular lo que está sin ubicar.';
+                Caption = 'Calcular';
+                ToolTip = 'Calcula lo que está sin ubicar con el almacén, los productos y la clase de artículo de la cabecera. Sin productos ni clase de artículo, pregunta si revisar todo el almacén.';
                 ApplicationArea = All;
-                Image = Refresh;
+                Image = Calculate;
 
                 trigger OnAction()
+                var
+                    AlmacenObligatorioErr: Label 'Indique el almacén.';
+                    TodoAlmacenQst: Label 'No ha indicado productos ni clase de artículo: se revisará todo el almacén y puede tardar. ¿Continuar?';
                 begin
+                    if FiltroAlmacen = '' then
+                        Error(AlmacenObligatorioErr);
+                    if (FiltroProductos = '') and (FiltroClase = FiltroClase::Todas) then
+                        if not Confirm(TodoAlmacenQst, false) then
+                            exit;
                     Recalcular();
                 end;
             }
@@ -260,6 +304,10 @@ page 51131 "Pendiente Ubicar SGA"
 
     var
         FiltroAlmacen: Code[10];
+        FiltroProductos: Text;
+        // Mismo orden que "Clase de articulo" de Item, con Todas delante: el valor de la ficha es
+        // el de aquí menos uno.
+        FiltroClase: Option Todas,"Mat. Prima",Granel,"Prod. Propio","Prod. Externo";
         Resumen: Text;
         EstiloDocumentos: Text;
 
@@ -268,7 +316,7 @@ page 51131 "Pendiente Ubicar SGA"
         rConfig: Record "Config. SGA";
     begin
         FiltroAlmacen := rConfig.AlmacenODefecto('');
-        Recalcular();
+        FiltroCambiado();
     end;
 
     trigger OnAfterGetRecord()
@@ -278,29 +326,45 @@ page 51131 "Pendiente Ubicar SGA"
 
     local procedure Recalcular()
     var
+        rItem: Record Item;
+        rConfig: Record "Config. SGA";
         cStock: Codeunit "Consulta Stock SGA";
         numLineas: Integer;
         aUbicar: Decimal;
         enDocumentos: Decimal;
         ResumenLbl: Label '%1 lotes con algo sin ubicar: %2 unidades a ubicar desde aquí y %3 pendientes en recepciones o ensamblados.', Comment = '%1 = lotes, %2 = unidades a ubicar aquí, %3 = unidades en documentos';
-        SinAlmacenLbl: Label 'Indique el almacén.';
-        TodoUbicadoLbl: Label 'Todo el stock del almacén está ubicado.';
+        TodoUbicadoLbl: Label 'Todo el stock revisado está ubicado.';
     begin
         Rec.Reset();
         Rec.DeleteAll();
-        Resumen := SinAlmacenLbl;
-        if FiltroAlmacen <> '' then begin
-            numLineas := cStock.CargarPendienteUbicar(FiltroAlmacen, Rec);
-            Rec.Reset();
-            Rec.CalcSums("A Ubicar", "En Documentos");
-            aUbicar := Rec."A Ubicar";
-            enDocumentos := Rec."En Documentos";
-            if numLineas = 0 then
-                Resumen := TodoUbicadoLbl
-            else
-                Resumen := StrSubstNo(ResumenLbl, numLineas, aUbicar, enDocumentos);
-        end;
+        rItem.SetFilter("No.", FiltroProductos);
+        if FiltroClase <> FiltroClase::Todas then
+            rItem.SetRange("Clase de articulo", FiltroClase - 1);
+        rConfig.ObtenerConfig();
+        numLineas := cStock.CargarPendienteUbicar(FiltroAlmacen, rItem.GetView(), rConfig."Fecha Inicio SGA", Rec);
+        Rec.Reset();
+        Rec.CalcSums("A Ubicar", "En Documentos");
+        aUbicar := Rec."A Ubicar";
+        enDocumentos := Rec."En Documentos";
+        if numLineas = 0 then
+            Resumen := TodoUbicadoLbl
+        else
+            Resumen := StrSubstNo(ResumenLbl, numLineas, aUbicar, enDocumentos);
         if Rec.FindFirst() then;
+        CurrPage.Update(false);
+    end;
+
+    /// <summary>
+    /// Al abrir o al cambiar un filtro de la cabecera no se calcula: se vacían las líneas, que ya
+    /// no corresponden a los filtros, hasta que se pulse Calcular con todos puestos.
+    /// </summary>
+    local procedure FiltroCambiado()
+    var
+        PulseCalcularLbl: Label 'Indique almacén, productos y clase de artículo y pulse Calcular.';
+    begin
+        Rec.Reset();
+        Rec.DeleteAll();
+        Resumen := PulseCalcularLbl;
         CurrPage.Update(false);
     end;
 

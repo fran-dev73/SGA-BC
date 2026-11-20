@@ -15,7 +15,8 @@ page 51100 "Ubicaciones SGA"
     UsageCategory = Lists;
     ApplicationArea = All;
     CardPageId = "Ficha Ubicacion SGA";
-    // Como en las listas estándar: solo consulta, y se edita en la ficha.
+    // Como en las listas estándar: se edita en la ficha. Desde Configuración se abre normal
+    // (Nuevo, Eliminar y ficha editable); desde Consultas, con RunPageMode = View (solo ver).
     Editable = false;
 
     layout
@@ -127,6 +128,10 @@ page 51100 "Ubicaciones SGA"
                     ToolTip = 'Si se desactiva, la ubicación solo puede contener un lote a la vez.';
                     ApplicationArea = All;
                     Visible = false;
+                }
+                field(Fondo; Rec.Fondo)
+                {
+                    ApplicationArea = All;
                 }
                 field("Fecha Ultimo Movimiento"; Rec."Fecha Ultimo Movimiento")
                 {
@@ -308,22 +313,6 @@ page 51100 "Ubicaciones SGA"
                     CurrPage.Update(false);
                 end;
             }
-            action(SincronizarTopologia)
-            {
-                Caption = 'Sincronizar ubicaciones';
-                ToolTip = 'Da de alta en SGA las ubicaciones de la topología que todavía no tienen datos de gestión de almacén.';
-                ApplicationArea = All;
-                Image = Refresh;
-                RunObject = report "Sincronizar Ubicaciones SGA";
-            }
-            action(GenerarUbicaciones)
-            {
-                Caption = 'Generar ubicaciones';
-                ToolTip = 'Crea de golpe todas las ubicaciones de un rango de estanterías, columnas y alturas.';
-                ApplicationArea = All;
-                Image = CreateForm;
-                RunObject = report "Generar Ubicaciones SGA";
-            }
             action(Conciliar)
             {
                 Caption = 'Conciliar con el stock';
@@ -348,12 +337,6 @@ page 51100 "Ubicaciones SGA"
                 {
                 }
                 actionref(RecalcularEstado_Promoted; RecalcularEstado)
-                {
-                }
-                actionref(SincronizarTopologia_Promoted; SincronizarTopologia)
-                {
-                }
-                actionref(GenerarUbicaciones_Promoted; GenerarUbicaciones)
                 {
                 }
                 actionref(Conciliar_Promoted; Conciliar)

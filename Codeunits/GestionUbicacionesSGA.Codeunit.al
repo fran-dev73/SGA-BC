@@ -28,9 +28,11 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     var
         rUbicacionSGA: Record "Ubicacion SGA";
     begin
+        // La ficha SGA elimina su Bin al borrarse (OnDelete de la tabla); sin ficha, el Bin solo.
         if rUbicacionSGA.Get(Rec."Location Code", Rec.Code) then
-            rUbicacionSGA.Delete(true);
-        Rec.Delete(true);
+            rUbicacionSGA.Delete(true)
+        else
+            Rec.Delete(true);
     end;
 
     /// <summary>
@@ -127,7 +129,7 @@ codeunit 51101 "Gestion Ubicaciones SGA"
                 if prm_CambiarTipo then
                     rUbicacionSGA.Validate("Tipo Ubicacion", TempPlantilla."Tipo Ubicacion");
                 if prm_CambiarZona then
-                    // Con Validate hereda de la zona el tipo y la secuencia si aún no los tiene.
+                    // Con Validate hereda de la zona la secuencia si aún no la tiene.
                     rUbicacionSGA.Validate("Cod. Zona SGA", TempPlantilla."Cod. Zona SGA");
                 // La ocupación la recalcula la validación de "Capacidad Uds."; vacía, nada más la cambia.
                 rUbicacionSGA.Modify(true);
@@ -234,8 +236,6 @@ codeunit 51101 "Gestion Ubicaciones SGA"
         rBin: Record Bin;
         rUbicacionSGA: Record "Ubicacion SGA";
         rConfig: Record "Config. SGA";
-        rZona: Record "Zona SGA";
-        rZonaPlaya: Record "Zona SGA";
         cVentana: Codeunit "Ventana Progreso SGA";
         codigos: List of [Code[20]];
         codBin: Code[20];
@@ -287,19 +287,6 @@ codeunit 51101 "Gestion Ubicaciones SGA"
                 rConfig."Ubic. Ajustes" := '';
                 rConfig.Modify();
             end;
-
-        // La playa de una zona tampoco puede quedar apuntando a una ubicación borrada.
-        rZona.SetRange("Cod. Almacen", prm_Almacen);
-        rZona.SetFilter("Ubicacion por Defecto", '<>%1', '');
-        if rZona.FindSet() then
-            repeat
-                // Se modifica en otra variable: el campo es el del filtro que se recorre.
-                if not UbicacionExiste(prm_Almacen, rZona."Ubicacion por Defecto") then begin
-                    rZonaPlaya := rZona;
-                    rZonaPlaya."Ubicacion por Defecto" := '';
-                    rZonaPlaya.Modify();
-                end;
-            until rZona.Next() = 0;
     end;
 
     /// <summary>
@@ -307,42 +294,76 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     /// las alturas que da AlturasDelRango (00, 10, 20…).
     /// Crea el Bin estándar si no existe y su fila de datos SGA, en ese orden.
     /// Es idempotente: lo que ya existe no se toca, así que se puede reejecutar para ampliar.
+    /// Las posiciones de un fondo de pasillo se saltan: no tienen alturas.
     /// </summary>
     procedure GenerarUbicaciones(prm_Almacen: Code[10]; prm_PasilloDesde: Integer; prm_PasilloHasta: Integer; prm_EstanteriaDesde: Integer; prm_EstanteriaHasta: Integer; prm_AlturaDesde: Integer; prm_AlturaHasta: Integer; prm_Zona: Code[10]; prm_Tipo: Enum "Tipo Ubicacion SGA"; prm_Capacidad: Decimal) creadas: Integer
     var
-        rBin: Record Bin;
         rUbicacionSGA: Record "Ubicacion SGA";
+        rZona: Record "Zona SGA";
         alturas: List of [Integer];
         pasillo: Integer;
         estanteria: Integer;
         altura: Integer;
         codBin: Code[20];
     begin
+        rZona.ComprobarAdmiteUbicaciones(prm_Almacen, prm_Zona);
         alturas := AlturasDelRango(prm_AlturaDesde, prm_AlturaHasta);
         for pasillo := prm_PasilloDesde to prm_PasilloHasta do
             for estanteria := prm_EstanteriaDesde to prm_EstanteriaHasta do
                 foreach altura in alturas do begin
                     codBin := ComponerCodigoUbicacion(pasillo, estanteria, altura);
 
-                    if not rBin.Get(prm_Almacen, codBin) then begin
-                        rBin.Init();
-                        rBin."Location Code" := prm_Almacen;
-                        rBin.Code := codBin;
-                        rBin.Description := CopyStr(codBin, 1, MaxStrLen(rBin.Description));
-                        rBin.Insert(true);
-                    end;
+                    // La posición de un fondo de pasillo no tiene alturas: se salta.
+                    if FondoEnPosicion(prm_Almacen, codBin) = '' then begin
+                        CrearBinSiFalta(prm_Almacen, codBin, codBin);
 
-                    if not rUbicacionSGA.Get(prm_Almacen, codBin) then begin
-                        // Nacen de un solo producto, como un hueco de palé. Las estanterías de
-                        // picking con varias referencias se marcan después.
-                        NuevaUbicacionSGA(rUbicacionSGA, prm_Almacen, codBin, false, SecuenciaDesde(pasillo, estanteria, altura));
-                        rUbicacionSGA."Cod. Zona SGA" := prm_Zona;
-                        rUbicacionSGA."Tipo Ubicacion" := prm_Tipo;
-                        rUbicacionSGA."Capacidad Uds." := prm_Capacidad;
-                        rUbicacionSGA.Insert();
-                        creadas += 1;
+                        if not rUbicacionSGA.Get(prm_Almacen, codBin) then begin
+                            // Nacen de un solo producto, como un hueco de palé. Las estanterías de
+                            // picking con varias referencias se marcan después.
+                            NuevaUbicacionSGA(rUbicacionSGA, prm_Almacen, codBin, false, SecuenciaDesde(pasillo, estanteria, altura));
+                            rUbicacionSGA."Cod. Zona SGA" := prm_Zona;
+                            rUbicacionSGA."Tipo Ubicacion" := prm_Tipo;
+                            rUbicacionSGA."Capacidad Uds." := prm_Capacidad;
+                            rUbicacionSGA.Insert();
+                            creadas += 1;
+                        end;
                     end;
                 end;
+    end;
+
+    /// <summary>
+    /// Al insertar una ubicación SGA (OnInsert de la tabla): crea su Bin si aún no existe, que
+    /// es el caso del alta a mano, y le pone la descripción (el código si va en blanco) y la
+    /// secuencia de picking (la del código pasillo-estantería-altura si va a 0).
+    /// </summary>
+    procedure CompletarAlta(var prm_Ubicacion: Record "Ubicacion SGA")
+    var
+        pasillo: Integer;
+        estanteria: Integer;
+        altura: Integer;
+    begin
+        if prm_Ubicacion.Descripcion = '' then
+            prm_Ubicacion.Descripcion := CopyStr(prm_Ubicacion."Cod. Bin", 1, MaxStrLen(prm_Ubicacion.Descripcion));
+        if prm_Ubicacion."Secuencia Picking" = 0 then
+            if TrocearCodigo(prm_Ubicacion."Cod. Bin", pasillo, estanteria, altura) then
+                prm_Ubicacion."Secuencia Picking" := SecuenciaDesde(pasillo, estanteria, altura);
+        CrearBinSiFalta(prm_Ubicacion."Cod. Almacen", prm_Ubicacion."Cod. Bin", prm_Ubicacion.Descripcion);
+    end;
+
+    /// <summary>
+    /// Crea la ubicación estándar de BC si no existe, con su descripción.
+    /// </summary>
+    local procedure CrearBinSiFalta(prm_Almacen: Code[10]; prm_Bin: Code[20]; prm_Descripcion: Text)
+    var
+        rBin: Record Bin;
+    begin
+        if rBin.Get(prm_Almacen, prm_Bin) then
+            exit;
+        rBin.Init();
+        rBin."Location Code" := prm_Almacen;
+        rBin.Code := prm_Bin;
+        rBin.Description := CopyStr(prm_Descripcion, 1, MaxStrLen(rBin.Description));
+        rBin.Insert(true);
     end;
 
     /// <summary>
@@ -391,6 +412,97 @@ codeunit 51101 "Gestion Ubicaciones SGA"
         exit(LeerParte(partes.Get(1), 3, prm_Pasillo) and
              LeerParte(partes.Get(2), 2, prm_Estanteria) and
              LeerParte(partes.Get(3), 2, prm_Altura));
+    end;
+
+    /// <summary>
+    /// Para marcar una ubicación como fondo de pasillo: su código tiene que ser
+    /// pasillo-estantería-altura (para dibujarla en el mapa y saber cuál es su posición) y en
+    /// esa posición no puede haber otra ubicación, porque un fondo no tiene alturas.
+    /// </summary>
+    procedure ComprobarPuedeSerFondo(prm_Almacen: Code[10]; prm_Bin: Code[20])
+    var
+        rBin: Record Bin;
+        filtro: Text;
+        FondoSinFormatoErr: Label 'Para ser fondo de pasillo, el código de la ubicación %1 tiene que ser pasillo-estantería-altura (por ejemplo 101-31-01).', Comment = '%1 = ubicación';
+        FondoConAlturasErr: Label 'La posición de %1 ya tiene otra ubicación (%2). Un fondo de pasillo no tiene alturas: bórrela antes de marcarlo.', Comment = '%1 = ubicación, %2 = otra ubicación de la misma posición';
+    begin
+        if not FiltroOtrasDePosicion(prm_Bin, filtro) then
+            Error(FondoSinFormatoErr, prm_Bin);
+        rBin.SetRange("Location Code", prm_Almacen);
+        rBin.SetFilter(Code, filtro);
+        rBin.SetLoadFields(Code);
+        if rBin.FindFirst() then
+            Error(FondoConAlturasErr, prm_Bin, rBin.Code);
+    end;
+
+    /// <summary>
+    /// El fondo de pasillo que ocupa la posición (pasillo y estantería) del código prm_Bin, sin
+    /// contar el propio prm_Bin. En blanco si no hay o si el código no sigue el formato.
+    /// </summary>
+    procedure FondoEnPosicion(prm_Almacen: Code[10]; prm_Bin: Code[20]): Code[20]
+    var
+        rUbicacionSGA: Record "Ubicacion SGA";
+        filtro: Text;
+    begin
+        if not FiltroOtrasDePosicion(prm_Bin, filtro) then
+            exit('');
+        rUbicacionSGA.SetRange("Cod. Almacen", prm_Almacen);
+        rUbicacionSGA.SetRange(Fondo, true);
+        rUbicacionSGA.SetFilter("Cod. Bin", filtro);
+        rUbicacionSGA.SetLoadFields("Cod. Bin");
+        if rUbicacionSGA.FindFirst() then
+            exit(rUbicacionSGA."Cod. Bin");
+    end;
+
+    /// <summary>
+    /// Filtro de las demás ubicaciones de la misma posición que prm_Bin (101-31-* menos ella).
+    /// False si el código no es pasillo-estantería-altura. El código validado solo lleva cifras
+    /// y guiones, así que no trae caracteres de filtro.
+    /// </summary>
+    local procedure FiltroOtrasDePosicion(prm_Bin: Code[20]; var prm_Filtro: Text): Boolean
+    var
+        pasillo: Integer;
+        estanteria: Integer;
+        altura: Integer;
+    begin
+        if not TrocearCodigo(prm_Bin, pasillo, estanteria, altura) then
+            exit(false);
+        prm_Filtro := ConCeros(pasillo, 3) + '-' + ConCeros(estanteria, 2) + '-*&<>' + prm_Bin;
+        exit(true);
+    end;
+
+    /// <summary>
+    /// Ninguna ubicación nueva, se cree desde donde se cree, puede caer en la posición de un
+    /// fondo de pasillo.
+    /// </summary>
+    [EventSubscriber(ObjectType::Table, Database::Bin, OnBeforeInsertEvent, '', false, false)]
+    local procedure NoCrearEnPosicionFondo(var Rec: Record Bin)
+    var
+        fondo: Code[20];
+        PosicionDeFondoErr: Label 'No se puede crear la ubicación %1: su posición es la del fondo de pasillo %2, que no tiene alturas.', Comment = '%1 = ubicación nueva, %2 = fondo de pasillo';
+    begin
+        if Rec.IsTemporary() then
+            exit;
+        fondo := FondoEnPosicion(Rec."Location Code", Rec.Code);
+        if fondo <> '' then
+            Error(PosicionDeFondoErr, Rec.Code, fondo);
+    end;
+
+    /// <summary>
+    /// Error si el código no es pasillo-estantería-altura con los rangos de Generar ubicaciones:
+    /// pasillo de 001 a 999, estantería de 01 a 99 y altura de 00 a 99.
+    /// </summary>
+    procedure ComprobarCodigoUbicacion(prm_Codigo: Code[20])
+    var
+        pasillo: Integer;
+        estanteria: Integer;
+        altura: Integer;
+        CodigoUbicacionErr: Label 'El código %1 no es válido. Tiene que ser pasillo-estantería-altura: pasillo de 001 a 999, estantería de 01 a 99 y altura de 00 a 99 (por ejemplo 101-15-10).', Comment = '%1 = código tecleado';
+    begin
+        if not TrocearCodigo(prm_Codigo, pasillo, estanteria, altura) then
+            Error(CodigoUbicacionErr, prm_Codigo);
+        if (pasillo < 1) or (estanteria < 1) then
+            Error(CodigoUbicacionErr, prm_Codigo);
     end;
 
     /// <summary>
@@ -464,18 +576,11 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     /// '&lt;&gt;101-01-01&amp;&lt;&gt;101-02-01', ver AnadirExclusion). Sirve para dos cosas: que el
     /// operario pueda pedir "otra ubicación" descartando la que se le acaba de ofrecer, y que al
     /// proponer en bloque no se asigne el mismo hueco vacío a dos cosas distintas.
-    ///
-    /// Si el producto tiene grupo IIEE y ese grupo tiene zonas en el almacén, la búsqueda entera
-    /// se hace primero en esas zonas y, si no hay hueco, en todo el almacén. Con la zona fijada
-    /// por ProponerEnZona manda esa zona y el grupo no cuenta.
     /// </summary>
     procedure ProponerUbicacionCon(prm_Estrategia: Enum "Estrategia Ubicacion SGA"; prm_Excluidas: Text; prm_Almacen: Code[10]; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_UM: Code[10]; prm_Cantidad: Decimal; var prm_Motivo: Text): Code[20]
     var
         codigo: Code[20];
-        grupo: Code[20];
         entrada: Decimal;
-        ZonaGrupoTxt: Label 'Zona del grupo IIEE %1. %2', Comment = '%1 = grupo IIEE, %2 = por qué ese hueco';
-        FueraZonaGrupoTxt: Label 'Fuera de las zonas del grupo IIEE %1: no queda sitio en ellas. %2', Comment = '%1 = grupo IIEE, %2 = por qué ese hueco';
         SinHuecoVacioTxt: Label 'No queda ningún hueco vacío que admita %1. La estrategia de esta entrada ("Solo hueco vacío") no usa huecos a medias: libere un hueco o cambie la estrategia en la configuración.', Comment = '%1 = producto';
         SinUbicacionFijaTxt: Label '%1 no tiene ubicación fija con sitio ("Producto fijo" en la ubicación o "Nº estantería" en la ficha). La estrategia de esta entrada ("Solo ubicación fija") no busca en otras.', Comment = '%1 = producto';
     begin
@@ -485,22 +590,7 @@ codeunit 51101 "Gestion Ubicaciones SGA"
         entrada := EntradaEnPales(prm_Producto, prm_UM, prm_Cantidad);
         PickingCompleto := PickingDelProductoCompleto(prm_Almacen, prm_Producto);
 
-        Clear(ZonasGrupo);
-        if ZonaDestino = '' then
-            ZonasGrupo := ZonasGrupoIIEE(prm_Almacen, prm_Producto, grupo);
-
-        // Con zonas de su grupo IIEE, primero en ellas; si no cabe, en el resto del almacén.
         codigo := ProponerPorTipos(prm_Estrategia, prm_Excluidas, prm_Almacen, prm_Producto, prm_Lote, entrada, prm_Motivo);
-        if ZonasGrupo.Count() > 0 then begin
-            Clear(ZonasGrupo);
-            if codigo <> '' then
-                prm_Motivo := StrSubstNo(ZonaGrupoTxt, grupo, prm_Motivo)
-            else begin
-                codigo := ProponerPorTipos(prm_Estrategia, prm_Excluidas, prm_Almacen, prm_Producto, prm_Lote, entrada, prm_Motivo);
-                if codigo <> '' then
-                    prm_Motivo := StrSubstNo(FueraZonaGrupoTxt, grupo, prm_Motivo);
-            end;
-        end;
 
         // Sin hueco, el porqué depende de la estrategia: las que solo miran una clase de hueco
         // dicen eso, no el recuento general (que contaría como válidos huecos que no buscan).
@@ -515,46 +605,6 @@ codeunit 51101 "Gestion Ubicaciones SGA"
             end;
 
         exit(codigo);
-    end;
-
-    /// <summary>
-    /// Zonas del almacén asignadas al grupo IIEE del producto (campo "Grupo IIEE" de la zona y de
-    /// la ficha del producto). Vacía si el producto no tiene grupo o el grupo no tiene zonas. En
-    /// prm_Grupo, el grupo del producto.
-    /// </summary>
-    local procedure ZonasGrupoIIEE(prm_Almacen: Code[10]; prm_Producto: Code[20]; var prm_Grupo: Code[20]) zonas: List of [Code[10]]
-    var
-        rItem: Record Item;
-        rZona: Record "Zona SGA";
-    begin
-        prm_Grupo := '';
-        rItem.SetLoadFields("Grupo IIEE");
-        if rItem.Get(prm_Producto) then
-            prm_Grupo := rItem."Grupo IIEE";
-        if prm_Grupo = '' then
-            exit;
-        rZona.SetRange("Cod. Almacen", prm_Almacen);
-        rZona.SetRange("Grupo IIEE", prm_Grupo);
-        rZona.SetLoadFields(Code);
-        if rZona.FindSet() then
-            repeat
-                zonas.Add(rZona.Code);
-            until rZona.Next() = 0;
-    end;
-
-    /// <summary>
-    /// Si la ubicación queda fuera de las zonas del grupo IIEE del producto, cuando ese grupo
-    /// tiene zonas en el almacén. Es el aviso que se confirma al ubicar o mover a mano. En
-    /// prm_Grupo, el grupo del producto.
-    /// </summary>
-    procedure FueraDeZonasGrupoIIEE(var prm_Ubicacion: Record "Ubicacion SGA"; prm_Producto: Code[20]; var prm_Grupo: Code[20]): Boolean
-    var
-        zonas: List of [Code[10]];
-    begin
-        zonas := ZonasGrupoIIEE(prm_Ubicacion."Cod. Almacen", prm_Producto, prm_Grupo);
-        if zonas.Count() = 0 then
-            exit(false);
-        exit(not zonas.Contains(prm_Ubicacion."Cod. Zona SGA"));
     end;
 
     /// <summary>
@@ -821,7 +871,6 @@ codeunit 51101 "Gestion Ubicaciones SGA"
             // (SSCCPale lo deja en la variable, no en la tabla).
             sscc := TempLinea.SSCCPale();
             ssccs.Add(sscc);
-            cContenido.FijarPropuesta(TempLinea."Ubicacion Propuesta");
             cContenido.RegistrarEntrada(prm_Almacen, TempLinea."Ubicacion Confirmada", prm_Producto, prm_Lote,
                                         sscc, TempLinea."Cod. Unidad Medida", TempLinea.Cantidad, "Origen Mov. SGA"::Manual, '', UbicadoGuiadoLbl);
         end;
@@ -875,7 +924,7 @@ codeunit 51101 "Gestion Ubicaciones SGA"
         SinSitioTxt: Label ' %1 llenas o sin sitio;', Comment = '%1 = número';
         OtroProductoTxt: Label ' %1 con otro producto (no aceptan mezcla);', Comment = '%1 = número';
         OtroLoteTxt: Label ' %1 con otro lote (no aceptan mezcla de lotes);', Comment = '%1 = número';
-        ReubicacionTxt: Label ' %1 vacías, esperando una reubicación de otro producto;', Comment = '%1 = número';
+        ReubicacionTxt: Label ' %1 vacías, esperando una reposición de otro producto;', Comment = '%1 = número';
         PickingCompletoTxt: Label ' %1 de picking, porque el producto ya ocupa todas las ubicaciones de picking que se le permiten;', Comment = '%1 = número';
         YaPropuestasTxt: Label ' %1 con sitio, pero descartadas en esta búsqueda (ya propuestas a otras líneas o la ubicación de origen);', Comment = '%1 = número';
         NoVaciasTxt: Label ' %1 con sitio, pero no vacías (aquí solo se usan huecos vacíos);', Comment = '%1 = número';
@@ -1238,26 +1287,8 @@ codeunit 51101 "Gestion Ubicaciones SGA"
         prm_Ubicacion.SetRange(Bloqueada, false);
         if ZonaDestino <> '' then
             prm_Ubicacion.SetRange("Cod. Zona SGA", ZonaDestino);
-        if ZonasGrupo.Count() > 0 then
-            prm_Ubicacion.SetFilter("Cod. Zona SGA", FiltroZonas(ZonasGrupo));
         if prm_Excluidas <> '' then
             prm_Ubicacion.SetFilter("Cod. Bin", prm_Excluidas);
-    end;
-
-    /// <summary>
-    /// Filtro de AL con las zonas de la lista ('A|B'). AddQuotes estándar entrecomilla la zona
-    /// que lleva algún carácter de filtro.
-    /// </summary>
-    local procedure FiltroZonas(prm_Zonas: List of [Code[10]]) filtro: Text
-    var
-        cSelectionFilterMgt: Codeunit SelectionFilterManagement;
-        zona: Code[10];
-    begin
-        foreach zona in prm_Zonas do begin
-            if filtro <> '' then
-                filtro += '|';
-            filtro += cSelectionFilterMgt.AddQuotes(zona);
-        end;
     end;
 
     /// <summary>
@@ -1312,9 +1343,6 @@ codeunit 51101 "Gestion Ubicaciones SGA"
             exit(3);
         // Fuera de la zona a la que se limita la búsqueda (ProponerEnZona), tampoco toca.
         if (ZonaDestino <> '') and (prm_Ubicacion."Cod. Zona SGA" <> ZonaDestino) then
-            exit(3);
-        // En la primera vuelta, solo las zonas del grupo IIEE del producto.
-        if (ZonasGrupo.Count() > 0) and not ZonasGrupo.Contains(prm_Ubicacion."Cod. Zona SGA") then
             exit(3);
         // El producto ya ocupa las ubicaciones de picking que se le permiten: solo donde ya está
         // o en las reservadas a él.
@@ -1520,9 +1548,6 @@ codeunit 51101 "Gestion Ubicaciones SGA"
         ParaReserva: Text;
         // Zona a la que ProponerEnZona limita la propuesta mientras dura; en blanco, todas.
         ZonaDestino: Code[10];
-        // Zonas del grupo IIEE del producto en la primera vuelta de ProponerUbicacionCon; vacía,
-        // todas.
-        ZonasGrupo: List of [Code[10]];
         // Tipo al que ProponerEnPicking limita la propuesta mientras dura; en blanco, almacenamiento
         // y luego picking.
         TipoForzado: Enum "Tipo Ubicacion SGA";

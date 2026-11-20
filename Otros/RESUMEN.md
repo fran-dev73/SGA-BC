@@ -1,6 +1,6 @@
 # SGA — Resumen para dirección de proyecto
 
-SGA es el módulo de gestión de ubicaciones del almacén dentro de Business Central. Documentos: [guía de uso](GUIA_USO_SGA.md), [manual de implantación](MANUAL_IMPLANTACION_SGA.md) y [documentación técnica](DOCUMENTACION_TECNICA_SGA.md), que incluye la arquitectura y las decisiones de almacén.
+SGA es el módulo de gestión de ubicaciones del almacén dentro de Business Central. Documentos: [manual de usuario](MANUAL_USUARIO_SGA.md), [manual de implantación](MANUAL_IMPLANTACION_SGA.md) y [documentación técnica](DOCUMENTACION_TECNICA_SGA.md), que incluye la arquitectura y las decisiones de almacén.
 
 ## Qué resuelve
 
@@ -25,9 +25,9 @@ SGA es el módulo de gestión de ubicaciones del almacén dentro de Business Cen
 | Puesta en marcha | Se generan las ubicaciones con tipo y capacidad, se imprimen sus etiquetas y se reparte el stock de BC con la carga inicial (simulando antes). |
 | Recepción de compra | Tras registrar el albarán, *Ubicar recepciones* propone un hueco por línea y el operario confirma. |
 | Producción | *Imprimir y ubicar palés* ubica cada palé al imprimir su etiqueta; *Ubicar ensamblados* recoge lo que falte. |
-| Venta | Oficina envía el pedido a picking, el preparador recoge parada a parada y la cantidad a enviar y los lotes pasan solos al pedido. |
-| PDA | En la app móvil de BC, con el rol *Preparador SGA (PDA)*: lee la ubicación de la etiqueta del hueco y la parada se confirma sola. |
-| Reparto del trabajo | Un responsable asigna órdenes y prioridades; los carretilleros reciben las reubicaciones y los preparadores los pedidos. |
+| Venta | Oficina envía el pedido a picking, el preparador recoge línea a línea y lo deja en la playa de la orden (una por defecto, cambiable antes de empezar), y la cantidad a enviar y los lotes pasan solos al pedido. |
+| PDA | En la app móvil de BC, con el rol *Preparador SGA (PDA)*: lee la ubicación de la etiqueta del hueco y la línea se confirma sola. |
+| Reparto del trabajo | Un responsable asigna órdenes y prioridades; los carretilleros reciben las reposiciones y los preparadores los pedidos. |
 | Control | La conciliación compara cada día ubicaciones contra stock de BC; las diferencias se corrigen con recuento o regularización. |
 
 ## Cómo se decide dónde va la mercancía
@@ -41,11 +41,11 @@ SGA es el módulo de gestión de ubicaciones del almacén dentro de Business Cen
 
 ## Cómo se repone el picking
 
-- En cuanto una ubicación de picking se queda **a cero** de un producto, por el movimiento que sea, se planifica sola su **reubicación** desde almacenamiento.
-- *Planificar reubicaciones* (a mano o programado) repone además los productos que no tienen nada en picking.
+- En cuanto una ubicación de picking se queda **a cero** de un producto, por el movimiento que sea, se planifica sola su **reposición** desde almacenamiento.
+- *Planificar reposiciones* (a mano o programado) repone además los productos que no tienen nada en picking.
 - Se trae **un palé como mucho**, a la misma ubicación de picking o a otra con sitio, que queda guardada para ese producto.
 - Se prepara como un picking: los usuarios marcados como **Carretillero SGA** las reciben con *Siguiente orden*.
-- **Coste aceptado**: entre que se vacía el picking y llega la reubicación, una venta de ese producto coge de almacenamiento.
+- **Coste aceptado**: entre que se vacía el picking y llega la reposición, una venta de ese producto coge de almacenamiento.
 
 ## Estado
 
@@ -55,8 +55,8 @@ SGA es el módulo de gestión de ubicaciones del almacén dentro de Business Cen
 - Carga inicial con simulación, *Pendiente de ubicar* e inicialización.
 - Entradas: recepciones de compra, ensamblados y palés de la línea.
 - Picking de venta completo: envío, asignación, prioridades, preparación, lectura de ubicación y paso al pedido.
-- Picking con PDA: escáner integrado en la app móvil de BC, confirmación de la parada al leer la ubicación y rol propio.
-- Reubicaciones y reparto entre preparadores y carretilleros.
+- Picking con PDA: escáner integrado en la app móvil de BC, confirmación de la línea al leer la ubicación y rol propio.
+- Reposiciones y reparto entre preparadores y carretilleros.
 - Consultas, mapa, mapa 3D con traslados arrastrando, conciliación, recuento y análisis ABC.
 
 **Pendiente de probar en sandbox**:
@@ -78,5 +78,5 @@ SGA es el módulo de gestión de ubicaciones del almacén dentro de Business Cen
 
 ## Decisiones abiertas
 
-1. **Reponer por mínimo en vez de al vaciarse.** Evitaría coger de almacenamiento mientras llega la reubicación, a cambio de poner cantidad mínima y máxima en cada hueco de picking.
+1. **Reponer por mínimo en vez de al vaciarse.** Evitaría coger de almacenamiento mientras llega la reposición, a cambio de poner cantidad mínima y máxima en cada hueco de picking.
 2. **Qué productos reponer primero cuando no hay picking para todos.** Se planifican en el orden en que salen; el que no encuentra hueco se queda sin planificar.

@@ -58,21 +58,29 @@ page 51118 "Ordenes Picking SGA"
                     ToolTip = 'Preparador que tiene asignada la orden.';
                     ApplicationArea = All;
                 }
+                field(Playa; Rec.Playa)
+                {
+                    ApplicationArea = All;
+                }
+                field("Descripcion Playa"; Rec."Descripcion Playa")
+                {
+                    ApplicationArea = All;
+                }
                 field("No. Lineas"; Rec."No. Lineas")
                 {
-                    ToolTip = 'Número de paradas del recorrido.';
+                    ToolTip = 'Número de líneas del recorrido.';
                     ApplicationArea = All;
                 }
                 field("Lineas Pendientes"; Rec."Lineas Pendientes")
                 {
-                    ToolTip = 'Paradas que quedan por recoger.';
+                    ToolTip = 'Líneas que quedan por recoger.';
                     ApplicationArea = All;
                 }
                 field("Paradas Retenidas"; Rec."Paradas Retenidas")
                 {
                     ApplicationArea = All;
                     Style = Unfavorable;
-                    DrillDownPageId = "Paradas Picking SGA";
+                    DrillDownPageId = "Lineas Picking SGA";
                 }
                 field(FechaCreacion; Rec.SystemCreatedAt)
                 {
@@ -109,7 +117,7 @@ page 51118 "Ordenes Picking SGA"
             action(Preparar)
             {
                 Caption = 'Preparar';
-                ToolTip = 'Abre la pantalla que guía al preparador parada a parada. Con asignación exigida, solo para el preparador asignado; si no, la orden pasa a ser suya.';
+                ToolTip = 'Abre la pantalla que guía al preparador línea a línea. Con asignación exigida, solo para el preparador asignado; si no, la orden pasa a ser suya.';
                 ApplicationArea = All;
                 Image = Warehouse;
 
@@ -170,10 +178,27 @@ page 51118 "Ordenes Picking SGA"
                     CurrPage.Update(false);
                 end;
             }
+            action(CambiarPlaya)
+            {
+                Caption = 'Cambiar playa';
+                ToolTip = 'Pone la playa que elija en las órdenes de venta seleccionadas que aún no se han empezado a preparar.';
+                ApplicationArea = All;
+                Image = Change;
+
+                trigger OnAction()
+                var
+                    rOrden: Record "Orden Picking SGA";
+                    cPicking: Codeunit "Gestion Picking SGA";
+                begin
+                    CurrPage.SetSelectionFilter(rOrden);
+                    cPicking.CambiarPlaya(rOrden);
+                    CurrPage.Update(false);
+                end;
+            }
             action(CancelarOrden)
             {
                 Caption = 'Cancelar orden';
-                ToolTip = 'Cancela la orden y todas sus paradas pendientes.';
+                ToolTip = 'Cancela la orden y todas sus líneas pendientes.';
                 ApplicationArea = All;
                 Image = Cancel;
 
@@ -219,6 +244,9 @@ page 51118 "Ordenes Picking SGA"
                 actionref(PasarAPedido_Promoted; PasarAPedido)
                 {
                 }
+                actionref(CambiarPlaya_Promoted; CambiarPlaya)
+                {
+                }
             }
         }
     }
@@ -243,7 +271,7 @@ page 51118 "Ordenes Picking SGA"
         }
         view(ConRetenidas)
         {
-            Caption = 'Con paradas retenidas';
+            Caption = 'Con líneas retenidas';
             Filters = where("Paradas Retenidas" = filter(> 0));
         }
         view(SinPasarAlPedido)

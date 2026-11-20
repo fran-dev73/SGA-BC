@@ -511,6 +511,7 @@ page 51107 "Mapa Almacen SGA"
                 ApplicationArea = All;
                 Image = BinContent;
                 RunObject = page "Ubicaciones SGA";
+                RunPageMode = View;
             }
         }
         area(Promoted)

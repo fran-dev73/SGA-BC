@@ -10,6 +10,9 @@ page 51101 "Ficha Ubicacion SGA"
     PageType = Card;
     SourceTable = "Ubicacion SGA";
     ApplicationArea = All;
+    // Alta y baja a mano desde la lista abierta en Configuración: al crear se crea también su
+    // ubicación de BC y al eliminar se elimina (OnInsert y OnDelete de la tabla). Abierta desde
+    // Consultas va en modo Ver.
 
     layout
     {
@@ -26,7 +29,7 @@ page 51101 "Ficha Ubicacion SGA"
                 }
                 field("Cod. Bin"; Rec."Cod. Bin")
                 {
-                    ToolTip = 'Código de la ubicación en la topología pasillo-estantería-altura (101-15-03).';
+                    ToolTip = 'Código de la ubicación en la topología pasillo-estantería-altura (101-15-03). Al crear una ubicación nueva, también se crea en BC si no existe.';
                     ApplicationArea = All;
                 }
                 field(Descripcion; Rec.Descripcion)
@@ -37,7 +40,7 @@ page 51101 "Ficha Ubicacion SGA"
                 field("Cod. Zona SGA"; Rec."Cod. Zona SGA")
                 {
                     Editable = EsVacia;
-                    ToolTip = 'Zona a la que pertenece la ubicación. Al asignarla se heredan el tipo y la ruta de la zona.';
+                    ToolTip = 'Zona a la que pertenece la ubicación. Al asignarla toma la secuencia de picking de la zona si aún no tiene.';
                     ApplicationArea = All;
                 }
                 field("Tipo Ubicacion"; Rec."Tipo Ubicacion")
@@ -138,6 +141,10 @@ page 51101 "Ficha Ubicacion SGA"
                 {
                     Editable = EsVacia;
                     ToolTip = 'Si se desactiva, la ubicación solo puede contener un lote a la vez.';
+                    ApplicationArea = All;
+                }
+                field(Fondo; Rec.Fondo)
+                {
                     ApplicationArea = All;
                 }
                 field("Producto Fijo"; Rec."Producto Fijo")
@@ -257,5 +264,15 @@ page 51101 "Ficha Ubicacion SGA"
     trigger OnAfterGetCurrRecord()
     begin
         EsVacia := Rec.EstaVacia();
+    end;
+
+    trigger OnNewRecord(BelowxRec: Boolean)
+    var
+        rConfig: Record "Config. SGA";
+    begin
+        // Si la lista viene filtrada por un almacén, ya lo trae; si no, el de por defecto.
+        if Rec."Cod. Almacen" = '' then
+            Rec."Cod. Almacen" := rConfig.AlmacenODefecto('');
+        EsVacia := true;
     end;
 }

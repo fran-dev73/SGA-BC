@@ -34,25 +34,6 @@ table 51100 "Zona SGA"
             Caption = 'Descripción';
             DataClassification = ToBeClassified;
         }
-        field(50; "Tipo Ubicacion"; Enum "Tipo Ubicacion SGA")
-        {
-            Caption = 'Tipo ubicación';
-            DataClassification = ToBeClassified;
-            ToolTip = 'Tipo que se propone por defecto a las ubicaciones que se creen en esta zona.';
-
-            trigger OnValidate()
-            begin
-                // Las ubicaciones de una playa van sin tipo, para que nunca se propongan.
-                if Playa then
-                    TestField("Tipo Ubicacion", "Tipo Ubicacion"::" ");
-            end;
-        }
-        field(55; "Grupo IIEE"; Code[20])
-        {
-            Caption = 'Grupo IIEE';
-            DataClassification = ToBeClassified;
-            ToolTip = 'Grupo IIEE de los productos que se guardan en esta zona. Al ubicar un producto de ese grupo se buscan primero huecos en sus zonas y, si no queda sitio, en el resto del almacén. La zona sigue admitiendo cualquier producto. Un grupo puede tener varias zonas. El grupo del producto es el "Grupo IIEE" de su ficha.';
-        }
         field(70; "Prioridad Picking"; Integer)
         {
             Caption = 'Prioridad picking';
@@ -69,28 +50,19 @@ table 51100 "Zona SGA"
         {
             Caption = 'Playa';
             DataClassification = ToBeClassified;
-            ToolTip = 'Zona de playas: cada ubicación es una playa donde se dejan los pedidos preparados. Sus ubicaciones van sin tipo, así que nunca se proponen para ubicar ni reponer.';
+            ToolTip = 'La zona es una playa: donde se dejan los pedidos preparados. No lleva ubicaciones. Las órdenes de picking de venta nacen con la playa por defecto de la configuración y se cambian con Cambiar playa.';
 
             trigger OnValidate()
+            var
+                rUbicacionSGA: Record "Ubicacion SGA";
+                PlayaConUbicacionesErr: Label 'La zona %1 tiene ubicaciones: una playa no lleva ubicaciones. Páselas a otra zona antes de marcarla como playa.', Comment = '%1 = zona';
             begin
-                if Playa then
-                    TestField("Tipo Ubicacion", "Tipo Ubicacion"::" ")
-                else
-                    "Ubicacion por Defecto" := '';
-            end;
-        }
-        field(96; "Ubicacion por Defecto"; Code[20])
-        {
-            Caption = 'Ubicación por defecto';
-            DataClassification = ToBeClassified;
-            TableRelation = "Ubicacion SGA"."Cod. Bin" where("Cod. Almacen" = field("Cod. Almacen"),
-                                                             "Cod. Zona SGA" = field(Code));
-            ToolTip = 'Playa en la que el preparador deja lo que recoge en el picking de venta. Se le indica en cada parada y al terminar la orden.';
-
-            trigger OnValidate()
-            begin
-                if "Ubicacion por Defecto" <> '' then
-                    TestField(Playa, true);
+                if not Playa then
+                    exit;
+                rUbicacionSGA.SetRange("Cod. Almacen", "Cod. Almacen");
+                rUbicacionSGA.SetRange("Cod. Zona SGA", Code);
+                if not rUbicacionSGA.IsEmpty() then
+                    Error(PlayaConUbicacionesErr, Code);
             end;
         }
         field(100; "No. Ubicaciones"; Integer)
@@ -113,7 +85,7 @@ table 51100 "Zona SGA"
 
     fieldgroups
     {
-        fieldgroup(DropDown; Code, Descripcion, "Tipo Ubicacion")
+        fieldgroup(DropDown; Code, Descripcion)
         {
         }
     }
@@ -130,20 +102,20 @@ table 51100 "Zona SGA"
     end;
 
     /// <summary>
-    /// Playa en la que se deja lo preparado en el almacén: la ubicación por defecto de su zona
-    /// de playas. En blanco si no tiene.
+    /// Para quien mete ubicaciones en una zona: error si la zona es una playa, que no lleva
+    /// ubicaciones. Sin zona o con una zona que no existe no hace nada.
     /// </summary>
-    procedure PlayaPorDefecto(prm_Almacen: Code[10]): Code[20]
+    procedure ComprobarAdmiteUbicaciones(prm_Almacen: Code[10]; prm_Zona: Code[10])
     var
         rZona: Record "Zona SGA";
+        PlayaSinUbicacionesErr: Label 'La zona %1 es una playa y no lleva ubicaciones.', Comment = '%1 = zona';
     begin
-        rZona.SetRange("Cod. Almacen", prm_Almacen);
-        rZona.SetRange(Playa, true);
-        rZona.SetFilter("Ubicacion por Defecto", '<>%1', '');
-        rZona.SetLoadFields("Ubicacion por Defecto");
-        if rZona.FindFirst() then
-            exit(rZona."Ubicacion por Defecto");
-        exit('');
+        if prm_Zona = '' then
+            exit;
+        rZona.SetLoadFields(Playa);
+        if rZona.Get(prm_Almacen, prm_Zona) then
+            if rZona.Playa then
+                Error(PlayaSinUbicacionesErr, prm_Zona);
     end;
 
     /// <summary>

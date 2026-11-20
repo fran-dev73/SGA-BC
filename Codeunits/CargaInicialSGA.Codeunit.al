@@ -139,7 +139,7 @@ codeunit 51106 "Carga Inicial SGA"
             rConfig.ObtenerConfig();
             if rConfig."Fecha Inicio SGA" = 0D then
                 Error(FechaInicioObligatoriaErr);
-            cStock.CargarPendienteUbicar(Almacen, TempPendientes);
+            cStock.CargarPendienteUbicar(Almacen, VistaProductos, 0D, TempPendientes);
         end;
 
         TempResultado.Reset();

@@ -3,17 +3,17 @@ namespace AntonioNadal.SGA;
 using System.Utilities;
 
 /// <summary>
-/// Page Reubicaciones SGA (ID 51132).
+/// Page Reposiciones SGA (ID 51132).
 /// Las reubicaciones de almacenamiento a picking: las paradas de las órdenes de origen
 /// Reposicion (las que llevan ubicación destino). Por defecto, las que quedan por hacer.
 ///
-/// Desde aquí se planifican las que falten (Cod. "Reubicaciones SGA".PlanificarAlmacen), se
+/// Desde aquí se planifican las que falten (Cod. "Reposiciones SGA".PlanificarAlmacen), se
 /// abre la preparación de su orden y se cancelan. Se planifican también solas al vaciar un
-/// picking y, si se programa, con la cola de proyectos (Cod. "Reubicaciones SGA").
+/// picking y, si se programa, con la cola de proyectos (Cod. "Reposiciones SGA").
 /// </summary>
-page 51132 "Reubicaciones SGA"
+page 51132 "Reposiciones SGA"
 {
-    Caption = 'Reubicaciones SGA';
+    Caption = 'Reposiciones SGA';
     PageType = List;
     ApplicationArea = All;
     UsageCategory = Lists;
@@ -32,11 +32,11 @@ page 51132 "Reubicaciones SGA"
             {
                 field("No. Orden"; Rec."No. Orden")
                 {
-                    ToolTip = 'Orden de reubicaciones en la que va. Se prepara como un picking.';
+                    ToolTip = 'Orden de reposiciones en la que va. Se prepara como un picking.';
                 }
                 field(Estado; Rec.Estado)
                 {
-                    ToolTip = 'Si la reubicación está por hacer, a medias, hecha o cancelada.';
+                    ToolTip = 'Si la reposición está por hacer, a medias, hecha o cancelada.';
                     StyleExpr = EstiloFila;
                 }
                 field("No. Producto"; Rec."No. Producto")
@@ -104,23 +104,23 @@ page 51132 "Reubicaciones SGA"
         {
             action(Planificar)
             {
-                Caption = 'Planificar reubicaciones';
+                Caption = 'Planificar reposiciones';
                 ToolTip = 'Planifica traer de almacenamiento cada producto que no tiene nada en picking y sí en almacenamiento, a su ubicación de picking o a la primera libre.';
                 Image = CalculatePlan;
 
                 trigger OnAction()
                 var
-                    cReubicaciones: Codeunit "Reubicaciones SGA";
-                    PlanificadasMsg: Label 'Reubicaciones planificadas: %1.', Comment = '%1 = número';
+                    cReposiciones: Codeunit "Reposiciones SGA";
+                    PlanificadasMsg: Label 'Reposiciones planificadas: %1.', Comment = '%1 = número';
                 begin
-                    Message(PlanificadasMsg, cReubicaciones.PlanificarAlmacen());
+                    Message(PlanificadasMsg, cReposiciones.PlanificarAlmacen());
                     CurrPage.Update(false);
                 end;
             }
             action(Preparar)
             {
                 Caption = 'Preparar';
-                ToolTip = 'Abre la pantalla de preparación con las reubicaciones pendientes de la orden de esta línea.';
+                ToolTip = 'Abre la pantalla de preparación con las reposiciones pendientes de la orden de esta línea.';
                 Image = Start;
 
                 trigger OnAction()
@@ -136,14 +136,14 @@ page 51132 "Reubicaciones SGA"
             action(Cancelar)
             {
                 Caption = 'Cancelar';
-                ToolTip = 'Cancela la reubicación y libera el stock que tenía reservado. Lo ya llevado no se deshace.';
+                ToolTip = 'Cancela la reposición y libera el stock que tenía reservado. Lo ya llevado no se deshace.';
                 Image = Cancel;
 
                 trigger OnAction()
                 var
                     cPicking: Codeunit "Gestion Picking SGA";
                     cConfirmMgt: Codeunit "Confirm Management";
-                    CancelarQst: Label '¿Cancelar la reubicación de %1 de %2 a %3?', Comment = '%1 = producto, %2 = ubicación origen, %3 = ubicación destino';
+                    CancelarQst: Label '¿Cancelar la reposición de %1 de %2 a %3?', Comment = '%1 = producto, %2 = ubicación origen, %3 = ubicación destino';
                 begin
                     if not cConfirmMgt.GetResponseOrDefault(StrSubstNo(CancelarQst, Rec."No. Producto", Rec."Cod. Bin Propuesto", Rec."Cod. Bin Destino"), false) then
                         exit;
@@ -157,7 +157,7 @@ page 51132 "Reubicaciones SGA"
             action(VerOrden)
             {
                 Caption = 'Orden';
-                ToolTip = 'Abre la orden de esta reubicación: preparador asignado, prioridad y avance.';
+                ToolTip = 'Abre la orden de esta reposición: preparador asignado, prioridad y avance.';
                 Image = Document;
                 RunObject = page "Ficha Orden Picking SGA";
                 RunPageLink = "No. Orden" = field("No. Orden");

@@ -45,10 +45,10 @@ page 51133 "Rol Center Preparador SGA"
             }
             action(Reubicaciones)
             {
-                Caption = 'Reubicaciones';
+                Caption = 'Reposiciones';
                 ToolTip = 'Lo que hay que llevar de almacenamiento a picking.';
                 ApplicationArea = All;
-                RunObject = page "Reubicaciones SGA";
+                RunObject = page "Reposiciones SGA";
             }
             action(DondeEsta)
             {

@@ -28,7 +28,7 @@ page 51135 "Cue Preparador SGA"
                 }
                 field("Mis Reubicaciones"; Rec."Mis Reubicaciones")
                 {
-                    ToolTip = 'Reubicaciones asignadas a usted que quedan por terminar.';
+                    ToolTip = 'Reposiciones asignadas a usted que quedan por terminar.';
                     ApplicationArea = All;
                 }
                 field("Ordenes Disponibles"; Rec."Ordenes Disponibles")
@@ -40,7 +40,7 @@ page 51135 "Cue Preparador SGA"
                 // Al carretillero "Siguiente orden" solo le da reubicaciones: se le cuentan esas.
                 field("Reubicaciones Disponibles"; Rec."Reubicaciones Disponibles")
                 {
-                    ToolTip = 'Reubicaciones sin asignar que puede coger con Siguiente orden.';
+                    ToolTip = 'Reposiciones sin asignar que puede coger con Siguiente orden.';
                     ApplicationArea = All;
                     Visible = (not ExigeAsignacion) and Carretillero;
                 }

@@ -225,14 +225,17 @@ codeunit 51103 "Consulta Stock SGA"
     /// documento; si se ubicara por otro lado, lo volverían a pedir. Lo que queda (A Ubicar)
     /// no tiene documento que lo reclame: restos de una carga inicial, ajustes, etc.
     ///
-    /// Solo cuenta los productos de tipo Inventario con existencias en el almacén, y solo mira los
-    /// documentos de los lotes que tienen algo sin ubicar.
+    /// Solo cuenta los productos de tipo Inventario con existencias en el almacén; los marcados
+    /// como "Producto Tianna" ni los de la categoría 820 nunca. Con prm_EntradoDesde, de cada
+    /// lote solo cuenta lo que queda de lo entrado desde esa fecha (lo de antes lo coloca la carga inicial); en blanco,
+    /// todo. Solo mira los documentos de los lotes que tienen algo sin ubicar.
     ///
-    /// El stock y el contenido de todo el almacén se leen de una vez (dos consultas, no dos por
-    /// producto). Las existencias de un producto son la suma de sus lotes: lo que queda en los
-    /// movimientos abiertos suma lo mismo que su Inventory.
+    /// Si prm_VistaProductos (GetView de Item) trae filtros, solo se leen el stock y el contenido
+    /// de los productos que los cumplen, uno a uno. Sin filtros, los de todo el almacén se leen de
+    /// una vez (dos consultas, no dos por producto). Las existencias de un producto son la suma de
+    /// sus lotes: lo que queda en los movimientos abiertos suma lo mismo que su Inventory.
     /// </summary>
-    procedure CargarPendienteUbicar(prm_Almacen: Code[10]; var prm_Pendiente: Record "Buffer Conciliacion SGA" temporary): Integer
+    procedure CargarPendienteUbicar(prm_Almacen: Code[10]; prm_VistaProductos: Text; prm_EntradoDesde: Date; var prm_Pendiente: Record "Buffer Conciliacion SGA" temporary): Integer
     var
         rItem: Record Item;
         TempStock: Record "Buffer Conciliacion SGA" temporary;
@@ -245,23 +248,47 @@ codeunit 51103 "Consulta Stock SGA"
         productoCuenta: Boolean;
         suma: Decimal;
         cantidadDoc: Decimal;
+        stockDesde: Decimal;
         lineas: Integer;
         PendienteNoTemporalErr: Label 'El pendiente de ubicar solo se calcula sobre una tabla temporal.';
         TituloLbl: Label 'Calculando lo pendiente de ubicar…';
         LeyendoStockLbl: Label 'Leyendo el stock y las ubicaciones del almacén';
-        ProductoLbl: Label 'Producto %1', Comment = '%1 = nº de producto';
+        LeyendoProductoLbl: Label 'Leyendo stock del producto %1', Comment = '%1 = nº de producto';
+        CategoriaExcluidaTok: Label '820', Locked = true;
+        ProductoLbl: Label 'Revisando lotes del producto %1', Comment = '%1 = nº de producto';
     begin
         if not prm_Pendiente.IsTemporary() then
             Error(PendienteNoTemporalErr);
         prm_Pendiente.Reset();
         prm_Pendiente.DeleteAll();
 
-        // Se enseña en qué va: las dos lecturas del almacén y luego lote a lote.
+        // Se enseña en qué va: la lectura del stock (de todo el almacén o producto a producto) y
+        // luego lote a lote.
         cVentana.Abrir(TituloLbl, 0);
-        cVentana.Fase(LeyendoStockLbl);
 
-        AcumularStockPorLote('', prm_Almacen, TempStock);
-        AcumularContenidoUbicado('', prm_Almacen, TempStock);
+        if prm_VistaProductos <> '' then
+            rItem.SetView(prm_VistaProductos);
+        if rItem.GetFilters() = '' then begin
+            cVentana.Fase(LeyendoStockLbl);
+            AcumularStockPorLote('', prm_Almacen, TempStock);
+            AcumularContenidoUbicado('', prm_Almacen, TempStock);
+        end else begin
+            // Tipo, Tianna y categoría van en otro grupo para no sustituir un filtro que traiga la
+            // vista.
+            rItem.FilterGroup(2);
+            rItem.SetRange(Type, rItem.Type::Inventory);
+            rItem.SetRange("Producto Tianna", false);
+            rItem.SetFilter("Item Category Code", '<>%1', CategoriaExcluidaTok);
+            rItem.FilterGroup(0);
+            rItem.SetLoadFields("No.");
+            cVentana.FijarTotal(rItem.Count());
+            if rItem.FindSet() then
+                repeat
+                    cVentana.Avanzar(StrSubstNo(LeyendoProductoLbl, rItem."No."));
+                    AcumularStockPorLote(rItem."No.", prm_Almacen, TempStock);
+                    AcumularContenidoUbicado(rItem."No.", prm_Almacen, TempStock);
+                until rItem.Next() = 0;
+        end;
 
         if TempStock.FindSet() then
             repeat
@@ -278,7 +305,8 @@ codeunit 51103 "Consulta Stock SGA"
         end;
         cVentana.FijarTotal(TempStock.Count());
 
-        rItem.SetLoadFields(Type);
+        rItem.Reset();
+        rItem.SetLoadFields(Type, "Producto Tianna", "Item Category Code");
         producto := '';
         repeat
             cVentana.Avanzar(StrSubstNo(ProductoLbl, TempStock."No. Producto"));
@@ -287,12 +315,18 @@ codeunit 51103 "Consulta Stock SGA"
                 productoCuenta := false;
                 if existencias.Get(producto) > 0 then
                     if rItem.Get(producto) then
-                        productoCuenta := rItem.IsInventoriableType();
+                        productoCuenta := rItem.IsInventoriableType() and not rItem."Producto Tianna" and
+                                          (rItem."Item Category Code" <> CategoriaExcluidaTok);
             end;
 
             if productoCuenta then begin
                 prm_Pendiente := TempStock;
                 prm_Pendiente.CalcularDiferencia();
+                if (prm_Pendiente.Diferencia > 0) and (prm_EntradoDesde <> 0D) then begin
+                    stockDesde := StockEntradoDesde(producto, prm_Almacen, TempStock."No. Lote", prm_EntradoDesde);
+                    if prm_Pendiente.Diferencia > stockDesde then
+                        prm_Pendiente.Diferencia := stockDesde;
+                end;
                 if prm_Pendiente.Diferencia > 0 then begin
                     prm_Pendiente."Fecha Caducidad" := CaducidadLote(producto, TempStock."No. Lote");
 
@@ -308,6 +342,24 @@ codeunit 51103 "Consulta Stock SGA"
 
         cVentana.Cerrar();
         exit(lineas);
+    end;
+
+    /// <summary>
+    /// Lo que le queda al lote en el almacén de las entradas registradas desde prm_Fecha, en
+    /// unidad base: lo pendiente del lote nunca pasa de aquí.
+    /// </summary>
+    local procedure StockEntradoDesde(prm_Producto: Code[20]; prm_Almacen: Code[10]; prm_Lote: Code[50]; prm_Fecha: Date): Decimal
+    var
+        rMov: Record "Item Ledger Entry";
+    begin
+        rMov.SetRange("Item No.", prm_Producto);
+        rMov.SetRange(Open, true);
+        rMov.SetRange(Positive, true);
+        rMov.SetRange("Location Code", prm_Almacen);
+        rMov.SetRange("Lot No.", prm_Lote);
+        rMov.SetFilter("Posting Date", '>=%1', prm_Fecha);
+        rMov.CalcSums("Remaining Quantity");
+        exit(rMov."Remaining Quantity");
     end;
 
     /// <summary>

@@ -1,7 +1,7 @@
 namespace AntonioNadal.SGA;
 
 /// <summary>
-/// Codeunit Reubicaciones SGA (ID 51113).
+/// Codeunit Reposiciones SGA (ID 51113).
 /// Decide qué hay que llevar de almacenamiento a picking y adónde, siempre que haya stock
 /// disponible en almacenamiento. Se planifica:
 ///   - en cuanto una ubicación de picking se queda a cero de un producto (ReubicarSiSeVacia, que
@@ -20,7 +20,7 @@ namespace AntonioNadal.SGA;
 /// AnadirReubicacion): reserva el stock de origen, se asigna, se prepara y se confirma como
 /// cualquier picking, y al confirmarla se traslada el stock al destino.
 /// </summary>
-codeunit 51113 "Reubicaciones SGA"
+codeunit 51113 "Reposiciones SGA"
 {
     Access = Public;
 

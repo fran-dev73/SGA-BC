@@ -94,7 +94,8 @@ codeunit 51102 "Gestion Mapa SGA"
     ///   y, solo si tiene contenido, de todas sus líneas: pp = productos (sin repetir, para
     ///   buscar), fc = caducidad más próxima (aaaa-mm-dd, vacía si ninguna lleva) y
     ///   r = mejor clase ABC de sus productos (1 A, 2 B, 3 C, 0 sin clase);
-    ///   ch = clase del hueco por su posición (1 A, 2 B, 3 C, 0 si no es hueco útil).
+    ///   ch = clase del hueco por su posición (1 A, 2 B, 3 C, 0 si no es hueco útil),
+    ///   f = 1 si es fondo de pasillo (solo si lo es).
     /// Las dos clases son del cálculo ABC prm_NoCalculoABC (0 = el último del almacén).
     /// Las claves son cortas porque el JSON viaja entero al navegador y un almacén grande
     /// son más de mil ubicaciones. Con prm_Pasillo distinto de 0, solo las de ese pasillo.
@@ -156,6 +157,8 @@ codeunit 51102 "Gestion Mapa SGA"
                     if not clasesHueco.Get(rUbicacionSGA."Cod. Bin", claseHueco) then
                         claseHueco := 0;
                     elemento.Add('ch', claseHueco);
+                    if rUbicacionSGA.Fondo then
+                        elemento.Add('f', 1);
                     motivoSinMedir := '';
                     if rUbicacionSGA."Lineas Contenido" > 0 then begin
                         elemento.Add('k', ContenidoParaMapa(rUbicacionSGA, sinUnidad, clasesABC, motivoSinMedir, productos, caducidad, claseABC));

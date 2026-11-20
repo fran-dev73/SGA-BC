@@ -130,12 +130,16 @@ var SGA3D = (function () {
     // estado manda sobre todo menos bloqueada.
     var COLOR_RESERVADA = '#14b8a6';
 
+    // Fondo de pasillo (u.f, lo manda AL): en el color por estado, su propio tono, con la parte
+    // oscura hasta donde está ocupado. Bloqueada, reservada, sobrepasada y sin medir mandan.
+    var COLOR_FONDO = '#ec4899';
+
     // Criterios de color. Cada uno da, para una ubicación, el color base y la entrada de su
     // leyenda. Las vacías van siempre en el gris de vacía.
     var CRITERIOS = {
         estado: {
             nombre: 'Estado',
-            leyenda: [['#d9dde3', 'vacía'], ['#7cc47f', 'con hueco'], ['#e8a33d', 'llena'], ['#9a3412', 'sobrepasada'], ['#d9534f', 'bloqueada'], [COLOR_RESERVADA, 'reservada'], ['#a5b4fc', 'sin medir']]
+            leyenda: [['#d9dde3', 'vacía'], ['#7cc47f', 'con hueco'], ['#e8a33d', 'llena'], ['#9a3412', 'sobrepasada'], ['#d9534f', 'bloqueada'], [COLOR_RESERVADA, 'reservada'], ['#a5b4fc', 'sin medir'], [COLOR_FONDO, 'fondo de pasillo']]
         },
         posicion: {
             nombre: 'Posición ABC',
@@ -650,6 +654,7 @@ var SGA3D = (function () {
             // sobrepasada.
             if (u.s !== 3 && u.v) { return paleta(COLOR_RESERVADA); }
             if (u.s !== 3 && u.s !== 4 && u.l && u.o > 100) { return PALETA[5]; }
+            if (u.f && u.s !== 3 && u.s !== 4) { return paleta(COLOR_FONDO); }
             return PALETA[u.s] || PALETA[0];
         }
         // Por posición se pintan todas, vacías también: es la clase del hueco, no de lo que tiene.
@@ -1520,6 +1525,7 @@ var SGA3D = (function () {
         }
         // Rotación y caducidad más próxima de todo lo que hay, no solo de las líneas listadas.
         var resumen = [];
+        if (u.f) { resumen.push('Fondo de pasillo'); }
         if (u.z) { resumen.push('Zona ' + u.z); }
         if (u.ch) { resumen.push('Hueco ' + 'ABC'.charAt(u.ch - 1)); }
         if (u.r) { resumen.push('Rotación ' + 'ABC'.charAt(u.r - 1)); }

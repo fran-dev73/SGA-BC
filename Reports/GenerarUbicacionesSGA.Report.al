@@ -11,8 +11,8 @@ using System.Utilities;
 /// estantería van de uno en uno; la altura, de 10 en 10 desde la inicial sin pasar de la
 /// final (00, 10, 20…).
 ///
-/// Se genera por almacén y zona: las ubicaciones nuevas nacen en la zona indicada, que
-/// propone su tipo de ubicación. Sin zona, quedan sin zona.
+/// Se genera por almacén y zona: las ubicaciones nuevas nacen en la zona indicada y con el
+/// tipo indicado. Sin zona, quedan sin zona.
 ///
 /// Es idempotente: lo que ya existe no se toca, así que se puede volver a ejecutar para
 /// ampliar el almacén.
@@ -119,7 +119,7 @@ report 51100 "Generar Ubicaciones SGA"
                     field(Zona; codZona)
                     {
                         Caption = 'Zona';
-                        ToolTip = 'Zona del almacén en la que nacen las ubicaciones creadas. Al elegirla se propone su tipo de ubicación, si lo tiene. Las ubicaciones que ya existen no cambian de zona. En blanco, se crean sin zona.';
+                        ToolTip = 'Zona del almacén en la que nacen las ubicaciones creadas. Las ubicaciones que ya existen no cambian de zona. En blanco, se crean sin zona.';
                         ApplicationArea = All;
 
                         trigger OnLookup(var Text: Text): Boolean
@@ -133,11 +133,8 @@ report 51100 "Generar Ubicaciones SGA"
                         var
                             rZona: Record "Zona SGA";
                         begin
-                            if codZona = '' then
-                                exit;
-                            rZona.Get(codAlmacen, codZona);
-                            if rZona."Tipo Ubicacion" <> rZona."Tipo Ubicacion"::" " then
-                                enumTipoUbicacion := rZona."Tipo Ubicacion";
+                            if codZona <> '' then
+                                rZona.Get(codAlmacen, codZona);
                         end;
                     }
                 }

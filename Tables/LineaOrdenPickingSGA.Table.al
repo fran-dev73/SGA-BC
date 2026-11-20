@@ -80,7 +80,7 @@ table 51109 "Linea Orden Picking SGA"
             Caption = 'Nº documento origen';
             DataClassification = ToBeClassified;
             Editable = false;
-            ToolTip = 'Pedido de venta del que sale la parada. Es el mismo de la cabecera de la orden; se repite aquí para poder sumar lo preparado por línea de pedido.';
+            ToolTip = 'Pedido de venta del que sale la línea. Es el mismo de la cabecera de la orden; se repite aquí para poder sumar lo preparado por línea de pedido.';
         }
         field(40; "Cod. Unidad Medida"; Code[10])
         {
@@ -91,7 +91,7 @@ table 51109 "Linea Orden Picking SGA"
         {
             Caption = 'UM pedido';
             DataClassification = ToBeClassified;
-            ToolTip = 'Unidad de medida de la línea del pedido. Es la que ve el preparador: las cantidades de la parada se guardan en UM base.';
+            ToolTip = 'Unidad de medida de la línea del pedido. Es la que ve el preparador: las cantidades de la línea se guardan en UM base.';
         }
         field(42; "Ctdad. por UM Documento"; Decimal)
         {
@@ -150,7 +150,7 @@ table 51109 "Linea Orden Picking SGA"
             DataClassification = ToBeClassified;
             TableRelation = Bin.Code where("Location Code" = field("Cod. Almacen"));
             Editable = false;
-            ToolTip = 'En una reubicación, ubicación de picking en la que se deja lo recogido. En blanco en el picking de un pedido.';
+            ToolTip = 'En una reposición, ubicación de picking en la que se deja lo recogido. En blanco en el picking de un pedido.';
         }
         field(70; Estado; Enum "Estado Linea Picking SGA")
         {
@@ -168,7 +168,7 @@ table 51109 "Linea Orden Picking SGA"
         {
             Caption = 'Nº línea origen';
             DataClassification = ToBeClassified;
-            ToolTip = 'Línea del documento origen que ha generado esta parada.';
+            ToolTip = 'Línea del documento origen que ha generado esta línea.';
         }
         field(100; "Fecha Confirmacion"; DateTime)
         {
@@ -187,35 +187,35 @@ table 51109 "Linea Orden Picking SGA"
             Caption = 'Veces saltada';
             DataClassification = ToBeClassified;
             Editable = false;
-            ToolTip = 'Cuántas veces el preparador ha pulsado Saltar en esta parada. A la segunda queda retenida.';
+            ToolTip = 'Cuántas veces el preparador ha pulsado Saltar en esta línea. A la segunda queda retenida.';
         }
         field(111; Retenida; Boolean)
         {
             Caption = 'Retenida';
             DataClassification = ToBeClassified;
             Editable = false;
-            ToolTip = 'La parada se ha saltado dos veces: algo impide recogerla. El preparador ya no la ve y sigue pendiente hasta que el jefe de almacén la resuelva desde Paradas retenidas.';
+            ToolTip = 'La línea se ha saltado dos veces: algo impide recogerla. El preparador ya no la ve y sigue pendiente hasta que el jefe de almacén la resuelva desde Líneas retenidas.';
         }
         field(112; "Fecha Retencion"; DateTime)
         {
             Caption = 'Fecha retención';
             DataClassification = ToBeClassified;
             Editable = false;
-            ToolTip = 'Momento en que la parada quedó retenida.';
+            ToolTip = 'Momento en que la línea quedó retenida.';
         }
         field(113; "Retenida por"; Code[50])
         {
             Caption = 'Retenida por';
             DataClassification = EndUserIdentifiableInformation;
             Editable = false;
-            ToolTip = 'Preparador que saltó la parada por segunda vez.';
+            ToolTip = 'Preparador que saltó la línea por segunda vez.';
         }
         field(114; Desvio; Boolean)
         {
             Caption = 'Desvío';
             DataClassification = ToBeClassified;
             Editable = false;
-            ToolTip = 'La parada se ha recogido de una ubicación distinta de la propuesta. Se guarda al confirmarla para poder contar los desvíos.';
+            ToolTip = 'La línea se ha recogido de una ubicación distinta de la propuesta. Se guarda al confirmarla para poder contar los desvíos.';
         }
     }
 

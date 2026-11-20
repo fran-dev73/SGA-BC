@@ -97,7 +97,7 @@
         if (!datos) { return; }
 
         if (datos.vacia) {
-            raiz.appendChild(nodo('div', 'pk-vacia', datos.mensaje || 'No hay paradas pendientes en esta orden.'));
+            raiz.appendChild(nodo('div', 'pk-vacia', datos.mensaje || 'No hay líneas pendientes en esta orden.'));
             // En turno se puede volver a buscar: el responsable puede haberle asignado otra.
             if (datos.enTurno) { raiz.appendChild(boton('BUSCAR SIGUIENTE ORDEN', 'pk-principal', 'siguiente')); }
             return;
