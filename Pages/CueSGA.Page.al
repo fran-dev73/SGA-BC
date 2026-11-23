@@ -33,19 +33,16 @@ page 51111 "Cue SGA"
                 {
                     ToolTip = 'Órdenes de picking abiertas que nadie ha empezado a recoger.';
                     ApplicationArea = All;
-                    DrillDownPageId = "Ordenes Picking SGA";
                 }
                 field("Ordenes En Proceso"; Rec."Ordenes En Proceso")
                 {
                     ToolTip = 'Órdenes de picking que se están recogiendo.';
                     ApplicationArea = All;
-                    DrillDownPageId = "Ordenes Picking SGA";
                 }
                 field("Ordenes Envio Vencido"; Rec."Ordenes Envio Vencido")
                 {
                     ToolTip = 'Órdenes de picking sin terminar cuyo pedido tiene la fecha de envío hoy o antes.';
                     ApplicationArea = All;
-                    DrillDownPageId = "Ordenes Picking SGA";
                     Style = Unfavorable;
                 }
                 field("Paradas Retenidas"; Rec."Paradas Retenidas")
@@ -59,7 +56,6 @@ page 51111 "Cue SGA"
                 {
                     ToolTip = 'Órdenes de venta terminadas cuyo resultado no se ha pasado al pedido. Hay que pasarlas a mano con Pasar al pedido.';
                     ApplicationArea = All;
-                    DrillDownPageId = "Ordenes Picking SGA";
                     Style = Unfavorable;
                 }
                 field("Reubicaciones Pendientes"; Rec."Reubicaciones Pendientes")
@@ -72,7 +68,6 @@ page 51111 "Cue SGA"
                 {
                     ToolTip = 'Órdenes de picking terminadas en la fecha de trabajo.';
                     ApplicationArea = All;
-                    DrillDownPageId = "Ordenes Picking SGA";
                     Style = Favorable;
                 }
                 field("Desvios Hoy"; Rec."Desvios Hoy")
@@ -91,33 +86,28 @@ page 51111 "Cue SGA"
                 {
                     ToolTip = 'Total de ubicaciones dadas de alta en SGA.';
                     ApplicationArea = All;
-                    DrillDownPageId = "Ubicaciones SGA";
                 }
                 field("Ubicaciones Vacias"; Rec."Ubicaciones Vacias")
                 {
                     ToolTip = 'Ubicaciones sin nada dentro, disponibles para ubicar.';
                     ApplicationArea = All;
-                    DrillDownPageId = "Ubicaciones SGA";
                     Style = Favorable;
                 }
                 field("Ubicaciones Parciales"; Rec."Ubicaciones Parciales")
                 {
                     ToolTip = 'Ubicaciones con contenido y hueco todavía disponible.';
                     ApplicationArea = All;
-                    DrillDownPageId = "Ubicaciones SGA";
                 }
                 field("Ubicaciones Llenas"; Rec."Ubicaciones Llenas")
                 {
                     ToolTip = 'Ubicaciones que han alcanzado su capacidad declarada.';
                     ApplicationArea = All;
-                    DrillDownPageId = "Ubicaciones SGA";
                     Style = Ambiguous;
                 }
                 field("Ubicaciones Bloqueadas"; Rec."Ubicaciones Bloqueadas")
                 {
                     ToolTip = 'Ubicaciones bloqueadas, que no admiten entradas ni se proponen para recoger.';
                     ApplicationArea = All;
-                    DrillDownPageId = "Ubicaciones SGA";
                     Style = Unfavorable;
                 }
             }
@@ -129,19 +119,16 @@ page 51111 "Cue SGA"
                 {
                     ToolTip = 'Combinaciones producto-lote-ubicación que hay en el almacén.';
                     ApplicationArea = All;
-                    DrillDownPageId = "Contenido Ubicaciones SGA";
                 }
                 field("Contenido Reservado"; Rec."Contenido Reservado")
                 {
                     ToolTip = 'Líneas de contenido con cantidad comprometida por órdenes de picking.';
                     ApplicationArea = All;
-                    DrillDownPageId = "Contenido Ubicaciones SGA";
                 }
                 field("Contenido Bloqueado"; Rec."Contenido Bloqueado")
                 {
                     ToolTip = 'Líneas de contenido bloqueadas, que el motor de picking no propone.';
                     ApplicationArea = All;
-                    DrillDownPageId = "Contenido Ubicaciones SGA";
                     Style = Unfavorable;
                 }
             }
@@ -155,7 +142,6 @@ page 51111 "Cue SGA"
                     Caption = 'Movimientos de hoy';
                     ToolTip = 'Movimientos de ubicación registrados en la fecha de trabajo.';
                     ApplicationArea = All;
-                    DrillDownPageId = "Movs. Ubicacion SGA";
                 }
             }
         }
@@ -164,6 +150,5 @@ page 51111 "Cue SGA"
     trigger OnOpenPage()
     begin
         Rec.ObtenerCue();
-        Rec.FiltrarCue();
     end;
 }

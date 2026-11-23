@@ -57,13 +57,34 @@ page 51121 "Preparar Picking SGA"
                 end;
 
                 trigger Cantidad(prm_Valor: Text)
+                var
+                    valor: Decimal;
                 begin
-                    LeerCantidad(prm_Valor);
+                    // Cantidad recogida en la unidad del pedido. 9 = formato XML: el punto
+                    // decimal, sea cual sea el idioma del usuario.
+                    if not Evaluate(valor, prm_Valor, 9) then
+                        exit;
+                    if valor < 0 then
+                        valor := 0;
+                    CantidadRecogida := valor;
                 end;
 
                 trigger Accion(prm_Accion: Text)
                 begin
-                    EjecutarAccion(prm_Accion);
+                    if prm_Accion = 'siguiente' then begin
+                        BuscarSiguienteOrden();
+                        exit;
+                    end;
+                    if not HayParada then
+                        exit;
+                    case prm_Accion of
+                        'confirmar':
+                            Confirmar();
+                        'saltar':
+                            Saltar();
+                        'sinstock':
+                            MarcarSinStock();
+                    end;
                 end;
             }
             // Escáner de la PDA. Sin interfaz: solo recibe lo leído.
@@ -149,11 +170,14 @@ page 51121 "Preparar Picking SGA"
     end;
 
     /// <summary>
-    /// Deja la pantalla lista para la parada actual.
+    /// Deja la pantalla lista para la parada actual, con el avance del recorrido.
     /// </summary>
     local procedure Preparar()
     var
         rOrden: Record "Orden Picking SGA";
+        total: Integer;
+        hechas: Integer;
+        ProgresoLbl: Label '%1 de %2 líneas', Comment = '%1 = líneas hechas, %2 = total de líneas';
     begin
         LineaMostrada := Rec."No. Linea";
         // Lo de un pedido se deja en la playa de su orden; una reubicación lleva su propio destino.
@@ -169,21 +193,11 @@ page 51121 "Preparar Picking SGA"
         CantidadRecogida := PendienteDocumento;
         UbicacionEscaneada := '';
         Avisar('', false);
-        CalcularProgreso();
-        Pintar();
-    end;
-
-    local procedure CalcularProgreso()
-    var
-        rOrden: Record "Orden Picking SGA";
-        total: Integer;
-        hechas: Integer;
-        ProgresoLbl: Label '%1 de %2 líneas', Comment = '%1 = líneas hechas, %2 = total de líneas';
-    begin
-        // Sin leer la orden: Progreso solo necesita el número, y con la pantalla vacía no lo hay.
+        // Progreso solo necesita el número: con la pantalla vacía no hay orden que leer.
         rOrden."No. Orden" := Rec."No. Orden";
         rOrden.Progreso(hechas, total);
         Progreso := StrSubstNo(ProgresoLbl, hechas, total);
+        Pintar();
     end;
 
     /// <summary>
@@ -233,35 +247,18 @@ page 51121 "Preparar Picking SGA"
     end;
 
     /// <summary>
-    /// Avisa si la ubicación de la que recoge no es la indicada. Que el desvío se admita o no
-    /// lo decide el motor al confirmar, según la configuración.
-    /// </summary>
-    local procedure ComprobarUbicacion()
-    var
-        rConfig: Record "Config. SGA";
-        DesvioUbicacionMsg: Label 'Esa no es la ubicación indicada (%1). Se registrará como desvío.', Comment = '%1 = ubicación indicada';
-        DesvioNoPermitidoErr: Label 'Esa no es la ubicación indicada (%1) y la configuración no permite desviarse.', Comment = '%1 = ubicación indicada';
-    begin
-        Avisar('', false);
-        if (UbicacionEscaneada = '') or (UbicacionEscaneada = Rec."Cod. Bin Propuesto") then
-            exit;
-
-        rConfig.ObtenerConfig();
-        if rConfig.DesvioPermitido(Rec."Cod. Bin Propuesto", UbicacionEscaneada) then
-            Avisar(StrSubstNo(DesvioUbicacionMsg, Rec."Cod. Bin Propuesto"), false)
-        else
-            Avisar(StrSubstNo(DesvioNoPermitidoErr, Rec."Cod. Bin Propuesto"), true);
-    end;
-
-    /// <summary>
     /// Lo escaneado o tecleado, o recibido del escáner de la app: la ubicación de la que recoge,
-    /// de la etiqueta del hueco. Si es válida, la parada se confirma sola.
+    /// de la etiqueta del hueco. Si no es la indicada, avisa: se registrará como desvío o, si la
+    /// configuración no lo permite, se vuelve a pedir. Si es válida, la parada se confirma sola.
     /// </summary>
     local procedure ProcesarLectura(prm_Lectura: Text)
     var
+        rConfig: Record "Config. SGA";
         cLectura: Codeunit "Codigos Barras SGA";
         bin: Code[20];
         NoEsUbicacionErr: Label '%1 no es una ubicación de este almacén. Escanee la etiqueta del hueco.', Comment = '%1 = lo leído';
+        DesvioUbicacionMsg: Label 'Esa no es la ubicación indicada (%1). Se registrará como desvío.', Comment = '%1 = ubicación indicada';
+        DesvioNoPermitidoErr: Label 'Esa no es la ubicación indicada (%1) y la configuración no permite desviarse.', Comment = '%1 = ubicación indicada';
     begin
         prm_Lectura := DelChr(prm_Lectura, '<>', ' ');
         if (prm_Lectura = '') or not HayParada then
@@ -273,51 +270,23 @@ page 51121 "Preparar Picking SGA"
             exit;
         end;
 
-        UbicacionEscaneada := bin;
-        ComprobarUbicacion();
-        // Un desvío no permitido no cuenta como leída: se vuelve a pedir la ubicación.
-        if AvisoEsError then begin
-            UbicacionEscaneada := '';
-            Pintar();
-            exit;
+        Avisar('', false);
+        if bin <> Rec."Cod. Bin Propuesto" then begin
+            rConfig.ObtenerConfig();
+            // Un desvío no permitido no cuenta como leída: se vuelve a pedir la ubicación.
+            if not rConfig.DesvioPermitido(Rec."Cod. Bin Propuesto", bin) then begin
+                UbicacionEscaneada := '';
+                Avisar(StrSubstNo(DesvioNoPermitidoErr, Rec."Cod. Bin Propuesto"), true);
+                Pintar();
+                exit;
+            end;
+            Avisar(StrSubstNo(DesvioUbicacionMsg, Rec."Cod. Bin Propuesto"), false);
         end;
+        UbicacionEscaneada := bin;
 
         CurrPage.Pantalla.Senal('ok');
         Pintar();
         Confirmar();
-    end;
-
-    /// <summary>
-    /// Cantidad recogida que manda la pantalla, en la unidad del pedido y con punto decimal.
-    /// </summary>
-    local procedure LeerCantidad(prm_Valor: Text)
-    var
-        valor: Decimal;
-    begin
-        // 9 = formato XML: el punto decimal, sea cual sea el idioma del usuario.
-        if not Evaluate(valor, prm_Valor, 9) then
-            exit;
-        if valor < 0 then
-            valor := 0;
-        CantidadRecogida := valor;
-    end;
-
-    local procedure EjecutarAccion(prm_Accion: Text)
-    begin
-        if prm_Accion = 'siguiente' then begin
-            BuscarSiguienteOrden();
-            exit;
-        end;
-        if not HayParada then
-            exit;
-        case prm_Accion of
-            'confirmar':
-                Confirmar();
-            'saltar':
-                Saltar();
-            'sinstock':
-                MarcarSinStock();
-        end;
     end;
 
     local procedure Confirmar()
@@ -327,14 +296,22 @@ page 51121 "Preparar Picking SGA"
         // La cantidad la comprueba ConfirmarLinea. El preparador habla en la UM del pedido; la parada, en base.
         cPicking.ConfirmarLinea(Rec, UbicacionEscaneada, Rec.CantidadBaseDesdeDocumento(CantidadRecogida, PendienteDocumento));
         CurrPage.Pantalla.Senal('ok');
+        SiguienteParada();
+    end;
 
-        // Al quedar recogida sale del filtro de pendientes, así que se recarga la vista.
+    /// <summary>
+    /// Tras confirmar, saltar o sustituir una parada: recarga la vista (lo hecho sale del filtro
+    /// de pendientes) y prepara la siguiente o, si no queda ninguna, termina la orden. Devuelve
+    /// false si la ha terminado.
+    /// </summary>
+    local procedure SiguienteParada(): Boolean
+    begin
         if not CargarParadas(Rec."No. Orden") then begin
             TerminarOrden();
-            exit;
+            exit(false);
         end;
-
         Preparar();
+        exit(true);
     end;
 
     /// <summary>
@@ -354,12 +331,8 @@ page 51121 "Preparar Picking SGA"
         retenida := cPicking.SaltarParada(Rec);
 
         // Al recargar, la saltada pasa detrás de las que no se han saltado.
-        if not CargarParadas(Rec."No. Orden") then begin
-            TerminarOrden();
+        if not SiguienteParada() then
             exit;
-        end;
-
-        Preparar();
         if retenida then begin
             Avisar(StrSubstNo(ParadaRetenidaMsg, bin), false);
             Pintar();
@@ -383,56 +356,24 @@ page 51121 "Preparar Picking SGA"
 
         resultado := cPicking.SustituirParadaSinStock(Rec, cubierta);
 
-        if not CargarParadas(Rec."No. Orden") then begin
-            TerminarOrden();
+        if not SiguienteParada() then
             exit;
-        end;
-
-        Preparar();
         Avisar(resultado, not cubierta);
         Pintar();
     end;
 
     /// <summary>
-    /// Cierra el recorrido y pasa lo recogido al pedido. Se guarda antes lo confirmado: si el
-    /// pedido no acepta los datos, el preparador no pierde su trabajo y oficina lo repite
-    /// desde la orden con "Pasar al pedido".
-    ///
-    /// Si quedan paradas retenidas, la orden sigue en proceso para el jefe de almacén, pero lo
-    /// recogido ya pasa al pedido: el paso se puede repetir sin duplicar cuando se resuelvan.
-    ///
-    /// En turno no se cierra: el resultado sale como aviso y se carga la siguiente orden. Si no
-    /// pasa al pedido, el aviso va en rojo.
+    /// Cierra el recorrido (TerminarRecorrido de Cod. "Gestion Picking SGA": guarda y pasa lo
+    /// recogido al pedido). En turno no se cierra la pantalla: el resultado sale como aviso y se
+    /// carga la siguiente orden; si no ha pasado al pedido, el aviso va en rojo.
     /// </summary>
     local procedure TerminarOrden()
     var
-        rOrden: Record "Orden Picking SGA";
+        cPicking: Codeunit "Gestion Picking SGA";
         resultado: Text;
         fallo: Boolean;
-        OrdenTerminadaMsg: Label 'Orden %1 terminada.', Comment = '%1 = nº orden';
-        DejarEnPlayaMsg: Label 'Déjela en la playa %1.', Comment = '%1 = playa (zona)';
-        OrdenConRetenidasMsg: Label 'Orden %1 recorrida. %2 líneas quedan retenidas para el jefe de almacén.', Comment = '%1 = nº orden, %2 = número de líneas retenidas';
-        PasadaAlPedidoMsg: Label 'Lo recogido ya está en el pedido %1.', Comment = '%1 = nº pedido';
-        SinPasarAlPedidoMsg: Label 'No se ha podido pasar al pedido %1: %2 Avise a oficina para que lo pase desde la orden.', Comment = '%1 = nº pedido, %2 = error';
     begin
-        Commit();
-
-        resultado := StrSubstNo(OrdenTerminadaMsg, Rec."No. Orden");
-        if rOrden.Get(Rec."No. Orden") then begin
-            rOrden.CalcFields("Paradas Retenidas");
-            if rOrden."Paradas Retenidas" > 0 then
-                resultado := StrSubstNo(OrdenConRetenidasMsg, rOrden."No. Orden", rOrden."Paradas Retenidas");
-            if rOrden.Origen = rOrden.Origen::Venta then begin
-                if rOrden.Playa <> '' then
-                    resultado += ' ' + StrSubstNo(DejarEnPlayaMsg, rOrden.Playa);
-                if Codeunit.Run(Codeunit::"Gestion Picking SGA", rOrden) then
-                    resultado += ' ' + StrSubstNo(PasadaAlPedidoMsg, rOrden."No. Documento Origen")
-                else begin
-                    resultado += ' ' + StrSubstNo(SinPasarAlPedidoMsg, rOrden."No. Documento Origen", GetLastErrorText());
-                    fallo := true;
-                end;
-            end;
-        end;
+        resultado := cPicking.TerminarRecorrido(Rec."No. Orden", fallo);
 
         if not EnTurno then begin
             Message(resultado);

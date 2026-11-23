@@ -237,24 +237,13 @@ page 51100 "Ubicaciones SGA"
                 var
                     rSeleccion: Record "Ubicacion SGA";
                     pCambiar: Page "Cambiar Ubicaciones SGA";
-                    hechas: Integer;
-                    omitidas: Integer;
-                    ejemplo: Text;
-                    UbicacionesCambiadasMsg: Label 'Se han cambiado %1 ubicaciones.', Comment = '%1 = número';
-                    UbicacionesCambiadasOmitidasMsg: Label 'Se han cambiado %1 ubicaciones.\%2 no se han cambiado porque tienen contenido (%3…). Su configuración solo se cambia cuando están vacías.', Comment = '%1 = cambiadas, %2 = omitidas, %3 = primeras ubicaciones omitidas';
                 begin
                     CurrPage.SetSelectionFilter(rSeleccion);
                     pCambiar.Inicializar(rSeleccion);
                     if pCambiar.RunModal() <> Action::OK then
                         exit;
-
-                    hechas := pCambiar.Aplicar();
+                    pCambiar.Aplicar();
                     CurrPage.Update(false);
-                    omitidas := pCambiar.UbicacionesOmitidas(ejemplo);
-                    if omitidas = 0 then
-                        Message(UbicacionesCambiadasMsg, hechas)
-                    else
-                        Message(UbicacionesCambiadasOmitidasMsg, hechas, omitidas, ejemplo);
                 end;
             }
             action(LiberarReserva)

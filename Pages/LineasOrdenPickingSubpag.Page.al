@@ -151,13 +151,9 @@ page 51120 "Lineas Orden Picking Subpag"
                 trigger OnAction()
                 var
                     cPicking: Codeunit "Gestion Picking SGA";
-                    cConfirmMgt: Codeunit "Confirm Management";
-                    CancelarParadaQst: Label '¿Cancelar la línea de %1 en %2?', Comment = '%1 = producto, %2 = ubicación';
                 begin
-                    if not cConfirmMgt.GetResponseOrDefault(StrSubstNo(CancelarParadaQst, Rec."No. Producto", Rec."Cod. Bin Propuesto"), false) then
-                        exit;
-                    cPicking.CancelarLinea(Rec);
-                    CurrPage.Update(false);
+                    if cPicking.CancelarLineaConDialogo(Rec) then
+                        CurrPage.Update(false);
                 end;
             }
         }

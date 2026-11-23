@@ -1,8 +1,8 @@
 namespace AntonioNadal.SGA;
 
 using Microsoft.Inventory.Item;
-using Microsoft.Inventory.Ledger;
 using Microsoft.Inventory.Location;
+using System.Utilities;
 
 /// <summary>
 /// Page Pendiente Ubicar SGA (ID 51131).
@@ -232,13 +232,14 @@ page 51131 "Pendiente Ubicar SGA"
 
                 trigger OnAction()
                 var
+                    cConfirmMgt: Codeunit "Confirm Management";
                     AlmacenObligatorioErr: Label 'Indique el almacén.';
                     TodoAlmacenQst: Label 'No ha indicado productos ni clase de artículo: se revisará todo el almacén y puede tardar. ¿Continuar?';
                 begin
                     if FiltroAlmacen = '' then
                         Error(AlmacenObligatorioErr);
                     if (FiltroProductos = '') and (FiltroClase = FiltroClase::Todas) then
-                        if not Confirm(TodoAlmacenQst, false) then
+                        if not cConfirmMgt.GetResponseOrDefault(TodoAlmacenQst, false) then
                             exit;
                     Recalcular();
                 end;
@@ -246,15 +247,6 @@ page 51131 "Pendiente Ubicar SGA"
         }
         area(Navigation)
         {
-            action(VerMovsProducto)
-            {
-                Caption = 'Movimientos del producto';
-                ToolTip = 'Movimientos de producto de BC de este producto y lote en el almacén.';
-                ApplicationArea = All;
-                Image = ItemLedger;
-                RunObject = page "Item Ledger Entries";
-                RunPageLink = "Item No." = field("No. Producto"), "Location Code" = field("Cod. Almacen"), "Lot No." = field("No. Lote");
-            }
             action(IrRecepciones)
             {
                 Caption = 'Ubicar recepciones';
@@ -326,8 +318,7 @@ page 51131 "Pendiente Ubicar SGA"
         ResumenLbl: Label '%1 lotes con algo sin ubicar: %2 unidades a ubicar desde aquí y %3 pendientes en recepciones o ensamblados.', Comment = '%1 = lotes, %2 = unidades a ubicar aquí, %3 = unidades en documentos';
         TodoUbicadoLbl: Label 'Todo el stock revisado está ubicado.';
     begin
-        Rec.Reset();
-        Rec.DeleteAll();
+        // CargarPendienteUbicar vacía Rec antes de llenarlo.
         rItem.SetFilter("No.", FiltroProductos);
         if FiltroClase <> FiltroClase::Todas then
             rItem.SetRange("Clase de articulo", FiltroClase - 1);
@@ -366,19 +357,11 @@ page 51131 "Pendiente Ubicar SGA"
     local procedure UbicarSeleccion()
     var
         TempSeleccion: Record "Buffer Conciliacion SGA" temporary;
-        TempResultado: Record "Linea Ubicacion SGA" temporary;
         cCarga: Codeunit "Carga Inicial SGA";
-        pResultado: Page "Resultado Carga Inicial SGA";
         opcion: Integer;
-        simular: Boolean;
-        cargadas: Decimal;
-        noCargadas: Decimal;
-        textoError: Text;
         NadaQueUbicarErr: Label 'Ninguna de las líneas seleccionadas tiene nada que ubicar desde aquí: lo que les falta está pendiente en recepciones o ensamblados.';
         OpcionesTxt: Label 'Ubicar ahora,Solo simular (no guarda nada)';
         PreguntaLbl: Label 'Buscar hueco para %1 lotes seleccionados:', Comment = '%1 = número de lotes';
-        TerminadoMsg: Label 'Terminado.\Unidades ubicadas: %1.\Unidades sin sitio: %2 (el motivo de cada una está en el detalle).', Comment = '%1 = ubicadas, %2 = sin sitio';
-        SimuladoMsg: Label 'Simulación (no se ha guardado nada).\Unidades que se ubicarían: %1.\Unidades sin sitio: %2 (el motivo de cada una está en el detalle).', Comment = '%1 = ubicadas, %2 = sin sitio';
     begin
         CurrPage.SetSelectionFilter(Rec);
         Rec.SetFilter("A Ubicar", '>0');
@@ -394,29 +377,9 @@ page 51131 "Pendiente Ubicar SGA"
         opcion := StrMenu(OpcionesTxt, 1, StrSubstNo(PreguntaLbl, TempSeleccion.Count()));
         if opcion = 0 then
             exit;
-        simular := opcion = 2;
 
-        cCarga.Configurar(FiltroAlmacen, 2, '', simular, '');
-        cCarga.FijarPendientes(TempSeleccion);
-        // Codeunit.Run para recoger el fin de simulación, que llega como error para que la base
-        // de datos deshaga lo escrito.
-        if not cCarga.Run() then begin
-            textoError := GetLastErrorText();
-            if not cCarga.EsFinSimulacion(textoError) then
-                Error(textoError);
-        end;
-
-        cCarga.ObtenerTotales(cargadas, noCargadas);
-        cCarga.ObtenerResultado(TempResultado);
-        if simular then
-            Message(SimuladoMsg, cargadas, noCargadas)
-        else
-            Message(TerminadoMsg, cargadas, noCargadas);
-        if not TempResultado.IsEmpty() then begin
-            pResultado.Rellenar(TempResultado);
-            pResultado.RunModal();
-        end;
-
+        cCarga.ConfigurarPendientes(FiltroAlmacen, opcion = 2, TempSeleccion);
+        cCarga.MostrarResultado(cCarga.Run());
         Recalcular();
     end;
 }

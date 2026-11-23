@@ -6,23 +6,24 @@ using Microsoft.Inventory.Item;
 /// Codeunit Carga Inicial SGA (ID 51106).
 /// Da de alta en las ubicaciones el stock que ya tiene BC, para arrancar SGA cuadrado.
 /// No toca el stock de BC: escribe contenido y movimientos de "Carga inicial" a través de
-/// Cod. "Gestion Contenido SGA". En "Ubicar seleccionadas" (solo pendientes) los movimientos
-/// son entradas a mano, con SSCC nuevo, como en "Ubicar producto".
+/// Cod. "Gestion Contenido SGA". En "Ubicar seleccionadas" (ConfigurarPendientes) los
+/// movimientos son entradas a mano, con SSCC nuevo, como en "Ubicar producto".
 ///
 /// Tres formas de elegir el destino:
 /// - Ubicación fija del producto: su casa (Shelf No.) o, si no tiene, la ubicación indicada.
 /// - Ubicación indicada: todo a una ubicación de paso, para repartir después a mano.
 /// - Huecos libres: cada palé completo a un hueco vacío siguiendo la ruta; el resto junto,
-///   consolidando con el mismo producto o en el primer hueco con sitio; un producto sin unidad
-///   de palé, a la ubicación indicada; y lo que no cabe, sin cargar. En la carga inicial se
-///   llena primero picking y luego almacenamiento, para arrancar con los huecos de picking
-///   servidos, pero cada producto ocupa como mucho FijarMaxPickingProducto ubicaciones de
-///   picking (por defecto 1) para que picking no se llene de palés de unos pocos; en "Ubicar
-///   seleccionadas" (solo pendientes), almacenamiento y luego picking, como cualquier entrada.
+///   consolidando con el mismo producto o en el primer hueco con sitio; y lo que no cabe, sin
+///   cargar. La ubicación indicada no se usa. En la carga inicial se llena primero picking y
+///   luego almacenamiento, para arrancar con los huecos de picking servidos, pero cada
+///   producto ocupa como mucho el máximo de ubicaciones de picking de Configurar, para que
+///   picking no se llene de palés de unos pocos; en "Ubicar seleccionadas", almacenamiento y
+///   luego picking, como cualquier entrada.
 ///
-/// Se lanza con Run. La simulación hace la carga de verdad y al final la deshace con un error
-/// marcado: así cada propuesta ve los huecos que han ocupado las anteriores, y lo único que
-/// sobrevive es el resultado, que va en una tabla temporal.
+/// Se lanza con Run y el resultado se enseña con MostrarResultado. La simulación hace la carga
+/// de verdad y al final la deshace con un error marcado: así cada propuesta ve los huecos que
+/// han ocupado las anteriores, y lo único que sobrevive es el resultado, que va en una tabla
+/// temporal.
 /// </summary>
 codeunit 51106 "Carga Inicial SGA"
 {
@@ -39,13 +40,12 @@ codeunit 51106 "Carga Inicial SGA"
     var
         TempResultado: Record "Linea Ubicacion SGA" temporary;
         // Lo que se reparte, lote a lote ("A Ubicar"): lo calcula Run para la carga entera, o lo
-        // fija FijarPendientes con las líneas elegidas en Pendiente Ubicar SGA.
+        // fija ConfigurarPendientes con las líneas elegidas en Pendiente Ubicar SGA.
         TempPendientes: Record "Buffer Conciliacion SGA" temporary;
         cContenido: Codeunit "Gestion Contenido SGA";
         cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
         cStock: Codeunit "Consulta Stock SGA";
         cUM: Codeunit "Unidades Producto SGA";
-        cVentana: Codeunit "Ventana Progreso SGA";
         Almacen: Code[10];
         UbicacionIndicada: Code[20];
         VistaProductos: Text;
@@ -55,78 +55,82 @@ codeunit 51106 "Carga Inicial SGA"
         ProductoMotivoSinHueco: Code[20];
         SoloPendientes: Boolean;
         MaxPickingProducto: Integer;
-        DescripcionMovimiento: Text;
         UnidadesCargadas: Decimal;
         UnidadesNoCargadas: Decimal;
         MarcaSimulacionTxt: Label 'SGA_SIMULACION_CARGA_INICIAL', Locked = true;
 
     /// <summary>
-    /// Fija los parámetros. prm_VistaProductos es el GetView del filtro de productos del informe.
+    /// Fija los parámetros de la carga inicial. prm_VistaProductos es el GetView del filtro de
+    /// productos del informe. prm_MaxPickingProducto: cuántas ubicaciones de picking puede
+    /// ocupar cada producto con "Huecos libres" (lo que pase va a almacenamiento); 0, sin
+    /// límite. Con "Huecos libres" la ubicación indicada no se usa.
     /// </summary>
-    procedure Configurar(prm_Almacen: Code[10]; prm_Destino: Option "Ubicacion Fija del Producto","Ubicacion Indicada","Huecos Libres"; prm_UbicacionIndicada: Code[20]; prm_Simular: Boolean; prm_VistaProductos: Text)
+    procedure Configurar(prm_Almacen: Code[10]; prm_Destino: Option "Ubicacion Fija del Producto","Ubicacion Indicada","Huecos Libres"; prm_UbicacionIndicada: Code[20]; prm_Simular: Boolean; prm_VistaProductos: Text; prm_MaxPickingProducto: Integer)
     begin
         Almacen := prm_Almacen;
         Destino := prm_Destino;
         UbicacionIndicada := prm_UbicacionIndicada;
+        if Destino = Destino::"Huecos Libres" then
+            UbicacionIndicada := '';
         Simular := prm_Simular;
         VistaProductos := prm_VistaProductos;
+        MaxPickingProducto := prm_MaxPickingProducto;
     end;
 
     /// <summary>
-    /// Cuántas ubicaciones de picking puede ocupar cada producto en el reparto por huecos libres
-    /// de la carga inicial; lo que pase de ahí va a almacenamiento. 0, sin límite. Se llama
-    /// después de Configurar.
+    /// Modo "solo pendientes" de "Ubicar seleccionadas" (Pendiente Ubicar SGA): reparte por
+    /// huecos libres el "A Ubicar" de las líneas recibidas (lo sin ubicar que no tiene documento
+    /// pendiente), como entradas a mano.
     /// </summary>
-    procedure FijarMaxPickingProducto(prm_Max: Integer)
+    procedure ConfigurarPendientes(prm_Almacen: Code[10]; prm_Simular: Boolean; var prm_Pendientes: Record "Buffer Conciliacion SGA" temporary)
     begin
-        MaxPickingProducto := prm_Max;
-    end;
-
-    /// <summary>
-    /// Cambia a modo "solo pendientes": reparte por huecos libres el "A Ubicar" de cada línea
-    /// (lo sin ubicar que no tiene documento pendiente), no todo el stock. Se llama después de
-    /// Configurar. Es lo que usa "Ubicar seleccionadas" de la página Pendiente Ubicar SGA.
-    /// </summary>
-    procedure FijarPendientes(var prm_Pendientes: Record "Buffer Conciliacion SGA" temporary)
-    var
-        UbicacionPendientesLbl: Label 'Ubicación de stock pendiente SGA';
-    begin
+        Configurar(prm_Almacen, Destino::"Huecos Libres", '', prm_Simular, '', 0);
         TempPendientes.Copy(prm_Pendientes, true);
         SoloPendientes := true;
-        Destino := Destino::"Huecos Libres";
-        DescripcionMovimiento := UbicacionPendientesLbl;
     end;
 
     /// <summary>
-    /// Indica si el error con el que ha terminado Run es el de fin de simulación y no uno real.
+    /// Tras Run (prm_RunOk es lo que ha devuelto): relanza el error si es uno real y no el fin
+    /// de la simulación, avisa de las unidades cargadas y sin sitio y abre el resultado, una
+    /// línea por palé o resto con su ubicación o su motivo.
     /// </summary>
-    procedure EsFinSimulacion(prm_TextoError: Text): Boolean
+    procedure MostrarResultado(prm_RunOk: Boolean)
+    var
+        pResultado: Page "Resultado Carga Inicial SGA";
+        textoError: Text;
+        TerminadoMsg: Label 'Terminado.\Unidades ubicadas: %1.\Unidades sin sitio: %2 (el motivo de cada una está en el detalle).', Comment = '%1 = ubicadas, %2 = sin sitio';
+        SimuladoMsg: Label 'Simulación (no se ha guardado nada).\Unidades que se ubicarían: %1.\Unidades sin sitio: %2 (el motivo de cada una está en el detalle).', Comment = '%1 = ubicadas, %2 = sin sitio';
     begin
-        exit(prm_TextoError = MarcaSimulacionTxt);
-    end;
+        // El fin de la simulación llega como error para que la base de datos deshaga lo escrito.
+        if not prm_RunOk then begin
+            textoError := GetLastErrorText();
+            if textoError <> MarcaSimulacionTxt then
+                Error(textoError);
+        end;
 
-    /// <summary>
-    /// Lo que ha hecho la carga: una línea por palé o resto, con Estado Ubicado
-    /// (y su ubicación) o "Sin Sitio" (y el motivo).
-    /// </summary>
-    procedure ObtenerResultado(var prm_Resultado: Record "Linea Ubicacion SGA" temporary)
-    begin
-        prm_Resultado.Copy(TempResultado, true);
-    end;
-
-    procedure ObtenerTotales(var prm_UnidadesCargadas: Decimal; var prm_UnidadesNoCargadas: Decimal)
-    begin
-        prm_UnidadesCargadas := UnidadesCargadas;
-        prm_UnidadesNoCargadas := UnidadesNoCargadas;
+        if not GuiAllowed() then
+            exit;
+        if Simular then
+            Message(SimuladoMsg, UnidadesCargadas, UnidadesNoCargadas)
+        else
+            Message(TerminadoMsg, UnidadesCargadas, UnidadesNoCargadas);
+        if not TempResultado.IsEmpty() then begin
+            pResultado.Rellenar(TempResultado);
+            pResultado.RunModal();
+        end;
     end;
 
     local procedure Procesar()
     var
         rProducto: Record Item;
         rConfig: Record "Config. SGA";
+        cVentana: Codeunit "Ventana Progreso SGA";
         AlmacenObligatorioErr: Label 'Debe indicar el almacén que se va a cargar.';
         UbicacionDestinoObligatoriaErr: Label 'Debe indicar la ubicación de destino.';
         FechaInicioObligatoriaErr: Label 'Ponga la "Fecha inicio SGA" en la configuración antes de la carga inicial: las recepciones y ensamblados desde esa fecha se ubican desde sus pantallas y no los coge la carga.';
+        ProductoBloqueadoLbl: Label 'Producto bloqueado.';
+        TituloLbl: Label 'Carga inicial de contenido…';
+        ProductoLbl: Label 'Producto %1', Comment = '%1 = nº de producto';
     begin
         if Almacen = '' then
             Error(AlmacenObligatorioErr);
@@ -134,8 +138,9 @@ codeunit 51106 "Carga Inicial SGA"
             Error(UbicacionDestinoObligatoriaErr);
 
         // Se carga, lote a lote, lo mismo que "Pendiente de ubicar" tiene "A ubicar": el stock de
-        // BC menos lo ya ubicado y menos lo que espera en recepciones o ensamblados. Así la carga
-        // se puede repetir sin duplicar y no coge lo que tiene su propio documento.
+        // BC menos lo ya ubicado y menos lo que espera en recepciones o ensamblados, solo de los
+        // productos que SGA ubica. Así la carga se puede repetir sin duplicar y no coge lo que
+        // tiene su propio documento.
         if not SoloPendientes then begin
             rConfig.ObtenerConfig();
             if rConfig."Fecha Inicio SGA" = 0D then
@@ -151,112 +156,28 @@ codeunit 51106 "Carga Inicial SGA"
         MotivoSinHuecoPale := '';
         ProductoMotivoSinHueco := '';
 
-        if SoloPendientes then begin
-            ProcesarPendientes();
-            exit;
-        end;
-
-        if VistaProductos <> '' then
-            rProducto.SetView(VistaProductos);
-        rProducto.SetRange(Type, rProducto.Type::Inventory);
-        AbrirVentana(rProducto.Count());
-        if rProducto.FindSet() then
-            repeat
-                AvanzarVentana(rProducto."No.");
-                ProcesarProducto(rProducto);
-            until rProducto.Next() = 0;
-        cVentana.Cerrar();
-    end;
-
-    /// <summary>
-    /// Ventana de progreso (Cod. "Ventana Progreso SGA"): producto en curso y barra. Sin nada
-    /// que recorrer no se abre.
-    /// </summary>
-    local procedure AbrirVentana(prm_Total: Integer)
-    var
-        TituloLbl: Label 'Carga inicial de contenido…';
-    begin
-        if prm_Total > 0 then
-            cVentana.Abrir(TituloLbl, prm_Total);
-    end;
-
-    local procedure AvanzarVentana(prm_Producto: Code[20])
-    var
-        ProductoLbl: Label 'Producto %1', Comment = '%1 = nº de producto';
-    begin
-        cVentana.Avanzar(StrSubstNo(ProductoLbl, prm_Producto));
-    end;
-
-    /// <summary>
-    /// Modo solo pendientes: un producto cada vez, los de las líneas recibidas.
-    /// </summary>
-    local procedure ProcesarPendientes()
-    var
-        rProducto: Record Item;
-        ultimo: Code[20];
-    begin
-        ultimo := '';
-        // Por la clave primaria, que agrupa por producto (las líneas son de un usuario y un almacén).
+        // Por la clave primaria, que agrupa por producto (las líneas son de un almacén).
         TempPendientes.Reset();
         TempPendientes.SetFilter("A Ubicar", '>0');
-        // La barra avanza por línea: aquí no se sabe cuántos productos hay sin recorrerlas.
-        AbrirVentana(TempPendientes.Count());
-        if TempPendientes.FindSet() then
-            repeat
-                AvanzarVentana(TempPendientes."No. Producto");
-                if TempPendientes."No. Producto" <> ultimo then begin
-                    ultimo := TempPendientes."No. Producto";
-                    if rProducto.Get(ultimo) then
-                        ProcesarProducto(rProducto);
-                end;
-            until TempPendientes.Next() = 0;
+        if not TempPendientes.FindSet() then
+            exit;
+        rProducto.SetLoadFields(Blocked);
+        cVentana.Abrir(TituloLbl, TempPendientes.Count());
+        repeat
+            cVentana.Avanzar(StrSubstNo(ProductoLbl, TempPendientes."No. Producto"));
+            if rProducto."No." <> TempPendientes."No. Producto" then
+                rProducto.Get(TempPendientes."No. Producto");
+            // La puerta de escritura rechaza los productos bloqueados y pararía toda la carga.
+            if rProducto.Blocked then
+                AnotarNoCargado(rProducto, TempPendientes, TempPendientes."Unidad Medida Base", TempPendientes."A Ubicar", TempPendientes."A Ubicar", ProductoBloqueadoLbl)
+            else
+                if Destino = Destino::"Huecos Libres" then
+                    RepartirPorHuecos(rProducto, TempPendientes)
+                else
+                    CargarEnDestinoFijo(rProducto, TempPendientes);
+        until TempPendientes.Next() = 0;
         cVentana.Cerrar();
         TempPendientes.Reset();
-    end;
-
-    /// <summary>
-    /// Pasa al buffer de stock las líneas pendientes de un producto, con el "A Ubicar" como
-    /// cantidad a repartir.
-    /// </summary>
-    local procedure CopiarPendientes(prm_Producto: Code[20]; var prm_Stock: Record "Buffer Conciliacion SGA" temporary)
-    var
-        TempLineas: Record "Buffer Conciliacion SGA" temporary;
-    begin
-        // Las líneas son ya de un solo almacén: el de la carga.
-        TempLineas.Copy(TempPendientes, true);
-        TempLineas.Reset();
-        TempLineas.SetRange("No. Producto", prm_Producto);
-        TempLineas.SetFilter("A Ubicar", '>0');
-        if TempLineas.FindSet() then
-            repeat
-                prm_Stock := TempLineas;
-                prm_Stock."Stock BC" := TempLineas."A Ubicar";
-                prm_Stock.Insert();
-            until TempLineas.Next() = 0;
-    end;
-
-    local procedure ProcesarProducto(var prm_Producto: Record Item)
-    var
-        TempStock: Record "Buffer Conciliacion SGA" temporary;
-        ProductoBloqueadoLbl: Label 'Producto bloqueado.';
-    begin
-        // CopiarPendientes solo trae líneas con algo que repartir.
-        CopiarPendientes(prm_Producto."No.", TempStock);
-        if not TempStock.FindSet() then
-            exit;
-
-        repeat
-            // La puerta de escritura rechaza los productos bloqueados y pararía toda la carga.
-            if prm_Producto.Blocked then
-                AnotarNoCargado(prm_Producto, TempStock, TempStock."Unidad Medida Base", TempStock."Stock BC", TempStock."Stock BC", ProductoBloqueadoLbl)
-            else
-                case Destino of
-                    Destino::"Huecos Libres":
-                        RepartirPorHuecos(prm_Producto, TempStock);
-                    else
-                        CargarEnDestinoFijo(prm_Producto, TempStock);
-                end;
-        until TempStock.Next() = 0;
     end;
 
     /// <summary>
@@ -280,9 +201,9 @@ codeunit 51106 "Carga Inicial SGA"
         end;
 
         if destinoLinea = '' then
-            AnotarNoCargado(prm_Producto, prm_Stock, prm_Stock."Unidad Medida Base", prm_Stock."Stock BC", prm_Stock."Stock BC", MotivoSinUbicacionLbl)
+            AnotarNoCargado(prm_Producto, prm_Stock, prm_Stock."Unidad Medida Base", prm_Stock."A Ubicar", prm_Stock."A Ubicar", MotivoSinUbicacionLbl)
         else
-            Cargar(prm_Producto, prm_Stock, destinoLinea, prm_Stock."Unidad Medida Base", prm_Stock."Stock BC", prm_Stock."Stock BC", motivo);
+            Cargar(prm_Producto, prm_Stock, destinoLinea, prm_Stock."Unidad Medida Base", prm_Stock."A Ubicar", prm_Stock."A Ubicar", motivo);
     end;
 
     /// <summary>
@@ -296,23 +217,18 @@ codeunit 51106 "Carga Inicial SGA"
         i: Integer;
         hueco: Code[20];
         motivo: Text;
-        SinPaleUbicacionIndicadaLbl: Label 'El producto no tiene palé por defecto en su ficha: se deja en la ubicación indicada.';
-        SinPaleSinUbicacionLbl: Label 'El producto no tiene palé por defecto en su ficha, así que no se puede repartir por huecos. Rellene su "Cód. palé por defecto" y vuelva a lanzar la carga.';
+        SinPaleLbl: Label 'El producto no tiene palé por defecto en su ficha, así que no se puede repartir por huecos. Rellene su "Cód. palé por defecto" y vuelva a lanzar la carga.';
     begin
         // El palé de cada producto sale de su ficha (palé por defecto), se llame como se llame
         // (PALE200, EUROPALE…), si lo tiene y lleva más de una unidad base.
         umPale := cUM.UMPale(prm_Producto."No.");
-
         if umPale = '' then begin
-            if UbicacionIndicada <> '' then
-                Cargar(prm_Producto, prm_Stock, UbicacionIndicada, prm_Stock."Unidad Medida Base", prm_Stock."Stock BC", prm_Stock."Stock BC", SinPaleUbicacionIndicadaLbl)
-            else
-                AnotarNoCargado(prm_Producto, prm_Stock, prm_Stock."Unidad Medida Base", prm_Stock."Stock BC", prm_Stock."Stock BC", SinPaleSinUbicacionLbl);
+            AnotarNoCargado(prm_Producto, prm_Stock, prm_Stock."Unidad Medida Base", prm_Stock."A Ubicar", prm_Stock."A Ubicar", SinPaleLbl);
             exit;
         end;
         // El reparto (cada palé y el resto) es el mismo que en "Ubicar producto"; aquí solo cambia
         // cómo se busca el hueco de los palés.
-        cUM.Repartir(prm_Producto."No.", prm_Stock."Stock BC", '', 0, TempTrozo);
+        cUM.Repartir(prm_Producto."No.", prm_Stock."A Ubicar", '', 0, TempTrozo);
 
         // Palés completos: uno por hueco vacío, siguiendo la ruta (en la carga inicial, picking y
         // luego almacenamiento; en solo pendientes, al revés).
@@ -363,13 +279,14 @@ codeunit 51106 "Carga Inicial SGA"
     var
         cLectura: Codeunit "Codigos Barras SGA";
         DescripcionCargaInicialLbl: Label 'Carga inicial SGA';
+        UbicacionPendientesLbl: Label 'Ubicación de stock pendiente SGA';
     begin
         if SoloPendientes then
             cContenido.RegistrarEntrada(Almacen, prm_Bin, prm_Producto."No.", prm_Stock."No. Lote", cLectura.NuevoSSCC(),
-                                        prm_UM, prm_Cantidad, "Origen Mov. SGA"::Manual, '', DescripcionMovimiento)
+                                        prm_UM, prm_Cantidad, "Origen Mov. SGA"::Manual, '', UbicacionPendientesLbl)
         else
-            cContenido.RegistrarCargaInicial(Almacen, prm_Bin, prm_Producto."No.", prm_Stock."No. Lote",
-                                             prm_UM, prm_Cantidad, DescripcionCargaInicialLbl);
+            cContenido.RegistrarAjuste("Tipo Mov. Ubicacion SGA"::"Carga Inicial", Almacen, prm_Bin, prm_Producto."No.",
+                                       prm_Stock."No. Lote", prm_UM, prm_Cantidad, DescripcionCargaInicialLbl);
 
         Anotar(prm_Producto, prm_Stock, prm_Bin, prm_UM, prm_Cantidad, prm_CantidadBase, true, prm_Motivo);
         UnidadesCargadas += prm_CantidadBase;

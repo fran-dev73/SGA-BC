@@ -75,13 +75,12 @@ pageextension 51104 "Sales Order SGA" extends "Sales Order"
 
                     trigger OnAction()
                     var
+                        rOrden: Record "Orden Picking SGA";
                         cPicking: Codeunit "Gestion Picking SGA";
-                        PickingPasadoMsg: Label 'Lo recogido se ha pasado al pedido.';
                     begin
                         CurrPage.SaveRecord();
-                        cPicking.PasarAPedidoDeVenta(Rec."No.");
+                        cPicking.PasarAPedidoConMensaje(rOrden, Rec."No.");
                         CurrPage.Update(false);
-                        Message(PickingPasadoMsg);
                     end;
                 }
                 action(VerOrdenesPickingSGA)

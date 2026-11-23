@@ -2,7 +2,6 @@ namespace AntonioNadal.SGA;
 
 using Microsoft.Inventory.Item;
 using Microsoft.Inventory.Location;
-using Microsoft.Warehouse.Structure;
 using System.Utilities;
 
 /// <summary>
@@ -61,17 +60,12 @@ report 51102 "Carga Inicial Contenido SGA"
                         OptionCaption = 'Ubicación fija del producto,Ubicación indicada,Huecos libres';
                         ToolTip = 'Huecos libres: cada palé a un hueco vacío por la ruta (primero picking, hasta el máximo por producto, y luego almacenamiento) y el resto junto a un hueco con sitio; lo que no cabe no se carga. Ubicación fija del producto: a su casa (Shelf No.) o, si no tiene, a la ubicación indicada. Ubicación indicada: todo a una ubicación de paso.';
                         ApplicationArea = All;
-
-                        trigger OnValidate()
-                        begin
-                            ActualizarUbicacionIndicada();
-                        end;
                     }
                     field(UbicacionIndicada; codUbicacionIndicada)
                     {
                         Caption = 'Ubicación indicada';
                         ToolTip = 'Ubicación de paso. Con "Ubicación indicada" va todo aquí; con "Ubicación fija del producto", solo los productos sin casa. Con "Huecos libres" no se usa: el sistema elige el hueco, y lo que no tiene sitio sale como no cargado.';
-                        Editable = blnUbicacionIndicadaEditable;
+                        Editable = optDestino <> optDestino::"Huecos Libres";
                         ApplicationArea = All;
 
                         trigger OnLookup(var Text: Text): Boolean
@@ -99,7 +93,7 @@ report 51102 "Carga Inicial Contenido SGA"
                         ToolTip = 'Con "Huecos libres", cuántas ubicaciones de picking puede ocupar cada producto. Así picking no se llena de palés de unos pocos productos y queda sitio para todos; el resto de sus palés va a almacenamiento. Cuentan también las que ya ocupa. Sus ubicaciones reservadas (Producto fijo) se llenan igualmente.';
                         ApplicationArea = All;
                         MinValue = 1;
-                        Editable = blnMaxPickingEditable;
+                        Editable = optDestino = optDestino::"Huecos Libres";
                     }
                     field(Simular; blnSimular)
                     {
@@ -122,7 +116,6 @@ report 51102 "Carga Inicial Contenido SGA"
                 codUbicacionIndicada := rConfig."Ubic. Ajustes";
             if intMaxPickingProducto = 0 then
                 intMaxPickingProducto := 1;
-            ActualizarUbicacionIndicada();
         end;
     }
 
@@ -132,64 +125,19 @@ report 51102 "Carga Inicial Contenido SGA"
         // "Huecos Libres" va al final para no cambiar lo que tengan guardado los usuarios (SaveValues).
         optDestino: Option "Ubicacion Fija del Producto","Ubicacion Indicada","Huecos Libres";
         blnSimular: Boolean;
-        blnUbicacionIndicadaEditable: Boolean;
-        blnMaxPickingEditable: Boolean;
         intMaxPickingProducto: Integer;
 
     local procedure Ejecutar()
     var
-        TempResultado: Record "Linea Ubicacion SGA" temporary;
         cCarga: Codeunit "Carga Inicial SGA";
         cConfirmMgt: Codeunit "Confirm Management";
-        pResultado: Page "Resultado Carga Inicial SGA";
-        textoError: Text;
         ConfirmarCargaQst: Label 'Se va a crear el contenido inicial de las ubicaciones del almacén %1 a partir del stock actual. ¿Desea continuar?', Comment = '%1 = almacén';
-        ProcesoFinalizadoMsg: Label 'Proceso finalizado.';
     begin
         if (not blnSimular) and GuiAllowed() then
             if not cConfirmMgt.GetResponseOrDefault(StrSubstNo(ConfirmarCargaQst, codAlmacen), false) then
                 exit;
 
-        cCarga.Configurar(codAlmacen, optDestino, UbicacionIndicadaEfectiva(), blnSimular, Producto.GetView());
-        cCarga.FijarMaxPickingProducto(intMaxPickingProducto);
-
-        // Codeunit.Run para poder recoger el fin de simulación, que llega como error para que
-        // la base de datos deshaga lo escrito.
-        if not cCarga.Run() then begin
-            textoError := GetLastErrorText();
-            if not cCarga.EsFinSimulacion(textoError) then
-                Error(textoError);
-        end;
-
-        if not GuiAllowed() then
-            exit;
-
-        // Solo el aviso de fin: el detalle, línea a línea y con su motivo, está en la página
-        // de resultado.
-        Message(ProcesoFinalizadoMsg);
-
-        cCarga.ObtenerResultado(TempResultado);
-        if not TempResultado.IsEmpty() then begin
-            pResultado.Rellenar(TempResultado);
-            pResultado.Run();
-        end;
-    end;
-
-    /// <summary>
-    /// Con "Huecos libres" el hueco lo elige el sistema: la ubicación indicada no se deja tocar
-    /// y no se usa, tampoco para los productos sin palé, que salen como no cargados. El máximo
-    /// de picking por producto, al revés: solo cuenta con "Huecos libres".
-    /// </summary>
-    local procedure ActualizarUbicacionIndicada()
-    begin
-        blnUbicacionIndicadaEditable := optDestino <> optDestino::"Huecos Libres";
-        blnMaxPickingEditable := not blnUbicacionIndicadaEditable;
-    end;
-
-    local procedure UbicacionIndicadaEfectiva(): Code[20]
-    begin
-        if optDestino = optDestino::"Huecos Libres" then
-            exit('');
-        exit(codUbicacionIndicada);
+        cCarga.Configurar(codAlmacen, optDestino, codUbicacionIndicada, blnSimular, Producto.GetView(), intMaxPickingProducto);
+        cCarga.MostrarResultado(cCarga.Run());
     end;
 }

@@ -241,16 +241,16 @@ Para un palé concreto, lee su etiqueta en *SSCC*: sale dónde está y, si se ha
 
 ### Ubicaciones SGA
 
-Los huecos con su ocupación: gris vacía, verde con hueco, amarillo llena y rojo bloqueada. El *% ocupación* va en verde por debajo del 80 %, en ámbar del 80 al 99 % y en rojo desde el 100 %; sin capacidad (0, sin límite), sin color. Vistas por estado y por tipo, y *Reservadas* y *Sin tipo*. Acciones: **Cambiar en bloque**, **Imprimir etiquetas**, **Liberar reserva**, **Bloquear / desbloquear** y **Recalcular ocupación**. En la ficha, además, **Vaciar ubicación** (todo queda sin ubicar; el stock de BC no cambia) y sus movimientos. Desde *Consultas* solo se mira: ni esas acciones ni la ficha cambian nada; se hace desde *Configuración*.
+Los huecos con su ocupación: gris vacía, verde con hueco, amarillo llena y rojo bloqueada. El *% ocupación* va en verde por debajo del 80 %, en ámbar del 80 al 99 % y en rojo desde el 100 %; sin capacidad (0, sin límite), sin color. Vistas por estado y por tipo, y *Reservadas* y *Sin tipo*. Acciones: **Cambiar en bloque**, **Imprimir etiquetas**, **Liberar reserva**, **Bloquear / desbloquear** y **Recalcular ocupación**. En la ficha, además, **Vaciar ubicación** (todo queda sin ubicar; el stock de BC no cambia), sus movimientos y el contenido, que solo se mira: se traslada y se bloquea desde *Contenido de ubicaciones*. Desde *Consultas* solo se mira: ni esas acciones ni la ficha cambian nada; se hace desde *Configuración*.
 
 ### Contenido de ubicaciones
 
 Qué hay en cada hueco: una línea por palé, con producto, lote y SSCC. Es para trabajar con el contenido, así que está en el menú *Almacén SGA* y no en *Consultas*.
 
-- **Trasladar** a otra ubicación. Con *Zona destino*, propone un hueco de esa zona.
+- **Trasladar** a otra ubicación. Con *Zona destino*, propone un hueco de esa zona. Al pulsar Aceptar se registra; si no se puede (el destino no la admite, por ejemplo), sale el motivo y la ventana sigue abierta para cambiarlo.
 - **Bloquear / desbloquear** una línea, por ejemplo un lote en cuarentena. Lo reservado por una orden no se puede bloquear.
-- **Recontar**: escribe la *Cantidad contada* en unidades base y la diferencia queda registrada. Corrige solo la ubicación, no el stock de BC.
-- **Quitar de la ubicación**: la línea sale entera y queda pendiente de ubicar.
+- **Recontar**: escribe la *Cantidad contada* en unidades base y al pulsar Aceptar la diferencia queda registrada. Corrige solo la ubicación, no el stock de BC.
+- **Quitar de la ubicación**: enseña lo que se quita, pide confirmación y las líneas seleccionadas salen enteras y quedan pendientes de ubicar. Es lo mismo que **Vaciar ubicación** de la ficha y del mapa 3D.
 - **Movimientos del palé**: la historia de su SSCC.
 
 ### Bloquear
@@ -274,7 +274,7 @@ Quién movió qué, cuándo y de dónde a dónde. Vistas *Traslados* y *Ajustes 
 Compara BC con las ubicaciones. Conviene lanzarla al final del día o cuando alguien no encuentra un producto.
 
 1. *Almacén SGA - Informes* > **Conciliar con el stock**, con el *Almacén*. Salen solo las diferencias; *Mostrar también las que cuadran* lo enseña todo.
-2. El resultado queda en *Almacén SGA - Consultas* > **Conciliación con el stock**, con las vistas *Stock sin ubicar* (BC tiene más) y *Sobra en ubicaciones* (las ubicaciones tienen más).
+2. El resultado queda en *Almacén SGA - Consultas* > **Conciliación con el stock**, con las vistas *Stock sin ubicar* (BC tiene más) y *Sobra en ubicaciones* (las ubicaciones tienen más). Al pulsar en *Stock BC* salen los movimientos de producto de los que sale; en *Stock SGA*, en qué ubicaciones está el lote.
 3. Lo que falta, ubícalo en su sitio desde *Pendiente de ubicar*. Si no se sabe dónde está, **Regularizar en ubicación de ajustes** lo deja en la ubicación de ajustes, de la que el picking no coge. Lo que sobra no se regulariza: se recuenta.
 4. **Volver a conciliar** para comprobar.
 

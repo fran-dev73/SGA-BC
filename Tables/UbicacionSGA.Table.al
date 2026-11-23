@@ -2,18 +2,12 @@ namespace AntonioNadal.SGA;
 
 using Microsoft.Inventory.Item;
 using Microsoft.Inventory.Location;
-using Microsoft.Warehouse.Structure;
 
 /// <summary>
 /// Table Ubicacion SGA (ID 51101).
-/// Atributos de gestión de almacén de un Bin: zona SGA, tipo, capacidad, bloqueo,
-/// reglas de mezcla y estado de ocupación.
-///
-/// Es una tabla compañera 1:1 de la tabla estándar Bin (7302) en lugar de una
-/// tableextension porque AL no permite extender objetos definidos en la propia app.
-/// Si falta la fila de un Bin, el primer movimiento la da de alta sincronizando la topología
-/// (Cod. "Gestion Contenido SGA"), de modo que SGA es puramente aditivo y la topología
-/// estándar no se toca.
+/// Las ubicaciones (huecos) de SGA: zona SGA, tipo, capacidad, bloqueo, reglas de mezcla y
+/// estado de ocupación. Es la única tabla de ubicaciones de SGA: no usa las ubicaciones (Bin)
+/// de BC.
 ///
 /// "Estado SGA" y "% Ocupacion" están persistidos (no son FlowField) para poder contar y
 /// filtrar ubicaciones vacías/llenas sin recorrer el contenido. Los mantiene
@@ -40,9 +34,7 @@ table 51101 "Ubicacion SGA"
             Caption = 'Cód. ubicación';
             DataClassification = ToBeClassified;
             NotBlank = true;
-            TableRelation = Bin.Code where("Location Code" = field("Cod. Almacen"));
-            // El alta a mano escribe un código nuevo: su Bin lo crea OnInsert (CompletarAlta).
-            ValidateTableRelation = false;
+            ToolTip = 'Código de la ubicación: pasillo-estantería-altura (por ejemplo 101-31-10).';
 
             trigger OnValidate()
             var
@@ -55,10 +47,8 @@ table 51101 "Ubicacion SGA"
         field(30; Descripcion; Text[100])
         {
             Caption = 'Descripción';
-            Editable = false;
-            FieldClass = FlowField;
-            CalcFormula = lookup(Bin.Description where("Location Code" = field("Cod. Almacen"), Code = field("Cod. Bin")));
-            ToolTip = 'Descripción de la ubicación: es la de su ubicación de BC (ficha del almacén > Ubicaciones), y se cambia allí. Al crearla es el código.';
+            DataClassification = ToBeClassified;
+            ToolTip = 'Descripción libre de la ubicación. Al crearla es el código.';
         }
         field(40; "Cod. Zona SGA"; Code[10])
         {
@@ -301,8 +291,6 @@ table 51101 "Ubicacion SGA"
     var
         cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
     begin
-        // SGA es aditivo sobre la topología estándar: sin su Bin no hay ubicación. El alta a mano
-        // (Nueva ubicación SGA) lo crea aquí; los demás caminos ya lo traen creado.
         cUbicaciones.CompletarAlta(Rec);
         RecalcularOcupacion();
     end;
@@ -364,12 +352,11 @@ table 51101 "Ubicacion SGA"
     trigger OnDelete()
     var
         rContenido: Record "Contenido Ubicacion SGA";
-        UbicacionConContenidoErr: Label 'No se pueden eliminar los datos SGA de la ubicación %1 porque todavía tiene contenido.', Comment = '%1 = ubicación';
+        UbicacionConContenidoErr: Label 'No se puede eliminar la ubicación %1 porque todavía tiene contenido.', Comment = '%1 = ubicación';
     begin
         rContenido.FiltrarUbicacion("Cod. Almacen", "Cod. Bin");
         if not rContenido.IsEmpty() then
             Error(UbicacionConContenidoErr, "Cod. Bin");
-        // Su Bin se borra con ella (BorrarBinConFicha de "Gestion Ubicaciones SGA").
     end;
 
     /// <summary>
@@ -496,25 +483,10 @@ table 51101 "Ubicacion SGA"
     /// Qué contenido del hueco impide dejar en él prm_Producto con lote prm_Lote: 0 si nada,
     /// 5 si hay otro producto y el hueco no acepta mezcla de productos, 6 si hay otro lote y no
     /// acepta mezcla de lotes (los mismos códigos que el motivo de rechazo de la propuesta).
-    /// Solo mira si existe una línea que choca, sin leerla: es la que usa la propuesta.
+    /// Con prm_LeerLinea deja en prm_Contenido la línea que choca, para nombrarla en el mensaje;
+    /// sin él solo mira si existe, sin leerla (la propuesta, que recorre cientos de huecos).
     /// </summary>
-    procedure ContenidoQueImpideMezcla(prm_Producto: Code[20]; prm_Lote: Code[50]): Integer
-    var
-        rContenido: Record "Contenido Ubicacion SGA";
-    begin
-        exit(ComprobarMezcla(prm_Producto, prm_Lote, false, rContenido));
-    end;
-
-    /// <summary>
-    /// Igual que ContenidoQueImpideMezcla sin contenido, pero deja en prm_Contenido la línea
-    /// que choca, para poder nombrarla en el mensaje.
-    /// </summary>
-    procedure ContenidoQueImpideMezcla(prm_Producto: Code[20]; prm_Lote: Code[50]; var prm_Contenido: Record "Contenido Ubicacion SGA"): Integer
-    begin
-        exit(ComprobarMezcla(prm_Producto, prm_Lote, true, prm_Contenido));
-    end;
-
-    local procedure ComprobarMezcla(prm_Producto: Code[20]; prm_Lote: Code[50]; prm_LeerLinea: Boolean; var prm_Contenido: Record "Contenido Ubicacion SGA"): Integer
+    procedure ContenidoQueImpideMezcla(prm_Producto: Code[20]; prm_Lote: Code[50]; prm_LeerLinea: Boolean; var prm_Contenido: Record "Contenido Ubicacion SGA"): Integer
     begin
         prm_Contenido.Reset();
         prm_Contenido.FiltrarUbicacion("Cod. Almacen", "Cod. Bin");
@@ -577,7 +549,7 @@ table 51101 "Ubicacion SGA"
     /// hay dentro podría dejar de cumplirla (dos palés en un hueco que pasa a ser de uno, dos
     /// productos en uno que deja de aceptar mezcla…). Bloquearla sí se puede siempre.
     /// </summary>
-    procedure TestVacia()
+    local procedure TestVacia()
     var
         UbicacionConContenidoConfigErr: Label 'La ubicación %1 tiene contenido y solo se puede cambiar su configuración cuando está vacía. Vacíela o traslade su contenido antes.', Comment = '%1 = ubicación';
     begin
@@ -602,6 +574,18 @@ table 51101 "Ubicacion SGA"
                     exit(false);
 
         exit(true);
+    end;
+
+    /// <summary>
+    /// Deja solo los huecos útiles del almacén, en los que se guarda stock: con tipo (picking o
+    /// almacenamiento) y no bloqueados por sí mismos. Las ubicaciones sin tipo (muelles,
+    /// ajustes…) no se proponen ni se clasifican en el ABC. Quien llama puede acotar el tipo.
+    /// </summary>
+    procedure FiltrarUtiles(prm_Almacen: Code[10])
+    begin
+        SetRange("Cod. Almacen", prm_Almacen);
+        SetRange(Bloqueada, false);
+        SetFilter("Tipo Ubicacion", '<>%1', "Tipo Ubicacion"::" ");
     end;
 
     /// <summary>

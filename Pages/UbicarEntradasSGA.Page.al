@@ -245,31 +245,11 @@ page 51123 "Ubicar Entradas SGA"
 
                 trigger OnAction()
                 var
-                    TempFila: Record "Linea Ubicacion SGA" temporary;
                     cEntradas: Codeunit "Gestion Entradas SGA";
-                    propuestas: Integer;
-                    UbicacionesPropuestasMsg: Label 'Se han propuesto %1 ubicaciones.', Comment = '%1 = número de propuestas';
-                    NingunaPropuestaMsg: Label 'No se ha podido proponer ninguna ubicación: la columna "Por qué ahí" de cada línea dice el motivo.';
-                    NadaQueProponerMsg: Label 'No hay líneas pendientes sin ubicación propuesta.';
-                    haySinPropuesta: Boolean;
                 begin
-                    TempFila.Copy(Rec, true);
-                    TempFila.Reset();
-                    TempFila.SetFilter(Estado, '<>%1', TempFila.Estado::Ubicado);
-                    TempFila.SetRange("Ubicacion Propuesta", '');
-                    haySinPropuesta := not TempFila.IsEmpty();
-
-                    propuestas := cEntradas.ProponerParaTodos(Rec);
+                    cEntradas.ProponerParaTodosConMensaje(Rec);
                     ActualizarResumen();
                     CurrPage.Update(false);
-
-                    if not haySinPropuesta then
-                        Message(NadaQueProponerMsg)
-                    else
-                        if propuestas = 0 then
-                            Message(NingunaPropuestaMsg)
-                        else
-                            Message(UbicacionesPropuestasMsg, propuestas);
                 end;
             }
             action(OtraUbicacion)
@@ -283,7 +263,6 @@ page 51123 "Ubicar Entradas SGA"
                 var
                     cEntradas: Codeunit "Gestion Entradas SGA";
                 begin
-                    TestLineaSinUbicar();
                     cEntradas.ProponerOtra(Rec);
                     CurrPage.Update(false);
                 end;
@@ -302,7 +281,6 @@ page 51123 "Ubicar Entradas SGA"
                     cantidad: Decimal;
                     ubicacion: Code[20];
                 begin
-                    TestLineaSinUbicar();
                     cantidad := Rec.Cantidad;
                     ubicacion := Rec."Ubicacion Confirmada";
 
@@ -383,13 +361,7 @@ page 51123 "Ubicar Entradas SGA"
                 var
                     rMov: Record "Movimiento Ubicacion SGA";
                 begin
-                    rMov.SetRange(Origen, Rec.Origen);
-                    // Los palés ubicados al imprimir su etiqueta van con el otro nº del
-                    // ensamblado (Documento Relacionado), y también cuentan como ya ubicados.
-                    if Rec."Documento Relacionado" <> '' then
-                        rMov.SetFilter("No. Documento Origen", '%1|%2', Rec."No. Documento", Rec."Documento Relacionado")
-                    else
-                        rMov.SetRange("No. Documento Origen", Rec."No. Documento");
+                    rMov.FiltrarEntrada(Rec.Origen, Rec."No. Documento", Rec."Documento Relacionado");
                     Page.Run(Page::"Movs. Ubicacion SGA", rMov);
                 end;
             }
@@ -436,17 +408,6 @@ page 51123 "Ubicar Entradas SGA"
     begin
         // Lo que no se ha llegado a ubicar suelta sus huecos reservados.
         cEntradas.LiberarReservasFilas(Rec);
-    end;
-
-    /// <summary>
-    /// Error si la línea ya está ubicada: no hay nada que proponer ni que confirmar.
-    /// </summary>
-    local procedure TestLineaSinUbicar()
-    var
-        LineaYaUbicadaErr: Label 'Esta línea ya está ubicada.';
-    begin
-        if Rec.Estado = Rec.Estado::Ubicado then
-            Error(LineaYaUbicadaErr);
     end;
 
     trigger OnOpenPage()
@@ -541,24 +502,27 @@ page 51123 "Ubicar Entradas SGA"
         total: Integer;
         pendientes: Integer;
         sinHueco: Integer;
-        ResumenEnsambladosLbl: Label '%1 ensamblados, %2 por ubicar.', Comment = '%1 = total, %2 = pendientes';
-        ResumenEnsambladosSinHuecoLbl: Label '%1 ensamblados, %2 por ubicar, %3 sin hueco disponible.', Comment = '%1 = total, %2 = pendientes, %3 = sin hueco';
-        SinEnsambladosLbl: Label 'No hay ensamblados con estos filtros.';
-        ResumenRecepcionesLbl: Label '%1 líneas recibidas, %2 por ubicar.', Comment = '%1 = total, %2 = pendientes';
-        ResumenRecepcionesSinHuecoLbl: Label '%1 líneas recibidas, %2 por ubicar, %3 sin hueco disponible.', Comment = '%1 = total, %2 = pendientes, %3 = sin hueco';
-        SinRecepcionesLbl: Label 'No hay recepciones de compra con estos filtros.';
+        queLbl: Text;
+        ResumenLbl: Label '%1 %2, %3 por ubicar.', Comment = '%1 = total, %2 = líneas recibidas o ensamblados, %3 = pendientes';
+        SinHuecoLbl: Label ' %1 sin hueco disponible.', Comment = '%1 = sin hueco';
+        NadaLbl: Label 'No hay %1 con estos filtros.', Comment = '%1 = recepciones de compra o ensamblados';
+        RecepcionesLbl: Label 'líneas recibidas';
+        RecepcionesNadaLbl: Label 'recepciones de compra';
+        EnsambladosLbl: Label 'ensamblados';
     begin
         TempFila.Copy(Rec, true);
         TempFila.Reset();
         total := TempFila.Count();
 
+        queLbl := EnsambladosLbl;
         if total = 0 then begin
             if EsCompra then
-                Resumen := SinRecepcionesLbl
-            else
-                Resumen := SinEnsambladosLbl;
+                queLbl := RecepcionesNadaLbl;
+            Resumen := StrSubstNo(NadaLbl, queLbl);
             exit;
         end;
+        if EsCompra then
+            queLbl := RecepcionesLbl;
 
         TempFila.SetFilter(Estado, '<>%1', TempFila.Estado::Ubicado);
         pendientes := TempFila.Count();
@@ -569,15 +533,8 @@ page 51123 "Ubicar Entradas SGA"
         TempFila.SetFilter(Motivo, '<>%1', '');
         sinHueco := TempFila.Count();
 
-        if EsCompra then begin
-            if sinHueco > 0 then
-                Resumen := StrSubstNo(ResumenRecepcionesSinHuecoLbl, total, pendientes, sinHueco)
-            else
-                Resumen := StrSubstNo(ResumenRecepcionesLbl, total, pendientes);
-        end else
-            if sinHueco > 0 then
-                Resumen := StrSubstNo(ResumenEnsambladosSinHuecoLbl, total, pendientes, sinHueco)
-            else
-                Resumen := StrSubstNo(ResumenEnsambladosLbl, total, pendientes);
+        Resumen := StrSubstNo(ResumenLbl, total, queLbl, pendientes);
+        if sinHueco > 0 then
+            Resumen += StrSubstNo(SinHuecoLbl, sinHueco);
     end;
 }

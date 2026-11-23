@@ -141,7 +141,7 @@ page 51103 "Contenido Ubicaciones SGA"
                     cContenido: Codeunit "Gestion Contenido SGA";
                     destino: Code[20];
                 begin
-                    if cContenido.TrasladarConDialogo(Rec, destino, '', false) <> 0 then
+                    if cContenido.TrasladarConDialogo(Rec, destino, '', false) then
                         CurrPage.Update(false);
                 end;
             }
@@ -168,20 +168,30 @@ page 51103 "Contenido Ubicaciones SGA"
                 Image = PhysicalInventory;
 
                 trigger OnAction()
+                var
+                    pRecontar: Page "Recontar Contenido SGA";
                 begin
-                    RecontarContenido();
+                    // El diálogo registra el recuento al aceptar.
+                    pRecontar.Inicializar(Rec);
+                    if pRecontar.RunModal() = Action::OK then
+                        CurrPage.Update(false);
                 end;
             }
             action(Desubicar)
             {
                 Caption = 'Quitar de la ubicación';
-                ToolTip = 'Saca de su ubicación las líneas seleccionadas y las deja pendientes de ubicar. No toca el stock de BC: la mercancía sigue en el almacén y vuelve a salir en "Ubicar producto" para colocarla bien.';
+                ToolTip = 'Saca de su ubicación las líneas seleccionadas y las deja pendientes de ubicar. No toca el stock de BC: la mercancía sigue en el almacén y vuelve a salir en "Ubicar producto" para colocarla bien. Lo reservado por una orden de picking no se puede quitar.';
                 ApplicationArea = All;
                 Image = RemoveLine;
 
                 trigger OnAction()
+                var
+                    rContenido: Record "Contenido Ubicacion SGA";
+                    cContenido: Codeunit "Gestion Contenido SGA";
                 begin
-                    DesubicarSeleccion();
+                    CurrPage.SetSelectionFilter(rContenido);
+                    if cContenido.DesubicarConDialogo(rContenido) > 0 then
+                        CurrPage.Update(false);
                 end;
             }
         }
@@ -274,71 +284,5 @@ page 51103 "Contenido Ubicaciones SGA"
     trigger OnAfterGetRecord()
     begin
         EstiloFila := Rec.EstiloContenido();
-    end;
-
-    /// <summary>
-    /// Saca de su ubicación las líneas seleccionadas, enteras, con una salida en el diario.
-    /// El stock de BC no cambia, así que la mercancía queda pendiente de ubicar: vuelve a salir
-    /// en "Ubicar producto" y en la conciliación como sin ubicar. Sirve para deshacer una
-    /// ubicación equivocada sin tener que inventarse un recuento.
-    ///
-    /// No se deja quitar lo reservado por una orden de picking: se quedaría sin el stock que
-    /// tiene que recoger. Hay que cancelar antes la orden o su parada.
-    /// </summary>
-    local procedure DesubicarSeleccion()
-    var
-        rContenido: Record "Contenido Ubicacion SGA";
-        rLinea: Record "Contenido Ubicacion SGA";
-        cContenido: Codeunit "Gestion Contenido SGA";
-        cConfirmMgt: Codeunit "Confirm Management";
-        lineas: Integer;
-        DesubicarLineasQst: Label 'Se van a quitar de su ubicación %1 líneas de contenido. La mercancía queda pendiente de ubicar (el stock de BC no cambia). ¿Continuar?', Comment = '%1 = número de líneas';
-        LineaDesubicadaMsg: Label 'Se ha quitado %1 %2 de %3 de la ubicación %4. Queda pendiente de ubicar.', Comment = '%1 = cantidad, %2 = unidad, %3 = producto, %4 = ubicación';
-        LineasDesubicadasMsg: Label 'Se han quitado %1 líneas de sus ubicaciones. Quedan pendientes de ubicar.', Comment = '%1 = número de líneas';
-    begin
-        CurrPage.SetSelectionFilter(rContenido);
-        lineas := rContenido.Count();
-        if lineas = 0 then
-            exit;
-
-        if not cConfirmMgt.GetResponseOrDefault(StrSubstNo(DesubicarLineasQst, lineas), false) then
-            exit;
-
-        // El mensaje de una sola línea cuenta lo que se ha quitado: se lee antes, porque al
-        // quitarla la línea desaparece.
-        if lineas = 1 then begin
-            rContenido.FindFirst();
-            rLinea := rContenido;
-        end;
-
-        lineas := cContenido.DesubicarLineas(rContenido);
-
-        if lineas = 1 then
-            Message(LineaDesubicadaMsg, rLinea."Cantidad Base", rLinea."Cod. Unidad Medida", rLinea."No. Producto", rLinea."Cod. Bin")
-        else
-            Message(LineasDesubicadasMsg, lineas);
-
-        CurrPage.Update(false);
-    end;
-
-    local procedure RecontarContenido()
-    var
-        cContenido: Codeunit "Gestion Contenido SGA";
-        pagRecontar: Page "Recontar Contenido SGA";
-        noMovimiento: Integer;
-        SinDiferenciaMsg: Label 'No había diferencia: la cantidad contada coincide con la registrada.';
-    begin
-        pagRecontar.Inicializar(Rec);
-        if pagRecontar.RunModal() <> Action::OK then
-            exit;
-
-        noMovimiento := cContenido.RegistrarRecuento(Rec."Cod. Almacen", Rec."Cod. Bin", Rec."No. Producto",
-                                                     Rec."No. Lote", Rec.SSCC,
-                                                     pagRecontar.ObtenerCantidadContada(),
-                                                     pagRecontar.ObtenerMotivo());
-        if noMovimiento = 0 then
-            Message(SinDiferenciaMsg);
-
-        CurrPage.Update(false);
     end;
 }

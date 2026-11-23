@@ -16,7 +16,7 @@ SGA es el módulo de gestión de ubicaciones del almacén dentro de Business Cen
 - **No ubica al registrar**: las compras y ensamblados se ubican después, al confirmarlo el operario. Así un hueco lleno nunca impide registrar un albarán.
 - **No crea solo la orden de picking**: oficina la envía desde el pedido lanzado.
 - **No regulariza excesos**: si las ubicaciones tienen más que BC, se recuenta a mano.
-- **No usa los documentos de almacén estándar de BC** (picking, envíos y movimientos de almacén).
+- **No usa los documentos de almacén estándar de BC** (picking, envíos y movimientos de almacén) **ni sus ubicaciones**: los huecos son de SGA, y el almacén no necesita *Ubicación obligatoria*.
 
 ## Flujos principales
 

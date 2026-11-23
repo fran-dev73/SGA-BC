@@ -2,7 +2,6 @@ namespace AntonioNadal.SGA;
 
 using Microsoft.Foundation.NoSeries;
 using Microsoft.Inventory.Location;
-using Microsoft.Warehouse.Structure;
 
 /// <summary>
 /// Table Config. SGA (ID 51104).
@@ -33,7 +32,7 @@ table 51104 "Config. SGA"
             trigger OnValidate()
             var
                 rZona: Record "Zona SGA";
-                rBin: Record Bin;
+                rUbicacionSGA: Record "Ubicacion SGA";
             begin
                 // La zona, la ubicación de ajustes y la playa son de un almacén: si no son del
                 // nuevo, se vacían para que no queden apuntando al anterior.
@@ -41,7 +40,7 @@ table 51104 "Config. SGA"
                     if not rZona.Get("Almacen por Defecto", "Zona por Defecto") then
                         "Zona por Defecto" := '';
                 if "Ubic. Ajustes" <> '' then
-                    if not rBin.Get("Almacen por Defecto", "Ubic. Ajustes") then
+                    if not rUbicacionSGA.Get("Almacen por Defecto", "Ubic. Ajustes") then
                         "Ubic. Ajustes" := '';
                 if "Playa por Defecto" <> '' then
                     if not rZona.Get("Almacen por Defecto", "Playa por Defecto") then
@@ -60,7 +59,7 @@ table 51104 "Config. SGA"
         {
             Caption = 'Ubic. ajustes';
             DataClassification = ToBeClassified;
-            TableRelation = Bin.Code where("Location Code" = field("Almacen por Defecto"));
+            TableRelation = "Ubicacion SGA"."Cod. Bin" where("Cod. Almacen" = field("Almacen por Defecto"));
             ToolTip = 'Ubicación contrapartida de los ajustes y descuadres detectados en la conciliación.';
         }
         field(25; "Playa por Defecto"; Code[10])

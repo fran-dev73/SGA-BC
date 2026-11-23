@@ -280,7 +280,6 @@ page 51117 "Ubicar Producto SGA"
         TempPlan: Record "Linea Ubicacion SGA";
         cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
         cUM: Codeunit "Unidades Producto SGA";
-        cUOMMgt: Codeunit "Unit of Measure Management";
         Almacen: Code[10];
         Producto: Code[20];
         DescripcionProducto: Text[100];
@@ -360,7 +359,7 @@ page 51117 "Ubicar Producto SGA"
         pendienteBase := cStock.PendienteDeUbicar(Almacen, Producto, Lote, stockBase, ubicadoBase);
 
         // El cálculo va en unidad base; se pasa a la UM elegida con su factor de conversión.
-        PendienteUbicar := cUOMMgt.CalcQtyFromBase(pendienteBase, cUM.FactorUM(Producto, UM));
+        PendienteUbicar := cUM.DesdeBase(Producto, UM, pendienteBase);
         DetalleDisponible := StrSubstNo(DetallePendienteLbl, stockBase, ubicadoBase, cUM.UMBase(Producto));
         DesglosePendiente := cUM.Desglose(Producto, pendienteBase);
         CalcularEquivalencia();
@@ -379,7 +378,7 @@ page 51117 "Ubicar Producto SGA"
         if (Producto = '') or (Cantidad <= 0) then
             exit;
 
-        cantidadBase := cUOMMgt.CalcBaseQty(Cantidad, cUM.FactorUM(Producto, UM));
+        cantidadBase := cUM.EnBase(Producto, UM, Cantidad);
         EquivaleBase := StrSubstNo(EquivalenciaLbl, cantidadBase, cUM.UMBase(Producto), cUM.Desglose(Producto, cantidadBase));
     end;
 
@@ -398,24 +397,19 @@ page 51117 "Ubicar Producto SGA"
     local procedure CalcularPropuesta()
     var
         rConfig: Record "Config. SGA";
-        cStock: Codeunit "Consulta Stock SGA";
         cConfirmMgt: Codeunit "Confirm Management";
         DatosIncompletosErr: Label 'Indique almacén, producto y cantidad antes de proponer una ubicación.';
-        LoteObligatorioErr: Label 'El producto %1 lleva lotes: indique el lote que va a ubicar.', Comment = '%1 = producto';
         UbicarLineaQst: Label '¿Ubicar %1 %2 de %3 en %4?', Comment = '%1 = cantidad, %2 = unidad, %3 = producto, %4 = ubicación';
         MasQuePendienteErr: Label 'Solo quedan %1 %2 pendientes de ubicar: SGA no puede ubicar más de lo que hay en el almacén según Business Central.', Comment = '%1 = cantidad pendiente, %2 = unidad';
     begin
         if (Almacen = '') or (Producto = '') or (Cantidad <= 0) then
             Error(DatosIncompletosErr);
-        // Con lotes de BC hay que saber de qué lote es: en blanco se mezclarían todos.
-        if (Lote = '') and cStock.LoteEstandar(Producto) then
-            Error(LoteObligatorioErr, Producto);
         if Cantidad > PendienteUbicar then
             Error(MasQuePendienteErr, PendienteUbicar, UM);
 
         rConfig.ObtenerConfig();
         cUbicaciones.ProponerReparto(rConfig."Estrategia Ubicacion", Almacen, Producto, Lote,
-                                     cUOMMgt.CalcBaseQty(Cantidad, cUM.FactorUM(Producto, UM)), TempPlan);
+                                     cUM.EnBase(Producto, UM, Cantidad), TempPlan);
 
         CurrPage.Plan.Page.Cargar(TempPlan);
         CurrPage.Update(false);
@@ -432,17 +426,15 @@ page 51117 "Ubicar Producto SGA"
 
     /// <summary>
     /// Registra las líneas de la tabla (todas con prm_Linea = 0, o solo una) con ConfirmarReparto
-    /// de "Gestion Ubicaciones SGA". Lo que queda sin ubicar pasa a ser la cantidad, en unidad
+    /// de "Gestion Entradas SGA". Lo que queda sin ubicar pasa a ser la cantidad, en unidad
     /// base, para volver a proponerlo cuando haya sitio; la tabla se queda a la vista.
     /// </summary>
     local procedure ConfirmarLineas(prm_Linea: Integer)
     var
-        restoBase: Decimal;
+        cEntradas: Codeunit "Gestion Entradas SGA";
     begin
-        restoBase := cUbicaciones.ConfirmarReparto(TempPlan, prm_Linea, Almacen, Producto, Lote);
-
+        Cantidad := cEntradas.ConfirmarReparto(TempPlan, prm_Linea);
         UM := cUM.UMBase(Producto);
-        Cantidad := restoBase;
         RecalcularPendiente();
         CurrPage.Plan.Page.Cargar(TempPlan);
         CurrPage.Update(false);

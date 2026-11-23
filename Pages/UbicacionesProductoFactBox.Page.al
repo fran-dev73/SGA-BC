@@ -75,13 +75,19 @@ page 51109 "Ubicaciones Producto FactBox"
 
                 trigger OnAction()
                 var
-                    rContenido: Record "Contenido Ubicacion SGA";
+                    cStock: Codeunit "Consulta Stock SGA";
+                    producto: Code[20];
+                    almacen: Code[10];
                 begin
-                    // Los filtros del enlace con la página que contiene el FactBox van en el grupo 4.
+                    // El enlace con la página que contiene el FactBox filtra en el grupo 4: el
+                    // producto y, en el análisis ABC, también el almacén.
                     Rec.FilterGroup(4);
-                    rContenido.CopyFilters(Rec);
+                    if Rec.GetFilter("No. Producto") <> '' then
+                        producto := Rec.GetRangeMin("No. Producto");
+                    if Rec.GetFilter("Cod. Almacen") <> '' then
+                        almacen := Rec.GetRangeMin("Cod. Almacen");
                     Rec.FilterGroup(0);
-                    Page.Run(Page::"Consulta Ubic. Producto SGA", rContenido);
+                    cStock.ConsultarUbicacionesProducto(producto, almacen, '');
                 end;
             }
         }

@@ -88,61 +88,11 @@ page 51102 "Contenido Ubicacion Subpag"
         }
     }
 
-    actions
-    {
-        area(Processing)
-        {
-            action(Trasladar)
-            {
-                Caption = 'Trasladar';
-                ToolTip = 'Mueve todo o parte de este contenido a otra ubicación del mismo almacén.';
-                ApplicationArea = All;
-                Image = TransferOrder;
-                Enabled = not SoloConsulta;
-
-                trigger OnAction()
-                var
-                    cContenido: Codeunit "Gestion Contenido SGA";
-                    destino: Code[20];
-                begin
-                    if cContenido.TrasladarConDialogo(Rec, destino, '', false) <> 0 then
-                        CurrPage.Update(false);
-                end;
-            }
-            action(AlternarBloqueo)
-            {
-                Caption = 'Bloquear / desbloquear';
-                ToolTip = 'Bloquea o desbloquea esta línea de contenido.';
-                ApplicationArea = All;
-                Image = Lock;
-                Enabled = not SoloConsulta;
-
-                trigger OnAction()
-                var
-                    cContenido: Codeunit "Gestion Contenido SGA";
-                begin
-                    cContenido.AlternarBloqueo(Rec);
-                    CurrPage.Update(false);
-                end;
-            }
-        }
-    }
-
     var
         EstiloFila: Text;
-        SoloConsulta: Boolean;
 
     trigger OnAfterGetRecord()
     begin
         EstiloFila := Rec.EstiloContenido();
-    end;
-
-    /// <summary>
-    /// Con la ficha de la ubicación en modo ver, el contenido solo se mira: sin trasladar ni
-    /// bloquear.
-    /// </summary>
-    procedure FijarSoloConsulta(prm_SoloConsulta: Boolean)
-    begin
-        SoloConsulta := prm_SoloConsulta;
     end;
 }

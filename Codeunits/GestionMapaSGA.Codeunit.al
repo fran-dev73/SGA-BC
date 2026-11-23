@@ -141,7 +141,7 @@ codeunit 51102 "Gestion Mapa SGA"
             // Sin pasillo, estantería y altura no hay dónde colocar el cubo.
             if cUbicaciones.TrocearCodigo(rUbicacionSGA."Cod. Bin", pasillo, estanteria, altura) then
                 if (prm_Pasillo = 0) or (pasillo = prm_Pasillo) then begin
-                    rUbicacionSGA.CalcFields("Lineas Contenido", Descripcion);
+                    rUbicacionSGA.CalcFields("Lineas Contenido");
 
                     Clear(elemento);
                     elemento.Add('b', rUbicacionSGA."Cod. Bin");
@@ -272,10 +272,10 @@ codeunit 51102 "Gestion Mapa SGA"
         umPale: Code[10];
         factorMostrar: Decimal;
     begin
-        rItem.SetLoadFields(Description, "Sales Unit of Measure", "Base Unit of Measure");
+        rItem.SetLoadFields(Description);
         if not rItem.Get(prm_Contenido."No. Producto") then
             Clear(rItem);
-        UnidadParaMostrar(rItem, prm_Contenido."Cantidad Base", umMostrar, factorMostrar);
+        cUM.UnidadParaMostrar(prm_Contenido."No. Producto", prm_Contenido."Cantidad Base", umMostrar, factorMostrar);
 
         linea.Add('p', prm_Contenido."No. Producto");
         linea.Add('t', CopyStr(rItem.Description, 1, 60));
@@ -304,44 +304,13 @@ codeunit 51102 "Gestion Mapa SGA"
     end;
 
     /// <summary>
-    /// Unidad en la que se enseña una línea de contenido y sus unidades base, con las mismas
-    /// reglas de palé y caja que el resto de SGA (Unidades Producto SGA): el palé si la línea lo
-    /// llena al 100 %; si no, la caja de venta; si no, la base. En blanco si el producto no se
-    /// reconoce.
-    /// </summary>
-    local procedure UnidadParaMostrar(var prm_Item: Record Item; prm_CantidadBase: Decimal; var prm_UM: Code[10]; var prm_Factor: Decimal)
-    var
-        cUM: Codeunit "Unidades Producto SGA";
-    begin
-        prm_UM := '';
-        prm_Factor := 0;
-        if prm_Item."No." = '' then
-            exit;
-
-        prm_Factor := cUM.FactorPale(prm_Item."No.");
-        if (prm_Factor > 1) and (prm_CantidadBase >= prm_Factor) then begin
-            prm_UM := cUM.UMPale(prm_Item."No.");
-            exit;
-        end;
-
-        if cUM.EsCaja(prm_Item."No.", prm_Item."Sales Unit of Measure") then begin
-            prm_UM := prm_Item."Sales Unit of Measure";
-            prm_Factor := cUM.FactorUM(prm_Item."No.", prm_UM);
-            exit;
-        end;
-
-        prm_UM := prm_Item."Base Unit of Measure";
-        prm_Factor := 1;
-    end;
-
-    /// <summary>
     /// Traduce el estado de la ubicación al índice de color que entiende el lienzo. Con
     /// contenido que no se puede medir (prm_SinMedir), 4: no se sabe si está llena.
     /// </summary>
     local procedure EstadoNumerico(var prm_Ubicacion: Record "Ubicacion SGA"; prm_SinMedir: Boolean): Integer
     begin
-        // Bloqueada la ubicación o su zona entera: no admite movimientos (EsUtilizable).
-        if not prm_Ubicacion.EsUtilizable() then
+        // El estado guardado ya dice si está bloqueada ella o su zona entera (RecalcularOcupacion).
+        if prm_Ubicacion."Estado SGA" = prm_Ubicacion."Estado SGA"::Bloqueada then
             exit(3);
         if prm_SinMedir then
             exit(4);
@@ -384,8 +353,8 @@ codeunit 51102 "Gestion Mapa SGA"
     begin
         prm_Estilo := prm_Ubicacion.EstiloEstado();
 
-        // Bloqueada la ubicación o su zona entera.
-        if not prm_Ubicacion.EsUtilizable() then begin
+        // Bloqueada la ubicación o su zona entera (el estado guardado ya lo recoge).
+        if prm_Ubicacion."Estado SGA" = prm_Ubicacion."Estado SGA"::Bloqueada then begin
             prm_Estilo := 'Unfavorable';
             prm_Resumen := 'BLOQ';
             exit;

@@ -37,6 +37,23 @@ codeunit 51108 "Unidades Producto SGA"
     end;
 
     /// <summary>
+    /// Una cantidad en una unidad del producto, pasada a unidad base con el factor de la ficha
+    /// (FactorUM) y el redondeo estándar ("Unit of Measure Management").
+    /// </summary>
+    procedure EnBase(prm_Producto: Code[20]; prm_UM: Code[10]; prm_Cantidad: Decimal): Decimal
+    begin
+        exit(cUOMMgt.CalcBaseQty(prm_Cantidad, FactorUM(prm_Producto, prm_UM)));
+    end;
+
+    /// <summary>
+    /// Una cantidad en unidad base, pasada a una unidad del producto (lo contrario de EnBase).
+    /// </summary>
+    procedure DesdeBase(prm_Producto: Code[20]; prm_UM: Code[10]; prm_CantidadBase: Decimal): Decimal
+    begin
+        exit(cUOMMgt.CalcQtyFromBase(prm_CantidadBase, FactorUM(prm_Producto, prm_UM)));
+    end;
+
+    /// <summary>
     /// Unidad de medida base del producto. En blanco si el producto no existe.
     /// </summary>
     procedure UMBase(prm_Producto: Code[20]): Code[10]
@@ -126,23 +143,54 @@ codeunit 51108 "Unidades Producto SGA"
     end;
 
     /// <summary>
-    /// Si la unidad de medida es la caja de venta del producto: la de venta de la ficha, con más
-    /// de una unidad base y menos que el palé. Es lo que decide que una línea se prepare por cajas.
+    /// Si la unidad de medida es la caja del producto (UnidadesReparto: la de venta de la ficha,
+    /// con más de una unidad base y menos que el palé si lo tiene). Es lo que decide que una
+    /// línea se prepare por cajas.
     /// </summary>
     procedure EsCaja(prm_Producto: Code[20]; prm_UM: Code[10]): Boolean
     var
-        rItem: Record Item;
+        umDelPale: Code[10];
+        umCaja: Code[10];
+        factorDelPale: Decimal;
         factorCaja: Decimal;
     begin
         if prm_UM = '' then
             exit(false);
-        rItem.SetLoadFields("Sales Unit of Measure");
-        if not rItem.Get(prm_Producto) then
-            exit(false);
-        if rItem."Sales Unit of Measure" <> prm_UM then
-            exit(false);
-        factorCaja := FactorUM(prm_Producto, prm_UM);
-        exit((factorCaja > 1) and (factorCaja < FactorPale(prm_Producto)));
+        UnidadesReparto(prm_Producto, '', umDelPale, factorDelPale, umCaja, factorCaja);
+        exit(umCaja = prm_UM);
+    end;
+
+    /// <summary>
+    /// Unidad en la que se enseña una cantidad del producto y sus unidades base, con las reglas
+    /// de palé y caja de UnidadesReparto: el palé si la cantidad lo llena; si no, la caja; si no,
+    /// la base. En blanco (y factor 0) si el producto no existe.
+    /// </summary>
+    procedure UnidadParaMostrar(prm_Producto: Code[20]; prm_CantidadBase: Decimal; var prm_UM: Code[10]; var prm_Factor: Decimal)
+    var
+        umDelPale: Code[10];
+        umCaja: Code[10];
+        factorDelPale: Decimal;
+        factorCaja: Decimal;
+    begin
+        UnidadesReparto(prm_Producto, '', umDelPale, factorDelPale, umCaja, factorCaja);
+        case true of
+            (umDelPale <> '') and (prm_CantidadBase >= factorDelPale):
+                begin
+                    prm_UM := umDelPale;
+                    prm_Factor := factorDelPale;
+                end;
+            umCaja <> '':
+                begin
+                    prm_UM := umCaja;
+                    prm_Factor := factorCaja;
+                end;
+            else begin
+                prm_UM := UMBase(prm_Producto);
+                prm_Factor := 1;
+                if prm_UM = '' then
+                    prm_Factor := 0;
+            end;
+        end;
     end;
 
     /// <summary>

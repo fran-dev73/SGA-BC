@@ -220,6 +220,21 @@ table 51103 "Movimiento Ubicacion SGA"
     end;
 
     /// <summary>
+    /// Deja solo los movimientos de una entrada (recepción o ensamblado): los de su documento y,
+    /// si lo tiene, los de su documento relacionado. Los palés de un ensamblado ubicados al
+    /// imprimir su etiqueta van con el nº del pedido, que no es el del registrado.
+    /// </summary>
+    procedure FiltrarEntrada(prm_Origen: Enum "Origen Mov. SGA"; prm_NoDocumento: Code[20]; prm_DocumentoRelacionado: Code[20])
+    begin
+        SetCurrentKey(Origen, "No. Documento Origen", "No. Linea Origen");
+        SetRange(Origen, prm_Origen);
+        if (prm_DocumentoRelacionado <> '') and (prm_DocumentoRelacionado <> prm_NoDocumento) then
+            SetFilter("No. Documento Origen", '%1|%2', prm_NoDocumento, prm_DocumentoRelacionado)
+        else
+            SetRange("No. Documento Origen", prm_NoDocumento);
+    end;
+
+    /// <summary>
     /// Texto legible del recorrido del movimiento, para listas y factboxes.
     /// </summary>
     procedure Recorrido(): Text

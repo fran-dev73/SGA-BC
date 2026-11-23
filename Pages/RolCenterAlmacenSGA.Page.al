@@ -5,7 +5,6 @@ using Microsoft.Purchases.Document;
 using Microsoft.Purchases.History;
 using Microsoft.Sales.Document;
 using Microsoft.Sales.History;
-using Microsoft.Warehouse.Structure;
 
 /// <summary>
 /// Page Rol Center Almacen SGA (ID 51112).
@@ -50,7 +49,7 @@ page 51112 "Rol Center Almacen SGA"
             action(PedidosVenta)
             {
                 Caption = 'Pedidos de venta';
-                ToolTip = 'Pedidos de venta, de los que salen las órdenes de picking al lanzarlos.';
+                ToolTip = 'Pedidos de venta. Las órdenes de picking salen de un pedido lanzado con Enviar a SGA.';
                 ApplicationArea = All;
                 RunObject = page "Sales Order List";
             }
@@ -167,51 +166,6 @@ page 51112 "Rol Center Almacen SGA"
                     RunObject = page "Contenido Ubicaciones SGA";
                 }
             }
-            group(SGAVentasCompras)
-            {
-                Caption = 'Almacén SGA - Ventas y compras';
-
-                action(SeccionProductos)
-                {
-                    Caption = 'Productos';
-                    ToolTip = 'Fichas de los productos: unidades de medida, palé por defecto y existencias.';
-                    ApplicationArea = All;
-                    Image = Item;
-                    RunObject = page "Item List";
-                }
-                action(SeccionPedidosVenta)
-                {
-                    Caption = 'Pedidos de venta';
-                    ToolTip = 'Pedidos de venta. Las órdenes de picking salen de un pedido lanzado con Enviar a SGA.';
-                    ApplicationArea = All;
-                    Image = Document;
-                    RunObject = page "Sales Order List";
-                }
-                action(SeccionAlbaranesVenta)
-                {
-                    Caption = 'Histórico de albaranes de venta';
-                    ToolTip = 'Envíos de venta ya registrados.';
-                    ApplicationArea = All;
-                    Image = PostedShipment;
-                    RunObject = page "Posted Sales Shipments";
-                }
-                action(SeccionPedidosCompra)
-                {
-                    Caption = 'Pedidos de compra';
-                    ToolTip = 'Pedidos de compra pendientes de recibir.';
-                    ApplicationArea = All;
-                    Image = Document;
-                    RunObject = page "Purchase Order List";
-                }
-                action(SeccionAlbaranesCompra)
-                {
-                    Caption = 'Histórico de albaranes de compra';
-                    ToolTip = 'Recepciones de compra ya registradas, de las que sale lo que hay que ubicar.';
-                    ApplicationArea = All;
-                    Image = PostedReceipt;
-                    RunObject = page "Posted Purchase Receipts";
-                }
-            }
             group(SGAConsultas)
             {
                 Caption = 'Almacén SGA - Consultas';
@@ -325,8 +279,8 @@ page 51112 "Rol Center Almacen SGA"
                 }
                 action(SincronizarUbicaciones)
                 {
-                    Caption = 'Sincronizar ubicaciones';
-                    ToolTip = 'Da de alta en SGA las ubicaciones que aún no tienen datos de gestión.';
+                    Caption = 'Recalcular ubicaciones';
+                    ToolTip = 'Recalcula el estado y la ocupación de las ubicaciones y, si se marca, reconstruye el contenido desde los movimientos.';
                     ApplicationArea = All;
                     Image = Refresh;
                     RunObject = report "Sincronizar Ubicaciones SGA";

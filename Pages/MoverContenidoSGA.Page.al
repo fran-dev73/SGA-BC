@@ -1,11 +1,12 @@
 namespace AntonioNadal.SGA;
 
-using Microsoft.Warehouse.Structure;
 
 /// <summary>
 /// Page Mover Contenido SGA (ID 51114).
 /// Diálogo de traslado: pregunta a dónde y cuánto se mueve, partiendo de una línea de
-/// contenido concreta. No registra nada; el traslado lo hace Cod. "Gestion Contenido SGA".
+/// contenido concreta, y al aceptar registra el traslado (RegistrarTraslado de Cod. "Gestion
+/// Contenido SGA"). Si no se puede, da el error y el diálogo sigue abierto. Se abre con
+/// TrasladarConDialogo.
 ///
 /// Con una zona destino, propone hueco en esa zona (ProponerEnZona) y solo admite
 /// ubicaciones suyas; el operario puede cambiar la propuesta por otra de la zona. Así se
@@ -108,7 +109,7 @@ page 51114 "Mover Contenido SGA"
                     ToolTip = 'Ubicación a la que se lleva la mercancía. Con zona destino, tiene que ser de esa zona.';
                     ApplicationArea = All;
                     ShowMandatory = true;
-                    TableRelation = Bin.Code;
+                    TableRelation = "Ubicacion SGA"."Cod. Bin";
 
                     trigger OnLookup(var Text: Text): Boolean
                     var
@@ -199,25 +200,25 @@ page 51114 "Mover Contenido SGA"
         ZonaEditable := not SoloMismaZona;
     end;
 
-    /// <summary>
-    /// El destino tiene que ser de la misma zona que el origen. Lo pide el mapa 3D, que no
-    /// traslada entre zonas: la zona destino es la del origen y no se puede cambiar. Va
-    /// después de Inicializar, que lee la zona del origen.
-    /// </summary>
-    procedure LimitarAMismaZona()
+    trigger OnQueryClosePage(CloseAction: Action): Boolean
+    var
+        cContenido: Codeunit "Gestion Contenido SGA";
     begin
-        SoloMismaZona := true;
-        ZonaDestino := ZonaOrigen;
+        if CloseAction <> Action::OK then
+            exit(true);
+        ComprobarZona();
+        cContenido.RegistrarTraslado(Almacen, UbicacionOrigen, UbicacionDestino, Producto, Lote, SSCC, UM, Cantidad,
+                                     "Origen Mov. SGA"::Manual, '', 0, Motivo);
+        exit(true);
     end;
 
+    /// <summary>
+    /// Con zona destino (la del origen si es del mapa 3D), el destino tiene que ser suyo.
+    /// </summary>
     local procedure ComprobarZona()
     var
         cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
     begin
-        if UbicacionDestino = '' then
-            exit;
-        if SoloMismaZona then
-            cUbicaciones.TestMismaZona(Almacen, UbicacionOrigen, UbicacionDestino);
         cUbicaciones.TestUbicacionEnZona(Almacen, UbicacionDestino, ZonaDestino);
     end;
 
@@ -241,9 +242,12 @@ page 51114 "Mover Contenido SGA"
     end;
 
     /// <summary>
-    /// Carga el diálogo desde una línea de contenido y propone trasladarlo entero.
+    /// Carga el diálogo desde una línea de contenido y propone trasladarlo entero. Con
+    /// prm_Destino relleno sale ese destino (el mapa 3D, donde ya se ha elegido arrastrando).
+    /// Con prm_MismaZona el destino tiene que ser de la zona del origen y la zona destino no se
+    /// puede cambiar (el mapa 3D no traslada entre zonas).
     /// </summary>
-    procedure Inicializar(var rContenido: Record "Contenido Ubicacion SGA")
+    procedure Inicializar(var rContenido: Record "Contenido Ubicacion SGA"; prm_Destino: Code[20]; prm_Motivo: Text[100]; prm_MismaZona: Boolean)
     var
         rUbicacionSGA: Record "Ubicacion SGA";
     begin
@@ -255,36 +259,20 @@ page 51114 "Mover Contenido SGA"
         UM := rContenido."Cod. Unidad Medida";
         CantidadDisponible := rContenido."Cantidad Disponible";
         Cantidad := rContenido."Cantidad Disponible";
+        UbicacionDestino := prm_Destino;
+        Motivo := prm_Motivo;
 
         ZonaOrigen := rUbicacionSGA.ZonaDe(Almacen, UbicacionOrigen);
+        SoloMismaZona := prm_MismaZona;
+        if SoloMismaZona then
+            ZonaDestino := ZonaOrigen;
     end;
 
     /// <summary>
-    /// Deja propuesto el destino. Lo usa el mapa 3D, donde el destino ya se ha elegido
-    /// arrastrando; el operario solo confirma la cantidad.
+    /// El destino al que se ha trasladado.
     /// </summary>
-    procedure FijarDestino(prm_Destino: Code[20])
+    procedure DestinoElegido(): Code[20]
     begin
-        UbicacionDestino := prm_Destino;
-    end;
-
-    /// <summary>
-    /// El destino elegido, comprobada la zona. Que no esté en blanco ni sea el origen, y que la
-    /// cantidad sea positiva, lo comprueba RegistrarTraslado al registrar.
-    /// </summary>
-    procedure ObtenerDestino(): Code[20]
-    begin
-        ComprobarZona();
         exit(UbicacionDestino);
-    end;
-
-    procedure ObtenerCantidad(): Decimal
-    begin
-        exit(Cantidad);
-    end;
-
-    procedure ObtenerMotivo(): Text[100]
-    begin
-        exit(Motivo);
     end;
 }

@@ -142,13 +142,9 @@ page 51132 "Reposiciones SGA"
                 trigger OnAction()
                 var
                     cPicking: Codeunit "Gestion Picking SGA";
-                    cConfirmMgt: Codeunit "Confirm Management";
-                    CancelarQst: Label '¿Cancelar la reposición de %1 de %2 a %3?', Comment = '%1 = producto, %2 = ubicación origen, %3 = ubicación destino';
                 begin
-                    if not cConfirmMgt.GetResponseOrDefault(StrSubstNo(CancelarQst, Rec."No. Producto", Rec."Cod. Bin Propuesto", Rec."Cod. Bin Destino"), false) then
-                        exit;
-                    cPicking.CancelarLinea(Rec);
-                    CurrPage.Update(false);
+                    if cPicking.CancelarLineaConDialogo(Rec) then
+                        CurrPage.Update(false);
                 end;
             }
         }

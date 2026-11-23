@@ -1,7 +1,6 @@
 namespace AntonioNadal.SGA;
 
 using Microsoft.Inventory.Item;
-using Microsoft.Warehouse.Structure;
 
 /// <summary>
 /// Table Linea Ubicacion SGA (ID 51114).
@@ -120,8 +119,8 @@ table 51114 "Linea Ubicacion SGA"
             ToolTip = 'Hueco en el que se deja. En blanco si no se ha podido ubicar.';
             DataClassification = ToBeClassified;
             // Las entradas (Compra y Produccion) no llevan relación ni búsqueda: el hueco se escanea o
-            // se teclea. El resto conserva la búsqueda y la validación estándar de la relación con Bin.
-            TableRelation = if (Origen = filter(<> Compra & <> Produccion)) Bin.Code where("Location Code" = field("Cod. Almacen"));
+            // se teclea. El resto conserva la búsqueda y la validación estándar de la relación.
+            TableRelation = if (Origen = filter(<> Compra & <> Produccion)) "Ubicacion SGA"."Cod. Bin" where("Cod. Almacen" = field("Cod. Almacen"));
 
             trigger OnValidate()
             var

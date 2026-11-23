@@ -106,6 +106,7 @@ codeunit 51113 "Reposiciones SGA"
     local procedure Planificar(prm_Almacen: Code[10]; prm_Producto: Code[20]; prm_Preferida: Code[20]): Boolean
     var
         rContenido: Record "Contenido Ubicacion SGA";
+        rLineaPicking: Record "Linea Orden Picking SGA";
         cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
         cPicking: Codeunit "Gestion Picking SGA";
         destino: Code[20];
@@ -114,7 +115,7 @@ codeunit 51113 "Reposiciones SGA"
         motivo: Text;
     begin
         // Sin prm_Preferida, PlanificarAlmacen ya ha descartado lo que tiene algo en picking.
-        if ReubicacionPendiente(prm_Almacen, prm_Producto, prm_Preferida) then
+        if rLineaPicking.HayReposicionPendiente(prm_Almacen, prm_Preferida, prm_Producto, false) then
             exit(false);
         if not BuscarOrigen(prm_Almacen, prm_Producto, rContenido) then
             exit(false);
@@ -135,7 +136,7 @@ codeunit 51113 "Reposiciones SGA"
             exit(false);
         // Si va a otra ubicación que la vaciada, tampoco se duplica la que ya va hacia allí.
         if (destino <> prm_Preferida) and (prm_Preferida <> '') then
-            if ReubicacionPendiente(prm_Almacen, prm_Producto, destino) then
+            if rLineaPicking.HayReposicionPendiente(prm_Almacen, destino, prm_Producto, false) then
                 exit(false);
 
         cPicking.AnadirReubicacion(rContenido, cantidad, destino);
@@ -144,7 +145,7 @@ codeunit 51113 "Reposiciones SGA"
 
     /// <summary>
     /// El contenido de almacenamiento que se trae: el primero con algo disponible en el orden
-    /// de la estrategia de picking de la configuración.
+    /// de la estrategia de picking de la configuración (la pasada 1 del picking).
     /// </summary>
     local procedure BuscarOrigen(prm_Almacen: Code[10]; prm_Producto: Code[20]; var prm_Contenido: Record "Contenido Ubicacion SGA"): Boolean
     var
@@ -153,37 +154,15 @@ codeunit 51113 "Reposiciones SGA"
         tramo: Integer;
     begin
         rConfig.ObtenerConfig();
-        prm_Contenido.Reset();
         prm_Contenido.FiltrarDisponible(prm_Almacen, prm_Producto);
-        prm_Contenido.SetRange("Tipo Ubicacion", prm_Contenido."Tipo Ubicacion"::Almacenamiento);
         // El primero que se pueda coger: no de una ubicación o zona bloqueada.
         for tramo := 1 to 2 do
-            if cPicking.OrdenarPorEstrategia(prm_Contenido, rConfig."Estrategia Picking", tramo) then
-                if prm_Contenido.FindSet() then
-                    repeat
-                        if prm_Contenido.SePuedeCoger(false) then
-                            exit(true);
-                    until prm_Contenido.Next() = 0;
+            if cPicking.BuscarEnPasada(prm_Contenido, 1, rConfig."Estrategia Picking", tramo) then
+                repeat
+                    if prm_Contenido.SePuedeCoger(false) then
+                        exit(true);
+                until prm_Contenido.Next() = 0;
         exit(false);
-    end;
-
-    /// <summary>
-    /// Si el producto ya tiene una reubicación sin terminar en el almacén: hacia prm_Destino o,
-    /// con prm_Destino en blanco, hacia cualquier ubicación.
-    /// </summary>
-    local procedure ReubicacionPendiente(prm_Almacen: Code[10]; prm_Producto: Code[20]; prm_Destino: Code[20]): Boolean
-    var
-        rLinea: Record "Linea Orden Picking SGA";
-    begin
-        rLinea.SetCurrentKey("No. Producto", "No. Lote");
-        rLinea.SetRange("No. Producto", prm_Producto);
-        rLinea.SetRange("Cod. Almacen", prm_Almacen);
-        if prm_Destino <> '' then
-            rLinea.SetRange("Cod. Bin Destino", prm_Destino)
-        else
-            rLinea.SetFilter("Cod. Bin Destino", '<>%1', '');
-        rLinea.FiltrarPendientes();
-        exit(not rLinea.IsEmpty());
     end;
 
     var

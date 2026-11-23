@@ -154,11 +154,9 @@ page 51118 "Ordenes Picking SGA"
                 trigger OnAction()
                 var
                     cPicking: Codeunit "Gestion Picking SGA";
-                    PickingPasadoMsg: Label 'Lo recogido se ha pasado al pedido %1.', Comment = '%1 = nº pedido';
                 begin
-                    cPicking.PasarAPedido(Rec);
+                    cPicking.PasarAPedidoConMensaje(Rec, '');
                     CurrPage.Update(false);
-                    Message(PickingPasadoMsg, Rec."No. Documento Origen");
                 end;
             }
             action(Asignarme)

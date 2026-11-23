@@ -49,10 +49,26 @@ page 51113 "Conciliacion SGA"
                 field("Stock BC"; Rec."Stock BC")
                 {
                     ApplicationArea = All;
+                    ToolTip = 'Existencias del lote en BC, en el almacén. Pulse para ver los movimientos de producto abiertos de los que sale.';
+
+                    trigger OnDrillDown()
+                    var
+                        cStock: Codeunit "Consulta Stock SGA";
+                    begin
+                        cStock.MostrarStockBC(Rec);
+                    end;
                 }
                 field("Stock SGA"; Rec."Stock SGA")
                 {
                     ApplicationArea = All;
+                    ToolTip = 'Lo que hay del lote en ubicaciones de SGA. Pulse para ver en qué ubicaciones está.';
+
+                    trigger OnDrillDown()
+                    var
+                        cStock: Codeunit "Consulta Stock SGA";
+                    begin
+                        cStock.ConsultarUbicacionesProducto(Rec."No. Producto", Rec."Cod. Almacen", Rec."No. Lote");
+                    end;
                 }
                 field(Diferencia; Rec.Diferencia)
                 {
@@ -95,33 +111,6 @@ page 51113 "Conciliacion SGA"
                 end;
             }
         }
-        area(Navigation)
-        {
-            action(VerUbicaciones)
-            {
-                Caption = 'Ubicaciones del producto';
-                ToolTip = 'Muestra en qué ubicaciones está el producto de la línea.';
-                ApplicationArea = All;
-                Image = BinContent;
-                RunObject = page "Contenido Ubicaciones SGA";
-                RunPageLink = "No. Producto" = field("No. Producto"),
-                              "Cod. Almacen" = field("Cod. Almacen");
-            }
-            action(VerMovsProducto)
-            {
-                Caption = 'Movs. producto';
-                ToolTip = 'Abre los movimientos de producto de BC que forman el stock BC de la línea: abiertos, del mismo producto, lote y almacén.';
-                ApplicationArea = All;
-                Image = Entries;
-
-                trigger OnAction()
-                var
-                    cStock: Codeunit "Consulta Stock SGA";
-                begin
-                    cStock.MostrarStockBC(Rec);
-                end;
-            }
-        }
         area(Promoted)
         {
             group(Category_Process)
@@ -132,17 +121,6 @@ page 51113 "Conciliacion SGA"
                 {
                 }
                 actionref(Regularizar_Promoted; Regularizar)
-                {
-                }
-            }
-            group(Category_Navigate)
-            {
-                Caption = 'Producto';
-
-                actionref(VerUbicaciones_Promoted; VerUbicaciones)
-                {
-                }
-                actionref(VerMovsProducto_Promoted; VerMovsProducto)
                 {
                 }
             }

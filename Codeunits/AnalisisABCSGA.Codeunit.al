@@ -50,13 +50,8 @@ codeunit 51107 "Analisis ABC SGA"
         if prm_Almacen = '' then
             Error(AlmacenObligatorioErr);
 
+        // Días y cortes nacen con su valor (InitValue) y no bajan de 1 (MinValue).
         rConfig.ObtenerConfig();
-        if rConfig."Dias Analisis ABC" <= 0 then
-            rConfig."Dias Analisis ABC" := 90;
-        if rConfig."Corte ABC Clase A" <= 0 then
-            rConfig."Corte ABC Clase A" := 80;
-        if rConfig."Corte ABC Clase B" <= 0 then
-            rConfig."Corte ABC Clase B" := 95;
         if rConfig."Corte ABC Clase B" < rConfig."Corte ABC Clase A" then
             Error(CorteBMenorQueAErr, rConfig."Corte ABC Clase B", rConfig."Corte ABC Clase A");
 
@@ -202,7 +197,7 @@ codeunit 51107 "Analisis ABC SGA"
         clave: Text;
     begin
         // Los huecos útiles, de una vez: no se lee la ubicación de cada línea de contenido.
-        FiltrarHuecosUtiles(rUbicacion, prm_Calculo."Cod. Almacen");
+        rUbicacion.FiltrarUtiles(prm_Calculo."Cod. Almacen");
         rUbicacion.SetLoadFields("Cod. Bin");
         if rUbicacion.FindSet() then
             repeat
@@ -308,18 +303,27 @@ codeunit 51107 "Analisis ABC SGA"
         rUbicacion: Record "Ubicacion SGA";
         TempOrden: Record "Ubicacion SGA" temporary;
         rLinea: Record "Clasificacion ABC SGA";
+        cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
         palesA: Integer;
         palesB: Integer;
         n: Integer;
+        pasillo: Integer;
+        estanteria: Integer;
+        altura: Integer;
     begin
-        FiltrarHuecosUtiles(rUbicacion, prm_Calculo."Cod. Almacen");
+        rUbicacion.FiltrarUtiles(prm_Calculo."Cod. Almacen");
         rUbicacion.SetLoadFields("Secuencia Picking");
         if rUbicacion.FindSet() then
             repeat
                 TempOrden := rUbicacion;
-                // La secuencia de un código generado llega a 9.999.999 (pasillo 999): cabe
-                // entera detrás de la altura, que no pasa de 100.
-                TempOrden."Secuencia Picking" := NivelHueco(rUbicacion."Cod. Bin") * 10000000 + Minimo(rUbicacion."Secuencia Picking", 9999999);
+                // La altura sale del código (pasillo-estantería-altura); sin esa forma, 100:
+                // cuenta como la peor. La secuencia de un código generado llega a 9.999.999
+                // (pasillo 999): cabe entera detrás de la altura.
+                if not cUbicaciones.TrocearCodigo(rUbicacion."Cod. Bin", pasillo, estanteria, altura) then
+                    altura := 100;
+                if TempOrden."Secuencia Picking" > 9999999 then
+                    TempOrden."Secuencia Picking" := 9999999;
+                TempOrden."Secuencia Picking" += altura * 10000000;
                 TempOrden.Insert();
             until rUbicacion.Next() = 0;
         prm_Calculo."Huecos Utiles" := TempOrden.Count();
@@ -413,38 +417,4 @@ codeunit 51107 "Analisis ABC SGA"
             until rLinea.Next() = 0;
     end;
 
-    /// <summary>
-    /// Los huecos útiles del almacén, en los que se guarda stock: con tipo (picking o
-    /// almacenamiento) y no bloqueados. Las ubicaciones sin tipo (muelles, ajustes…) no se
-    /// clasifican. Solo cuenta el bloqueo del propio hueco, no el de su zona.
-    /// </summary>
-    local procedure FiltrarHuecosUtiles(var prm_Ubicacion: Record "Ubicacion SGA"; prm_Almacen: Code[10])
-    begin
-        prm_Ubicacion.SetRange("Cod. Almacen", prm_Almacen);
-        prm_Ubicacion.SetRange(Bloqueada, false);
-        prm_Ubicacion.SetFilter("Tipo Ubicacion", '<>%1', prm_Ubicacion."Tipo Ubicacion"::" ");
-    end;
-
-    /// <summary>
-    /// Altura del hueco sacada de su código (pasillo-estantería-altura), de 0 a 99. Si el código
-    /// no tiene esa forma, 100: cuenta como la peor.
-    /// </summary>
-    local procedure NivelHueco(prm_Codigo: Code[20]): Integer
-    var
-        cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
-        pasillo: Integer;
-        estanteria: Integer;
-        altura: Integer;
-    begin
-        if not cUbicaciones.TrocearCodigo(prm_Codigo, pasillo, estanteria, altura) then
-            exit(100);
-        exit(altura);
-    end;
-
-    local procedure Minimo(prm_A: Integer; prm_B: Integer): Integer
-    begin
-        if prm_A < prm_B then
-            exit(prm_A);
-        exit(prm_B);
-    end;
 }

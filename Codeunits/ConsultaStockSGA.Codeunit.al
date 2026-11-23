@@ -27,7 +27,7 @@ codeunit 51103 "Consulta Stock SGA"
     /// Si SGA ubica el producto: de tipo Inventario, sin marcar como "Producto Tianna" y fuera
     /// de la categoría 820. Lo mismo que filtra FiltrarProductosSGA.
     /// </summary>
-    procedure ProductoSGA(var prm_Item: Record Item): Boolean
+    local procedure ProductoSGA(var prm_Item: Record Item): Boolean
     begin
         exit(prm_Item.IsInventoriableType() and not prm_Item."Producto Tianna" and
              (prm_Item."Item Category Code" <> CategoriaExcluidaTok));
@@ -70,7 +70,7 @@ codeunit 51103 "Consulta Stock SGA"
     /// (Pendiente de ubicar). SGA no distingue variantes: el stock de todas se suma en la misma
     /// fila.
     /// </summary>
-    procedure AcumularStockPorLote(prm_Producto: Code[20]; prm_Almacen: Code[10]; var rStock: Record "Buffer Conciliacion SGA")
+    local procedure AcumularStockPorLote(prm_Producto: Code[20]; prm_Almacen: Code[10]; var rStock: Record "Buffer Conciliacion SGA")
     var
         cUM: Codeunit "Unidades Producto SGA";
         qMovsAbiertos: Query "Grouped Item Ledger Entries";
@@ -98,7 +98,7 @@ codeunit 51103 "Consulta Stock SGA"
     /// guarde el del ensamblado, y comparar lote a lote daría una fila "sin ubicar" y otra
     /// "sobra" de la misma mercancía.
     /// </summary>
-    procedure AcumularContenidoUbicado(prm_Producto: Code[20]; prm_Almacen: Code[10]; var rStock: Record "Buffer Conciliacion SGA")
+    local procedure AcumularContenidoUbicado(prm_Producto: Code[20]; prm_Almacen: Code[10]; var rStock: Record "Buffer Conciliacion SGA")
     var
         rContenido: Record "Contenido Ubicacion SGA";
         cUM: Codeunit "Unidades Producto SGA";
@@ -131,33 +131,78 @@ codeunit 51103 "Consulta Stock SGA"
     end;
 
     /// <summary>
-    /// Deja el buffer filtrado por el usuario y, con prm_SoloDiferencias, solo las filas con
-    /// diferencia (ya calculada al acumular).
+    /// Conciliación (Rep. "Conciliacion SGA vs Stock"): deja en el buffer del usuario el stock
+    /// de BC y lo ubicado, lote a lote, de los productos que SGA ubica (ProductoSGA) en un almacén
+    /// (en blanco, todos), con la misma lectura que "Pendiente de ubicar" (LeerStockYUbicado).
+    /// Con prm_SoloDiferencias, solo las filas que no cuadran. Borra antes la conciliación
+    /// anterior del usuario (el buffer es compartido: dos personas pueden conciliar a la vez).
+    /// Devuelve cuántas filas quedan.
     /// </summary>
-    procedure ClasificarYFiltrar(var rStock: Record "Buffer Conciliacion SGA"; prm_SoloDiferencias: Boolean)
+    procedure Conciliar(prm_Almacen: Code[10]; prm_VistaProductos: Text; prm_SoloDiferencias: Boolean): Integer
+    var
+        rStock: Record "Buffer Conciliacion SGA";
+        rItem: Record Item;
+        cVentana: Codeunit "Ventana Progreso SGA";
+        producto: Code[20];
+        productoCuenta: Boolean;
+        TituloLbl: Label 'Conciliando el stock de BC con las ubicaciones…';
     begin
-        // Siempre acotado al usuario: el buffer es compartido y dos personas pueden
-        // estar conciliando a la vez.
-        rStock.Reset();
         rStock.FiltrarUsuarioActual();
-
-        if not prm_SoloDiferencias then
-            exit;
-
-        rStock.SetRange(Diferencia, 0);
         rStock.DeleteAll();
-        rStock.SetRange(Diferencia);
+
+        cVentana.Abrir(TituloLbl, 0);
+        LeerStockYUbicado(prm_Almacen, prm_VistaProductos, rStock, cVentana);
+        cVentana.Cerrar();
+
+        // Leyendo todo el almacén de una vez vienen todos los productos: fuera los que SGA no
+        // ubica y, si se piden solo las diferencias, lo que cuadra.
+        rItem.SetLoadFields(Type, "Producto Tianna", "Item Category Code");
+        rStock.FiltrarUsuarioActual();
+        producto := '';
+        if rStock.FindSet() then
+            repeat
+                if rStock."No. Producto" <> producto then begin
+                    producto := rStock."No. Producto";
+                    productoCuenta := false;
+                    if rItem.Get(producto) then
+                        productoCuenta := ProductoSGA(rItem);
+                end;
+                if (not productoCuenta) or (prm_SoloDiferencias and (rStock.Diferencia = 0)) then
+                    rStock.Delete();
+            until rStock.Next() = 0;
+        exit(rStock.Count());
     end;
 
     /// <summary>
-    /// Borra los resultados de la conciliación anterior de este usuario.
+    /// Acumula en prm_Stock el stock de BC y lo ubicado, lote a lote, de un almacén. Si
+    /// prm_VistaProductos (GetView de Item) trae filtros, solo de los productos que SGA ubica y
+    /// los cumplen, uno a uno. Sin filtros, los de todo el almacén de una vez (dos consultas, no
+    /// dos por producto), sin mirar si SGA los ubica: eso lo decide quien llama.
     /// </summary>
-    procedure LimpiarBuffer(var rStock: Record "Buffer Conciliacion SGA")
+    local procedure LeerStockYUbicado(prm_Almacen: Code[10]; prm_VistaProductos: Text; var prm_Stock: Record "Buffer Conciliacion SGA"; var prm_Ventana: Codeunit "Ventana Progreso SGA")
+    var
+        rItem: Record Item;
+        LeyendoStockLbl: Label 'Leyendo el stock y las ubicaciones del almacén';
+        LeyendoProductoLbl: Label 'Leyendo stock del producto %1', Comment = '%1 = nº de producto';
     begin
-        rStock.Reset();
-        rStock.FiltrarUsuarioActual();
-        rStock.DeleteAll();
-        rStock.Reset();
+        if prm_VistaProductos <> '' then
+            rItem.SetView(prm_VistaProductos);
+        if rItem.GetFilters() = '' then begin
+            prm_Ventana.Fase(LeyendoStockLbl);
+            AcumularStockPorLote('', prm_Almacen, prm_Stock);
+            AcumularContenidoUbicado('', prm_Almacen, prm_Stock);
+            exit;
+        end;
+
+        FiltrarProductosSGA(rItem);
+        rItem.SetLoadFields("No.");
+        prm_Ventana.FijarTotal(rItem.Count());
+        if rItem.FindSet() then
+            repeat
+                prm_Ventana.Avanzar(StrSubstNo(LeyendoProductoLbl, rItem."No."));
+                AcumularStockPorLote(rItem."No.", prm_Almacen, prm_Stock);
+                AcumularContenidoUbicado(rItem."No.", prm_Almacen, prm_Stock);
+            until rItem.Next() = 0;
     end;
 
     /// <summary>
@@ -219,7 +264,7 @@ codeunit 51103 "Consulta Stock SGA"
 
         // El stock que BC tiene y SGA no aparece en la ubicación de ajustes hasta que
         // alguien lo coloque físicamente donde le corresponde.
-        cContenido.RegistrarAjuste(prm_Fila."Cod. Almacen", rConfig."Ubic. Ajustes", prm_Fila."No. Producto",
+        cContenido.RegistrarAjuste("Tipo Mov. Ubicacion SGA"::Ajuste, prm_Fila."Cod. Almacen", rConfig."Ubic. Ajustes", prm_Fila."No. Producto",
                                    prm_Fila."No. Lote", prm_Fila."Unidad Medida Base",
                                    aRegularizar, RegularizacionConciliacionLbl);
 
@@ -293,8 +338,6 @@ codeunit 51103 "Consulta Stock SGA"
         lineas: Integer;
         PendienteNoTemporalErr: Label 'El pendiente de ubicar solo se calcula sobre una tabla temporal.';
         TituloLbl: Label 'Calculando lo pendiente de ubicar…';
-        LeyendoStockLbl: Label 'Leyendo el stock y las ubicaciones del almacén';
-        LeyendoProductoLbl: Label 'Leyendo stock del producto %1', Comment = '%1 = nº de producto';
         ProductoLbl: Label 'Revisando lotes del producto %1', Comment = '%1 = nº de producto';
     begin
         if not prm_Pendiente.IsTemporary() then
@@ -305,24 +348,7 @@ codeunit 51103 "Consulta Stock SGA"
         // Se enseña en qué va: la lectura del stock (de todo el almacén o producto a producto) y
         // luego lote a lote.
         cVentana.Abrir(TituloLbl, 0);
-
-        if prm_VistaProductos <> '' then
-            rItem.SetView(prm_VistaProductos);
-        if rItem.GetFilters() = '' then begin
-            cVentana.Fase(LeyendoStockLbl);
-            AcumularStockPorLote('', prm_Almacen, TempStock);
-            AcumularContenidoUbicado('', prm_Almacen, TempStock);
-        end else begin
-            FiltrarProductosSGA(rItem);
-            rItem.SetLoadFields("No.");
-            cVentana.FijarTotal(rItem.Count());
-            if rItem.FindSet() then
-                repeat
-                    cVentana.Avanzar(StrSubstNo(LeyendoProductoLbl, rItem."No."));
-                    AcumularStockPorLote(rItem."No.", prm_Almacen, TempStock);
-                    AcumularContenidoUbicado(rItem."No.", prm_Almacen, TempStock);
-                until rItem.Next() = 0;
-        end;
+        LeerStockYUbicado(prm_Almacen, prm_VistaProductos, TempStock, cVentana);
 
         if TempStock.FindSet() then
             repeat

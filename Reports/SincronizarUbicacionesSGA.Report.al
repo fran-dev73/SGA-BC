@@ -5,9 +5,8 @@ using System.Utilities;
 
 /// <summary>
 /// Report Sincronizar Ubicaciones SGA (ID 51101).
-/// Da de alta en SGA las ubicaciones de la topología que aún no tienen datos de gestión
-/// de almacén, recalcula la ocupación y, si se pide, reconstruye el contenido a partir del
-/// diario de movimientos.
+/// Recalcula el estado y la ocupación de las ubicaciones y, si se pide, reconstruye el
+/// contenido a partir del diario de movimientos.
 ///
 /// La reconstrucción es la red de seguridad del módulo: deja el contenido exactamente como
 /// lo dictan los movimientos registrados. Las reservas de las órdenes abiertas se vuelven a
@@ -15,7 +14,7 @@ using System.Utilities;
 /// </summary>
 report 51101 "Sincronizar Ubicaciones SGA"
 {
-    Caption = 'Sincronizar ubicaciones SGA';
+    Caption = 'Recalcular ubicaciones SGA';
     ProcessingOnly = true;
     UsageCategory = Tasks;
     ApplicationArea = All;
@@ -36,8 +35,6 @@ report 51101 "Sincronizar Ubicaciones SGA"
                 ProcesoFinalizadoMsg: Label 'Proceso finalizado.';
                 textoAlmacen: Text;
             begin
-                cUbicaciones.SincronizarTopologia(codAlmacen);
-
                 if not blnReconstruirContenido then begin
                     cUbicaciones.RecalcularEstados(codAlmacen, '');
                     if GuiAllowed() then
@@ -78,7 +75,7 @@ report 51101 "Sincronizar Ubicaciones SGA"
                     field(Almacen; codAlmacen)
                     {
                         Caption = 'Almacén';
-                        ToolTip = 'Almacén que se sincroniza. En blanco sincroniza todos.';
+                        ToolTip = 'Almacén que se recalcula. En blanco, todos.';
                         ApplicationArea = All;
                         TableRelation = Location;
                     }

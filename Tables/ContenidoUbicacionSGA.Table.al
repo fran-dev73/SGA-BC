@@ -2,7 +2,6 @@ namespace AntonioNadal.SGA;
 
 using Microsoft.Inventory.Item;
 using Microsoft.Inventory.Location;
-using Microsoft.Warehouse.Structure;
 
 /// <summary>
 /// Table Contenido Ubicacion SGA (ID 51102).
@@ -36,7 +35,7 @@ table 51102 "Contenido Ubicacion SGA"
         {
             Caption = 'Cód. ubicación';
             DataClassification = ToBeClassified;
-            TableRelation = Bin.Code where("Location Code" = field("Cod. Almacen"));
+            TableRelation = "Ubicacion SGA"."Cod. Bin" where("Cod. Almacen" = field("Cod. Almacen"));
         }
         field(30; "No. Producto"; Code[20])
         {
@@ -241,25 +240,11 @@ table 51102 "Contenido Ubicacion SGA"
     end;
 
     /// <summary>
-    /// Indica si el lote de la línea está caducado a la fecha indicada.
-    /// </summary>
-    procedure EstaCaducado(prm_Fecha: Date): Boolean
-    begin
-        if "Fecha Caducidad" = 0D then
-            exit(false);
-
-        exit("Fecha Caducidad" < prm_Fecha);
-    end;
-
-    /// <summary>
-    /// Expresión de estilo para las páginas de contenido.
+    /// Expresión de estilo para las páginas de contenido: en rojo lo bloqueado y lo caducado.
     /// </summary>
     procedure EstiloContenido(): Text
     begin
-        if Bloqueado then
-            exit('Unfavorable');
-
-        if EstaCaducado(WorkDate()) then
+        if Bloqueado or (("Fecha Caducidad" <> 0D) and ("Fecha Caducidad" < WorkDate())) then
             exit('Unfavorable');
 
         if "Cantidad Reservada" > 0 then

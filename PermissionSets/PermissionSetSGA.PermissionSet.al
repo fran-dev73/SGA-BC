@@ -6,7 +6,6 @@ using Microsoft.Inventory.Item;
 using Microsoft.Inventory.Ledger;
 using Microsoft.Inventory.Tracking;
 using Microsoft.Sales.Document;
-using Microsoft.Warehouse.Structure;
 using System.Security.AccessControl;
 using System.Security.User;
 
@@ -54,9 +53,6 @@ permissionset 51100 "PermissionSet-SGA"
         // Para saber si el usuario es responsable de picking y elegir a quién se asigna una orden.
         tabledata "User Setup" = R,
         tabledata User = R,
-        // Generar y eliminar ubicaciones crean y borran las de BC (al borrar, BC borra su contenido).
-        tabledata Bin = RIMD,
-        tabledata "Bin Content" = RD,
         // Imprimir y ubicar anota en la tarea las etiquetas impresas y prepara los datos de la etiqueta.
         tabledata "Tareas Produccion" = RM,
         tabledata "Datos Reports Temporales" = RIMD,
@@ -71,6 +67,7 @@ permissionset 51100 "PermissionSet-SGA"
         codeunit "Unidades Producto SGA" = X,
         codeunit "Ventana Progreso SGA" = X,
         codeunit "Reposiciones SGA" = X,
+        codeunit "Lote BC Ensamblado SGA" = X,
         page "Reposiciones SGA" = X,
         table "Calculo ABC SGA" = X,
         tabledata "Calculo ABC SGA" = RIMD,

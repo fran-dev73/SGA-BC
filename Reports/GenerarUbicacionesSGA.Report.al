@@ -32,61 +32,10 @@ report 51100 "Generar Ubicaciones SGA"
 
             trigger OnAfterGetRecord()
             var
-                rZona: Record "Zona SGA";
                 cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
-                cConfirmMgt: Codeunit "Confirm Management";
-                combinaciones: Integer;
-                creadas: Integer;
-                alturas: List of [Integer];
-                ConfirmarGenerarQst: Label 'Se van a revisar %1 ubicaciones del almacén %2 (alturas %3), y se crearán las que falten. ¿Desea continuar?', Comment = '%1 = nº de combinaciones, %2 = almacén, %3 = lista de alturas';
-                ConfirmarGenerarZonaQst: Label 'Se van a revisar %1 ubicaciones del almacén %2 (alturas %3), y se crearán las que falten en la zona %4. Las que ya existen conservan su zona. ¿Desea continuar?', Comment = '%1 = nº de combinaciones, %2 = almacén, %3 = lista de alturas, %4 = zona';
-                enFondo: Integer;
-                resultado: Text;
-                CreadasMsg: Label 'Proceso terminado. Se han creado %1 ubicaciones.', Comment = '%1 = nº creadas';
-                YaExistianMsg: Label '%1 ya existían y no se han tocado.', Comment = '%1 = nº que ya existían';
-                EnFondoMsg: Label '%1 son posiciones de un fondo de pasillo, que no tiene alturas, y no se han creado.', Comment = '%1 = nº de posiciones saltadas';
-                AlmacenObligatorioErr: Label 'Indique el almacén.';
-                RangoErr: Label 'El %1 desde (%2) no puede ser mayor que el hasta (%3).', Comment = '%1 = pasillo, estantería o altura, %2 = desde, %3 = hasta';
-                PasilloLbl: Label 'pasillo';
-                EstanteriaLbl: Label 'estantería';
-                AlturaLbl: Label 'altura';
             begin
-                if codAlmacen = '' then
-                    Error(AlmacenObligatorioErr);
-                if intPasilloDesde > intPasilloHasta then
-                    Error(RangoErr, PasilloLbl, intPasilloDesde, intPasilloHasta);
-                if intEstanteriaDesde > intEstanteriaHasta then
-                    Error(RangoErr, EstanteriaLbl, intEstanteriaDesde, intEstanteriaHasta);
-                if intAlturaDesde > intAlturaHasta then
-                    Error(RangoErr, AlturaLbl, intAlturaDesde, intAlturaHasta);
-                // La zona se guarda entre ejecuciones: puede venir de otro almacén.
-                if codZona <> '' then
-                    rZona.Get(codAlmacen, codZona);
-
-                alturas := cUbicaciones.AlturasDelRango(intAlturaDesde, intAlturaHasta);
-                combinaciones := (intPasilloHasta - intPasilloDesde + 1) *
-                                 (intEstanteriaHasta - intEstanteriaDesde + 1) * alturas.Count();
-
-                if GuiAllowed() then
-                    if codZona = '' then begin
-                        if not cConfirmMgt.GetResponseOrDefault(StrSubstNo(ConfirmarGenerarQst, combinaciones, codAlmacen, ListaAlturas(alturas)), false) then
-                            exit;
-                    end else
-                        if not cConfirmMgt.GetResponseOrDefault(StrSubstNo(ConfirmarGenerarZonaQst, combinaciones, codAlmacen, ListaAlturas(alturas), codZona), false) then
-                            exit;
-
-                creadas := cUbicaciones.GenerarUbicaciones(codAlmacen, intPasilloDesde, intPasilloHasta,
-                                                           intEstanteriaDesde, intEstanteriaHasta, intAlturaDesde, intAlturaHasta,
-                                                           codZona, enumTipoUbicacion, decCapacidadUds, enFondo);
-
-                if not GuiAllowed() then
-                    exit;
-                resultado := StrSubstNo(CreadasMsg, creadas);
-                if combinaciones - creadas - enFondo > 0 then
-                    resultado += ' ' + StrSubstNo(YaExistianMsg, combinaciones - creadas - enFondo);
-                if enFondo > 0 then
-                    resultado += ' ' + StrSubstNo(EnFondoMsg, enFondo);
-                Message(resultado);
+                cUbicaciones.GenerarUbicaciones(codAlmacen, intPasilloDesde, intPasilloHasta, intEstanteriaDesde, intEstanteriaHasta,
+                                                intAlturaDesde, intAlturaHasta, codZona, enumTipoUbicacion, decCapacidadUds);
             end;
         }
     }
@@ -254,26 +203,12 @@ report 51100 "Generar Ubicaciones SGA"
         decCapacidadUds: Decimal;
 
     /// <summary>
-    /// Las alturas que se van a recorrer, a dos dígitos (00, 10, 20), para confirmarlas antes de
-    /// generar: la página guarda los valores de la última vez y un desde antiguo no se ve.
-    /// </summary>
-    local procedure ListaAlturas(prm_Alturas: List of [Integer]) lista: Text
-    var
-        altura: Integer;
-    begin
-        foreach altura in prm_Alturas do begin
-            if lista <> '' then
-                lista += ', ';
-            lista += DosDigitos(altura);
-        end;
-    end;
-
-    /// <summary>
     /// Lee una altura tecleada (0, 5, 00, 10…) y la deja escrita a dos dígitos, como va en el
     /// código de la ubicación. En blanco cuenta como 00.
     /// </summary>
     local procedure LeerAltura(var prm_Texto: Text[2]; var prm_Altura: Integer)
     var
+        cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
         AlturaErr: Label 'La altura debe ser un número de dos dígitos, de 00 a 99.';
     begin
         prm_Texto := CopyStr(DelChr(prm_Texto, '<>', ' '), 1, MaxStrLen(prm_Texto));
@@ -282,13 +217,6 @@ report 51100 "Generar Ubicaciones SGA"
         if DelChr(prm_Texto, '=', '0123456789') <> '' then
             Error(AlturaErr);
         Evaluate(prm_Altura, prm_Texto);
-        prm_Texto := CopyStr(DosDigitos(prm_Altura), 1, MaxStrLen(prm_Texto));
-    end;
-
-    local procedure DosDigitos(prm_Valor: Integer): Text
-    var
-        cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
-    begin
-        exit(cUbicaciones.ConCeros(prm_Valor, 2));
+        prm_Texto := CopyStr(cUbicaciones.ConCeros(prm_Altura, 2), 1, MaxStrLen(prm_Texto));
     end;
 }

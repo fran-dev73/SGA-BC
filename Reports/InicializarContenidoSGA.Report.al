@@ -8,7 +8,7 @@ using System.Utilities;
 /// Report Inicializar Contenido SGA (ID 51107).
 /// Lo contrario de la carga inicial: deja el almacén sin nada ubicado, borrando el contenido,
 /// los movimientos de ubicación y las órdenes de picking sin terminar. Con "Eliminar también
-/// las ubicaciones" borra además todos los huecos del almacén (ficha SGA y Bin), para volver a
+/// las ubicaciones" borra además todos los huecos del almacén, para volver a
 /// generarlos; si no, las ubicaciones se quedan. Aquí solo se piden las opciones; el trabajo lo
 /// hacen Inicializar de Cod. "Gestion Contenido SGA" y EliminarUbicaciones de Cod. "Gestion
 /// Ubicaciones SGA".
@@ -83,17 +83,13 @@ report 51107 "Inicializar Contenido SGA"
         cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
         cConfirmMgt: Codeunit "Confirm Management";
         alcance: Text;
-        ejemplos: Text;
-        motivo: Text;
         eliminadas: Integer;
-        noEliminadas: Integer;
         InicializarQst: Label 'Se va a borrar el contenido de las ubicaciones del almacén %1 (%2), todos sus movimientos de ubicación y las órdenes de picking sin terminar. Las ubicaciones y el stock de BC no cambian. No se puede deshacer.\\¿Desea continuar?', Comment = '%1 = almacén, %2 = qué productos';
-        EliminarUbicacionesQst: Label 'Se va a borrar todo lo del almacén %1 en SGA: el contenido de las ubicaciones, todos sus movimientos, las órdenes de picking sin terminar y las propias ubicaciones (ficha SGA y ubicación de BC). El stock de BC no cambia. No se puede deshacer.\\¿Desea continuar?', Comment = '%1 = almacén';
+        EliminarUbicacionesQst: Label 'Se va a borrar todo lo del almacén %1 en SGA: el contenido de las ubicaciones, todos sus movimientos, las órdenes de picking sin terminar y las propias ubicaciones. El stock de BC no cambia. No se puede deshacer.\\¿Desea continuar?', Comment = '%1 = almacén';
         EliminarConFiltroErr: Label 'Para eliminar las ubicaciones quite el filtro de productos: se borra el almacén entero.';
         TodosProductosLbl: Label 'todos los productos';
         ProcesoFinalizadoMsg: Label 'Proceso finalizado.';
         UbicacionesEliminadasMsg: Label 'Proceso finalizado. Ubicaciones eliminadas: %1.', Comment = '%1 = cuántas';
-        UbicacionesNoEliminadasMsg: Label 'Proceso finalizado. Ubicaciones eliminadas: %1. No se han podido eliminar %2 (por ejemplo: %3).\\Motivo de la primera: %4', Comment = '%1 = eliminadas, %2 = no eliminadas, %3 = primeras ubicaciones, %4 = error de BC';
     begin
         alcance := Producto.GetFilters();
         if blnEliminarUbicaciones and (alcance <> '') then
@@ -111,17 +107,13 @@ report 51107 "Inicializar Contenido SGA"
 
         cContenido.Inicializar(codAlmacen, Producto.GetView());
         if blnEliminarUbicaciones then
-            eliminadas := cUbicaciones.EliminarUbicaciones(codAlmacen, noEliminadas, ejemplos, motivo);
+            eliminadas := cUbicaciones.EliminarUbicaciones(codAlmacen);
 
         if not GuiAllowed() then
             exit;
-        case true of
-            not blnEliminarUbicaciones:
-                Message(ProcesoFinalizadoMsg);
-            noEliminadas = 0:
-                Message(UbicacionesEliminadasMsg, eliminadas);
-            else
-                Message(UbicacionesNoEliminadasMsg, eliminadas, noEliminadas, ejemplos, motivo);
-        end;
+        if blnEliminarUbicaciones then
+            Message(UbicacionesEliminadasMsg, eliminadas)
+        else
+            Message(ProcesoFinalizadoMsg);
     end;
 }

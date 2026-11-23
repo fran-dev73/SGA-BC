@@ -6,7 +6,7 @@ using Microsoft.Inventory.Location;
 /// Table Cue SGA (ID 51105).
 /// Origen de las pilas de los rol center de almacén y del preparador. Todos los contadores
 /// son FlowField count sobre las tablas de SGA, filtrados por los FlowFilter de almacén,
-/// fecha, momento, fecha de envío y usuario (FiltrarCue): la base de datos los cuenta con sus
+/// fecha, momento, fecha de envío y usuario (ObtenerCue): la base de datos los cuenta con sus
 /// índices y la página los calcula todos a la vez al leer el registro, sin código que recorra.
 /// </summary>
 table 51105 "Cue SGA"
@@ -250,25 +250,20 @@ table 51105 "Cue SGA"
     }
 
     /// <summary>
-    /// Devuelve el registro de cues, creándolo la primera vez.
+    /// Lee el registro de cues (lo crea la primera vez) y pone los filtros de las pilas: el
+    /// almacén por defecto de la configuración, el usuario actual, la fecha de trabajo
+    /// (movimientos), todo el día de trabajo (lo terminado o confirmado hoy) y las fechas de
+    /// envío ya llegadas.
     /// </summary>
     procedure ObtenerCue()
+    var
+        rConfig: Record "Config. SGA";
     begin
         if not Get() then begin
             Init();
             Insert();
         end;
-    end;
 
-    /// <summary>
-    /// Pone los filtros de las pilas: el almacén por defecto de la configuración, el usuario
-    /// actual, la fecha de trabajo (movimientos), todo el día de trabajo (lo terminado o
-    /// confirmado hoy) y las fechas de envío ya llegadas.
-    /// </summary>
-    procedure FiltrarCue()
-    var
-        rConfig: Record "Config. SGA";
-    begin
         rConfig.ObtenerConfig();
         if rConfig."Almacen por Defecto" <> '' then
             SetRange("Filtro Almacen", rConfig."Almacen por Defecto");

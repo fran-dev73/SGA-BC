@@ -46,7 +46,7 @@ page 51122 "Mapa 3D Almacen SGA"
                     begin
                         // Las zonas son de cada almacén.
                         FiltroZona := '';
-                        Refrescar();
+                        Refrescar(false);
                     end;
                 }
                 field(FiltroZona; FiltroZona)
@@ -68,7 +68,7 @@ page 51122 "Mapa 3D Almacen SGA"
                     begin
                         if FiltroZona <> '' then
                             rZona.Get(FiltroAlmacen, FiltroZona);
-                        Refrescar();
+                        Refrescar(false);
                     end;
                 }
                 field(FiltroPasillo; FiltroPasillo)
@@ -82,7 +82,7 @@ page 51122 "Mapa 3D Almacen SGA"
 
                     trigger OnValidate()
                     begin
-                        Refrescar();
+                        Refrescar(false);
                     end;
                 }
                 field(Resumen; Resumen)
@@ -102,7 +102,7 @@ page 51122 "Mapa 3D Almacen SGA"
                 begin
                     // El lienzo ya está montado: hasta ahora no había dónde pintar.
                     ControlPreparado := true;
-                    Refrescar();
+                    Refrescar(false);
                 end;
 
                 trigger CeldaPulsada(prm_CodBin: Text)
@@ -119,8 +119,15 @@ page 51122 "Mapa 3D Almacen SGA"
                 end;
 
                 trigger VaciarSolicitado(prm_CodBin: Text)
+                var
+                    rContenido: Record "Contenido Ubicacion SGA";
+                    cContenido: Codeunit "Gestion Contenido SGA";
                 begin
-                    Vaciar(CopyStr(prm_CodBin, 1, 20));
+                    // Clic derecho en un bloque: todo queda sin ubicar y el mapa se repinta sin
+                    // perder la vista.
+                    rContenido.FiltrarUbicacion(FiltroAlmacen, CopyStr(prm_CodBin, 1, MaxStrLen(rContenido."Cod. Bin")));
+                    if cContenido.DesubicarConDialogo(rContenido) > 0 then
+                        Refrescar(true);
                 end;
 
                 trigger PasilloSeleccionado(prm_Pasillo: Text)
@@ -136,7 +143,7 @@ page 51122 "Mapa 3D Almacen SGA"
                     // Si el lienzo solo tenía un pasillo (se dibujó con el filtro puesto) y ahora
                     // se piden todos, hay que leer el almacén entero: el lienzo no los tiene.
                     if (FiltroPasillo = 0) and (anterior <> 0) then begin
-                        Refrescar();
+                        Refrescar(false);
                         exit;
                     end;
                     CurrPage.Update(false);
@@ -158,7 +165,7 @@ page 51122 "Mapa 3D Almacen SGA"
 
                 trigger OnAction()
                 begin
-                    Refrescar();
+                    Refrescar(false);
                 end;
             }
             action(VerRejilla)
@@ -223,21 +230,33 @@ page 51122 "Mapa 3D Almacen SGA"
         Preparada := true;
     end;
 
-    local procedure Refrescar()
+    /// <summary>
+    /// Vuelve a leer las ubicaciones y el resumen. Con prm_ConservarVista (tras trasladar o
+    /// vaciar) el lienzo repinta sin perder el giro, el zoom ni el pasillo del operario.
+    /// </summary>
+    local procedure Refrescar(prm_ConservarVista: Boolean)
     var
         cMapa: Codeunit "Gestion Mapa SGA";
+        cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
         datos: Text;
+        IndiqueAlmacenLbl: Label 'Indique un almacén para dibujar el mapa.';
     begin
         if not ControlPreparado then
             exit;
 
         datos := cMapa.DatosMapa3D(FiltroAlmacen, FiltroZona, FiltroPasillo, NoCalculoABC);
-        CurrPage.Lienzo.Dibujar(datos);
+        if prm_ConservarVista then
+            CurrPage.Lienzo.Actualizar(datos)
+        else
+            CurrPage.Lienzo.Dibujar(datos);
         if Preparada then begin
             CurrPage.Lienzo.Preparar(CriterioInicial, BusquedaInicial);
             Preparada := false;
         end;
-        CalcularResumen();
+        if FiltroAlmacen = '' then
+            Resumen := IndiqueAlmacenLbl
+        else
+            Resumen := cUbicaciones.ResumenUbicaciones(FiltroAlmacen, FiltroZona);
         CurrPage.Update(false);
     end;
 
@@ -250,8 +269,8 @@ page 51122 "Mapa 3D Almacen SGA"
     local procedure Trasladar(prm_Origen: Code[20]; prm_Destino: Code[20])
     var
         rContenido: Record "Contenido Ubicacion SGA";
+        rUbicacionSGA: Record "Ubicacion SGA";
         cContenido: Codeunit "Gestion Contenido SGA";
-        cMapa: Codeunit "Gestion Mapa SGA";
         cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
         pContenido: Page "Contenido Ubicaciones SGA";
         destino: Code[20];
@@ -259,7 +278,8 @@ page 51122 "Mapa 3D Almacen SGA"
         TrasladadoMsg: Label 'Trasladado de %1 a %2.', Comment = '%1 = origen, %2 = destino';
         TrasladoMapa3DLbl: Label 'Traslado desde el mapa 3D';
     begin
-        cUbicaciones.TestMismaZona(FiltroAlmacen, prm_Origen, prm_Destino);
+        // Desde el mapa solo dentro de la zona del origen.
+        cUbicaciones.TestUbicacionEnZona(FiltroAlmacen, prm_Destino, rUbicacionSGA.ZonaDe(FiltroAlmacen, prm_Origen));
 
         rContenido.FiltrarUbicacion(FiltroAlmacen, prm_Origen);
         if not rContenido.FindSet() then
@@ -277,43 +297,10 @@ page 51122 "Mapa 3D Almacen SGA"
 
         // El operario puede cambiar en el diálogo el destino del arrastre: el mensaje lleva el elegido.
         destino := prm_Destino;
-        if cContenido.TrasladarConDialogo(rContenido, destino, TrasladoMapa3DLbl, true) = 0 then
+        if not cContenido.TrasladarConDialogo(rContenido, destino, TrasladoMapa3DLbl, true) then
             exit;
 
-        // Sin perder la vista: el operario sigue en el mismo giro, zoom y pasillo.
-        CurrPage.Lienzo.Actualizar(cMapa.DatosMapa3D(FiltroAlmacen, FiltroZona, FiltroPasillo, NoCalculoABC));
-        CalcularResumen();
-        CurrPage.Update(false);
+        Refrescar(true);
         Message(TrasladadoMsg, prm_Origen, destino);
-    end;
-
-    /// <summary>
-    /// Vaciar desde el mapa (clic derecho en un bloque): se enseña qué hay, se confirma y todo
-    /// queda sin ubicar. El mapa se repinta sin perder la vista.
-    /// </summary>
-    local procedure Vaciar(prm_CodBin: Code[20])
-    var
-        cContenido: Codeunit "Gestion Contenido SGA";
-        cMapa: Codeunit "Gestion Mapa SGA";
-    begin
-        if cContenido.VaciarUbicacionConDialogo(FiltroAlmacen, prm_CodBin) = 0 then
-            exit;
-
-        CurrPage.Lienzo.Actualizar(cMapa.DatosMapa3D(FiltroAlmacen, FiltroZona, FiltroPasillo, NoCalculoABC));
-        CalcularResumen();
-        CurrPage.Update(false);
-    end;
-
-    local procedure CalcularResumen()
-    var
-        cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
-        IndiqueAlmacenLbl: Label 'Indique un almacén para dibujar el mapa.';
-    begin
-        if FiltroAlmacen = '' then begin
-            Resumen := IndiqueAlmacenLbl;
-            exit;
-        end;
-
-        Resumen := cUbicaciones.ResumenUbicaciones(FiltroAlmacen, FiltroZona);
     end;
 }

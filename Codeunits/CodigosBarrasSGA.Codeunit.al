@@ -48,7 +48,7 @@ codeunit 51114 "Codigos Barras SGA"
     /// Devuelve true si la lectura trae un SSCC: el (00) de un GS1-128 o los 18 dígitos solos,
     /// con su dígito de control bien. El SSCC queda en prm_SSCC.
     /// </summary>
-    procedure LeerSSCC(prm_Lectura: Text; var prm_SSCC: Code[20]): Boolean
+    local procedure LeerSSCC(prm_Lectura: Text; var prm_SSCC: Code[20]): Boolean
     var
         codigo: Text;
         sscc: Text;

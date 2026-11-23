@@ -3,7 +3,6 @@ namespace AntonioNadal.SGA;
 using Microsoft.Foundation.UOM;
 using Microsoft.Inventory.Item;
 using Microsoft.Inventory.Location;
-using Microsoft.Warehouse.Structure;
 
 /// <summary>
 /// Table Linea Orden Picking SGA (ID 51109).
@@ -134,21 +133,21 @@ table 51109 "Linea Orden Picking SGA"
         {
             Caption = 'Ubicación propuesta';
             DataClassification = ToBeClassified;
-            TableRelation = Bin.Code where("Location Code" = field("Cod. Almacen"));
+            TableRelation = "Ubicacion SGA"."Cod. Bin" where("Cod. Almacen" = field("Cod. Almacen"));
             ToolTip = 'Ubicación de la que el sistema dice que hay que recoger.';
         }
         field(61; "Cod. Bin Confirmado"; Code[20])
         {
             Caption = 'Ubicación confirmada';
             DataClassification = ToBeClassified;
-            TableRelation = Bin.Code where("Location Code" = field("Cod. Almacen"));
+            TableRelation = "Ubicacion SGA"."Cod. Bin" where("Cod. Almacen" = field("Cod. Almacen"));
             ToolTip = 'Ubicación de la que el preparador ha recogido realmente.';
         }
         field(62; "Cod. Bin Destino"; Code[20])
         {
             Caption = 'Ubicación destino';
             DataClassification = ToBeClassified;
-            TableRelation = Bin.Code where("Location Code" = field("Cod. Almacen"));
+            TableRelation = "Ubicacion SGA"."Cod. Bin" where("Cod. Almacen" = field("Cod. Almacen"));
             Editable = false;
             ToolTip = 'En una reposición, ubicación de picking en la que se deja lo recogido. En blanco en el picking de un pedido.';
         }
@@ -329,29 +328,52 @@ table 51109 "Linea Orden Picking SGA"
     end;
 
     /// <summary>
-    /// Pasa una cantidad en la UM del pedido a UM base.
-    /// </summary>
-    procedure EnUMBase(prm_CantidadDocumento: Decimal): Decimal
-    var
-        cUOMMgt: Codeunit "Unit of Measure Management";
-    begin
-        if "Ctdad. por UM Documento" <= 0 then
-            exit(prm_CantidadDocumento);
-
-        exit(cUOMMgt.CalcBaseQty(prm_CantidadDocumento, "Ctdad. por UM Documento"));
-    end;
-
-    /// <summary>
     /// Cantidad base que corresponde a lo que el preparador teclea en la UM del pedido. Si
     /// teclea lo pendiente (prm_PendienteDocumento, lo que se le enseña), se toma el pendiente
     /// exacto en base para no dejar restos de redondeo.
     /// </summary>
     procedure CantidadBaseDesdeDocumento(prm_Cantidad: Decimal; prm_PendienteDocumento: Decimal): Decimal
+    var
+        cUOMMgt: Codeunit "Unit of Measure Management";
     begin
         if prm_Cantidad = prm_PendienteDocumento then
             exit("Cantidad Pendiente");
+        if "Ctdad. por UM Documento" <= 0 then
+            exit(prm_Cantidad);
+        exit(cUOMMgt.CalcBaseQty(prm_Cantidad, "Ctdad. por UM Documento"));
+    end;
 
-        exit(EnUMBase(prm_Cantidad));
+    /// <summary>
+    /// Deja solo las paradas de una línea del pedido, de todas sus órdenes, por la clave con
+    /// sumatorios de lo recogido. Solo las paradas de venta llevan el pedido como documento de
+    /// origen.
+    /// </summary>
+    procedure FiltrarLineaPedido(prm_NoPedido: Code[20]; prm_NoLineaPedido: Integer)
+    begin
+        SetCurrentKey("No. Documento Origen", "No. Linea Origen");
+        SetRange("No. Documento Origen", prm_NoPedido);
+        SetRange("No. Linea Origen", prm_NoLineaPedido);
+    end;
+
+    /// <summary>
+    /// Si hay una reposición sin terminar en el almacén hacia prm_Destino (en blanco, hacia
+    /// cualquier ubicación): de prm_Producto o, con prm_DeOtroProducto, de cualquier otro.
+    /// </summary>
+    procedure HayReposicionPendiente(prm_Almacen: Code[10]; prm_Destino: Code[20]; prm_Producto: Code[20]; prm_DeOtroProducto: Boolean): Boolean
+    var
+        rLinea: Record "Linea Orden Picking SGA";
+    begin
+        rLinea.SetRange("Cod. Almacen", prm_Almacen);
+        if prm_Destino <> '' then
+            rLinea.SetRange("Cod. Bin Destino", prm_Destino)
+        else
+            rLinea.SetFilter("Cod. Bin Destino", '<>%1', '');
+        if prm_DeOtroProducto then
+            rLinea.SetFilter("No. Producto", '<>%1', prm_Producto)
+        else
+            rLinea.SetRange("No. Producto", prm_Producto);
+        rLinea.FiltrarPendientes();
+        exit(not rLinea.IsEmpty());
     end;
 
     /// <summary>

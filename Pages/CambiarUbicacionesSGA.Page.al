@@ -139,8 +139,6 @@ page 51126 "Cambiar Ubicaciones SGA"
         TipoUbicacion: Enum "Tipo Ubicacion SGA";
         CambiarZona: Boolean;
         Zona: Code[10];
-        Omitidas: Integer;
-        OmitidasEjemplo: Text;
 
     /// <summary>
     /// Recibe las ubicaciones a cambiar (con sus filtros de selección).
@@ -161,13 +159,18 @@ page 51126 "Cambiar Ubicaciones SGA"
     end;
 
     /// <summary>
-    /// Aplica lo marcado a la selección con Cod. "Gestion Ubicaciones SGA". Devuelve cuántas
-    /// ubicaciones se han cambiado; las que tienen contenido se saltan y lo dice
-    /// UbicacionesOmitidas.
+    /// Aplica lo marcado a la selección con Cod. "Gestion Ubicaciones SGA" y dice cuántas
+    /// ubicaciones se han cambiado; las que tienen contenido se saltan, y se dice cuántas y las
+    /// primeras (hasta 5).
     /// </summary>
-    procedure Aplicar(): Integer
+    procedure Aplicar()
     var
         TempPlantilla: Record "Ubicacion SGA" temporary;
+        hechas: Integer;
+        omitidas: Integer;
+        ejemplo: Text;
+        UbicacionesCambiadasMsg: Label 'Se han cambiado %1 ubicaciones.', Comment = '%1 = número';
+        UbicacionesCambiadasOmitidasMsg: Label 'Se han cambiado %1 ubicaciones.\%2 no se han cambiado porque tienen contenido (%3…). Su configuración solo se cambia cuando están vacías.', Comment = '%1 = cambiadas, %2 = omitidas, %3 = primeras ubicaciones omitidas';
     begin
         // La plantilla solo lleva los valores: se asignan sin validar, porque las validaciones
         // de la tabla son para una ubicación de verdad.
@@ -177,18 +180,11 @@ page 51126 "Cambiar Ubicaciones SGA"
         TempPlantilla."Tipo Ubicacion" := TipoUbicacion;
         TempPlantilla."Cod. Zona SGA" := Zona;
 
-        exit(cUbicaciones.AplicarCambiosUbicaciones(rSeleccion, TempPlantilla, CambiarCapacidad, CambiarControlCapacidad,
-                                                    CambiarMezcla, CambiarTipoUbicacion, CambiarZona,
-                                                    Omitidas, OmitidasEjemplo));
-    end;
-
-    /// <summary>
-    /// Ubicaciones de la selección que no se han cambiado por tener contenido, y las primeras
-    /// de ellas (hasta 5) para decírselo al usuario.
-    /// </summary>
-    procedure UbicacionesOmitidas(var prm_Ejemplo: Text): Integer
-    begin
-        prm_Ejemplo := OmitidasEjemplo;
-        exit(Omitidas);
+        hechas := cUbicaciones.AplicarCambiosUbicaciones(rSeleccion, TempPlantilla, CambiarCapacidad, CambiarControlCapacidad,
+                                                         CambiarMezcla, CambiarTipoUbicacion, CambiarZona, omitidas, ejemplo);
+        if omitidas = 0 then
+            Message(UbicacionesCambiadasMsg, hechas)
+        else
+            Message(UbicacionesCambiadasOmitidasMsg, hechas, omitidas, ejemplo);
     end;
 }

@@ -21,7 +21,7 @@ Para quien configura SGA: vosotros o el partner. Se hace una vez y se toca solo 
 
 SGA se apoya en el maestro de BC. Sin estos datos, la configuración de abajo no sirve de nada. Hacerlo en este orden:
 
-1. **Almacén.** Cada almacén que use SGA tiene marcada *Ubicación obligatoria*. SGA crea los huecos como ubicaciones (`Bin`) de BC, así que no hace falta darlos de alta antes en BC.
+1. **Almacén.** El almacén de BC en el que se trabaja. SGA lleva sus propias ubicaciones (huecos): no usa las ubicaciones de BC ni necesita *Ubicación obligatoria*.
 2. **Productos con palé.** En la ficha del producto, *Cód. palé por defecto* con una unidad de medida de palé en su *Unidades de medida* y su factor (cuántas unidades base tiene el palé). Sin ese factor mayor que 1, el producto se cuenta como si no tuviera palé: no cabe en las ubicaciones con capacidad y la carga inicial no lo reparte por huecos.
 3. **Series.** Una serie de números para *Nºs orden SGA* (apartado 2); sin ella no se puede enviar ningún pedido a SGA. Los SSCC de los palés que entran sin etiqueta salen de las series de la *Configuración de inventario*, *Nº serie EAN-128 - IA00* (número de 9 dígitos) y *Nº serie ind. extensión IA00* (dígito de extensión), las mismas de las etiquetas de palé del resto del sistema; sin ellas no se puede ubicar un palé que entra sin etiqueta.
 4. **Lotes de BC (opcional).** Para tener trazabilidad por lote en los albaranes y facturas de venta, el producto fabricado necesita un código de seguimiento con *Seguimiento específico de lote* (y, si se quiere caducidad, *Usar fechas de caducidad* y la *Fórmula de caducidad* en su ficha). Con eso, el *Lote* del ensamblado pasa solo al seguimiento de BC y el picking lo escribe en el pedido. BC no deja cambiar el código de seguimiento de un producto que ya tiene movimientos.
@@ -30,7 +30,7 @@ SGA se apoya en el maestro de BC. Sin estos datos, la configuración de abajo no
 ## 1. Roles y permisos
 
 1. En *Mi configuración* > *Rol*, elige **Almacén SGA**. El rol de *Procesador de pedidos* tiene los mismos menús. A quien prepara con PDA se le asigna **Preparador SGA (PDA)**.
-2. Menús: **Almacén SGA** (día a día), **Almacén SGA - Ventas y compras**, **Almacén SGA - Consultas**, **Almacén SGA - Informes** y **Almacén SGA - Configuración**.
+2. Menús: **Almacén SGA** (día a día), **Almacén SGA - Consultas**, **Almacén SGA - Informes** y **Almacén SGA - Configuración**. Productos, pedidos y albaranes de venta y compra están en la barra de navegación del rol center.
 3. Conjuntos de permisos: **PermissionSet-SGA** para todos y **SGA - Responsable de almacén** para los responsables (añade *Inicializar contenido*). Quién puede asignar órdenes y cambiar su prioridad lo dice *Responsable picking SGA* en Configuración de usuarios, cuando la configuración exige asignación. Para abrir productos, pedidos y albaranes hacen falta además los permisos estándar de BC.
 4. En *Configuración de usuarios*, marca **Responsable picking SGA** a quien reparta órdenes, y **Carretillero SGA** a quien haga las reposiciones.
 
@@ -41,7 +41,7 @@ Menú **Almacén SGA - Configuración** > **Configuración SGA**.
 | Pestaña | Qué se pone |
 |---|---|
 | General | *Almacén por defecto* y *Zona por defecto* |
-| Ubicaciones por flujo | *Ubic. ajustes*: donde van las faltas que se regularizan. Mejor una ubicación sin tipo. *Playa por defecto*: la playa con la que nacen las órdenes de picking de venta (apartado 3) |
+| Ubicaciones por flujo | *Ubic. ajustes*: donde van las faltas que se regularizan. Tiene que ser una ubicación SGA; mejor sin tipo. *Playa por defecto*: la playa con la que nacen las órdenes de picking de venta (apartado 3) |
 | Estrategias | Estrategia de ubicación, de compras y de ensamblados; estrategia de picking (FIFO, FEFO o por orden de ubicación). Ver *Estrategias de ubicación*, más abajo |
 | Análisis ABC | Días de ventas y cortes de las clases A y B |
 | Controles | Ver tabla siguiente |
@@ -94,13 +94,13 @@ Qué estrategia usa cada pantalla:
 
 Se crean, cambian y eliminan solo desde el menú *Almacén SGA - Configuración*. Desde *Consultas*, *Ubicaciones SGA* y su ficha se abren en modo ver.
 
-- **Ubicaciones del almacén** (en Configuración) abre *Ubicaciones SGA* con **Nuevo** y **Eliminar**, y la ficha editable. **Nuevo** crea una ubicación suelta a mano (por ejemplo un fondo de pasillo) y también la de BC si no existe. El código tiene que ser `xxx-xx-xx` con los mismos límites que *Generar ubicaciones*: pasillo de 001 a 999, estantería de 01 a 99 y altura de 00 a 99; la descripción es el código y la secuencia sale del código. La descripción es la de la ubicación de BC: para cambiarla, ficha del almacén > *Ubicaciones*. **Eliminar** borra la ubicación SGA y la de BC; no deja si tiene contenido o si BC no permite borrarla.
+- **Ubicaciones del almacén** (en Configuración) abre *Ubicaciones SGA* con **Nuevo** y **Eliminar**, y la ficha editable. **Nuevo** crea una ubicación suelta a mano (por ejemplo un fondo de pasillo). El código tiene que ser `xxx-xx-xx` con los mismos límites que *Generar ubicaciones*: pasillo de 001 a 999, estantería de 01 a 99 y altura de 00 a 99; la descripción nace con el código y se cambia en la ficha, y la secuencia sale del código. **Eliminar** no deja borrar una ubicación con contenido.
 
 - **Generar ubicaciones** crea los huecos de golpe. Pide almacén, zona, pasillo desde y hasta (1 a 999), estantería desde y hasta (1 a 99), altura desde y hasta (dos cifras, de 00 a 99), tipo de ubicación y capacidad en palés. Pasillo y estantería van de uno en uno. La altura va de 10 en 10 desde la inicial sin pasar de la final: de 00 a 40 crea 00, 10, 20, 30 y 40.
 - El código sale como `pasillo-estantería-altura` con ceros: `101-15-03`. De él salen la secuencia de picking (el orden de recorrido: cuanto menor, antes) y los mapas.
 - Lánzalo una vez por zona y por grupo de pasillos iguales. Se puede relanzar para ampliar: lo que ya existe no se toca.
-- El almacén tiene que tener marcada *Ubicación obligatoria* en su ficha.
-- **Sincronizar ubicaciones** da de alta en SGA las ubicaciones creadas en BC por fuera. Las deja sin tipo: hay que ponérselo.
+- Al terminar dice cuántas ha creado, cuántas ya existían y cuántas posiciones de un fondo de pasillo se han saltado.
+- **Recalcular ubicaciones** vuelve a calcular el estado y la ocupación de todas y, si se marca, reconstruye el contenido desde los movimientos.
 
 ## 5. Tipo y capacidad
 
@@ -127,7 +127,7 @@ Reparte entre las ubicaciones el stock que ya tiene BC. Menú **Configuración**
    - en *Configuración SGA* > *General* está puesta la **Fecha inicio SGA** (sin ella no se lanza). Las recepciones y ensamblados desde esa fecha se ubican desde *Ubicar recepciones* y *Ubicar ensamblados*, no los coge la carga.
 2. *Ubicación de destino* = **Huecos libres**: cada palé completo a un hueco vacío y el resto junto en otro hueco con sitio. Se llena primero picking y luego almacenamiento. Para que picking no se llene de palés de unos pocos productos, *Máx. ubicaciones de picking por producto* (por defecto 1) limita cuántas ocupa cada uno. Sus ubicaciones reservadas (producto fijo) se llenan igualmente.
 3. Lánzala primero con **Solo simular**: hace el reparto completo, lo enseña y lo deshace.
-4. Al terminar sale **Resultado de la carga inicial**. La vista *No cargado* dice qué se ha quedado fuera y por qué.
+4. Al terminar dice cuántas unidades se han ubicado y cuántas se han quedado sin sitio, y sale **Resultado de la carga inicial**. La vista *No cargado* dice qué se ha quedado fuera y por qué.
 5. Se puede relanzar sin riesgo: carga, lote a lote, solo lo que falta (stock de BC menos lo ya ubicado y menos lo pendiente en albaranes y ensamblados), lo mismo que enseña **Pendiente de ubicar**.
 
 ## 8. Empezar de cero

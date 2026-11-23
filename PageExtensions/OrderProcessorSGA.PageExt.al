@@ -6,7 +6,6 @@ using Microsoft.Purchases.History;
 using Microsoft.Sales.Document;
 using Microsoft.Sales.History;
 using Microsoft.Sales.RoleCenters;
-using Microsoft.Warehouse.Structure;
 
 /// <summary>
 /// PageExtension Order Processor SGA (ID 51103) extends Page "Order Processor Role Center".
@@ -110,51 +109,6 @@ pageextension 51103 "Order Processor SGA" extends "Order Processor Role Center"
                     ApplicationArea = All;
                     Image = ItemLines;
                     RunObject = page "Contenido Ubicaciones SGA";
-                }
-            }
-            group(SGAVentasCompras)
-            {
-                Caption = 'Almacén SGA - Ventas y compras';
-
-                action(ProductosSGA)
-                {
-                    Caption = 'Productos';
-                    ToolTip = 'Fichas de los productos: unidades de medida, palé por defecto y existencias.';
-                    ApplicationArea = All;
-                    Image = Item;
-                    RunObject = page "Item List";
-                }
-                action(PedidosVentaSGA)
-                {
-                    Caption = 'Pedidos de venta';
-                    ToolTip = 'Pedidos de venta. Las órdenes de picking salen de un pedido lanzado con Enviar a SGA.';
-                    ApplicationArea = All;
-                    Image = Document;
-                    RunObject = page "Sales Order List";
-                }
-                action(AlbaranesVentaSGA)
-                {
-                    Caption = 'Histórico de albaranes de venta';
-                    ToolTip = 'Envíos de venta ya registrados.';
-                    ApplicationArea = All;
-                    Image = PostedShipment;
-                    RunObject = page "Posted Sales Shipments";
-                }
-                action(PedidosCompraSGA)
-                {
-                    Caption = 'Pedidos de compra';
-                    ToolTip = 'Pedidos de compra pendientes de recibir.';
-                    ApplicationArea = All;
-                    Image = Document;
-                    RunObject = page "Purchase Order List";
-                }
-                action(AlbaranesCompraSGA)
-                {
-                    Caption = 'Histórico de albaranes de compra';
-                    ToolTip = 'Recepciones de compra ya registradas, de las que sale lo que hay que ubicar.';
-                    ApplicationArea = All;
-                    Image = PostedReceipt;
-                    RunObject = page "Posted Purchase Receipts";
                 }
             }
             group(SGAConsultas)
@@ -270,8 +224,8 @@ pageextension 51103 "Order Processor SGA" extends "Order Processor Role Center"
                 }
                 action(SincronizarUbicacionesSGA)
                 {
-                    Caption = 'Sincronizar ubicaciones';
-                    ToolTip = 'Da de alta en SGA las ubicaciones que aún no tienen datos de gestión.';
+                    Caption = 'Recalcular ubicaciones';
+                    ToolTip = 'Recalcula el estado y la ocupación de las ubicaciones y, si se marca, reconstruye el contenido desde los movimientos.';
                     ApplicationArea = All;
                     Image = Refresh;
                     RunObject = report "Sincronizar Ubicaciones SGA";

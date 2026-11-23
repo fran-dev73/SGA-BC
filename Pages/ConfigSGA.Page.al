@@ -144,10 +144,10 @@ page 51106 "Config. SGA"
                 Image = CreateForm;
                 RunObject = report "Generar Ubicaciones SGA";
             }
-            action(SincronizarTopologia)
+            action(RecalcularUbicaciones)
             {
-                Caption = 'Sincronizar ubicaciones';
-                ToolTip = 'Da de alta en SGA las ubicaciones de la topología que todavía no tienen datos de gestión de almacén.';
+                Caption = 'Recalcular ubicaciones';
+                ToolTip = 'Recalcula el estado y la ocupación de las ubicaciones y, si se marca, reconstruye el contenido desde los movimientos.';
                 ApplicationArea = All;
                 Image = Refresh;
                 RunObject = report "Sincronizar Ubicaciones SGA";
@@ -189,7 +189,7 @@ page 51106 "Config. SGA"
                 actionref(GenerarUbicaciones_Promoted; GenerarUbicaciones)
                 {
                 }
-                actionref(SincronizarTopologia_Promoted; SincronizarTopologia)
+                actionref(RecalcularUbicaciones_Promoted; RecalcularUbicaciones)
                 {
                 }
                 actionref(CargaInicial_Promoted; CargaInicial)

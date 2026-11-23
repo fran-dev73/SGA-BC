@@ -2,8 +2,9 @@ namespace AntonioNadal.SGA;
 
 /// <summary>
 /// Page Recontar Contenido SGA (ID 51115).
-/// Diálogo de recuento de una línea de contenido: muestra lo que consta y pide lo que
-/// se ha contado realmente. No registra nada; el ajuste lo hace Cod. "Gestion Contenido SGA".
+/// Diálogo de recuento de una línea de contenido: muestra lo que consta, pide lo que se ha
+/// contado realmente y al aceptar registra la diferencia (RegistrarRecuento de Cod. "Gestion
+/// Contenido SGA"). Si no se puede, da el error y el diálogo sigue abierto.
 /// </summary>
 page 51115 "Recontar Contenido SGA"
 {
@@ -93,6 +94,7 @@ page 51115 "Recontar Contenido SGA"
     }
 
     var
+        Almacen: Code[10];
         Ubicacion: Code[20];
         Producto: Code[20];
         Lote: Code[50];
@@ -109,6 +111,7 @@ page 51115 "Recontar Contenido SGA"
     var
         RecuentoManualLbl: Label 'Recuento manual';
     begin
+        Almacen := rContenido."Cod. Almacen";
         Ubicacion := rContenido."Cod. Bin";
         Producto := rContenido."No. Producto";
         Lote := rContenido."No. Lote";
@@ -119,14 +122,16 @@ page 51115 "Recontar Contenido SGA"
         CalcularDiferencia();
     end;
 
-    procedure ObtenerCantidadContada(): Decimal
+    trigger OnQueryClosePage(CloseAction: Action): Boolean
+    var
+        cContenido: Codeunit "Gestion Contenido SGA";
+        SinDiferenciaMsg: Label 'No había diferencia: la cantidad contada coincide con la registrada.';
     begin
-        exit(CantidadContada);
-    end;
-
-    procedure ObtenerMotivo(): Text[100]
-    begin
-        exit(Motivo);
+        if CloseAction <> Action::OK then
+            exit(true);
+        if cContenido.RegistrarRecuento(Almacen, Ubicacion, Producto, Lote, SSCC, CantidadContada, Motivo) = 0 then
+            Message(SinDiferenciaMsg);
+        exit(true);
     end;
 
     local procedure CalcularDiferencia()

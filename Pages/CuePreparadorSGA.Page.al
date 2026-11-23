@@ -58,7 +58,6 @@ page 51135 "Cue Preparador SGA"
         cPicking: Codeunit "Gestion Picking SGA";
     begin
         Rec.ObtenerCue();
-        Rec.FiltrarCue();
 
         // Con asignación exigida, el preparador no coge órdenes por su cuenta.
         rConfig.ObtenerConfig();

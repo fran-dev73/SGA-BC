@@ -102,7 +102,7 @@ page 51107 "Mapa Almacen SGA"
                     ToolTip = 'Hueco de la estantería 01: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 01";
-                    Visible = MostrarCol01;
+                    Visible = ColumnasVisibles >= 1;
 
                     trigger OnDrillDown()
                     begin
@@ -114,7 +114,7 @@ page 51107 "Mapa Almacen SGA"
                     ToolTip = 'Hueco de la estantería 02: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 02";
-                    Visible = MostrarCol02;
+                    Visible = ColumnasVisibles >= 2;
 
                     trigger OnDrillDown()
                     begin
@@ -126,7 +126,7 @@ page 51107 "Mapa Almacen SGA"
                     ToolTip = 'Hueco de la estantería 03: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 03";
-                    Visible = MostrarCol03;
+                    Visible = ColumnasVisibles >= 3;
 
                     trigger OnDrillDown()
                     begin
@@ -138,7 +138,7 @@ page 51107 "Mapa Almacen SGA"
                     ToolTip = 'Hueco de la estantería 04: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 04";
-                    Visible = MostrarCol04;
+                    Visible = ColumnasVisibles >= 4;
 
                     trigger OnDrillDown()
                     begin
@@ -150,7 +150,7 @@ page 51107 "Mapa Almacen SGA"
                     ToolTip = 'Hueco de la estantería 05: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 05";
-                    Visible = MostrarCol05;
+                    Visible = ColumnasVisibles >= 5;
 
                     trigger OnDrillDown()
                     begin
@@ -162,7 +162,7 @@ page 51107 "Mapa Almacen SGA"
                     ToolTip = 'Hueco de la estantería 06: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 06";
-                    Visible = MostrarCol06;
+                    Visible = ColumnasVisibles >= 6;
 
                     trigger OnDrillDown()
                     begin
@@ -174,7 +174,7 @@ page 51107 "Mapa Almacen SGA"
                     ToolTip = 'Hueco de la estantería 07: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 07";
-                    Visible = MostrarCol07;
+                    Visible = ColumnasVisibles >= 7;
 
                     trigger OnDrillDown()
                     begin
@@ -186,7 +186,7 @@ page 51107 "Mapa Almacen SGA"
                     ToolTip = 'Hueco de la estantería 08: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 08";
-                    Visible = MostrarCol08;
+                    Visible = ColumnasVisibles >= 8;
 
                     trigger OnDrillDown()
                     begin
@@ -198,7 +198,7 @@ page 51107 "Mapa Almacen SGA"
                     ToolTip = 'Hueco de la estantería 09: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 09";
-                    Visible = MostrarCol09;
+                    Visible = ColumnasVisibles >= 9;
 
                     trigger OnDrillDown()
                     begin
@@ -210,7 +210,7 @@ page 51107 "Mapa Almacen SGA"
                     ToolTip = 'Hueco de la estantería 10: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 10";
-                    Visible = MostrarCol10;
+                    Visible = ColumnasVisibles >= 10;
 
                     trigger OnDrillDown()
                     begin
@@ -222,7 +222,7 @@ page 51107 "Mapa Almacen SGA"
                     ToolTip = 'Hueco de la estantería 11: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 11";
-                    Visible = MostrarCol11;
+                    Visible = ColumnasVisibles >= 11;
 
                     trigger OnDrillDown()
                     begin
@@ -234,7 +234,7 @@ page 51107 "Mapa Almacen SGA"
                     ToolTip = 'Hueco de la estantería 12: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 12";
-                    Visible = MostrarCol12;
+                    Visible = ColumnasVisibles >= 12;
 
                     trigger OnDrillDown()
                     begin
@@ -246,7 +246,7 @@ page 51107 "Mapa Almacen SGA"
                     ToolTip = 'Hueco de la estantería 13: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 13";
-                    Visible = MostrarCol13;
+                    Visible = ColumnasVisibles >= 13;
 
                     trigger OnDrillDown()
                     begin
@@ -258,7 +258,7 @@ page 51107 "Mapa Almacen SGA"
                     ToolTip = 'Hueco de la estantería 14: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 14";
-                    Visible = MostrarCol14;
+                    Visible = ColumnasVisibles >= 14;
 
                     trigger OnDrillDown()
                     begin
@@ -270,7 +270,7 @@ page 51107 "Mapa Almacen SGA"
                     ToolTip = 'Hueco de la estantería 15: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 15";
-                    Visible = MostrarCol15;
+                    Visible = ColumnasVisibles >= 15;
 
                     trigger OnDrillDown()
                     begin
@@ -282,7 +282,7 @@ page 51107 "Mapa Almacen SGA"
                     ToolTip = 'Hueco de la estantería 16: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 16";
-                    Visible = MostrarCol16;
+                    Visible = ColumnasVisibles >= 16;
 
                     trigger OnDrillDown()
                     begin
@@ -294,7 +294,7 @@ page 51107 "Mapa Almacen SGA"
                     ToolTip = 'Hueco de la estantería 17: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 17";
-                    Visible = MostrarCol17;
+                    Visible = ColumnasVisibles >= 17;
 
                     trigger OnDrillDown()
                     begin
@@ -306,7 +306,7 @@ page 51107 "Mapa Almacen SGA"
                     ToolTip = 'Hueco de la estantería 18: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 18";
-                    Visible = MostrarCol18;
+                    Visible = ColumnasVisibles >= 18;
 
                     trigger OnDrillDown()
                     begin
@@ -318,7 +318,7 @@ page 51107 "Mapa Almacen SGA"
                     ToolTip = 'Hueco de la estantería 19: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 19";
-                    Visible = MostrarCol19;
+                    Visible = ColumnasVisibles >= 19;
 
                     trigger OnDrillDown()
                     begin
@@ -330,7 +330,7 @@ page 51107 "Mapa Almacen SGA"
                     ToolTip = 'Hueco de la estantería 20: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 20";
-                    Visible = MostrarCol20;
+                    Visible = ColumnasVisibles >= 20;
 
                     trigger OnDrillDown()
                     begin
@@ -342,7 +342,7 @@ page 51107 "Mapa Almacen SGA"
                     ToolTip = 'Hueco de la estantería 21: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 21";
-                    Visible = MostrarCol21;
+                    Visible = ColumnasVisibles >= 21;
 
                     trigger OnDrillDown()
                     begin
@@ -354,7 +354,7 @@ page 51107 "Mapa Almacen SGA"
                     ToolTip = 'Hueco de la estantería 22: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 22";
-                    Visible = MostrarCol22;
+                    Visible = ColumnasVisibles >= 22;
 
                     trigger OnDrillDown()
                     begin
@@ -366,7 +366,7 @@ page 51107 "Mapa Almacen SGA"
                     ToolTip = 'Hueco de la estantería 23: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 23";
-                    Visible = MostrarCol23;
+                    Visible = ColumnasVisibles >= 23;
 
                     trigger OnDrillDown()
                     begin
@@ -378,7 +378,7 @@ page 51107 "Mapa Almacen SGA"
                     ToolTip = 'Hueco de la estantería 24: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 24";
-                    Visible = MostrarCol24;
+                    Visible = ColumnasVisibles >= 24;
 
                     trigger OnDrillDown()
                     begin
@@ -390,7 +390,7 @@ page 51107 "Mapa Almacen SGA"
                     ToolTip = 'Hueco de la estantería 25: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 25";
-                    Visible = MostrarCol25;
+                    Visible = ColumnasVisibles >= 25;
 
                     trigger OnDrillDown()
                     begin
@@ -402,7 +402,7 @@ page 51107 "Mapa Almacen SGA"
                     ToolTip = 'Hueco de la estantería 26: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 26";
-                    Visible = MostrarCol26;
+                    Visible = ColumnasVisibles >= 26;
 
                     trigger OnDrillDown()
                     begin
@@ -414,7 +414,7 @@ page 51107 "Mapa Almacen SGA"
                     ToolTip = 'Hueco de la estantería 27: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 27";
-                    Visible = MostrarCol27;
+                    Visible = ColumnasVisibles >= 27;
 
                     trigger OnDrillDown()
                     begin
@@ -426,7 +426,7 @@ page 51107 "Mapa Almacen SGA"
                     ToolTip = 'Hueco de la estantería 28: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 28";
-                    Visible = MostrarCol28;
+                    Visible = ColumnasVisibles >= 28;
 
                     trigger OnDrillDown()
                     begin
@@ -438,7 +438,7 @@ page 51107 "Mapa Almacen SGA"
                     ToolTip = 'Hueco de la estantería 29: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 29";
-                    Visible = MostrarCol29;
+                    Visible = ColumnasVisibles >= 29;
 
                     trigger OnDrillDown()
                     begin
@@ -450,7 +450,7 @@ page 51107 "Mapa Almacen SGA"
                     ToolTip = 'Hueco de la estantería 30: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 30";
-                    Visible = MostrarCol30;
+                    Visible = ColumnasVisibles >= 30;
 
                     trigger OnDrillDown()
                     begin
@@ -462,7 +462,7 @@ page 51107 "Mapa Almacen SGA"
                     ToolTip = 'Hueco de la estantería 31: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 31";
-                    Visible = MostrarCol31;
+                    Visible = ColumnasVisibles >= 31;
 
                     trigger OnDrillDown()
                     begin
@@ -474,7 +474,7 @@ page 51107 "Mapa Almacen SGA"
                     ToolTip = 'Hueco de la estantería 32: producto y cantidad que contiene.';
                     ApplicationArea = All;
                     StyleExpr = Rec."Estilo 32";
-                    Visible = MostrarCol32;
+                    Visible = ColumnasVisibles >= 32;
 
                     trigger OnDrillDown()
                     begin
@@ -534,38 +534,6 @@ page 51107 "Mapa Almacen SGA"
         Aviso: Text;
         HayAviso: Boolean;
         ColumnasVisibles: Integer;
-        MostrarCol01: Boolean;
-        MostrarCol02: Boolean;
-        MostrarCol03: Boolean;
-        MostrarCol04: Boolean;
-        MostrarCol05: Boolean;
-        MostrarCol06: Boolean;
-        MostrarCol07: Boolean;
-        MostrarCol08: Boolean;
-        MostrarCol09: Boolean;
-        MostrarCol10: Boolean;
-        MostrarCol11: Boolean;
-        MostrarCol12: Boolean;
-        MostrarCol13: Boolean;
-        MostrarCol14: Boolean;
-        MostrarCol15: Boolean;
-        MostrarCol16: Boolean;
-        MostrarCol17: Boolean;
-        MostrarCol18: Boolean;
-        MostrarCol19: Boolean;
-        MostrarCol20: Boolean;
-        MostrarCol21: Boolean;
-        MostrarCol22: Boolean;
-        MostrarCol23: Boolean;
-        MostrarCol24: Boolean;
-        MostrarCol25: Boolean;
-        MostrarCol26: Boolean;
-        MostrarCol27: Boolean;
-        MostrarCol28: Boolean;
-        MostrarCol29: Boolean;
-        MostrarCol30: Boolean;
-        MostrarCol31: Boolean;
-        MostrarCol32: Boolean;
 
     trigger OnOpenPage()
     var
@@ -610,7 +578,6 @@ page 51107 "Mapa Almacen SGA"
         if columnaMaxima < ColumnasVisibles then
             ColumnasVisibles := columnaMaxima;
 
-        FijarVisibilidad();
         FiltrarPasillo();
     end;
 
@@ -631,39 +598,4 @@ page 51107 "Mapa Almacen SGA"
         CurrPage.Update(false);
     end;
 
-    local procedure FijarVisibilidad()
-    begin
-        MostrarCol01 := ColumnasVisibles >= 1;
-        MostrarCol02 := ColumnasVisibles >= 2;
-        MostrarCol03 := ColumnasVisibles >= 3;
-        MostrarCol04 := ColumnasVisibles >= 4;
-        MostrarCol05 := ColumnasVisibles >= 5;
-        MostrarCol06 := ColumnasVisibles >= 6;
-        MostrarCol07 := ColumnasVisibles >= 7;
-        MostrarCol08 := ColumnasVisibles >= 8;
-        MostrarCol09 := ColumnasVisibles >= 9;
-        MostrarCol10 := ColumnasVisibles >= 10;
-        MostrarCol11 := ColumnasVisibles >= 11;
-        MostrarCol12 := ColumnasVisibles >= 12;
-        MostrarCol13 := ColumnasVisibles >= 13;
-        MostrarCol14 := ColumnasVisibles >= 14;
-        MostrarCol15 := ColumnasVisibles >= 15;
-        MostrarCol16 := ColumnasVisibles >= 16;
-        MostrarCol17 := ColumnasVisibles >= 17;
-        MostrarCol18 := ColumnasVisibles >= 18;
-        MostrarCol19 := ColumnasVisibles >= 19;
-        MostrarCol20 := ColumnasVisibles >= 20;
-        MostrarCol21 := ColumnasVisibles >= 21;
-        MostrarCol22 := ColumnasVisibles >= 22;
-        MostrarCol23 := ColumnasVisibles >= 23;
-        MostrarCol24 := ColumnasVisibles >= 24;
-        MostrarCol25 := ColumnasVisibles >= 25;
-        MostrarCol26 := ColumnasVisibles >= 26;
-        MostrarCol27 := ColumnasVisibles >= 27;
-        MostrarCol28 := ColumnasVisibles >= 28;
-        MostrarCol29 := ColumnasVisibles >= 29;
-        MostrarCol30 := ColumnasVisibles >= 30;
-        MostrarCol31 := ColumnasVisibles >= 31;
-        MostrarCol32 := ColumnasVisibles >= 32;
-    end;
 }

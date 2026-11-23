@@ -109,23 +109,6 @@ codeunit 51105 "Gestion Entradas SGA"
     end;
 
     /// <summary>
-    /// Aplica el rango de fechas al campo de fecha de registro. Con las dos en blanco no filtra.
-    /// </summary>
-    local procedure FiltroFechas(prm_Desde: Date; prm_Hasta: Date): Text
-    begin
-        case true of
-            (prm_Desde = 0D) and (prm_Hasta = 0D):
-                exit('');
-            prm_Desde = 0D:
-                exit(StrSubstNo('..%1', prm_Hasta));
-            prm_Hasta = 0D:
-                exit(StrSubstNo('%1..', prm_Desde));
-            else
-                exit(StrSubstNo('%1..%2', prm_Desde, prm_Hasta));
-        end;
-    end;
-
-    /// <summary>
     /// Si el producto es de la clase pedida en pantalla (o no se filtra por clase).
     /// </summary>
     local procedure ClaseAdmitida(var prm_Item: Record Item): Boolean
@@ -155,7 +138,11 @@ codeunit 51105 "Gestion Entradas SGA"
     begin
         rConfig.ObtenerConfig();
 
-        rCabEns.SetFilter("Posting Date", FiltroFechas(FechaDesde, FechaHasta));
+        // Con las dos fechas en blanco no filtra.
+        if FechaHasta = 0D then
+            rCabEns.SetFilter("Posting Date", '%1..', FechaDesde)
+        else
+            rCabEns.SetRange("Posting Date", FechaDesde, FechaHasta);
         // Un ensamblado deshecho no sacó nada: sin lotes de BC su cantidad sale de la cabecera,
         // que no se pone a cero al deshacerlo.
         rCabEns.SetRange(Reversed, false);
@@ -275,10 +262,10 @@ codeunit 51105 "Gestion Entradas SGA"
     var
         acumulado: Decimal;
     begin
-        if prm_Lotes.Get(prm_Lote, acumulado) then
-            prm_Lotes.Set(prm_Lote, acumulado + prm_Cantidad)
-        else
-            prm_Lotes.Add(prm_Lote, prm_Cantidad);
+        // Set añade la clave si aún no está.
+        if not prm_Lotes.Get(prm_Lote, acumulado) then
+            acumulado := 0;
+        prm_Lotes.Set(prm_Lote, acumulado + prm_Cantidad);
     end;
 
     /// <summary>
@@ -329,7 +316,10 @@ codeunit 51105 "Gestion Entradas SGA"
     begin
         rItemLedgEntry.SetRange("Entry Type", rItemLedgEntry."Entry Type"::Purchase);
         rItemLedgEntry.SetRange("Document Type", rItemLedgEntry."Document Type"::"Purchase Receipt");
-        rItemLedgEntry.SetFilter("Posting Date", FiltroFechas(FechaDesde, FechaHasta));
+        if FechaHasta = 0D then
+            rItemLedgEntry.SetFilter("Posting Date", '%1..', FechaDesde)
+        else
+            rItemLedgEntry.SetRange("Posting Date", FechaDesde, FechaHasta);
         rItem.SetLoadFields("Clase de articulo", "Base Unit of Measure");
         // Sin fecha de inicio se mirarían todas las compras de la historia. Se acota a las
         // recepciones que aún tienen stock (movimiento abierto): lo ya consumido o deshecho no
@@ -449,6 +439,35 @@ codeunit 51105 "Gestion Entradas SGA"
     end;
 
     /// <summary>
+    /// ProponerParaTodos desde la pantalla de ubicar entradas, diciendo cuántas ubicaciones se
+    /// han propuesto, que no había nada que proponer o que no ha encontrado sitio (el motivo de
+    /// cada fila queda en su línea).
+    /// </summary>
+    procedure ProponerParaTodosConMensaje(var prm_Buffer: Record "Linea Ubicacion SGA" temporary)
+    var
+        TempFila: Record "Linea Ubicacion SGA" temporary;
+        propuestas: Integer;
+        UbicacionesPropuestasMsg: Label 'Se han propuesto %1 ubicaciones.', Comment = '%1 = número de propuestas';
+        NingunaPropuestaMsg: Label 'No se ha podido proponer ninguna ubicación: la columna "Por qué ahí" de cada línea dice el motivo.';
+        NadaQueProponerMsg: Label 'No hay líneas pendientes sin ubicación propuesta.';
+    begin
+        TempFila.Copy(prm_Buffer, true);
+        TempFila.Reset();
+        TempFila.SetFilter(Estado, '<>%1', TempFila.Estado::Ubicado);
+        TempFila.SetRange("Ubicacion Propuesta", '');
+        if TempFila.IsEmpty() then begin
+            Message(NadaQueProponerMsg);
+            exit;
+        end;
+
+        propuestas := ProponerParaTodos(prm_Buffer);
+        if propuestas = 0 then
+            Message(NingunaPropuestaMsg)
+        else
+            Message(UbicacionesPropuestasMsg, propuestas);
+    end;
+
+    /// <summary>
     /// Busca una alternativa para una fila, descartando la que ya se le había ofrecido y las
     /// que están reservadas por las demás filas.
     /// </summary>
@@ -459,6 +478,7 @@ codeunit 51105 "Gestion Entradas SGA"
         codigo: Code[20];
         SinOtraUbicacionMsg: Label 'No hay otra ubicación disponible para %1. Se mantiene la propuesta anterior.', Comment = '%1 = producto';
     begin
+        TestFilaSinUbicar(prm_Fila);
         excluidas := ExclusionesDeOtrasFilas(prm_Fila);
         excluidas := cUbicaciones.AnadirExclusion(excluidas, prm_Fila."Ubicacion Propuesta");
 
@@ -476,6 +496,67 @@ codeunit 51105 "Gestion Entradas SGA"
     end;
 
     /// <summary>
+    /// Registra las líneas de un reparto de "Ubicar producto" (ProponerReparto de Cod. "Gestion
+    /// Ubicaciones SGA"): todas las que tengan ubicación confirmada y no estén ya ubicadas
+    /// (prm_Linea = 0), o solo esa línea. Primero comprueba todas (TestFilaParaUbicar) y luego
+    /// registra, para no dejar el reparto a medias por un error en una línea. Cada línea entra
+    /// con el SSCC leído de su palé o, si no se ha leído, con uno nuevo. Devuelve lo que queda
+    /// sin ubicar del reparto, en unidad base.
+    /// </summary>
+    procedure ConfirmarReparto(var TempLinea: Record "Linea Ubicacion SGA" temporary; prm_Linea: Integer): Decimal
+    var
+        cContenido: Codeunit "Gestion Contenido SGA";
+        lineas: List of [Integer];
+        ssccs: List of [Code[20]];
+        n: Integer;
+        i: Integer;
+        restoBase: Decimal;
+        SinLineasConfirmarErr: Label 'No hay ninguna línea con ubicación que confirmar.';
+        UbicadoGuiadoLbl: Label 'Ubicado desde la pantalla de ubicación guiada.';
+    begin
+        TempLinea.Reset();
+        if prm_Linea <> 0 then
+            TempLinea.SetRange(Linea, prm_Linea);
+        TempLinea.SetFilter(Estado, '<>%1', TempLinea.Estado::Ubicado);
+        if TempLinea.FindSet() then
+            repeat
+                // Confirmando todo, lo que no tiene sitio se salta; una línea sola, no.
+                if (TempLinea."Ubicacion Confirmada" <> '') or (prm_Linea <> 0) then begin
+                    TestFilaParaUbicar(TempLinea);
+                    lineas.Add(TempLinea.Linea);
+                end;
+            until TempLinea.Next() = 0;
+
+        if lineas.Count() = 0 then
+            Error(SinLineasConfirmarErr);
+
+        // Primero se registran todas y después se marcan: la tabla de la pantalla es temporal y
+        // no se deshace con un error, así que si una falla no debe quedar ninguna como ubicada.
+        // El palé sin etiqueta recibe un SSCC nuevo (SSCCPale lo deja en la variable, no en la
+        // tabla), que se guarda al marcarla.
+        TempLinea.Reset();
+        foreach n in lineas do begin
+            TempLinea.Get(n);
+            ssccs.Add(TempLinea.SSCCPale());
+            cContenido.RegistrarEntrada(TempLinea."Cod. Almacen", TempLinea."Ubicacion Confirmada", TempLinea."No. Producto", TempLinea."No. Lote",
+                                        ssccs.Get(ssccs.Count()), TempLinea."Cod. Unidad Medida", TempLinea.Cantidad, "Origen Mov. SGA"::Manual, '', UbicadoGuiadoLbl);
+        end;
+        for i := 1 to lineas.Count() do begin
+            TempLinea.Get(lineas.Get(i));
+            TempLinea.SSCC := ssccs.Get(i);
+            TempLinea.Estado := TempLinea.Estado::Ubicado;
+            TempLinea.Motivo := '';
+            TempLinea.Modify();
+        end;
+
+        TempLinea.SetFilter(Estado, '<>%1', TempLinea.Estado::Ubicado);
+        TempLinea.CalcSums("Cantidad Base");
+        restoBase := TempLinea."Cantidad Base";
+        TempLinea.Reset();
+        exit(restoBase);
+    end;
+
+    /// <summary>
     /// Registra la entrada de una fila en la ubicación confirmada, con el SSCC leído de su palé o,
     /// si no se ha leído (palé sin etiqueta), con uno nuevo. Si a la fila aún le queda, se queda
     /// sin SSCC ni hueco, con el siguiente palé como cantidad, para proponerle otro.
@@ -489,9 +570,7 @@ codeunit 51105 "Gestion Entradas SGA"
         EnsambladoLbl: Label 'Ensamblado %1', Comment = '%1 = nº ensamblado';
         RecepcionLbl: Label 'Recepción %1', Comment = '%1 = nº albarán de compra';
     begin
-        if prm_Fila.Estado = prm_Fila.Estado::Ubicado then
-            exit;
-
+        TestFilaSinUbicar(prm_Fila);
         TestFilaParaUbicar(prm_Fila);
 
         // Lo ya ubicado se vuelve a leer del diario, bloqueándolo: la lista puede llevar rato
@@ -525,10 +604,22 @@ codeunit 51105 "Gestion Entradas SGA"
     end;
 
     /// <summary>
+    /// Error si la fila ya está ubicada: no hay nada que proponer ni que confirmar.
+    /// </summary>
+    local procedure TestFilaSinUbicar(var prm_Fila: Record "Linea Ubicacion SGA" temporary)
+    var
+        LineaYaUbicadaErr: Label 'La línea de %1 ya está ubicada.', Comment = '%1 = producto';
+    begin
+        if prm_Fila.Estado = prm_Fila.Estado::Ubicado then
+            Error(LineaYaUbicadaErr, prm_Fila."No. Producto");
+    end;
+
+    /// <summary>
     /// Lo que se comprueba de una fila antes de ubicarla y que no depende de lo ya ubicado:
     /// ubicación indicada, cantidad positiva, desvío permitido por la configuración y no más de
-    /// un palé por vez (cada palé entra con su SSCC). Imprimir y ubicar lo comprueba antes de
-    /// sacar la etiqueta.
+    /// un palé por vez (cada palé entra con su SSCC). En "Ubicar producto" (Origen Manual), con
+    /// "Exigir confirmar ubicación", la etiqueta del hueco tiene que estar leída y ser la de la
+    /// ubicación en la que se deja. Imprimir y ubicar lo comprueba antes de sacar la etiqueta.
     /// </summary>
     local procedure TestFilaParaUbicar(var prm_Fila: Record "Linea Ubicacion SGA" temporary)
     var
@@ -538,6 +629,8 @@ codeunit 51105 "Gestion Entradas SGA"
         CantidadNoPositivaErr: Label 'La cantidad a ubicar de %1 debe ser mayor que cero.', Comment = '%1 = producto';
         DesvioNoPermitidoErr: Label 'La configuración no permite dejar %1 en una ubicación distinta de la propuesta (%2).', Comment = '%1 = producto, %2 = ubicación propuesta';
         MasDeUnPaleErr: Label 'Se ubica de palé en palé, cada uno con su SSCC: como mucho %1 %2 de %3 cada vez.', Comment = '%1 = cantidad de un palé, %2 = unidad, %3 = producto';
+        SinLecturaErr: Label 'Escanee la etiqueta de la ubicación en la que deja %1: la configuración exige confirmar la ubicación.', Comment = '%1 = producto';
+        LecturaDistintaErr: Label 'Se ha leído la ubicación %1, pero %3 se deja en %2. Lleve la mercancía a %2 y escanee su etiqueta, o cambie la ubicación.', Comment = '%1 = ubicación leída, %2 = ubicación de la línea, %3 = producto';
     begin
         if prm_Fila."Ubicacion Confirmada" = '' then
             Error(UbicacionNoIndicadaErr, prm_Fila."No. Producto");
@@ -545,11 +638,17 @@ codeunit 51105 "Gestion Entradas SGA"
         if prm_Fila.Cantidad <= 0 then
             Error(CantidadNoPositivaErr, prm_Fila."No. Producto");
 
-        if prm_Fila."Ubicacion Propuesta" <> '' then begin
-            rConfig.ObtenerConfig();
+        rConfig.ObtenerConfig();
+        if (prm_Fila.Origen = prm_Fila.Origen::Manual) and rConfig."Exigir Confirmar Ubicacion" then begin
+            if prm_Fila."Ubicacion Leida" = '' then
+                Error(SinLecturaErr, prm_Fila."No. Producto");
+            if prm_Fila."Ubicacion Leida" <> prm_Fila."Ubicacion Confirmada" then
+                Error(LecturaDistintaErr, prm_Fila."Ubicacion Leida", prm_Fila."Ubicacion Confirmada", prm_Fila."No. Producto");
+        end;
+
+        if prm_Fila."Ubicacion Propuesta" <> '' then
             if not rConfig.DesvioPermitido(prm_Fila."Ubicacion Propuesta", prm_Fila."Ubicacion Confirmada") then
                 Error(DesvioNoPermitidoErr, prm_Fila."No. Producto", prm_Fila."Ubicacion Propuesta");
-        end;
 
         // Cada palé entra con su SSCC: no más de un palé por vez.
         if UnPaleEnUMFila(prm_Fila, paleEnUMFila) then
@@ -777,12 +876,7 @@ codeunit 51105 "Gestion Entradas SGA"
         SinPalesMsg: Label 'El ensamblado %1 no tiene palés ubicados en SGA.', Comment = '%1 = nº ensamblado registrado';
         SinContenidoMsg: Label 'Los palés del ensamblado %1 ya no están en ninguna ubicación. Su historia está en Movimientos de ubicación.', Comment = '%1 = nº ensamblado registrado';
     begin
-        rMov.SetCurrentKey(Origen, "No. Documento Origen", "No. Linea Origen");
-        rMov.SetRange(Origen, rMov.Origen::Produccion);
-        if prm_NoPedido <> '' then
-            rMov.SetFilter("No. Documento Origen", '%1|%2', prm_NoRegistrado, prm_NoPedido)
-        else
-            rMov.SetRange("No. Documento Origen", prm_NoRegistrado);
+        rMov.FiltrarEntrada(rMov.Origen::Produccion, prm_NoRegistrado, prm_NoPedido);
         rMov.SetRange("Tipo Movimiento", rMov."Tipo Movimiento"::Entrada);
         rMov.SetFilter(SSCC, '<>%1', '');
         rMov.SetLoadFields(SSCC);
@@ -832,11 +926,10 @@ codeunit 51105 "Gestion Entradas SGA"
     begin
         // Antes de imprimir, todo lo que ConfirmarFila rechazaría: si no, la etiqueta saldría
         // para un palé que luego no se ubica. Lo primero, la fila (ubicación indicada, desvío,
-        // un palé) y que la ubicación exista en BC.
+        // un palé).
         TestFilaParaUbicar(prm_Pale);
-        cUbicaciones.ComprobarUbicacionExiste(prm_Pale."Cod. Almacen", prm_Pale."Ubicacion Confirmada");
         ComprobarEtiqueta(prm_Tarea);
-        // Antes de imprimir, que el hueco admita el palé con las mismas reglas que al ubicar:
+        // Que la ubicación exista en SGA y admita el palé con las mismas reglas que al ubicar:
         // si no, saldría una etiqueta para un palé que luego no se puede colocar ahí.
         cContenido.TestEntradaAdmitida(prm_Pale."Cod. Almacen", prm_Pale."Ubicacion Confirmada", prm_Pale."No. Producto",
                                        prm_Pale."No. Lote", prm_Pale."Cod. Unidad Medida", prm_Pale.Cantidad, prm_Pale.ReservaFila());
@@ -1127,26 +1220,15 @@ codeunit 51105 "Gestion Entradas SGA"
         factorPale := cUM.FactorPale(prm_Fila."No. Producto");
         if factorPale <= 1 then
             exit(false);
-        prm_PaleEnUM := cUOMMgt.CalcQtyFromBase(factorPale, cUM.FactorUM(prm_Fila."No. Producto", prm_Fila."Cod. Unidad Medida"));
+        prm_PaleEnUM := cUM.DesdeBase(prm_Fila."No. Producto", prm_Fila."Cod. Unidad Medida", factorPale);
         exit(true);
     end;
 
     /// <summary>
-    /// Lo ya ubicado de una fila, en su unidad. Los palés ubicados al imprimir su etiqueta
-    /// (Ubicar Palets Linea SGA) van con el nº del pedido de ensamblado, que no es el del
-    /// registrado: sin sumarlos se ubicarían dos veces.
-    /// </summary>
-    local procedure YaUbicadaFila(var prm_Fila: Record "Linea Ubicacion SGA" temporary) ubicada: Decimal
-    begin
-        ubicada := CantidadYaUbicada(prm_Fila.Origen, prm_Fila."No. Documento", prm_Fila."No. Producto",
-                                     prm_Fila."No. Lote", prm_Fila."Cod. Unidad Medida");
-        if (prm_Fila."Documento Relacionado" <> '') and (prm_Fila."Documento Relacionado" <> prm_Fila."No. Documento") then
-            ubicada += CantidadYaUbicada(prm_Fila.Origen, prm_Fila."Documento Relacionado", prm_Fila."No. Producto",
-                                         prm_Fila."No. Lote", prm_Fila."Cod. Unidad Medida");
-    end;
-
-    /// <summary>
-    /// Cantidad de una entrada que SGA ya tiene colocada, leída del diario de movimientos.
+    /// Lo ya ubicado de una fila, en su unidad, leído del diario de movimientos. Los palés
+    /// ubicados al imprimir su etiqueta (Ubicar Palets Linea SGA) van con el nº del pedido de
+    /// ensamblado (Documento Relacionado), que no es el del registrado: sin sumarlos se ubicarían
+    /// dos veces.
     ///
     /// La clave (Origen + documento) no lleva sumatorios: CalcSums suma en la tabla, sobre los
     /// pocos movimientos del documento.
@@ -1154,30 +1236,28 @@ codeunit 51105 "Gestion Entradas SGA"
     /// en cajas y en palés, en filas distintas, y no hay que mezclarlas.
     /// En producción hay una sola fila por ensamblado, pero sus palés pueden haberse ubicado en
     /// otra unidad al imprimir la etiqueta (palé, cajas o unidades, ver PrepararPaleTarea). Ahí
-    /// se suma todo en unidad base y se devuelve en la unidad pedida, para no ubicarlo dos veces.
+    /// se suma todo en unidad base y se devuelve en la unidad de la fila.
     /// </summary>
-    local procedure CantidadYaUbicada(prm_Origen: Enum "Origen Mov. SGA"; prm_NoDocumento: Code[20]; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_UM: Code[10]): Decimal
+    local procedure YaUbicadaFila(var prm_Fila: Record "Linea Ubicacion SGA" temporary): Decimal
     var
         rMov: Record "Movimiento Ubicacion SGA";
         todasLasUM: Boolean;
     begin
-        if prm_NoDocumento = '' then
+        if prm_Fila."No. Documento" = '' then
             exit(0);
 
-        todasLasUM := prm_Origen = prm_Origen::Produccion;
+        todasLasUM := prm_Fila.Origen = prm_Fila.Origen::Produccion;
 
-        rMov.SetCurrentKey(Origen, "No. Documento Origen", "No. Linea Origen");
-        rMov.SetRange(Origen, prm_Origen);
-        rMov.SetRange("No. Documento Origen", prm_NoDocumento);
-        rMov.SetRange("No. Producto", prm_Producto);
-        rMov.SetRange("No. Lote", prm_Lote);
+        rMov.FiltrarEntrada(prm_Fila.Origen, prm_Fila."No. Documento", prm_Fila."Documento Relacionado");
+        rMov.SetRange("No. Producto", prm_Fila."No. Producto");
+        rMov.SetRange("No. Lote", prm_Fila."No. Lote");
         if not todasLasUM then
-            rMov.SetRange("Cod. Unidad Medida", prm_UM);
+            rMov.SetRange("Cod. Unidad Medida", prm_Fila."Cod. Unidad Medida");
         rMov.SetRange("Tipo Movimiento", rMov."Tipo Movimiento"::Entrada);
         rMov.CalcSums(Cantidad, "Cantidad Base");
 
         if todasLasUM then
-            exit(cUOMMgt.CalcQtyFromBase(rMov."Cantidad Base", cUM.FactorUM(prm_Producto, prm_UM)));
+            exit(cUM.DesdeBase(prm_Fila."No. Producto", prm_Fila."Cod. Unidad Medida", rMov."Cantidad Base"));
         exit(rMov.Cantidad);
     end;
 

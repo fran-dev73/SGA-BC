@@ -372,168 +372,18 @@ table 51106 "Buffer Mapa SGA"
     /// Asigna el texto y el estilo de una columna de la rejilla (1-32).
     /// </summary>
     procedure FijarColumna(prm_Columna: Integer; prm_Texto: Text; prm_Estilo: Text)
+    var
+        rrBuffer: RecordRef;
+        frCampo: FieldRef;
     begin
-        case prm_Columna of
-            1:
-                begin
-                    "Columna 01" := CopyStr(prm_Texto, 1, MaxStrLen("Columna 01"));
-                    "Estilo 01" := CopyStr(prm_Estilo, 1, MaxStrLen("Estilo 01"));
-                end;
-            2:
-                begin
-                    "Columna 02" := CopyStr(prm_Texto, 1, MaxStrLen("Columna 02"));
-                    "Estilo 02" := CopyStr(prm_Estilo, 1, MaxStrLen("Estilo 02"));
-                end;
-            3:
-                begin
-                    "Columna 03" := CopyStr(prm_Texto, 1, MaxStrLen("Columna 03"));
-                    "Estilo 03" := CopyStr(prm_Estilo, 1, MaxStrLen("Estilo 03"));
-                end;
-            4:
-                begin
-                    "Columna 04" := CopyStr(prm_Texto, 1, MaxStrLen("Columna 04"));
-                    "Estilo 04" := CopyStr(prm_Estilo, 1, MaxStrLen("Estilo 04"));
-                end;
-            5:
-                begin
-                    "Columna 05" := CopyStr(prm_Texto, 1, MaxStrLen("Columna 05"));
-                    "Estilo 05" := CopyStr(prm_Estilo, 1, MaxStrLen("Estilo 05"));
-                end;
-            6:
-                begin
-                    "Columna 06" := CopyStr(prm_Texto, 1, MaxStrLen("Columna 06"));
-                    "Estilo 06" := CopyStr(prm_Estilo, 1, MaxStrLen("Estilo 06"));
-                end;
-            7:
-                begin
-                    "Columna 07" := CopyStr(prm_Texto, 1, MaxStrLen("Columna 07"));
-                    "Estilo 07" := CopyStr(prm_Estilo, 1, MaxStrLen("Estilo 07"));
-                end;
-            8:
-                begin
-                    "Columna 08" := CopyStr(prm_Texto, 1, MaxStrLen("Columna 08"));
-                    "Estilo 08" := CopyStr(prm_Estilo, 1, MaxStrLen("Estilo 08"));
-                end;
-            9:
-                begin
-                    "Columna 09" := CopyStr(prm_Texto, 1, MaxStrLen("Columna 09"));
-                    "Estilo 09" := CopyStr(prm_Estilo, 1, MaxStrLen("Estilo 09"));
-                end;
-            10:
-                begin
-                    "Columna 10" := CopyStr(prm_Texto, 1, MaxStrLen("Columna 10"));
-                    "Estilo 10" := CopyStr(prm_Estilo, 1, MaxStrLen("Estilo 10"));
-                end;
-            11:
-                begin
-                    "Columna 11" := CopyStr(prm_Texto, 1, MaxStrLen("Columna 11"));
-                    "Estilo 11" := CopyStr(prm_Estilo, 1, MaxStrLen("Estilo 11"));
-                end;
-            12:
-                begin
-                    "Columna 12" := CopyStr(prm_Texto, 1, MaxStrLen("Columna 12"));
-                    "Estilo 12" := CopyStr(prm_Estilo, 1, MaxStrLen("Estilo 12"));
-                end;
-            13:
-                begin
-                    "Columna 13" := CopyStr(prm_Texto, 1, MaxStrLen("Columna 13"));
-                    "Estilo 13" := CopyStr(prm_Estilo, 1, MaxStrLen("Estilo 13"));
-                end;
-            14:
-                begin
-                    "Columna 14" := CopyStr(prm_Texto, 1, MaxStrLen("Columna 14"));
-                    "Estilo 14" := CopyStr(prm_Estilo, 1, MaxStrLen("Estilo 14"));
-                end;
-            15:
-                begin
-                    "Columna 15" := CopyStr(prm_Texto, 1, MaxStrLen("Columna 15"));
-                    "Estilo 15" := CopyStr(prm_Estilo, 1, MaxStrLen("Estilo 15"));
-                end;
-            16:
-                begin
-                    "Columna 16" := CopyStr(prm_Texto, 1, MaxStrLen("Columna 16"));
-                    "Estilo 16" := CopyStr(prm_Estilo, 1, MaxStrLen("Estilo 16"));
-                end;
-            17:
-                begin
-                    "Columna 17" := CopyStr(prm_Texto, 1, MaxStrLen("Columna 17"));
-                    "Estilo 17" := CopyStr(prm_Estilo, 1, MaxStrLen("Estilo 17"));
-                end;
-            18:
-                begin
-                    "Columna 18" := CopyStr(prm_Texto, 1, MaxStrLen("Columna 18"));
-                    "Estilo 18" := CopyStr(prm_Estilo, 1, MaxStrLen("Estilo 18"));
-                end;
-            19:
-                begin
-                    "Columna 19" := CopyStr(prm_Texto, 1, MaxStrLen("Columna 19"));
-                    "Estilo 19" := CopyStr(prm_Estilo, 1, MaxStrLen("Estilo 19"));
-                end;
-            20:
-                begin
-                    "Columna 20" := CopyStr(prm_Texto, 1, MaxStrLen("Columna 20"));
-                    "Estilo 20" := CopyStr(prm_Estilo, 1, MaxStrLen("Estilo 20"));
-                end;
-            21:
-                begin
-                    "Columna 21" := CopyStr(prm_Texto, 1, MaxStrLen("Columna 21"));
-                    "Estilo 21" := CopyStr(prm_Estilo, 1, MaxStrLen("Estilo 21"));
-                end;
-            22:
-                begin
-                    "Columna 22" := CopyStr(prm_Texto, 1, MaxStrLen("Columna 22"));
-                    "Estilo 22" := CopyStr(prm_Estilo, 1, MaxStrLen("Estilo 22"));
-                end;
-            23:
-                begin
-                    "Columna 23" := CopyStr(prm_Texto, 1, MaxStrLen("Columna 23"));
-                    "Estilo 23" := CopyStr(prm_Estilo, 1, MaxStrLen("Estilo 23"));
-                end;
-            24:
-                begin
-                    "Columna 24" := CopyStr(prm_Texto, 1, MaxStrLen("Columna 24"));
-                    "Estilo 24" := CopyStr(prm_Estilo, 1, MaxStrLen("Estilo 24"));
-                end;
-            25:
-                begin
-                    "Columna 25" := CopyStr(prm_Texto, 1, MaxStrLen("Columna 25"));
-                    "Estilo 25" := CopyStr(prm_Estilo, 1, MaxStrLen("Estilo 25"));
-                end;
-            26:
-                begin
-                    "Columna 26" := CopyStr(prm_Texto, 1, MaxStrLen("Columna 26"));
-                    "Estilo 26" := CopyStr(prm_Estilo, 1, MaxStrLen("Estilo 26"));
-                end;
-            27:
-                begin
-                    "Columna 27" := CopyStr(prm_Texto, 1, MaxStrLen("Columna 27"));
-                    "Estilo 27" := CopyStr(prm_Estilo, 1, MaxStrLen("Estilo 27"));
-                end;
-            28:
-                begin
-                    "Columna 28" := CopyStr(prm_Texto, 1, MaxStrLen("Columna 28"));
-                    "Estilo 28" := CopyStr(prm_Estilo, 1, MaxStrLen("Estilo 28"));
-                end;
-            29:
-                begin
-                    "Columna 29" := CopyStr(prm_Texto, 1, MaxStrLen("Columna 29"));
-                    "Estilo 29" := CopyStr(prm_Estilo, 1, MaxStrLen("Estilo 29"));
-                end;
-            30:
-                begin
-                    "Columna 30" := CopyStr(prm_Texto, 1, MaxStrLen("Columna 30"));
-                    "Estilo 30" := CopyStr(prm_Estilo, 1, MaxStrLen("Estilo 30"));
-                end;
-            31:
-                begin
-                    "Columna 31" := CopyStr(prm_Texto, 1, MaxStrLen("Columna 31"));
-                    "Estilo 31" := CopyStr(prm_Estilo, 1, MaxStrLen("Estilo 31"));
-                end;
-            32:
-                begin
-                    "Columna 32" := CopyStr(prm_Texto, 1, MaxStrLen("Columna 32"));
-                    "Estilo 32" := CopyStr(prm_Estilo, 1, MaxStrLen("Estilo 32"));
-                end;
-        end;
+        if (prm_Columna < 1) or (prm_Columna > 32) then
+            exit;
+        // "Columna NN" y "Estilo NN" van numerados seguidos desde la 01.
+        rrBuffer.GetTable(Rec);
+        frCampo := rrBuffer.Field(FieldNo("Columna 01") + prm_Columna - 1);
+        frCampo.Value := CopyStr(prm_Texto, 1, frCampo.Length);
+        frCampo := rrBuffer.Field(FieldNo("Estilo 01") + prm_Columna - 1);
+        frCampo.Value := CopyStr(prm_Estilo, 1, frCampo.Length);
+        rrBuffer.SetTable(Rec);
     end;
 }
