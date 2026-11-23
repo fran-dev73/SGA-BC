@@ -52,10 +52,13 @@ table 51101 "Ubicacion SGA"
                 cUbicaciones.ComprobarCodigoUbicacion("Cod. Bin");
             end;
         }
-        field(30; Descripcion; Text[50])
+        field(30; Descripcion; Text[100])
         {
             Caption = 'Descripción';
-            DataClassification = ToBeClassified;
+            Editable = false;
+            FieldClass = FlowField;
+            CalcFormula = lookup(Bin.Description where("Location Code" = field("Cod. Almacen"), Code = field("Cod. Bin")));
+            ToolTip = 'Descripción de la ubicación: es la de su ubicación de BC (ficha del almacén > Ubicaciones), y se cambia allí. Al crearla es el código.';
         }
         field(40; "Cod. Zona SGA"; Code[10])
         {
@@ -69,13 +72,8 @@ table 51101 "Ubicacion SGA"
             begin
                 TestVacia();
                 rZona.ComprobarAdmiteUbicaciones("Cod. Almacen", "Cod. Zona SGA");
-                // Al asignar zona hereda la ruta si la ubicación aún no la tiene.
-                if "Cod. Zona SGA" = '' then
-                    exit;
-                if not rZona.Get("Cod. Almacen", "Cod. Zona SGA") then
-                    exit;
-                if "Secuencia Picking" = 0 then
-                    "Secuencia Picking" := rZona."Prioridad Picking";
+                // Una zona bloqueada bloquea sus ubicaciones.
+                RecalcularOcupacion();
             end;
         }
         field(50; "Tipo Ubicacion"; Enum "Tipo Ubicacion SGA")
@@ -133,6 +131,8 @@ table 51101 "Ubicacion SGA"
 
             trigger OnValidate()
             begin
+                if not Bloqueada then
+                    "Motivo Bloqueo" := '';
                 RecalcularOcupacion();
             end;
         }
@@ -140,6 +140,7 @@ table 51101 "Ubicacion SGA"
         {
             Caption = 'Motivo bloqueo';
             DataClassification = ToBeClassified;
+            ToolTip = 'Por qué está bloqueada la ubicación. Se escribe en la ficha con la ubicación bloqueada y se borra al desbloquearla.';
         }
         field(90; "Permite Mezcla Producto"; Boolean)
         {
@@ -204,6 +205,7 @@ table 51101 "Ubicacion SGA"
             Editable = false;
             DecimalPlaces = 0 : 2;
             MinValue = 0;
+            ToolTip = 'Porcentaje de la capacidad declarada que está ocupado: verde por debajo del 80 %, ámbar del 80 al 99 % y rojo desde el 100 %. Con capacidad 0 (sin límite), 0 y sin color.';
         }
         field(130; "Fecha Ultimo Movimiento"; DateTime)
         {
@@ -359,32 +361,15 @@ table 51101 "Ubicacion SGA"
         Modify();
     end;
 
-    /// <summary>
-    /// Error si la ubicación leída en la etiqueta del hueco no es una ubicación SGA del almacén.
-    /// Es lo que certifica que el preparador lee el hueco al que va: la etiqueta trae el código
-    /// de la ubicación y se compara con la propuesta en el picking.
-    /// </summary>
-    procedure ComprobarUbicacionLeida(prm_Almacen: Code[10]; prm_Bin: Code[20])
-    var
-        UbicacionNoExisteErr: Label 'La ubicación %1 no existe en SGA para el almacén %2.', Comment = '%1 = ubicación, %2 = almacén';
-    begin
-        if not Get(prm_Almacen, prm_Bin) then
-            Error(UbicacionNoExisteErr, prm_Bin, prm_Almacen);
-    end;
-
     trigger OnDelete()
     var
         rContenido: Record "Contenido Ubicacion SGA";
-        rBin: Record Bin;
         UbicacionConContenidoErr: Label 'No se pueden eliminar los datos SGA de la ubicación %1 porque todavía tiene contenido.', Comment = '%1 = ubicación';
     begin
         rContenido.FiltrarUbicacion("Cod. Almacen", "Cod. Bin");
         if not rContenido.IsEmpty() then
             Error(UbicacionConContenidoErr, "Cod. Bin");
-        // Una ubicación es su Bin más sus datos SGA: se eliminan juntos. Las comprobaciones del
-        // estándar (stock de BC en la ubicación…) siguen valiendo y paran el borrado.
-        if rBin.Get("Cod. Almacen", "Cod. Bin") then
-            rBin.Delete(true);
+        // Su Bin se borra con ella (BorrarBinConFicha de "Gestion Ubicaciones SGA").
     end;
 
     /// <summary>
@@ -397,25 +382,21 @@ table 51101 "Ubicacion SGA"
     begin
         CalcFields("Cantidad Base", "Lineas Contenido");
 
-        // Lo ocupado en palés solo se calcula contra una capacidad declarada.
+        // Lo ocupado en palés solo se calcula contra una capacidad declarada. Capacidad 0 es sin
+        // límite: no se llena nunca y su % de ocupación queda a 0.
+        "% Ocupacion" := 0;
         if "Capacidad Uds." > 0 then begin
             ocupado := OcupadoEnPales();
             "% Ocupacion" := Round(ocupado / "Capacidad Uds." * 100, 0.01);
-        end else
-            if "Cantidad Base" > 0 then
-                "% Ocupacion" := 100
-            else
-                "% Ocupacion" := 0;
+        end;
 
         case true of
-            Bloqueada:
+            // Bloqueada ella o su zona entera.
+            not EsUtilizable():
                 "Estado SGA" := "Estado SGA"::Bloqueada;
             "Lineas Contenido" = 0:
                 "Estado SGA" := "Estado SGA"::Vacia;
             ("Capacidad Uds." > 0) and (ocupado >= "Capacidad Uds."):
-                "Estado SGA" := "Estado SGA"::Llena;
-            "Capacidad Uds." = 0:
-                // Sin capacidad declarada no se puede distinguir parcial de llena: con contenido queda llena.
                 "Estado SGA" := "Estado SGA"::Llena;
             else
                 "Estado SGA" := "Estado SGA"::Parcial;
@@ -621,6 +602,24 @@ table 51101 "Ubicacion SGA"
                     exit(false);
 
         exit(true);
+    end;
+
+    /// <summary>
+    /// Expresión de estilo del % de ocupación: verde por debajo del 80 %, ámbar del 80 al
+    /// 99 % y rojo desde el 100 %. Sin capacidad declarada (sin límite), sin color.
+    /// </summary>
+    procedure EstiloOcupacion(): Text
+    begin
+        case true of
+            "Capacidad Uds." <= 0:
+                exit('Standard');
+            "% Ocupacion" >= 100:
+                exit('Unfavorable');
+            "% Ocupacion" >= 80:
+                exit('Ambiguous');
+        end;
+
+        exit('Favorable');
     end;
 
     /// <summary>

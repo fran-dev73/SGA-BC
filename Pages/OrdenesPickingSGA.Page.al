@@ -257,7 +257,7 @@ page 51118 "Ordenes Picking SGA"
         {
             Caption = 'Mis órdenes';
             Filters = where("Cod. Usuario Asignado" = filter('%user'), Estado = filter(Abierta | "En Proceso"));
-            OrderBy = ascending(Estado, Prioridad, "No. Orden");
+            OrderBy = descending(Estado, Prioridad, "No. Orden");
         }
         view(Pendientes)
         {

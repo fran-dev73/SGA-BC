@@ -144,7 +144,7 @@ page 51131 "Pendiente Ubicar SGA"
                 {
                     ApplicationArea = All;
                     Caption = 'Sin ubicar';
-                    ToolTip = 'Stock de BC que no está en ninguna ubicación: Stock BC menos Ubicado, sin pasar de lo que el lote ha recibido desde la fecha de inicio de SGA.';
+                    ToolTip = 'Stock de BC que no está en ninguna ubicación: Stock BC menos Ubicado. Si SGA aún no ha movido nunca el lote, sin pasar de lo que ha recibido desde la fecha de inicio de SGA (lo anterior es de la carga inicial).';
                 }
                 field("Stock BC"; Rec."Stock BC")
                 {
@@ -195,7 +195,7 @@ page 51131 "Pendiente Ubicar SGA"
             action(Ubicar)
             {
                 Caption = 'Ubicar';
-                ToolTip = 'Abre Ubicar producto con esta línea ya puesta (producto, lote, caducidad y lo que hay que ubicar aquí). Allí se propone el hueco de cada parte y se confirma, o se cambia a mano.';
+                ToolTip = 'Abre Ubicar producto con esta línea ya puesta (producto, lote y lo que hay que ubicar aquí). Allí se propone el hueco de cada parte y se confirma, o se cambia a mano.';
                 ApplicationArea = All;
                 Image = CreatePutAway;
 
@@ -246,15 +246,6 @@ page 51131 "Pendiente Ubicar SGA"
         }
         area(Navigation)
         {
-            action(VerContenido)
-            {
-                Caption = 'Dónde está el producto';
-                ToolTip = 'Ubicaciones en las que ya hay de este producto.';
-                ApplicationArea = All;
-                Image = BinContent;
-                RunObject = page "Contenido Ubicaciones SGA";
-                RunPageLink = "No. Producto" = field("No. Producto"), "Cod. Almacen" = field("Cod. Almacen");
-            }
             action(VerMovsProducto)
             {
                 Caption = 'Movimientos del producto';

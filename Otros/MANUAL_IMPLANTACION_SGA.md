@@ -31,7 +31,7 @@ SGA se apoya en el maestro de BC. Sin estos datos, la configuración de abajo no
 
 1. En *Mi configuración* > *Rol*, elige **Almacén SGA**. El rol de *Procesador de pedidos* tiene los mismos menús. A quien prepara con PDA se le asigna **Preparador SGA (PDA)**.
 2. Menús: **Almacén SGA** (día a día), **Almacén SGA - Ventas y compras**, **Almacén SGA - Consultas**, **Almacén SGA - Informes** y **Almacén SGA - Configuración**.
-3. Conjuntos de permisos: **PermissionSet-SGA** para todos y **SGA - Responsable de almacén** para los responsables (añade *Asignar órdenes de picking* e *Inicializar contenido*). Para abrir productos, pedidos y albaranes hacen falta además los permisos estándar de BC.
+3. Conjuntos de permisos: **PermissionSet-SGA** para todos y **SGA - Responsable de almacén** para los responsables (añade *Inicializar contenido*). Quién puede asignar órdenes y cambiar su prioridad lo dice *Responsable picking SGA* en Configuración de usuarios, cuando la configuración exige asignación. Para abrir productos, pedidos y albaranes hacen falta además los permisos estándar de BC.
 4. En *Configuración de usuarios*, marca **Responsable picking SGA** a quien reparta órdenes, y **Carretillero SGA** a quien haga las reposiciones.
 
 ## 2. Configuración SGA
@@ -42,7 +42,7 @@ Menú **Almacén SGA - Configuración** > **Configuración SGA**.
 |---|---|
 | General | *Almacén por defecto* y *Zona por defecto* |
 | Ubicaciones por flujo | *Ubic. ajustes*: donde van las faltas que se regularizan. Mejor una ubicación sin tipo. *Playa por defecto*: la playa con la que nacen las órdenes de picking de venta (apartado 3) |
-| Estrategias | Estrategia de ubicación, de compras y de ensamblados; estrategia de picking (FIFO, FEFO o vaciar ubicación). Ver *Estrategias de ubicación*, más abajo |
+| Estrategias | Estrategia de ubicación, de compras y de ensamblados; estrategia de picking (FIFO, FEFO o por orden de ubicación). Ver *Estrategias de ubicación*, más abajo |
 | Análisis ABC | Días de ventas y cortes de las clases A y B |
 | Controles | Ver tabla siguiente |
 | Numeración | *Nºs orden SGA*: obligatoria para crear órdenes de picking y reposiciones. Los SSCC no se configuran aquí: ver *Series* en *Antes de empezar* |
@@ -82,7 +82,7 @@ Qué estrategia usa cada pantalla:
 | Reposiciones de picking | Estándar, solo huecos de picking | Fija |
 | Carga inicial, *Huecos libres* | Palés: primer hueco vacío sin producto fijo. Resto: Priorizar consolidación | Fija |
 | Carga inicial, ubicación fija o indicada | Sin estrategia: la ubicación fija del producto o la indicada | Fija |
-| Ubicar seleccionadas | Igual que la carga inicial | Fija |
+| Ubicar seleccionadas | Igual que la carga inicial, pero primero almacenamiento y luego picking. Entra como entrada manual, con SSCC nuevo | Fija |
 
 ## 3. Zonas
 
@@ -94,7 +94,7 @@ Qué estrategia usa cada pantalla:
 
 Se crean, cambian y eliminan solo desde el menú *Almacén SGA - Configuración*. Desde *Consultas*, *Ubicaciones SGA* y su ficha se abren en modo ver.
 
-- **Ubicaciones del almacén** (en Configuración) abre *Ubicaciones SGA* con **Nuevo** y **Eliminar**, y la ficha editable. **Nuevo** crea una ubicación suelta a mano (por ejemplo un fondo de pasillo) y también la de BC si no existe. El código tiene que ser `xxx-xx-xx` con los mismos límites que *Generar ubicaciones*: pasillo de 001 a 999, estantería de 01 a 99 y altura de 00 a 99; con la descripción en blanco toma el código y con la secuencia a 0 la saca del código. **Eliminar** borra la ubicación SGA y la de BC; no deja si tiene contenido o si BC no permite borrarla.
+- **Ubicaciones del almacén** (en Configuración) abre *Ubicaciones SGA* con **Nuevo** y **Eliminar**, y la ficha editable. **Nuevo** crea una ubicación suelta a mano (por ejemplo un fondo de pasillo) y también la de BC si no existe. El código tiene que ser `xxx-xx-xx` con los mismos límites que *Generar ubicaciones*: pasillo de 001 a 999, estantería de 01 a 99 y altura de 00 a 99; la descripción es el código y la secuencia sale del código. La descripción es la de la ubicación de BC: para cambiarla, ficha del almacén > *Ubicaciones*. **Eliminar** borra la ubicación SGA y la de BC; no deja si tiene contenido o si BC no permite borrarla.
 
 - **Generar ubicaciones** crea los huecos de golpe. Pide almacén, zona, pasillo desde y hasta (1 a 999), estantería desde y hasta (1 a 99), altura desde y hasta (dos cifras, de 00 a 99), tipo de ubicación y capacidad en palés. Pasillo y estantería van de uno en uno. La altura va de 10 en 10 desde la inicial sin pasar de la final: de 00 a 40 crea 00, 10, 20, 30 y 40.
 - El código sale como `pasillo-estantería-altura` con ceros: `101-15-03`. De él salen la secuencia de picking (el orden de recorrido: cuanto menor, antes) y los mapas.
@@ -112,7 +112,7 @@ La configuración de una ubicación solo se cambia si está vacía. Bloquearla s
 
 **Fondo de pasillo.** Una ubicación a ras de suelo al fondo del pasillo con sitio para varios palés de productos distintos. Se crea con **Nuevo** en *Ubicaciones del almacén*, con un código de la posición siguiente a la última estantería y altura 01 (`101-31-01`), para que el mapa la dibuje en su sitio, y una descripción con la que nombrarla ("Fondo pasillo 101"). En su ficha: tipo *Almacenamiento*, *Capacidad* = palés que caben, las dos mezclas y **Fondo de pasillo** marcados. Al marcarla, su posición no puede tener otras alturas, y mientras esté marcada no se pueden crear (ni a mano ni con *Generar ubicaciones*, que las salta). En el mapa 3D, coloreado por estado, sale en rosa (con la parte oscura hasta donde está ocupada) y su ficha flotante dice *Fondo de pasillo*.
 
-**Capacidad en palés.** Cada producto se cuenta con su *Cód. palé por defecto*: medio palé ocupa 0,5. Un producto sin palé en su ficha no cabe en una ubicación con capacidad. Con 0 no hay capacidad declarada: no limita, pero con cualquier cosa dentro sale como llena.
+**Capacidad en palés.** Cada producto se cuenta con su *Cód. palé por defecto*: medio palé ocupa 0,5. Un producto sin palé en su ficha no cabe en una ubicación con capacidad. Con 0 no hay capacidad declarada: no limita, nunca sale como llena y su ocupación queda a 0 %.
 
 ## 6. Etiquetas de ubicación
 

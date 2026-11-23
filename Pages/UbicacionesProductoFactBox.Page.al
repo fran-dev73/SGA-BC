@@ -81,7 +81,7 @@ page 51109 "Ubicaciones Producto FactBox"
                     Rec.FilterGroup(4);
                     rContenido.CopyFilters(Rec);
                     Rec.FilterGroup(0);
-                    Page.Run(Page::"Contenido Ubicaciones SGA", rContenido);
+                    Page.Run(Page::"Consulta Ubic. Producto SGA", rContenido);
                 end;
             }
         }

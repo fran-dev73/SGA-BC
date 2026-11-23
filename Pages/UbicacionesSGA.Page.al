@@ -16,7 +16,7 @@ page 51100 "Ubicaciones SGA"
     ApplicationArea = All;
     CardPageId = "Ficha Ubicacion SGA";
     // Como en las listas estándar: se edita en la ficha. Desde Configuración se abre normal
-    // (Nuevo, Eliminar y ficha editable); desde Consultas, con RunPageMode = View (solo ver).
+    // (Nuevo, Eliminar y ficha editable); desde Consultas, con AbrirSoloConsulta (solo ver).
     Editable = false;
 
     layout
@@ -39,7 +39,6 @@ page 51100 "Ubicaciones SGA"
                 }
                 field(Descripcion; Rec.Descripcion)
                 {
-                    ToolTip = 'Descripción libre de la ubicación.';
                     ApplicationArea = All;
                 }
                 field("Estado SGA"; Rec."Estado SGA")
@@ -50,9 +49,8 @@ page 51100 "Ubicaciones SGA"
                 }
                 field("% Ocupacion"; Rec."% Ocupacion")
                 {
-                    ToolTip = 'Porcentaje de la capacidad declarada que está ocupado.';
                     ApplicationArea = All;
-                    StyleExpr = EstiloFila;
+                    StyleExpr = EstiloPorcentaje;
                 }
                 field("Cod. Zona SGA"; Rec."Cod. Zona SGA")
                 {
@@ -96,7 +94,6 @@ page 51100 "Ubicaciones SGA"
                 }
                 field("Motivo Bloqueo"; Rec."Motivo Bloqueo")
                 {
-                    ToolTip = 'Razón del bloqueo.';
                     ApplicationArea = All;
                 }
                 field("Reservada Para"; Rec."Reservada Para")
@@ -199,6 +196,7 @@ page 51100 "Ubicaciones SGA"
                 ToolTip = 'Mantenimiento de las zonas del almacén.';
                 ApplicationArea = All;
                 Image = Warehouse;
+                Visible = not SoloConsulta;
                 RunObject = page "Zonas SGA";
             }
             action(VerMapa)
@@ -233,6 +231,7 @@ page 51100 "Ubicaciones SGA"
                 ToolTip = 'Cambia de una vez la capacidad, qué admiten, el tipo, la zona o la mezcla de productos de las ubicaciones seleccionadas. Filtre la lista y seleccione todas con Ctrl+A.';
                 ApplicationArea = All;
                 Image = ChangeBatch;
+                Visible = not SoloConsulta;
 
                 trigger OnAction()
                 var
@@ -264,6 +263,7 @@ page 51100 "Ubicaciones SGA"
                 ToolTip = 'Quita la reserva de las ubicaciones seleccionadas, para que se puedan volver a proponer. Úselo si una pantalla de ubicar se ha cerrado mal y el hueco se ha quedado reservado sin usarse.';
                 ApplicationArea = All;
                 Image = ReleaseDoc;
+                Visible = not SoloConsulta;
 
                 trigger OnAction()
                 var
@@ -287,6 +287,7 @@ page 51100 "Ubicaciones SGA"
                 ToolTip = 'Bloquea o desbloquea la ubicación seleccionada.';
                 ApplicationArea = All;
                 Image = Lock;
+                Visible = not SoloConsulta;
 
                 trigger OnAction()
                 begin
@@ -301,6 +302,7 @@ page 51100 "Ubicaciones SGA"
                 ToolTip = 'Vuelve a calcular el estado y el porcentaje de ocupación de las ubicaciones del almacén seleccionado.';
                 ApplicationArea = All;
                 Image = Recalculate;
+                Visible = not SoloConsulta;
 
                 trigger OnAction()
                 var
@@ -308,7 +310,7 @@ page 51100 "Ubicaciones SGA"
                     actualizadas: Integer;
                     UbicacionesActualizadasMsg: Label 'Se han actualizado %1 ubicaciones.', Comment = '%1 = número';
                 begin
-                    actualizadas := cUbicaciones.RecalcularEstados(Rec."Cod. Almacen");
+                    actualizadas := cUbicaciones.RecalcularEstados(Rec."Cod. Almacen", '');
                     Message(UbicacionesActualizadasMsg, actualizadas);
                     CurrPage.Update(false);
                 end;
@@ -409,9 +411,24 @@ page 51100 "Ubicaciones SGA"
 
     var
         EstiloFila: Text;
+        EstiloPorcentaje: Text;
+        SoloConsulta: Boolean;
 
     trigger OnAfterGetRecord()
     begin
         EstiloFila := Rec.EstiloEstado();
+        EstiloPorcentaje := Rec.EstiloOcupacion();
+    end;
+
+    /// <summary>
+    /// Abre la lista desde Consultas: solo se mira. Sin los botones que cambian datos ni el
+    /// mantenimiento de zonas, y con la ficha en modo ver. Crear, cambiar y borrar se hace
+    /// desde Configuración.
+    /// </summary>
+    procedure AbrirSoloConsulta()
+    begin
+        SoloConsulta := true;
+        Editable(false);
+        Run();
     end;
 }

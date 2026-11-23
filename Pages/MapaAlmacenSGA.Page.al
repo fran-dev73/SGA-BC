@@ -510,8 +510,7 @@ page 51107 "Mapa Almacen SGA"
                 ToolTip = 'Abre la lista de ubicaciones del almacén.';
                 ApplicationArea = All;
                 Image = BinContent;
-                RunObject = page "Ubicaciones SGA";
-                RunPageMode = View;
+                RunObject = codeunit "Consulta Ubicaciones SGA";
             }
         }
         area(Promoted)

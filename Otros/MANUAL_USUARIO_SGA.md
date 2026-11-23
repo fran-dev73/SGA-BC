@@ -97,7 +97,7 @@ Ni el producto ni el palé se leen: solo la ubicación. Si lo leído no es una u
 
 Al terminar sale *Orden terminada*, la playa en la que dejarla y que lo recogido ya está en el pedido. Si quedan líneas retenidas, dice que la orden está recorrida y cuántas quedan para el responsable. Si dice que no se ha podido pasar al pedido, avisa a oficina: no se pierde nada.
 
-**En qué orden sale.** De un pedido salen primero los palés, luego las cajas (las de más volumen antes, para que queden abajo) y por último los sueltos. Se recoge primero de palés completos de almacenamiento, luego de picking y lo que falte de las demás ubicaciones (menos la de ajustes). Dentro de cada paso manda la estrategia de picking: lo que entró antes (FIFO), lo que antes caduca, y lo que no tiene caducidad al final (FEFO) o por orden de ubicación, para ir vaciando huecos.
+**En qué orden sale.** De un pedido salen primero los palés, luego las cajas (las de más volumen antes, para que queden abajo) y por último los sueltos. Se recoge primero de palés completos de almacenamiento, luego de picking y lo que falte de las demás ubicaciones (menos la de ajustes). Dentro de cada paso manda la estrategia de picking: lo que entró antes (FIFO), lo que antes caduca, y lo que no tiene caducidad al final (FEFO) o por orden de ubicación (por su código). Lo que se traslada o se repone conserva su fecha de entrada.
 
 ### Preparar el terminal (una vez)
 
@@ -170,7 +170,7 @@ Para una cosa suelta. Indica producto, lote, unidad de medida y cantidad, o puls
 
 ### Pendiente de ubicar
 
-El stock de BC que no está en ninguna ubicación, lote a lote. Los productos marcados como *Producto Tianna* y los de la categoría 820 no salen nunca. Solo cuenta el stock que ha entrado desde la *Fecha inicio SGA*; lo anterior lo coloca la carga inicial y aquí no sale. Arriba eliges *Almacén*, *Productos* (uno, un filtro como `1000..1999`, o varios marcados al pulsar la flecha) y *Clase de artículo*, y pulsas **Calcular**: solo se calcula lo indicado. Al abrir o al cambiar un filtro no se calcula nada. Sin productos ni clase, **Calcular** pregunta antes de revisar todo el almacén. Lo que sale en *En recepciones o ensamblados* se ubica desde esas pantallas. El resto:
+El stock de BC que no está en ninguna ubicación, lote a lote. Los productos marcados como *Producto Tianna* y los de la categoría 820 no salen nunca. De un lote que SGA no ha movido nunca, solo cuenta lo que ha entrado desde la *Fecha inicio SGA*: lo anterior lo coloca la carga inicial. Si SGA ya ha movido el lote (por ejemplo, se ha quitado de un hueco), sale todo lo que le falta. Arriba eliges *Almacén*, *Productos* (uno, un filtro como `1000..1999`, o varios marcados al pulsar la flecha) y *Clase de artículo*, y pulsas **Calcular**: solo se calcula lo indicado. Al abrir o al cambiar un filtro no se calcula nada. Sin productos ni clase, **Calcular** pregunta antes de revisar todo el almacén. Lo que sale en *En recepciones o ensamblados* se ubica desde esas pantallas. El resto:
 
 - **Ubicar**: abre *Ubicar producto* con todo puesto.
 - **Ubicar seleccionadas**: busca hueco para varias líneas a la vez (cada palé a un hueco vacío y el resto junto). Se puede simular antes. Al terminar dice lo ubicado y, de lo que no cabe, por qué.
@@ -200,7 +200,7 @@ Las pilas de órdenes no cuentan las reposiciones. Los grupos *Ubicaciones*, *Co
 
 **Asignar órdenes de picking SGA**, vistas *Sin asignar* y *Asignadas*:
 
-- **Asignar a** da las seleccionadas a un preparador. **Quitar asignación** las devuelve a la bolsa. Si se exige asignación, una orden empezada se puede reasignar, pero no dejar sin nadie.
+- **Asignar a** da las seleccionadas a un preparador. **Quitar asignación** devuelve a la bolsa las que no se han empezado; una orden empezada se puede reasignar, pero no dejar sin nadie.
 - **Subir prioridad** / **Bajar prioridad**: cuanto mayor, antes sale. Cambian a la vez todas las órdenes del pedido.
 - **Cambiar playa**: elige la playa donde se dejan las órdenes seleccionadas. Solo cambia las que aún no se han empezado; el mensaje dice cuántas no. También está en *Órdenes de picking SGA*.
 
@@ -235,17 +235,17 @@ Cada hueco lleva su etiqueta, y el preparador la lee al recoger. Se imprimen por
 
 ### ¿Dónde está el producto?
 
-Escribe el *Producto* y, si quieres, *Almacén* y *Lote*. Salen las ubicaciones donde está, por caducidad. *Solo con cantidad disponible* oculta lo bloqueado y lo reservado. También desde la ficha o la lista de productos: **SGA** > **¿Dónde está?**
+Solo consulta. Escribe el *Producto* y, si quieres, *Almacén* y *Lote*. Salen las ubicaciones donde está, por caducidad. *Solo con cantidad disponible* oculta lo bloqueado y lo reservado. También desde la ficha o la lista de productos (**SGA** > **¿Dónde está?**), desde **Ver todas** del cuadro de ubicaciones del producto y desde la columna *Ubicado* de *Pendiente de ubicar*.
 
 Para un palé concreto, lee su etiqueta en *SSCC*: sale dónde está y, si se ha partido, dónde están sus cajas.
 
 ### Ubicaciones SGA
 
-Los huecos con su ocupación: gris vacía, verde con hueco, amarillo llena y rojo bloqueada. Vistas por estado y por tipo, y *Reservadas* y *Sin tipo*. Acciones: **Cambiar en bloque**, **Imprimir etiquetas**, **Liberar reserva**, **Bloquear / desbloquear** y **Recalcular ocupación**. En la ficha, además, **Vaciar ubicación** (todo queda sin ubicar; el stock de BC no cambia) y sus movimientos.
+Los huecos con su ocupación: gris vacía, verde con hueco, amarillo llena y rojo bloqueada. El *% ocupación* va en verde por debajo del 80 %, en ámbar del 80 al 99 % y en rojo desde el 100 %; sin capacidad (0, sin límite), sin color. Vistas por estado y por tipo, y *Reservadas* y *Sin tipo*. Acciones: **Cambiar en bloque**, **Imprimir etiquetas**, **Liberar reserva**, **Bloquear / desbloquear** y **Recalcular ocupación**. En la ficha, además, **Vaciar ubicación** (todo queda sin ubicar; el stock de BC no cambia) y sus movimientos. Desde *Consultas* solo se mira: ni esas acciones ni la ficha cambian nada; se hace desde *Configuración*.
 
 ### Contenido de ubicaciones
 
-Qué hay en cada hueco: una línea por palé, con producto, lote y SSCC.
+Qué hay en cada hueco: una línea por palé, con producto, lote y SSCC. Es para trabajar con el contenido, así que está en el menú *Almacén SGA* y no en *Consultas*.
 
 - **Trasladar** a otra ubicación. Con *Zona destino*, propone un hueco de esa zona.
 - **Bloquear / desbloquear** una línea, por ejemplo un lote en cuarentena. Lo reservado por una orden no se puede bloquear.

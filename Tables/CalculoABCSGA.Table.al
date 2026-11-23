@@ -206,7 +206,7 @@ table 51112 "Calculo ABC SGA"
         ResumenConcentracionLbl: Label 'El 20 % de los productos (%1 de %2) hace el %3 % de los palés salidos (%4 palés).', Comment = '%1 = productos top, %2 = productos, %3 = %, %4 = palés salidos';
         ResumenClasesLbl: Label 'A: %1 productos (%2 palés en almacén) · B: %3 productos · C: %4 productos.', Comment = '%1 = productos A, %2 = palés A, %3 = productos B, %4 = productos C';
         ResumenHuecosLbl: Label '%1 de %2 palés están en un hueco de su clase (%3 %). De los palés A, el %4 % está en huecos A. Huecos de picking y almacenamiento: %5.', Comment = '%1 = bien ubicados, %2 = palés, %3 = %, %4 = % A en A, %5 = huecos';
-        ProductosSinUMPaleLbl: Label '%1 productos con ventas no tienen unidad de palé: quedan como C. Márquelos en la columna "Unidad de palé".', Comment = '%1 = nº productos';
+        ProductosSinUMPaleLbl: Label '%1 productos con ventas no tienen unidad de palé: quedan como C. Salen marcados en la columna "Unidad de palé": rellene su "Cód. palé por defecto" en la ficha del producto y vuelva a calcular.', Comment = '%1 = nº productos';
     begin
         CalcFields(Usuario);
         prm_Info := StrSubstNo(InfoCalculoLbl, "No.", SystemCreatedAt, Usuario, "Fecha Desde", "Fecha Hasta", "Corte A", "Corte B");

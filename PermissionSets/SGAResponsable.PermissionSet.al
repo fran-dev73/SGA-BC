@@ -2,14 +2,12 @@ namespace AntonioNadal.SGA;
 
 /// <summary>
 /// PermissionSet SGA Responsable (ID 51101).
-/// Lo de "PermissionSet-SGA" más el reparto de órdenes de picking y la inicialización del
-/// contenido. Se asigna a los responsables de almacén; los preparadores se quedan con
-/// "PermissionSet-SGA".
+/// Lo de "PermissionSet-SGA" más la inicialización del contenido, que deja un almacén sin nada
+/// ubicado. Se asigna a los responsables de almacén.
 ///
-/// Ojo: el permiso sobre la página ordena, pero no impide. Los conjuntos estándar de BC suelen
-/// dar ejecución sobre todas las páginas, así que lo que de verdad frena a un preparador es la
-/// casilla "Responsable picking SGA" de Configuración de usuarios, que se comprueba por código
-/// cuando la configuración exige asignación.
+/// El reparto de órdenes de picking no va aquí: quién puede asignar lo decide la casilla
+/// "Responsable picking SGA" de Configuración de usuarios, que se comprueba por código cuando
+/// la configuración exige asignación. Sin ella el reparto es libre.
 /// </summary>
 permissionset 51101 "SGA-Responsable"
 {
@@ -17,6 +15,5 @@ permissionset 51101 "SGA-Responsable"
     Caption = 'SGA - Responsable de almacén';
     IncludedPermissionSets = "PermissionSet-SGA";
 
-    Permissions = page "Asignar Ordenes Picking SGA" = X,
-                  report "Inicializar Contenido SGA" = X;
+    Permissions = report "Inicializar Contenido SGA" = X;
 }

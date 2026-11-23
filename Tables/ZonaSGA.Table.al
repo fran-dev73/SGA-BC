@@ -5,7 +5,8 @@ using Microsoft.Inventory.Location;
 /// <summary>
 /// Table Zona SGA (ID 51100).
 /// Agrupación lógica de ubicaciones dentro de un almacén (cámara, almacenamiento, picking...).
-/// La zona fija las prioridades por defecto que heredan sus ubicaciones.
+/// Una zona se bloquea entera o es una playa (sin ubicaciones), y acota los traslados
+/// arrastrando en el mapa.
 /// </summary>
 table 51100 "Zona SGA"
 {
@@ -34,17 +35,22 @@ table 51100 "Zona SGA"
             Caption = 'Descripción';
             DataClassification = ToBeClassified;
         }
-        field(70; "Prioridad Picking"; Integer)
-        {
-            Caption = 'Prioridad picking';
-            DataClassification = ToBeClassified;
-            ToolTip = 'Secuencia de picking que toma una ubicación al asignarle esta zona, si aún no tiene la suya. Menor valor, antes en el recorrido.';
-        }
         field(90; Bloqueada; Boolean)
         {
             Caption = 'Bloqueada';
             DataClassification = ToBeClassified;
-            ToolTip = 'Impide proponer las ubicaciones de esta zona para ubicar o recoger.';
+            ToolTip = 'Bloquea todas las ubicaciones de la zona: no se proponen ni admiten movimientos y salen como bloqueadas.';
+
+            trigger OnValidate()
+            var
+                cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
+            begin
+                // El estado de cada ubicación lee de la base de datos si su zona está bloqueada
+                // (EsUtilizable): se guarda la zona antes. Una zona aún sin insertar no tiene
+                // ubicaciones.
+                if Modify() then
+                    cUbicaciones.RecalcularEstados("Cod. Almacen", Code);
+            end;
         }
         field(95; Playa; Boolean)
         {

@@ -56,7 +56,11 @@ page 51117 "Ubicar Producto SGA"
                     ShowMandatory = true;
 
                     trigger OnValidate()
+                    var
+                        cStock: Codeunit "Consulta Stock SGA";
                     begin
+                        if Producto <> '' then
+                            cStock.TestProductoSGA(Producto);
                         CargarProducto();
                         RecalcularPendiente();
                         LimpiarPropuesta();
@@ -399,12 +403,15 @@ page 51117 "Ubicar Producto SGA"
         DatosIncompletosErr: Label 'Indique almacén, producto y cantidad antes de proponer una ubicación.';
         LoteObligatorioErr: Label 'El producto %1 lleva lotes: indique el lote que va a ubicar.', Comment = '%1 = producto';
         UbicarLineaQst: Label '¿Ubicar %1 %2 de %3 en %4?', Comment = '%1 = cantidad, %2 = unidad, %3 = producto, %4 = ubicación';
+        MasQuePendienteErr: Label 'Solo quedan %1 %2 pendientes de ubicar: SGA no puede ubicar más de lo que hay en el almacén según Business Central.', Comment = '%1 = cantidad pendiente, %2 = unidad';
     begin
         if (Almacen = '') or (Producto = '') or (Cantidad <= 0) then
             Error(DatosIncompletosErr);
         // Con lotes de BC hay que saber de qué lote es: en blanco se mezclarían todos.
         if (Lote = '') and cStock.LoteEstandar(Producto) then
             Error(LoteObligatorioErr, Producto);
+        if Cantidad > PendienteUbicar then
+            Error(MasQuePendienteErr, PendienteUbicar, UM);
 
         rConfig.ObtenerConfig();
         cUbicaciones.ProponerReparto(rConfig."Estrategia Ubicacion", Almacen, Producto, Lote,

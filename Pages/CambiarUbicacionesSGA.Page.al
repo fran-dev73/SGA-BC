@@ -100,7 +100,7 @@ page 51126 "Cambiar Ubicaciones SGA"
                 field(Zona; Zona)
                 {
                     Caption = 'Zona';
-                    ToolTip = 'Zona a la que pasan las ubicaciones. Solo las zonas de su almacén. Las ubicaciones sin secuencia de picking toman la de la zona.';
+                    ToolTip = 'Zona a la que pasan las ubicaciones. Solo las zonas de su almacén.';
                     ApplicationArea = All;
                     Editable = CambiarZona;
 

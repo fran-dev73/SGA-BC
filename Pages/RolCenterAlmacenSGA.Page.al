@@ -158,13 +158,13 @@ page 51112 "Rol Center Almacen SGA"
                     Image = Warehouse;
                     RunObject = page "Reposiciones SGA";
                 }
-                action(DondeEsta)
+                action(Contenido)
                 {
-                    Caption = '¿Dónde está el producto?';
-                    ToolTip = 'Localiza un producto y dice a qué ubicación hay que ir a recogerlo.';
+                    Caption = 'Contenido de ubicaciones';
+                    ToolTip = 'Qué producto y lote hay en cada ubicación. Desde aquí se traslada (también a otra zona), se bloquea, se recuenta y se quita de la ubicación.';
                     ApplicationArea = All;
-                    Image = Find;
-                    RunObject = page "Consulta Ubic. Producto SGA";
+                    Image = ItemLines;
+                    RunObject = page "Contenido Ubicaciones SGA";
                 }
             }
             group(SGAVentasCompras)
@@ -182,7 +182,7 @@ page 51112 "Rol Center Almacen SGA"
                 action(SeccionPedidosVenta)
                 {
                     Caption = 'Pedidos de venta';
-                    ToolTip = 'Pedidos de venta, de los que salen las órdenes de picking al lanzarlos.';
+                    ToolTip = 'Pedidos de venta. Las órdenes de picking salen de un pedido lanzado con Enviar a SGA.';
                     ApplicationArea = All;
                     Image = Document;
                     RunObject = page "Sales Order List";
@@ -222,16 +222,15 @@ page 51112 "Rol Center Almacen SGA"
                     ToolTip = 'Ubicaciones del almacén, con su estado y su ocupación. Solo consulta: se crean, cambian y eliminan desde Configuración.';
                     ApplicationArea = All;
                     Image = BinContent;
-                    RunObject = page "Ubicaciones SGA";
-                    RunPageMode = View;
+                    RunObject = codeunit "Consulta Ubicaciones SGA";
                 }
-                action(Contenido)
+                action(DondeEsta)
                 {
-                    Caption = 'Contenido de ubicaciones';
-                    ToolTip = 'Qué producto y lote hay en cada ubicación. Desde aquí se traslada (también a otra zona), se bloquea y se recuenta.';
+                    Caption = '¿Dónde está el producto?';
+                    ToolTip = 'Localiza un producto, un lote o un palé (leyendo su SSCC) y dice en qué ubicaciones está. Solo consulta.';
                     ApplicationArea = All;
-                    Image = ItemLines;
-                    RunObject = page "Contenido Ubicaciones SGA";
+                    Image = Find;
+                    RunObject = page "Consulta Ubic. Producto SGA";
                 }
                 action(MapaAlmacen)
                 {
@@ -303,7 +302,7 @@ page 51112 "Rol Center Almacen SGA"
                 action(Zonas)
                 {
                     Caption = 'Zonas';
-                    ToolTip = 'Agrupa las ubicaciones en zonas y fija sus prioridades de ubicación y de picking.';
+                    ToolTip = 'Zonas del almacén: agrupan las ubicaciones, se bloquean enteras y marcan las playas.';
                     ApplicationArea = All;
                     Image = Warehouse;
                     RunObject = page "Zonas SGA";
@@ -319,7 +318,7 @@ page 51112 "Rol Center Almacen SGA"
                 action(GenerarUbicaciones)
                 {
                     Caption = 'Generar ubicaciones';
-                    ToolTip = 'Crea de golpe todas las ubicaciones de una zona en un rango de estanterías, columnas y alturas.';
+                    ToolTip = 'Crea las ubicaciones que falten en un rango de pasillos, estanterías y alturas, con su zona, tipo y capacidad. Las que ya existen no se tocan.';
                     ApplicationArea = All;
                     Image = CreateForm;
                     RunObject = report "Generar Ubicaciones SGA";

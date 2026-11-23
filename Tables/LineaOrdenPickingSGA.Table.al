@@ -394,19 +394,11 @@ table 51109 "Linea Orden Picking SGA"
     end;
 
     /// <summary>
-    /// Indica si el preparador se ha desviado de la ubicación propuesta.
-    /// </summary>
-    procedure HayDesvio(): Boolean
-    begin
-        exit(("Cod. Bin Confirmado" <> '') and ("Cod. Bin Confirmado" <> "Cod. Bin Propuesto"));
-    end;
-
-    /// <summary>
     /// Estilo de la ubicación confirmada: resaltada si el preparador se ha desviado.
     /// </summary>
     procedure EstiloUbicacionConfirmada(): Text
     begin
-        if HayDesvio() then
+        if Desvio then
             exit('Attention');
 
         exit('Standard');

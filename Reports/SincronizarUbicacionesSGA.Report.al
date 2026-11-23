@@ -39,7 +39,7 @@ report 51101 "Sincronizar Ubicaciones SGA"
                 cUbicaciones.SincronizarTopologia(codAlmacen);
 
                 if not blnReconstruirContenido then begin
-                    cUbicaciones.RecalcularEstados(codAlmacen);
+                    cUbicaciones.RecalcularEstados(codAlmacen, '');
                     if GuiAllowed() then
                         Message(ProcesoFinalizadoMsg);
                     exit;

@@ -26,7 +26,7 @@ report 51103 "Conciliacion SGA vs Stock"
 
             trigger OnPreDataItem()
             begin
-                Producto.SetRange(Type, Producto.Type::Inventory);
+                cStock.FiltrarProductosSGA(Producto);
                 cStock.LimpiarBuffer(rBuffer);
                 ProductosRevisados := 0;
             end;

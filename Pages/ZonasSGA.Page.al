@@ -34,14 +34,8 @@ page 51105 "Zonas SGA"
                     ToolTip = 'Descripción de la zona.';
                     ApplicationArea = All;
                 }
-                field("Prioridad Picking"; Rec."Prioridad Picking")
-                {
-                    ToolTip = 'Secuencia de picking que toma una ubicación al asignarle esta zona, si aún no tiene la suya. Menor valor, antes en el recorrido.';
-                    ApplicationArea = All;
-                }
                 field(Bloqueada; Rec.Bloqueada)
                 {
-                    ToolTip = 'Impide proponer las ubicaciones de esta zona para ubicar o recoger.';
                     ApplicationArea = All;
                 }
                 field(Playa; Rec.Playa)

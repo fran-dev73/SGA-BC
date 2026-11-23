@@ -421,6 +421,8 @@ codeunit 51100 "Gestion Contenido SGA"
         rMovimiento: Record "Movimiento Ubicacion SGA";
         TempBloqueadas: Record "Contenido Ubicacion SGA" temporary;
         cPicking: Codeunit "Gestion Picking SGA";
+        umBase: Code[10];
+        fechaEntrada: DateTime;
     begin
         if prm_Almacen <> '' then
             rContenido.SetRange("Cod. Almacen", prm_Almacen);
@@ -439,10 +441,15 @@ codeunit 51100 "Gestion Contenido SGA"
 
         if rMovimiento.FindSet() then
             repeat
-                if rMovimiento."Cod. Bin Origen" <> '' then
-                    AcumularSinValidar(rMovimiento, rMovimiento."Cod. Bin Origen", -rMovimiento."Cantidad Base");
+                umBase := cUM.UMBase(rMovimiento."No. Producto");
+                fechaEntrada := rMovimiento.SystemCreatedAt;
+                if rMovimiento."Cod. Bin Origen" <> '' then begin
+                    fechaEntrada := FechaEntradaEn(rMovimiento."Cod. Almacen", rMovimiento."Cod. Bin Origen", rMovimiento."No. Producto",
+                                                   rMovimiento."No. Lote", umBase, rMovimiento.SSCC, fechaEntrada);
+                    AcumularSinValidar(rMovimiento, rMovimiento."Cod. Bin Origen", umBase, -rMovimiento."Cantidad Base", rMovimiento.SystemCreatedAt);
+                end;
                 if rMovimiento."Cod. Bin Destino" <> '' then
-                    AcumularSinValidar(rMovimiento, rMovimiento."Cod. Bin Destino", rMovimiento."Cantidad Base");
+                    AcumularSinValidar(rMovimiento, rMovimiento."Cod. Bin Destino", umBase, rMovimiento."Cantidad Base", fechaEntrada);
             until rMovimiento.Next() = 0;
 
         LimpiarContenidoVacio(prm_Almacen);
@@ -463,7 +470,7 @@ codeunit 51100 "Gestion Contenido SGA"
             until TempBloqueadas.Next() = 0;
 
         cPicking.RecalcularReservasAlmacen(prm_Almacen);
-        cUbicaciones.RecalcularEstados(prm_Almacen);
+        cUbicaciones.RecalcularEstados(prm_Almacen, '');
     end;
 
     /// <summary>
@@ -498,7 +505,7 @@ codeunit 51100 "Gestion Contenido SGA"
         end;
 
         cPicking.RecalcularReservasAlmacen(prm_Almacen);
-        cUbicaciones.RecalcularEstados(prm_Almacen);
+        cUbicaciones.RecalcularEstados(prm_Almacen, '');
     end;
 
     /// <summary>
@@ -548,6 +555,7 @@ codeunit 51100 "Gestion Contenido SGA"
         factor: Decimal;
         cantidadBase: Decimal;
         caducidad: Date;
+        fechaEntrada: DateTime;
         AlmacenObligatorioErr: Label 'Indique el almacén.';
         ProductoObligatorioErr: Label 'Debe indicar el producto.';
         ProductoBloqueadoErr: Label 'El producto %1 está bloqueado.', Comment = '%1 = producto';
@@ -576,17 +584,22 @@ codeunit 51100 "Gestion Contenido SGA"
         if (prm_SSCC = '') and (prm_UbicacionOrigen <> '') then
             prm_SSCC := SSCCEnUbicacion(prm_Almacen, prm_UbicacionOrigen, prm_Producto, prm_Lote);
 
-        // Salida primero: si no hay existencias en el origen no llego a tocar el destino.
-        if prm_UbicacionOrigen <> '' then
+        // Salida primero: si no hay existencias en el origen no llego a tocar el destino. Lo que
+        // se mueve entre ubicaciones conserva su fecha de entrada al almacén (FIFO).
+        fechaEntrada := CurrentDateTime();
+        if prm_UbicacionOrigen <> '' then begin
+            fechaEntrada := FechaEntradaEn(prm_Almacen, prm_UbicacionOrigen, prm_Producto, prm_Lote, umBase, prm_SSCC, fechaEntrada);
             AplicarDelta(prm_Almacen, prm_UbicacionOrigen, prm_Producto, prm_Lote, prm_SSCC, umBase,
-                         -cantidadBase, caducidad, false);
+                         -cantidadBase, caducidad, false, CurrentDateTime());
+        end;
 
         // La carga inicial, un recuento al alza y un ajuste reflejan mercancía que ya está ahí:
         // no se comprueba si la ubicación la admite (capacidad, mezcla, bloqueo, reserva).
         if prm_UbicacionDestino <> '' then
             AplicarDelta(prm_Almacen, prm_UbicacionDestino, prm_Producto, prm_Lote, prm_SSCC, umBase,
                          cantidadBase, caducidad,
-                         not (prm_Tipo in ["Tipo Mov. Ubicacion SGA"::"Carga Inicial", "Tipo Mov. Ubicacion SGA"::Recuento, "Tipo Mov. Ubicacion SGA"::Ajuste]));
+                         not (prm_Tipo in ["Tipo Mov. Ubicacion SGA"::"Carga Inicial", "Tipo Mov. Ubicacion SGA"::Recuento, "Tipo Mov. Ubicacion SGA"::Ajuste]),
+                         fechaEntrada);
 
         noMovimiento := InsertarMovimiento(prm_Tipo, prm_Origen, prm_Almacen, prm_UbicacionOrigen, prm_UbicacionDestino,
                                            prm_Producto, prm_Lote, prm_SSCC, caducidad, umUsada,
@@ -598,7 +611,7 @@ codeunit 51100 "Gestion Contenido SGA"
             cReposiciones.ReubicarSiSeVacia(prm_Almacen, prm_UbicacionOrigen, prm_Producto);
     end;
 
-    local procedure AplicarDelta(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_SSCC: Code[20]; prm_UMBase: Code[10]; prm_DeltaBase: Decimal; prm_Caducidad: Date; prm_ValidarEntrada: Boolean)
+    local procedure AplicarDelta(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_SSCC: Code[20]; prm_UMBase: Code[10]; prm_DeltaBase: Decimal; prm_Caducidad: Date; prm_ValidarEntrada: Boolean; prm_Fecha: DateTime)
     var
         rContenido: Record "Contenido Ubicacion SGA";
         rUbicacionSGA: Record "Ubicacion SGA";
@@ -630,7 +643,7 @@ codeunit 51100 "Gestion Contenido SGA"
                 Error(ExistenciasInsuficientesErr, prm_Ubicacion, rContenido."Cantidad Base", prm_Producto, prm_Lote, -prm_DeltaBase);
         end;
 
-        SumarALinea(rContenido, prm_DeltaBase, prm_Caducidad, CurrentDateTime());
+        SumarALinea(rContenido, prm_DeltaBase, prm_Caducidad, prm_Fecha);
 
         case true of
             (rContenido."Cantidad Base" = 0) and (rContenido."Cantidad Reservada" = 0) and existe:
@@ -646,45 +659,59 @@ codeunit 51100 "Gestion Contenido SGA"
 
     /// <summary>
     /// Suma prm_DeltaBase a una línea de contenido (leída o nueva, sin guardar): cantidad,
-    /// caducidad si llega, fecha de última entrada o salida y cantidades derivadas. Quien llama
-    /// la guarda.
+    /// caducidad si llega, fecha y cantidades derivadas. Quien llama la guarda. En una entrada
+    /// prm_Fecha es la fecha de entrada al almacén de lo que llega, y la línea se queda con la
+    /// más antigua de las dos; en una salida, el momento de la salida.
     /// </summary>
-    local procedure SumarALinea(var prm_Contenido: Record "Contenido Ubicacion SGA"; prm_DeltaBase: Decimal; prm_Caducidad: Date; prm_Momento: DateTime)
+    local procedure SumarALinea(var prm_Contenido: Record "Contenido Ubicacion SGA"; prm_DeltaBase: Decimal; prm_Caducidad: Date; prm_Fecha: DateTime)
     begin
+        if prm_DeltaBase > 0 then begin
+            if (prm_Contenido."Cantidad Base" <= 0) or (prm_Contenido."Fecha Entrada" = 0DT) or (prm_Fecha < prm_Contenido."Fecha Entrada") then
+                prm_Contenido."Fecha Entrada" := prm_Fecha;
+        end else
+            prm_Contenido."Fecha Ultima Salida" := prm_Fecha;
+
         prm_Contenido."Cantidad Base" := prm_Contenido."Cantidad Base" + prm_DeltaBase;
         if prm_Caducidad <> 0D then
             prm_Contenido."Fecha Caducidad" := prm_Caducidad;
-
-        if prm_DeltaBase > 0 then
-            prm_Contenido."Fecha Ultima Entrada" := prm_Momento
-        else
-            prm_Contenido."Fecha Ultima Salida" := prm_Momento;
 
         prm_Contenido.ActualizarCantidades();
         prm_Contenido.AutorizarEscritura();
     end;
 
-    local procedure AcumularSinValidar(var rMovimiento: Record "Movimiento Ubicacion SGA"; prm_Ubicacion: Code[20]; prm_DeltaBase: Decimal)
+    local procedure AcumularSinValidar(var rMovimiento: Record "Movimiento Ubicacion SGA"; prm_Ubicacion: Code[20]; prm_UMBase: Code[10]; prm_DeltaBase: Decimal; prm_Fecha: DateTime)
     var
         rContenido: Record "Contenido Ubicacion SGA";
-        umBase: Code[10];
         existe: Boolean;
     begin
-        umBase := cUM.UMBase(rMovimiento."No. Producto");
-
         existe := rContenido.Get(rMovimiento."Cod. Almacen", prm_Ubicacion, rMovimiento."No. Producto",
-                                 rMovimiento."No. Lote", umBase, rMovimiento.SSCC);
+                                 rMovimiento."No. Lote", prm_UMBase, rMovimiento.SSCC);
 
         if not existe then
             NuevaLineaContenido(rContenido, rMovimiento."Cod. Almacen", prm_Ubicacion, rMovimiento."No. Producto",
-                                rMovimiento."No. Lote", rMovimiento.SSCC, umBase);
+                                rMovimiento."No. Lote", rMovimiento.SSCC, prm_UMBase);
 
-        SumarALinea(rContenido, prm_DeltaBase, rMovimiento."Fecha Caducidad", rMovimiento.SystemCreatedAt);
+        SumarALinea(rContenido, prm_DeltaBase, rMovimiento."Fecha Caducidad", prm_Fecha);
 
         if existe then
             rContenido.Modify(false)
         else
             rContenido.Insert(false);
+    end;
+
+    /// <summary>
+    /// Fecha de entrada al almacén de lo que hay en una línea de contenido, o prm_SiNoHay si la
+    /// línea no existe o no la tiene.
+    /// </summary>
+    local procedure FechaEntradaEn(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_UMBase: Code[10]; prm_SSCC: Code[20]; prm_SiNoHay: DateTime): DateTime
+    var
+        rContenido: Record "Contenido Ubicacion SGA";
+    begin
+        rContenido.SetLoadFields("Fecha Entrada");
+        if rContenido.Get(prm_Almacen, prm_Ubicacion, prm_Producto, prm_Lote, prm_UMBase, prm_SSCC) then
+            if rContenido."Fecha Entrada" <> 0DT then
+                exit(rContenido."Fecha Entrada");
+        exit(prm_SiNoHay);
     end;
 
     /// <summary>

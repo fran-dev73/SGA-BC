@@ -20,6 +20,49 @@ using System.Utilities;
 /// </summary>
 codeunit 51103 "Consulta Stock SGA"
 {
+    var
+        CategoriaExcluidaTok: Label '820', Locked = true;
+
+    /// <summary>
+    /// Si SGA ubica el producto: de tipo Inventario, sin marcar como "Producto Tianna" y fuera
+    /// de la categoría 820. Lo mismo que filtra FiltrarProductosSGA.
+    /// </summary>
+    procedure ProductoSGA(var prm_Item: Record Item): Boolean
+    begin
+        exit(prm_Item.IsInventoriableType() and not prm_Item."Producto Tianna" and
+             (prm_Item."Item Category Code" <> CategoriaExcluidaTok));
+    end;
+
+    /// <summary>
+    /// Deja en prm_Item solo los productos que SGA ubica (ProductoSGA). Va en otro grupo de
+    /// filtros para no sustituir los que ya traiga.
+    /// </summary>
+    procedure FiltrarProductosSGA(var prm_Item: Record Item)
+    var
+        grupo: Integer;
+    begin
+        grupo := prm_Item.FilterGroup();
+        prm_Item.FilterGroup(2);
+        prm_Item.SetRange(Type, prm_Item.Type::Inventory);
+        prm_Item.SetRange("Producto Tianna", false);
+        prm_Item.SetFilter("Item Category Code", '<>%1', CategoriaExcluidaTok);
+        prm_Item.FilterGroup(grupo);
+    end;
+
+    /// <summary>
+    /// Error si SGA no ubica el producto (ProductoSGA).
+    /// </summary>
+    procedure TestProductoSGA(prm_Producto: Code[20])
+    var
+        rItem: Record Item;
+        ProductoFueraSGAErr: Label 'SGA no ubica el producto %1: solo los de tipo Inventario que no son "Producto Tianna" ni de la categoría %2.', Comment = '%1 = producto, %2 = categoría excluida';
+    begin
+        rItem.SetLoadFields(Type, "Producto Tianna", "Item Category Code");
+        rItem.Get(prm_Producto);
+        if not ProductoSGA(rItem) then
+            Error(ProductoFueraSGAErr, prm_Producto, CategoriaExcluidaTok);
+    end;
+
     /// <summary>
     /// Acumula en el buffer el stock de BC de un producto en un almacén, desglosado por lote.
     /// No borra el buffer: suma sobre lo que ya haya, de modo que se puede llamar en bucle para
@@ -225,10 +268,10 @@ codeunit 51103 "Consulta Stock SGA"
     /// documento; si se ubicara por otro lado, lo volverían a pedir. Lo que queda (A Ubicar)
     /// no tiene documento que lo reclame: restos de una carga inicial, ajustes, etc.
     ///
-    /// Solo cuenta los productos de tipo Inventario con existencias en el almacén; los marcados
-    /// como "Producto Tianna" ni los de la categoría 820 nunca. Con prm_EntradoDesde, de cada
-    /// lote solo cuenta lo que queda de lo entrado desde esa fecha (lo de antes lo coloca la carga inicial); en blanco,
-    /// todo. Solo mira los documentos de los lotes que tienen algo sin ubicar.
+    /// Solo cuenta los productos que SGA ubica (ProductoSGA) con existencias en el almacén. Con
+    /// prm_EntradoDesde, de cada lote solo cuenta lo que queda de lo entrado desde esa fecha (lo
+    /// de antes lo coloca la carga inicial); en blanco, todo. Solo mira los documentos de los
+    /// lotes que tienen algo sin ubicar.
     ///
     /// Si prm_VistaProductos (GetView de Item) trae filtros, solo se leen el stock y el contenido
     /// de los productos que los cumplen, uno a uno. Sin filtros, los de todo el almacén se leen de
@@ -247,14 +290,11 @@ codeunit 51103 "Consulta Stock SGA"
         producto: Code[20];
         productoCuenta: Boolean;
         suma: Decimal;
-        cantidadDoc: Decimal;
-        stockDesde: Decimal;
         lineas: Integer;
         PendienteNoTemporalErr: Label 'El pendiente de ubicar solo se calcula sobre una tabla temporal.';
         TituloLbl: Label 'Calculando lo pendiente de ubicar…';
         LeyendoStockLbl: Label 'Leyendo el stock y las ubicaciones del almacén';
         LeyendoProductoLbl: Label 'Leyendo stock del producto %1', Comment = '%1 = nº de producto';
-        CategoriaExcluidaTok: Label '820', Locked = true;
         ProductoLbl: Label 'Revisando lotes del producto %1', Comment = '%1 = nº de producto';
     begin
         if not prm_Pendiente.IsTemporary() then
@@ -273,13 +313,7 @@ codeunit 51103 "Consulta Stock SGA"
             AcumularStockPorLote('', prm_Almacen, TempStock);
             AcumularContenidoUbicado('', prm_Almacen, TempStock);
         end else begin
-            // Tipo, Tianna y categoría van en otro grupo para no sustituir un filtro que traiga la
-            // vista.
-            rItem.FilterGroup(2);
-            rItem.SetRange(Type, rItem.Type::Inventory);
-            rItem.SetRange("Producto Tianna", false);
-            rItem.SetFilter("Item Category Code", '<>%1', CategoriaExcluidaTok);
-            rItem.FilterGroup(0);
+            FiltrarProductosSGA(rItem);
             rItem.SetLoadFields("No.");
             cVentana.FijarTotal(rItem.Count());
             if rItem.FindSet() then
@@ -315,24 +349,13 @@ codeunit 51103 "Consulta Stock SGA"
                 productoCuenta := false;
                 if existencias.Get(producto) > 0 then
                     if rItem.Get(producto) then
-                        productoCuenta := rItem.IsInventoriableType() and not rItem."Producto Tianna" and
-                                          (rItem."Item Category Code" <> CategoriaExcluidaTok);
+                        productoCuenta := ProductoSGA(rItem);
             end;
 
             if productoCuenta then begin
                 prm_Pendiente := TempStock;
-                prm_Pendiente.CalcularDiferencia();
-                if (prm_Pendiente.Diferencia > 0) and (prm_EntradoDesde <> 0D) then begin
-                    stockDesde := StockEntradoDesde(producto, prm_Almacen, TempStock."No. Lote", prm_EntradoDesde);
-                    if prm_Pendiente.Diferencia > stockDesde then
-                        prm_Pendiente.Diferencia := stockDesde;
-                end;
-                if prm_Pendiente.Diferencia > 0 then begin
+                if CalcularPendienteLote(cEntradas, TempEntradas, prm_Almacen, prm_EntradoDesde, prm_Pendiente) then begin
                     prm_Pendiente."Fecha Caducidad" := CaducidadLote(producto, TempStock."No. Lote");
-
-                    cantidadDoc := PendienteEnDocumentosHasta(cEntradas, TempEntradas, prm_Almacen, TempStock, prm_Pendiente.Diferencia);
-                    prm_Pendiente."En Documentos" := cantidadDoc;
-                    prm_Pendiente."A Ubicar" := prm_Pendiente.Diferencia - cantidadDoc;
                     prm_Pendiente.Desglose := CopyStr(cUM.Desglose(producto, prm_Pendiente."A Ubicar"), 1, MaxStrLen(prm_Pendiente.Desglose));
                     prm_Pendiente.Insert();
                     lineas += 1;
@@ -342,6 +365,50 @@ codeunit 51103 "Consulta Stock SGA"
 
         cVentana.Cerrar();
         exit(lineas);
+    end;
+
+    /// <summary>
+    /// Lo pendiente de ubicar de un lote: la regla única que usan "Pendiente de ubicar" y
+    /// "Ubicar producto". prm_Lote trae el producto, el lote, "Stock BC" y "Stock SGA"; deja en
+    /// él la Diferencia (sin ubicar), "En Documentos" (lo que espera en Ubicar recepciones o
+    /// Ubicar ensamblados) y "A Ubicar" (el resto). Lo entrado antes de prm_EntradoDesde es de
+    /// la carga inicial mientras SGA no haya movido nunca el lote. Devuelve si queda algo sin
+    /// ubicar.
+    /// </summary>
+    local procedure CalcularPendienteLote(var prm_Entradas: Codeunit "Gestion Entradas SGA"; var prm_Buffer: Record "Linea Ubicacion SGA" temporary; prm_Almacen: Code[10]; prm_EntradoDesde: Date; var prm_Lote: Record "Buffer Conciliacion SGA" temporary): Boolean
+    var
+        stockDesde: Decimal;
+    begin
+        prm_Lote.CalcularDiferencia();
+        if (prm_Lote.Diferencia > 0) and (prm_EntradoDesde <> 0D) and
+           not LoteMovidoEnSGA(prm_Lote."No. Producto", prm_Almacen, prm_Lote."No. Lote")
+        then begin
+            stockDesde := StockEntradoDesde(prm_Lote."No. Producto", prm_Almacen, prm_Lote."No. Lote", prm_EntradoDesde);
+            if prm_Lote.Diferencia > stockDesde then
+                prm_Lote.Diferencia := stockDesde;
+        end;
+        if prm_Lote.Diferencia <= 0 then
+            exit(false);
+
+        prm_Lote."En Documentos" := PendienteEnDocumentosHasta(prm_Entradas, prm_Buffer, prm_Almacen, prm_Lote, prm_Lote.Diferencia);
+        prm_Lote."A Ubicar" := prm_Lote.Diferencia - prm_Lote."En Documentos";
+        exit(true);
+    end;
+
+    /// <summary>
+    /// Si SGA tiene algún movimiento del lote en el almacén. Un lote en blanco (producto sin
+    /// lotes de BC) mira el producto entero: SGA puede guardarle el lote del ensamblado.
+    /// </summary>
+    local procedure LoteMovidoEnSGA(prm_Producto: Code[20]; prm_Almacen: Code[10]; prm_Lote: Code[50]): Boolean
+    var
+        rMovimiento: Record "Movimiento Ubicacion SGA";
+    begin
+        rMovimiento.SetCurrentKey("No. Producto", "No. Lote", "Fecha Registro");
+        rMovimiento.SetRange("No. Producto", prm_Producto);
+        if prm_Lote <> '' then
+            rMovimiento.SetRange("No. Lote", prm_Lote);
+        rMovimiento.SetRange("Cod. Almacen", prm_Almacen);
+        exit(not rMovimiento.IsEmpty());
     end;
 
     /// <summary>
@@ -454,68 +521,39 @@ codeunit 51103 "Consulta Stock SGA"
     end;
 
     /// <summary>
-    /// Cantidad ya repartida en ubicaciones de un almacén y producto, en
-    /// unidad de medida base. El lote solo filtra si viene informado.
-    /// </summary>
-    local procedure TotalUbicadoProducto(prm_Almacen: Code[10]; prm_Producto: Code[20]; prm_Lote: Code[50]): Decimal
-    var
-        rContenido: Record "Contenido Ubicacion SGA";
-    begin
-        rContenido.SetRange("No. Producto", prm_Producto);
-        rContenido.SetRange("Cod. Almacen", prm_Almacen);
-        if prm_Lote <> '' then
-            rContenido.SetRange("No. Lote", prm_Lote);
-        rContenido.CalcSums("Cantidad Base");
-        exit(rContenido."Cantidad Base");
-    end;
-
-    /// <summary>
-    /// Lo que queda por ubicar de un producto: las existencias que BC dice que hay en el
-    /// almacén menos lo que SGA ya tiene repartido en ubicaciones. En unidad de medida base.
+    /// Lo que queda por ubicar de un producto (y lote, si viene) en un almacén, en unidad base:
+    /// la suma de "A Ubicar" de sus lotes, con la misma regla que "Pendiente de ubicar"
+    /// (CalcularPendienteLote, con la "Fecha inicio SGA"). Un lote al que le sobra no resta a
+    /// los que les falta.
     ///
     /// Devuelve también el stock y lo ya ubicado por referencia, porque un pendiente a cero
     /// no dice si es que no hay stock o si es que ya está todo colocado.
     /// </summary>
-    procedure PendienteDeUbicar(prm_Almacen: Code[10]; prm_Producto: Code[20]; prm_Lote: Code[50]; var prm_StockBase: Decimal; var prm_UbicadoBase: Decimal): Decimal
+    procedure PendienteDeUbicar(prm_Almacen: Code[10]; prm_Producto: Code[20]; prm_Lote: Code[50]; var prm_StockBase: Decimal; var prm_UbicadoBase: Decimal) pendiente: Decimal
     var
-        rItem: Record Item;
-        TempLote: Record "Buffer Conciliacion SGA" temporary;
+        TempStock: Record "Buffer Conciliacion SGA" temporary;
         TempEntradas: Record "Linea Ubicacion SGA" temporary;
+        rConfig: Record "Config. SGA";
         cEntradas: Codeunit "Gestion Entradas SGA";
-        loteBC: Code[50];
-        pendiente: Decimal;
-        enDocumentos: Decimal;
     begin
         prm_StockBase := 0;
         prm_UbicadoBase := 0;
 
-        // El producto y el almacén llegan siempre (Ubicar producto no llama sin ellos).
-        if not rItem.Get(prm_Producto) then
-            exit(0);
-
+        AcumularStockPorLote(prm_Producto, prm_Almacen, TempStock);
+        AcumularContenidoUbicado(prm_Producto, prm_Almacen, TempStock);
         // Sin lotes de BC, el stock de BC no lleva lote aunque SGA guarde el del ensamblado: se
-        // compara el total del producto, como en la conciliación.
-        if LoteEstandar(prm_Producto) then
-            loteBC := prm_Lote;
+        // mira el total del producto, como en la conciliación.
+        if (prm_Lote <> '') and LoteEstandar(prm_Producto) then
+            TempStock.SetRange("No. Lote", prm_Lote);
 
-        rItem.SetRange("Location Filter", prm_Almacen);
-        if loteBC <> '' then
-            rItem.SetRange("Lot No. Filter", loteBC);
-        rItem.CalcFields(Inventory);
-
-        prm_StockBase := rItem.Inventory;
-        prm_UbicadoBase := TotalUbicadoProducto(prm_Almacen, prm_Producto, loteBC);
-        pendiente := prm_StockBase - prm_UbicadoBase;
-        if pendiente <= 0 then
-            exit(pendiente);
-
-        // Lo pendiente en Ubicar recepciones y Ubicar ensamblados se ubica desde allí, que lo
-        // cuentan por su documento: si se ubicara aquí, lo volverían a pedir. Igual que en
-        // "Pendiente de ubicar" (CargarPendienteUbicar).
-        TempLote."No. Producto" := prm_Producto;
-        TempLote."No. Lote" := loteBC;
-        enDocumentos := PendienteEnDocumentosHasta(cEntradas, TempEntradas, prm_Almacen, TempLote, pendiente);
-        exit(pendiente - enDocumentos);
+        rConfig.ObtenerConfig();
+        if TempStock.FindSet() then
+            repeat
+                prm_StockBase += TempStock."Stock BC";
+                prm_UbicadoBase += TempStock."Stock SGA";
+                if CalcularPendienteLote(cEntradas, TempEntradas, prm_Almacen, rConfig."Fecha Inicio SGA", TempStock) then
+                    pendiente += TempStock."A Ubicar";
+            until TempStock.Next() = 0;
     end;
 
     /// <summary>

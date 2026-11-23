@@ -92,11 +92,12 @@ table 51102 "Contenido Ubicacion SGA"
             Editable = false;
             ToolTip = 'Caducidad del lote. Es el criterio de ordenación cuando la estrategia de picking es FEFO.';
         }
-        field(100; "Fecha Ultima Entrada"; DateTime)
+        field(100; "Fecha Entrada"; DateTime)
         {
-            Caption = 'Fecha última entrada';
+            Caption = 'Fecha entrada';
             DataClassification = ToBeClassified;
             Editable = false;
+            ToolTip = 'Fecha y hora en que la mercancía entró en el almacén. Un traslado o una reposición conservan la que traía. Con la estrategia de picking FIFO se recoge primero la más antigua.';
         }
         field(101; "Fecha Ultima Salida"; DateTime)
         {
@@ -114,6 +115,8 @@ table 51102 "Contenido Ubicacion SGA"
         {
             Caption = 'Motivo bloqueo';
             DataClassification = ToBeClassified;
+            Editable = false;
+            ToolTip = 'Quién bloqueó la línea y cuándo. Se borra al desbloquearla.';
         }
         field(120; Descripcion; Text[100])
         {
@@ -172,7 +175,7 @@ table 51102 "Contenido Ubicacion SGA"
         {
             SumIndexFields = "Cantidad Base";
         }
-        key(Antiguedad; "Cod. Almacen", "No. Producto", "Fecha Ultima Entrada")
+        key(Antiguedad; "Cod. Almacen", "No. Producto", "Fecha Entrada")
         {
         }
     }

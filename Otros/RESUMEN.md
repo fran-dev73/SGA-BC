@@ -73,7 +73,7 @@ SGA es el módulo de gestión de ubicaciones del almacén dentro de Business Cen
 ## Pendiente
 
 - **Etiqueta del palé con el SSCC que guarda SGA.** Con BarTender coinciden; la etiqueta A5 (Sandbox) genera el suyo. Falta imprimir etiqueta a los palés que reciben un SSCC nuevo (sin etiqueta del proveedor).
-- **SSCC del stock que ya está en el almacén.** En pruebas se carga con la carga inicial, sin SSCC. Para producción, por decidir; se puede meter en *Ubicar producto*, y *Ubicar seleccionadas* aún no lo recoge.
+- **SSCC del stock que ya está en el almacén.** En pruebas se carga con la carga inicial, sin SSCC. Para producción, por decidir; se puede meter en *Ubicar producto*, y *Ubicar seleccionadas* da un SSCC nuevo a cada palé.
 - **Palé sin SSCC leído en *Ubicar producto* y *Ubicar ensamblados*.** Por decidir si se exige la etiqueta o se genera un SSCC nuevo (lo que hace ahora).
 
 ## Decisiones abiertas

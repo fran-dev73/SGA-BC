@@ -126,7 +126,9 @@ table 51114 "Linea Ubicacion SGA"
             trigger OnValidate()
             var
                 cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
+                cLectura: Codeunit "Codigos Barras SGA";
             begin
+                "Ubicacion Confirmada" := cLectura.UbicacionLeida("Ubicacion Confirmada");
                 cUbicaciones.ComprobarUbicacionExiste("Cod. Almacen", "Ubicacion Confirmada");
 
                 // En las entradas, el hueco elegido a mano queda reservado para la fila y el que
@@ -144,6 +146,13 @@ table 51114 "Linea Ubicacion SGA"
             Caption = 'Ubicación leída';
             ToolTip = 'Ubicación escaneada de la etiqueta del hueco al dejar la mercancía. Con "Exigir confirmar ubicación" tiene que ser la ubicación en la que se deja.';
             DataClassification = ToBeClassified;
+
+            trigger OnValidate()
+            var
+                cLectura: Codeunit "Codigos Barras SGA";
+            begin
+                "Ubicacion Leida" := cLectura.UbicacionLeida("Ubicacion Leida");
+            end;
         }
         field(40; Estado; Option)
         {

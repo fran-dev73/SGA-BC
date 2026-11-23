@@ -1,10 +1,13 @@
 namespace AntonioNadal.SGA;
 
 using AntonioNadal.Produccion;
+using Microsoft.Foundation.NoSeries;
+using Microsoft.Inventory.Item;
 using Microsoft.Inventory.Ledger;
 using Microsoft.Inventory.Tracking;
 using Microsoft.Sales.Document;
 using Microsoft.Warehouse.Structure;
+using System.Security.AccessControl;
 using System.Security.User;
 
 /// <summary>
@@ -40,11 +43,17 @@ permissionset 51100 "PermissionSet-SGA"
         tabledata "Orden Picking SGA" = RIMD,
         table "Linea Orden Picking SGA" = X,
         tabledata "Linea Orden Picking SGA" = RIMD,
+        // Enviar a SGA lee el pedido y sus productos y numera las órdenes con su serie.
+        tabledata "Sales Header" = R,
+        tabledata Item = R,
+        tabledata "No. Series" = R,
+        tabledata "No. Series Line" = RM,
         // Al terminar un picking se escribe en el pedido: cantidad a enviar y seguimiento por lote.
         tabledata "Sales Line" = RM,
         tabledata "Reservation Entry" = RIMD,
-        // Para saber si el usuario es responsable de picking.
+        // Para saber si el usuario es responsable de picking y elegir a quién se asigna una orden.
         tabledata "User Setup" = R,
+        tabledata User = R,
         // Generar y eliminar ubicaciones crean y borran las de BC (al borrar, BC borra su contenido).
         tabledata Bin = RIMD,
         tabledata "Bin Content" = RD,
@@ -56,6 +65,8 @@ permissionset 51100 "PermissionSet-SGA"
         codeunit "Gestion Mapa SGA" = X,
         codeunit "Consulta Stock SGA" = X,
         codeunit "Gestion Picking SGA" = X,
+        codeunit "Enviar Pedido SGA" = X,
+        codeunit "Consulta Ubicaciones SGA" = X,
         codeunit "Gestion Entradas SGA" = X,
         codeunit "Unidades Producto SGA" = X,
         codeunit "Ventana Progreso SGA" = X,
@@ -71,7 +82,8 @@ permissionset 51100 "PermissionSet-SGA"
         page "Analisis ABC SGA" = X,
         page "Calculos ABC SGA" = X,
         page "Ubicaciones SGA" = X,
-        page "Ficha Ubicacion SGA" = X,        page "Contenido Ubicacion Subpag" = X,
+        page "Ficha Ubicacion SGA" = X,
+        page "Contenido Ubicacion Subpag" = X,
         page "Contenido Ubicaciones SGA" = X,
         page "Movs. Ubicacion SGA" = X,
         page "Zonas SGA" = X,
@@ -93,6 +105,8 @@ permissionset 51100 "PermissionSet-SGA"
         page "Ubicar Palets Linea SGA" = X,
         page "Cambiar Ubicaciones SGA" = X,
         page "Ordenes Picking SGA" = X,
+        // Quién puede asignar lo decide "Responsable picking SGA" en Configuración de usuarios.
+        page "Asignar Ordenes Picking SGA" = X,
         page "Ficha Orden Picking SGA" = X,
         page "Lineas Orden Picking Subpag" = X,
         page "Preparar Picking SGA" = X,

@@ -36,6 +36,15 @@ codeunit 51114 "Codigos Barras SGA"
     end;
 
     /// <summary>
+    /// La ubicación de una lectura o de lo tecleado, para guardarla en un campo: sin los
+    /// espacios ni el identificador de simbología que pone el escáner.
+    /// </summary>
+    procedure UbicacionLeida(prm_Lectura: Text): Code[20]
+    begin
+        exit(CopyStr(Normalizar(prm_Lectura), 1, 20));
+    end;
+
+    /// <summary>
     /// Devuelve true si la lectura trae un SSCC: el (00) de un GS1-128 o los 18 dígitos solos,
     /// con su dígito de control bien. El SSCC queda en prm_SSCC.
     /// </summary>

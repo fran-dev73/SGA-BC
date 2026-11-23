@@ -141,7 +141,7 @@ codeunit 51102 "Gestion Mapa SGA"
             // Sin pasillo, estantería y altura no hay dónde colocar el cubo.
             if cUbicaciones.TrocearCodigo(rUbicacionSGA."Cod. Bin", pasillo, estanteria, altura) then
                 if (prm_Pasillo = 0) or (pasillo = prm_Pasillo) then begin
-                    rUbicacionSGA.CalcFields("Lineas Contenido");
+                    rUbicacionSGA.CalcFields("Lineas Contenido", Descripcion);
 
                     Clear(elemento);
                     elemento.Add('b', rUbicacionSGA."Cod. Bin");

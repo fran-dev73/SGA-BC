@@ -14,10 +14,11 @@ using System.Text;
 ///   - Motor de propuesta: en qué hueco dejar un producto (primero almacenamiento, luego
 ///     picking), por qué no hay hueco y la ubicación guiada de un reparto.
 ///
-/// OnRun borra un hueco entero (Rec): su ficha SGA y el Bin estándar, con el borrado de BC (que
-/// se lleva el contenido de ubicación de BC y no deja borrar un hueco con stock o con documentos
-/// pendientes). Existe para lanzarlo con Codeunit.Run desde EliminarUbicaciones, un hueco por
-/// transacción: el que BC no deja borrar se queda entero y no tumba el resto.
+/// OnRun borra un hueco entero (Rec): el Bin estándar, con el borrado de BC (que se lleva el
+/// contenido de ubicación de BC y no deja borrar un hueco con stock o con documentos
+/// pendientes), y con él su ficha SGA (BorrarFichaConBin). Existe para lanzarlo con
+/// Codeunit.Run desde EliminarUbicaciones, un hueco por transacción: el que no se puede borrar
+/// se queda entero y no tumba el resto.
 /// </summary>
 codeunit 51101 "Gestion Ubicaciones SGA"
 {
@@ -25,14 +26,8 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     TableNo = Bin;
 
     trigger OnRun()
-    var
-        rUbicacionSGA: Record "Ubicacion SGA";
     begin
-        // La ficha SGA elimina su Bin al borrarse (OnDelete de la tabla); sin ficha, el Bin solo.
-        if rUbicacionSGA.Get(Rec."Location Code", Rec.Code) then
-            rUbicacionSGA.Delete(true)
-        else
-            Rec.Delete(true);
+        Rec.Delete(true);
     end;
 
     /// <summary>
@@ -57,7 +52,7 @@ codeunit 51101 "Gestion Ubicaciones SGA"
         repeat
             if not rUbicacionSGA.Get(rBin."Location Code", rBin.Code) then begin
                 // Con un código pasillo-estantería-altura, la ruta sale de él como al generarlas;
-                // si no, queda a 0 y la toma de su zona al asignársela.
+                // si no, queda a 0.
                 secuencia := 0;
                 if TrocearCodigo(rBin.Code, pasillo, estanteria, altura) then
                     secuencia := SecuenciaDesde(pasillo, estanteria, altura);
@@ -68,10 +63,10 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     end;
 
     /// <summary>
-    /// Recalcula el estado y el porcentaje de ocupación de las ubicaciones del almacén.
-    /// Devuelve cuántas filas ha actualizado.
+    /// Recalcula el estado y el porcentaje de ocupación de las ubicaciones del almacén, o solo
+    /// de una zona si prm_Zona no va en blanco. Devuelve cuántas filas ha actualizado.
     /// </summary>
-    procedure RecalcularEstados(prm_Almacen: Code[10]) actualizadas: Integer
+    procedure RecalcularEstados(prm_Almacen: Code[10]; prm_Zona: Code[10]) actualizadas: Integer
     var
         rUbicacionSGA: Record "Ubicacion SGA";
         estadoAnterior: Enum "Estado Ubicacion SGA";
@@ -79,6 +74,8 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     begin
         if prm_Almacen <> '' then
             rUbicacionSGA.SetRange("Cod. Almacen", prm_Almacen);
+        if prm_Zona <> '' then
+            rUbicacionSGA.SetRange("Cod. Zona SGA", prm_Zona);
 
         if not rUbicacionSGA.FindSet() then
             exit(0);
@@ -159,44 +156,28 @@ codeunit 51101 "Gestion Ubicaciones SGA"
 
     /// <summary>
     /// Resumen de ocupación de un almacén, o de una de sus zonas si prm_Zona no va en blanco:
-    /// cuántas ubicaciones tiene y cuántas están vacías, llenas o bloqueadas. Bloqueada cuenta
-    /// como el mapa la pinta (EsUtilizable): la ubicación o su zona.
+    /// cuántas ubicaciones tiene y cuántas están vacías, llenas o bloqueadas (ella o su zona:
+    /// el estado ya lo recoge).
     /// </summary>
     procedure ResumenUbicaciones(prm_Almacen: Code[10]; prm_Zona: Code[10]): Text
     var
         rUbicacionSGA: Record "Ubicacion SGA";
-        rZona: Record "Zona SGA";
-        zonasBloqueadas: List of [Code[10]];
         total: Integer;
         vacias: Integer;
         llenas: Integer;
         bloqueadas: Integer;
         ResumenLbl: Label '%1 ubicaciones: %2 vacías, %3 llenas, %4 bloqueadas.', Comment = '%1 = total, %2 = vacías, %3 = llenas, %4 = bloqueadas';
     begin
-        rZona.SetRange("Cod. Almacen", prm_Almacen);
-        rZona.SetRange(Bloqueada, true);
-        rZona.SetLoadFields(Code);
-        if rZona.FindSet() then
-            repeat
-                zonasBloqueadas.Add(rZona.Code);
-            until rZona.Next() = 0;
-
         rUbicacionSGA.SetRange("Cod. Almacen", prm_Almacen);
         if prm_Zona <> '' then
             rUbicacionSGA.SetRange("Cod. Zona SGA", prm_Zona);
-        rUbicacionSGA.SetLoadFields("Estado SGA", "Cod. Zona SGA");
-        if rUbicacionSGA.FindSet() then
-            repeat
-                total += 1;
-                case true of
-                    (rUbicacionSGA."Estado SGA" = rUbicacionSGA."Estado SGA"::Bloqueada) or zonasBloqueadas.Contains(rUbicacionSGA."Cod. Zona SGA"):
-                        bloqueadas += 1;
-                    rUbicacionSGA."Estado SGA" = rUbicacionSGA."Estado SGA"::Vacia:
-                        vacias += 1;
-                    rUbicacionSGA."Estado SGA" = rUbicacionSGA."Estado SGA"::Llena:
-                        llenas += 1;
-                end;
-            until rUbicacionSGA.Next() = 0;
+        total := rUbicacionSGA.Count();
+        rUbicacionSGA.SetRange("Estado SGA", rUbicacionSGA."Estado SGA"::Vacia);
+        vacias := rUbicacionSGA.Count();
+        rUbicacionSGA.SetRange("Estado SGA", rUbicacionSGA."Estado SGA"::Llena);
+        llenas := rUbicacionSGA.Count();
+        rUbicacionSGA.SetRange("Estado SGA", rUbicacionSGA."Estado SGA"::Bloqueada);
+        bloqueadas := rUbicacionSGA.Count();
 
         exit(StrSubstNo(ResumenLbl, total, vacias, llenas, bloqueadas));
     end;
@@ -294,9 +275,10 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     /// las alturas que da AlturasDelRango (00, 10, 20…).
     /// Crea el Bin estándar si no existe y su fila de datos SGA, en ese orden.
     /// Es idempotente: lo que ya existe no se toca, así que se puede reejecutar para ampliar.
-    /// Las posiciones de un fondo de pasillo se saltan: no tienen alturas.
+    /// Las posiciones de un fondo de pasillo se saltan, porque no tienen alturas: cuántas, en
+    /// prm_EnFondo.
     /// </summary>
-    procedure GenerarUbicaciones(prm_Almacen: Code[10]; prm_PasilloDesde: Integer; prm_PasilloHasta: Integer; prm_EstanteriaDesde: Integer; prm_EstanteriaHasta: Integer; prm_AlturaDesde: Integer; prm_AlturaHasta: Integer; prm_Zona: Code[10]; prm_Tipo: Enum "Tipo Ubicacion SGA"; prm_Capacidad: Decimal) creadas: Integer
+    procedure GenerarUbicaciones(prm_Almacen: Code[10]; prm_PasilloDesde: Integer; prm_PasilloHasta: Integer; prm_EstanteriaDesde: Integer; prm_EstanteriaHasta: Integer; prm_AlturaDesde: Integer; prm_AlturaHasta: Integer; prm_Zona: Code[10]; prm_Tipo: Enum "Tipo Ubicacion SGA"; prm_Capacidad: Decimal; var prm_EnFondo: Integer) creadas: Integer
     var
         rUbicacionSGA: Record "Ubicacion SGA";
         rZona: Record "Zona SGA";
@@ -307,6 +289,7 @@ codeunit 51101 "Gestion Ubicaciones SGA"
         codBin: Code[20];
     begin
         rZona.ComprobarAdmiteUbicaciones(prm_Almacen, prm_Zona);
+        prm_EnFondo := 0;
         alturas := AlturasDelRango(prm_AlturaDesde, prm_AlturaHasta);
         for pasillo := prm_PasilloDesde to prm_PasilloHasta do
             for estanteria := prm_EstanteriaDesde to prm_EstanteriaHasta do
@@ -314,8 +297,10 @@ codeunit 51101 "Gestion Ubicaciones SGA"
                     codBin := ComponerCodigoUbicacion(pasillo, estanteria, altura);
 
                     // La posición de un fondo de pasillo no tiene alturas: se salta.
-                    if FondoEnPosicion(prm_Almacen, codBin) = '' then begin
-                        CrearBinSiFalta(prm_Almacen, codBin, codBin);
+                    if FondoEnPosicion(prm_Almacen, codBin) <> '' then
+                        prm_EnFondo += 1
+                    else begin
+                        CrearBinSiFalta(prm_Almacen, codBin);
 
                         if not rUbicacionSGA.Get(prm_Almacen, codBin) then begin
                             // Nacen de un solo producto, como un hueco de palé. Las estanterías de
@@ -333,8 +318,8 @@ codeunit 51101 "Gestion Ubicaciones SGA"
 
     /// <summary>
     /// Al insertar una ubicación SGA (OnInsert de la tabla): crea su Bin si aún no existe, que
-    /// es el caso del alta a mano, y le pone la descripción (el código si va en blanco) y la
-    /// secuencia de picking (la del código pasillo-estantería-altura si va a 0).
+    /// es el caso del alta a mano, y le pone la secuencia de picking (la del código
+    /// pasillo-estantería-altura si va a 0).
     /// </summary>
     procedure CompletarAlta(var prm_Ubicacion: Record "Ubicacion SGA")
     var
@@ -342,18 +327,17 @@ codeunit 51101 "Gestion Ubicaciones SGA"
         estanteria: Integer;
         altura: Integer;
     begin
-        if prm_Ubicacion.Descripcion = '' then
-            prm_Ubicacion.Descripcion := CopyStr(prm_Ubicacion."Cod. Bin", 1, MaxStrLen(prm_Ubicacion.Descripcion));
         if prm_Ubicacion."Secuencia Picking" = 0 then
             if TrocearCodigo(prm_Ubicacion."Cod. Bin", pasillo, estanteria, altura) then
                 prm_Ubicacion."Secuencia Picking" := SecuenciaDesde(pasillo, estanteria, altura);
-        CrearBinSiFalta(prm_Ubicacion."Cod. Almacen", prm_Ubicacion."Cod. Bin", prm_Ubicacion.Descripcion);
+        CrearBinSiFalta(prm_Ubicacion."Cod. Almacen", prm_Ubicacion."Cod. Bin");
     end;
 
     /// <summary>
-    /// Crea la ubicación estándar de BC si no existe, con su descripción.
+    /// Crea la ubicación estándar de BC si no existe, con el código como descripción. La
+    /// descripción es solo la del Bin: la ficha SGA la enseña (Descripcion es un FlowField).
     /// </summary>
-    local procedure CrearBinSiFalta(prm_Almacen: Code[10]; prm_Bin: Code[20]; prm_Descripcion: Text)
+    local procedure CrearBinSiFalta(prm_Almacen: Code[10]; prm_Bin: Code[20])
     var
         rBin: Record Bin;
     begin
@@ -362,7 +346,7 @@ codeunit 51101 "Gestion Ubicaciones SGA"
         rBin.Init();
         rBin."Location Code" := prm_Almacen;
         rBin.Code := prm_Bin;
-        rBin.Description := CopyStr(prm_Descripcion, 1, MaxStrLen(rBin.Description));
+        rBin.Description := prm_Bin;
         rBin.Insert(true);
     end;
 
@@ -489,6 +473,37 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     end;
 
     /// <summary>
+    /// Una ubicación es su Bin más su ficha SGA: se borran juntos, se borre por donde se borre.
+    /// Al borrar el Bin (desde BC estándar o desde SGA) se borra su ficha, que no deja si tiene
+    /// contenido y lo deshace todo.
+    /// </summary>
+    [EventSubscriber(ObjectType::Table, Database::Bin, OnAfterDeleteEvent, '', false, false)]
+    local procedure BorrarFichaConBin(var Rec: Record Bin)
+    var
+        rUbicacionSGA: Record "Ubicacion SGA";
+    begin
+        if Rec.IsTemporary() then
+            exit;
+        if rUbicacionSGA.Get(Rec."Location Code", Rec.Code) then
+            rUbicacionSGA.Delete(true);
+    end;
+
+    /// <summary>
+    /// Al borrar la ficha SGA (con sus triggers) se borra su Bin, con las comprobaciones del
+    /// estándar (stock de BC en la ubicación…), que paran el borrado de los dos.
+    /// </summary>
+    [EventSubscriber(ObjectType::Table, Database::"Ubicacion SGA", OnAfterDeleteEvent, '', false, false)]
+    local procedure BorrarBinConFicha(var Rec: Record "Ubicacion SGA"; RunTrigger: Boolean)
+    var
+        rBin: Record Bin;
+    begin
+        if Rec.IsTemporary() or not RunTrigger then
+            exit;
+        if rBin.Get(Rec."Cod. Almacen", Rec."Cod. Bin") then
+            rBin.Delete(true);
+    end;
+
+    /// <summary>
     /// Error si el código no es pasillo-estantería-altura con los rangos de Generar ubicaciones:
     /// pasillo de 001 a 999, estantería de 01 a 99 y altura de 00 a 99.
     /// </summary>
@@ -542,15 +557,14 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     end;
 
     /// <summary>
-    /// Deja preparada, sin insertar, la ficha SGA de una ubicación nueva: su descripción es el
-    /// código y admite mezcla de lotes. Quien llama completa el resto e inserta.
+    /// Deja preparada, sin insertar, la ficha SGA de una ubicación nueva, que admite mezcla de
+    /// lotes. Quien llama completa el resto e inserta.
     /// </summary>
     local procedure NuevaUbicacionSGA(var prm_Ubicacion: Record "Ubicacion SGA"; prm_Almacen: Code[10]; prm_Bin: Code[20]; prm_PermiteMezclaProducto: Boolean; prm_Secuencia: Integer)
     begin
         prm_Ubicacion.Init();
         prm_Ubicacion."Cod. Almacen" := prm_Almacen;
         prm_Ubicacion."Cod. Bin" := prm_Bin;
-        prm_Ubicacion.Descripcion := CopyStr(prm_Bin, 1, MaxStrLen(prm_Ubicacion.Descripcion));
         prm_Ubicacion."Permite Mezcla Producto" := prm_PermiteMezclaProducto;
         prm_Ubicacion."Secuencia Picking" := prm_Secuencia;
     end;
@@ -1197,24 +1211,30 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     end;
 
     /// <summary>
-    /// Error si la ubicación no existe en el almacén. No comprueba nada si el almacén o la
-    /// ubicación van en blanco: eso lo decide quien llama.
+    /// Error si la ubicación no es una ubicación SGA del almacén (con su ficha): es la única
+    /// comprobación de que una ubicación existe, para cualquier movimiento, también la que lee
+    /// el preparador en el picking. No comprueba nada si el almacén o la ubicación van en
+    /// blanco: eso lo decide quien llama.
     /// </summary>
     procedure ComprobarUbicacionExiste(prm_Almacen: Code[10]; prm_Ubicacion: Code[20])
     var
-        UbicacionNoExisteErr: Label 'La ubicación %1 no existe en el almacén %2.', Comment = '%1 = ubicación, %2 = almacén';
+        rUbicacionSGA: Record "Ubicacion SGA";
+        UbicacionNoExisteErr: Label 'La ubicación %1 no existe en SGA para el almacén %2.', Comment = '%1 = ubicación, %2 = almacén';
     begin
         if (prm_Almacen = '') or (prm_Ubicacion = '') then
             exit;
 
-        if not UbicacionExiste(prm_Almacen, prm_Ubicacion) then
+        rUbicacionSGA.SetRange("Cod. Almacen", prm_Almacen);
+        rUbicacionSGA.SetRange("Cod. Bin", prm_Ubicacion);
+        if rUbicacionSGA.IsEmpty() then
             Error(UbicacionNoExisteErr, prm_Ubicacion, prm_Almacen);
     end;
 
     /// <summary>
-    /// Si existe el Bin prm_Ubicacion en el almacén. Con la ubicación en blanco, no.
+    /// Si existe el Bin prm_Ubicacion en el almacén. Con la ubicación en blanco, no. Solo para
+    /// limpiar lo que ha quedado sin Bin (EliminarUbicaciones).
     /// </summary>
-    procedure UbicacionExiste(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]): Boolean
+    local procedure UbicacionExiste(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]): Boolean
     var
         rBin: Record Bin;
     begin

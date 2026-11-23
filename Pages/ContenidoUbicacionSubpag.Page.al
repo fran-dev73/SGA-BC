@@ -77,12 +77,10 @@ page 51102 "Contenido Ubicacion Subpag"
                 }
                 field("Motivo Bloqueo"; Rec."Motivo Bloqueo")
                 {
-                    ToolTip = 'Razón del bloqueo.';
                     ApplicationArea = All;
                 }
-                field("Fecha Ultima Entrada"; Rec."Fecha Ultima Entrada")
+                field("Fecha Entrada"; Rec."Fecha Entrada")
                 {
-                    ToolTip = 'Fecha y hora en que entró por última vez.';
                     ApplicationArea = All;
                     Visible = false;
                 }
@@ -100,6 +98,7 @@ page 51102 "Contenido Ubicacion Subpag"
                 ToolTip = 'Mueve todo o parte de este contenido a otra ubicación del mismo almacén.';
                 ApplicationArea = All;
                 Image = TransferOrder;
+                Enabled = not SoloConsulta;
 
                 trigger OnAction()
                 var
@@ -116,6 +115,7 @@ page 51102 "Contenido Ubicacion Subpag"
                 ToolTip = 'Bloquea o desbloquea esta línea de contenido.';
                 ApplicationArea = All;
                 Image = Lock;
+                Enabled = not SoloConsulta;
 
                 trigger OnAction()
                 var
@@ -130,9 +130,19 @@ page 51102 "Contenido Ubicacion Subpag"
 
     var
         EstiloFila: Text;
+        SoloConsulta: Boolean;
 
     trigger OnAfterGetRecord()
     begin
         EstiloFila := Rec.EstiloContenido();
+    end;
+
+    /// <summary>
+    /// Con la ficha de la ubicación en modo ver, el contenido solo se mira: sin trasladar ni
+    /// bloquear.
+    /// </summary>
+    procedure FijarSoloConsulta(prm_SoloConsulta: Boolean)
+    begin
+        SoloConsulta := prm_SoloConsulta;
     end;
 }

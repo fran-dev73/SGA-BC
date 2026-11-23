@@ -376,18 +376,20 @@ codeunit 51104 "Gestion Picking SGA"
     /// Segunda ronda de picking: a cada pedido de venta lanzado que ya pasó por picking, no tiene
     /// orden abierta y aún tiene algo por preparar le crea una orden con lo que falta, si ya hay
     /// contenido ubicado de alguno de esos productos. Lo que sigue sin stock espera a la
-    /// siguiente ronda. Devuelve el resumen para enseñarlo.
+    /// siguiente ronda. Cada pedido se envía por separado (Cod. "Enviar Pedido SGA"): uno que
+    /// da error no para a los demás y su error sale en el resumen. Devuelve el resumen para
+    /// enseñarlo.
     /// </summary>
     procedure SegundaRonda() resumen: Text
     var
         rCabVenta: Record "Sales Header";
+        cEnviar: Codeunit "Enviar Pedido SGA";
         creadas: Integer;
-        delPedido: Integer;
         esperan: Integer;
-        faltas: Text;
         detalle: Text;
         ResumenTxt: Label 'Segunda ronda: %1 órdenes nuevas. %2 pedidos siguen esperando stock ubicado.', Comment = '%1 = órdenes creadas, %2 = pedidos sin stock';
         OrdenesCreadasTxt: Label '%1 → %2 órdenes', Comment = '%1 = nº pedido, %2 = número de órdenes';
+        PedidoConErrorTxt: Label '%1 → no enviado: %2', Comment = '%1 = nº pedido, %2 = error';
     begin
         rCabVenta.SetRange("Document Type", rCabVenta."Document Type"::Order);
         rCabVenta.SetRange(Status, rCabVenta.Status::Released);
@@ -396,11 +398,11 @@ codeunit 51104 "Gestion Picking SGA"
             repeat
                 if PideSegundaRonda(rCabVenta) then
                     if HayContenidoParaFaltas(rCabVenta) then begin
-                        faltas := '';
-                        delPedido := EnviarPedidoASGA(rCabVenta."No.", faltas);
-                        Commit();
-                        creadas += delPedido;
-                        detalle += '\' + StrSubstNo(OrdenesCreadasTxt, rCabVenta."No.", delPedido);
+                        if cEnviar.Run(rCabVenta) then begin
+                            creadas += cEnviar.OrdenesCreadas();
+                            detalle += '\' + StrSubstNo(OrdenesCreadasTxt, rCabVenta."No.", cEnviar.OrdenesCreadas());
+                        end else
+                            detalle += '\' + StrSubstNo(PedidoConErrorTxt, rCabVenta."No.", GetLastErrorText());
                     end else
                         esperan += 1;
             until rCabVenta.Next() = 0;
@@ -685,7 +687,8 @@ codeunit 51104 "Gestion Picking SGA"
     /// <summary>
     /// Fija el orden en que se recorre el contenido según la estrategia configurada, en tramos
     /// que se recorren uno detrás de otro (1 y 2). Devuelve false si la estrategia no tiene ese
-    /// tramo. FIFO y Vaciar ubicación van en un tramo. FEFO va en dos: primero lo que tiene
+    /// tramo. FIFO y Por orden de ubicación (código de ubicación) van en un tramo. FEFO va en
+    /// dos: primero lo que tiene
     /// caducidad, de la más próxima a la más lejana, y después lo que no la tiene (por la
     /// clave, la fecha en blanco iría delante de todas). Al preparador se le dice el lote
     /// concreto de cada parada. Las reubicaciones eligen con el mismo orden qué traer de
@@ -695,8 +698,8 @@ codeunit 51104 "Gestion Picking SGA"
     begin
         case prm_Estrategia of
             prm_Estrategia::FIFO:
-                prm_Contenido.SetCurrentKey("Cod. Almacen", "No. Producto", "Fecha Ultima Entrada");
-            prm_Estrategia::"Vaciar Ubicacion":
+                prm_Contenido.SetCurrentKey("Cod. Almacen", "No. Producto", "Fecha Entrada");
+            prm_Estrategia::"Orden Ubicacion":
                 prm_Contenido.SetCurrentKey("Cod. Almacen", "Cod. Bin");
             else begin
                 prm_Contenido.SetCurrentKey("Cod. Almacen", "No. Producto", Bloqueado, "Fecha Caducidad", "Cod. Bin");
@@ -726,8 +729,8 @@ codeunit 51104 "Gestion Picking SGA"
     var
         rOrden: Record "Orden Picking SGA";
         rConfig: Record "Config. SGA";
-        rUbicacion: Record "Ubicacion SGA";
         cContenido: Codeunit "Gestion Contenido SGA";
+        cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
         sscc: Code[20];
         CantidadNoPositivaErr: Label 'La cantidad recogida debe ser mayor que cero.';
         LineaCanceladaErr: Label 'La línea está cancelada.';
@@ -756,7 +759,7 @@ codeunit 51104 "Gestion Picking SGA"
 
         // Certifica que el hueco leído es una ubicación SGA. Se comprueba aquí y no en la pantalla
         // para que no se pueda saltar.
-        rUbicacion.ComprobarUbicacionLeida(prm_Linea."Cod. Almacen", prm_Bin);
+        cUbicaciones.ComprobarUbicacionExiste(prm_Linea."Cod. Almacen", prm_Bin);
 
         rOrden.Get(prm_Linea."No. Orden");
         ComprobarPreparador(rOrden);
@@ -771,7 +774,9 @@ codeunit 51104 "Gestion Picking SGA"
         // rebajada cuando la salida lo vacíe.
         prm_Linea."Cod. Bin Confirmado" := prm_Bin;
         prm_Linea."SSCC Recogido" := sscc;
-        prm_Linea.Desvio := prm_Linea.HayDesvio();
+        // Una línea recogida en varias veces es desvío si lo ha sido alguna de ellas.
+        if prm_Bin <> prm_Linea."Cod. Bin Propuesto" then
+            prm_Linea.Desvio := true;
         prm_Linea."Cantidad Recogida" += prm_Cantidad;
         prm_Linea."Fecha Confirmacion" := CurrentDateTime();
         prm_Linea."Cod. Usuario Confirmacion" := rConfig.UsuarioActual();
@@ -1154,13 +1159,16 @@ codeunit 51104 "Gestion Picking SGA"
     end;
 
     /// <summary>
-    /// Asigna (o desasigna, con prm_Usuario en blanco) todas las órdenes del conjunto recibido
-    /// (filtros o marcas de la selección). Devuelve cuántas ha tocado.
+    /// Asigna todas las órdenes del conjunto recibido (filtros o marcas de la selección), o, con
+    /// prm_Usuario en blanco, quita la asignación de las que no se han empezado: una empezada
+    /// se puede pasar a otro preparador, pero no dejar sin nadie. Devuelve cuántas ha tocado.
     /// </summary>
     procedure AsignarOrdenes(var prm_Orden: Record "Orden Picking SGA"; prm_Usuario: Code[50]): Integer
     var
         hechas: Integer;
     begin
+        if prm_Usuario = '' then
+            prm_Orden.FiltrarSinEmpezar();
         // Por la clave primaria: asignar cambia el estado, que encabeza la clave de la página,
         // y recorrer por ella mientras se modifica saltaría órdenes.
         prm_Orden.SetCurrentKey("No. Orden");

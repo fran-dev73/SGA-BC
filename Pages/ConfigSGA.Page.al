@@ -139,7 +139,7 @@ page 51106 "Config. SGA"
             action(GenerarUbicaciones)
             {
                 Caption = 'Generar ubicaciones';
-                ToolTip = 'Crea la estructura del almacén: todas las ubicaciones a partir de los rangos de pasillo, estantería y altura.';
+                ToolTip = 'Crea las ubicaciones que falten en un rango de pasillos, estanterías y alturas, con su zona, tipo y capacidad. Las que ya existen no se tocan.';
                 ApplicationArea = All;
                 Image = CreateForm;
                 RunObject = report "Generar Ubicaciones SGA";

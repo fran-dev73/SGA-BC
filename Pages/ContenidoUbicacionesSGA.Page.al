@@ -94,7 +94,6 @@ page 51103 "Contenido Ubicaciones SGA"
                 }
                 field("Motivo Bloqueo"; Rec."Motivo Bloqueo")
                 {
-                    ToolTip = 'Razón del bloqueo.';
                     ApplicationArea = All;
                 }
                 field("Secuencia Picking"; Rec."Secuencia Picking")
@@ -103,9 +102,8 @@ page 51103 "Contenido Ubicaciones SGA"
                     ApplicationArea = All;
                     Visible = false;
                 }
-                field("Fecha Ultima Entrada"; Rec."Fecha Ultima Entrada")
+                field("Fecha Entrada"; Rec."Fecha Entrada")
                 {
-                    ToolTip = 'Fecha y hora en que entró por última vez.';
                     ApplicationArea = All;
                 }
                 field("Fecha Ultima Salida"; Rec."Fecha Ultima Salida")

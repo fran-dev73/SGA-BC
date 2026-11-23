@@ -40,9 +40,11 @@ report 51100 "Generar Ubicaciones SGA"
                 alturas: List of [Integer];
                 ConfirmarGenerarQst: Label 'Se van a revisar %1 ubicaciones del almacén %2 (alturas %3), y se crearán las que falten. ¿Desea continuar?', Comment = '%1 = nº de combinaciones, %2 = almacén, %3 = lista de alturas';
                 ConfirmarGenerarZonaQst: Label 'Se van a revisar %1 ubicaciones del almacén %2 (alturas %3), y se crearán las que falten en la zona %4. Las que ya existen conservan su zona. ¿Desea continuar?', Comment = '%1 = nº de combinaciones, %2 = almacén, %3 = lista de alturas, %4 = zona';
+                enFondo: Integer;
+                resultado: Text;
                 CreadasMsg: Label 'Proceso terminado. Se han creado %1 ubicaciones.', Comment = '%1 = nº creadas';
-                CreadasYExistentesMsg: Label 'Proceso terminado. Se han creado %1 ubicaciones; otras %2 ya existían y no se han tocado.', Comment = '%1 = nº creadas, %2 = nº que ya existían';
-                TodasExistianMsg: Label 'Proceso terminado. No se ha creado ninguna ubicación: las %1 ya existían.', Comment = '%1 = nº revisadas';
+                YaExistianMsg: Label '%1 ya existían y no se han tocado.', Comment = '%1 = nº que ya existían';
+                EnFondoMsg: Label '%1 son posiciones de un fondo de pasillo, que no tiene alturas, y no se han creado.', Comment = '%1 = nº de posiciones saltadas';
                 AlmacenObligatorioErr: Label 'Indique el almacén.';
                 RangoErr: Label 'El %1 desde (%2) no puede ser mayor que el hasta (%3).', Comment = '%1 = pasillo, estantería o altura, %2 = desde, %3 = hasta';
                 PasilloLbl: Label 'pasillo';
@@ -75,17 +77,16 @@ report 51100 "Generar Ubicaciones SGA"
 
                 creadas := cUbicaciones.GenerarUbicaciones(codAlmacen, intPasilloDesde, intPasilloHasta,
                                                            intEstanteriaDesde, intEstanteriaHasta, intAlturaDesde, intAlturaHasta,
-                                                           codZona, enumTipoUbicacion, decCapacidadUds);
+                                                           codZona, enumTipoUbicacion, decCapacidadUds, enFondo);
 
-                if GuiAllowed() then
-                    case true of
-                        creadas = 0:
-                            Message(TodasExistianMsg, combinaciones);
-                        creadas = combinaciones:
-                            Message(CreadasMsg, creadas);
-                        else
-                            Message(CreadasYExistentesMsg, creadas, combinaciones - creadas);
-                    end;
+                if not GuiAllowed() then
+                    exit;
+                resultado := StrSubstNo(CreadasMsg, creadas);
+                if combinaciones - creadas - enFondo > 0 then
+                    resultado += ' ' + StrSubstNo(YaExistianMsg, combinaciones - creadas - enFondo);
+                if enFondo > 0 then
+                    resultado += ' ' + StrSubstNo(EnFondoMsg, enFondo);
+                Message(resultado);
             end;
         }
     }

@@ -6,7 +6,8 @@ using Microsoft.Inventory.Item;
 /// Codeunit Carga Inicial SGA (ID 51106).
 /// Da de alta en las ubicaciones el stock que ya tiene BC, para arrancar SGA cuadrado.
 /// No toca el stock de BC: escribe contenido y movimientos de "Carga inicial" a través de
-/// Cod. "Gestion Contenido SGA".
+/// Cod. "Gestion Contenido SGA". En "Ubicar seleccionadas" (solo pendientes) los movimientos
+/// son entradas a mano, con SSCC nuevo, como en "Ubicar producto".
 ///
 /// Tres formas de elegir el destino:
 /// - Ubicación fija del producto: su casa (Shelf No.) o, si no tiene, la ubicación indicada.
@@ -353,16 +354,22 @@ codeunit 51106 "Carga Inicial SGA"
             Cargar(prm_Producto, prm_Stock, hueco, TempTrozo."Cod. Unidad Medida", TempTrozo.Cantidad, TempTrozo."Cantidad Base", motivo);
     end;
 
+    /// <summary>
+    /// Registra un trozo en su hueco. En la carga inicial, como carga inicial. En "Ubicar
+    /// seleccionadas", como cualquier entrada a mano (lo mismo que "Ubicar producto"): con un
+    /// SSCC nuevo y comprobando que el hueco la admite.
+    /// </summary>
     local procedure Cargar(var prm_Producto: Record Item; var prm_Stock: Record "Buffer Conciliacion SGA"; prm_Bin: Code[20]; prm_UM: Code[10]; prm_Cantidad: Decimal; prm_CantidadBase: Decimal; prm_Motivo: Text)
     var
+        cLectura: Codeunit "Codigos Barras SGA";
         DescripcionCargaInicialLbl: Label 'Carga inicial SGA';
-        descripcion: Text;
     begin
-        descripcion := DescripcionMovimiento;
-        if descripcion = '' then
-            descripcion := DescripcionCargaInicialLbl;
-        cContenido.RegistrarCargaInicial(Almacen, prm_Bin, prm_Producto."No.", prm_Stock."No. Lote",
-                                         prm_UM, prm_Cantidad, descripcion);
+        if SoloPendientes then
+            cContenido.RegistrarEntrada(Almacen, prm_Bin, prm_Producto."No.", prm_Stock."No. Lote", cLectura.NuevoSSCC(),
+                                        prm_UM, prm_Cantidad, "Origen Mov. SGA"::Manual, '', DescripcionMovimiento)
+        else
+            cContenido.RegistrarCargaInicial(Almacen, prm_Bin, prm_Producto."No.", prm_Stock."No. Lote",
+                                             prm_UM, prm_Cantidad, DescripcionCargaInicialLbl);
 
         Anotar(prm_Producto, prm_Stock, prm_Bin, prm_UM, prm_Cantidad, prm_CantidadBase, true, prm_Motivo);
         UnidadesCargadas += prm_CantidadBase;

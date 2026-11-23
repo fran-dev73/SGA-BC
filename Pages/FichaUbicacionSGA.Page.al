@@ -34,7 +34,6 @@ page 51101 "Ficha Ubicacion SGA"
                 }
                 field(Descripcion; Rec.Descripcion)
                 {
-                    ToolTip = 'Descripción libre de la ubicación.';
                     ApplicationArea = All;
                 }
                 field("Cod. Zona SGA"; Rec."Cod. Zona SGA")
@@ -67,9 +66,8 @@ page 51101 "Ficha Ubicacion SGA"
                 }
                 field("% Ocupacion"; Rec."% Ocupacion")
                 {
-                    ToolTip = 'Porcentaje de la capacidad declarada que está ocupado.';
                     ApplicationArea = All;
-                    StyleExpr = EstiloFila;
+                    StyleExpr = EstiloPorcentaje;
                 }
                 field("Cantidad Base"; Rec."Cantidad Base")
                 {
@@ -114,7 +112,6 @@ page 51101 "Ficha Ubicacion SGA"
                 }
                 field("Motivo Bloqueo"; Rec."Motivo Bloqueo")
                 {
-                    ToolTip = 'Razón del bloqueo.';
                     ApplicationArea = All;
                     Enabled = Rec.Bloqueada;
                 }
@@ -208,6 +205,7 @@ page 51101 "Ficha Ubicacion SGA"
                 ToolTip = 'Vuelve a calcular el estado y el porcentaje de ocupación de esta ubicación.';
                 ApplicationArea = All;
                 Image = Recalculate;
+                Enabled = Modificable;
 
                 trigger OnAction()
                 begin
@@ -222,6 +220,7 @@ page 51101 "Ficha Ubicacion SGA"
                 ToolTip = 'Saca todo lo que hay en esta ubicación y lo deja sin ubicar (pendiente de ubicar). No toca el stock de BC.';
                 ApplicationArea = All;
                 Image = RemoveLine;
+                Enabled = Modificable;
 
                 trigger OnAction()
                 var
@@ -253,17 +252,23 @@ page 51101 "Ficha Ubicacion SGA"
 
     var
         EstiloFila: Text;
+        EstiloPorcentaje: Text;
         // La configuración solo se cambia con la ubicación vacía (ver TestVacia de la tabla).
         EsVacia: Boolean;
+        // En modo ver (desde Consultas) no se ejecuta nada que cambie datos.
+        Modificable: Boolean;
 
     trigger OnAfterGetRecord()
     begin
         EstiloFila := Rec.EstiloEstado();
+        EstiloPorcentaje := Rec.EstiloOcupacion();
     end;
 
     trigger OnAfterGetCurrRecord()
     begin
         EsVacia := Rec.EstaVacia();
+        Modificable := CurrPage.Editable();
+        CurrPage.Contenido.Page.FijarSoloConsulta(not Modificable);
     end;
 
     trigger OnNewRecord(BelowxRec: Boolean)

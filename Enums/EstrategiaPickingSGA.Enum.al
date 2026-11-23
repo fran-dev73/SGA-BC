@@ -2,8 +2,8 @@ namespace AntonioNadal.SGA;
 
 /// <summary>
 /// Enum Estrategia Picking SGA (ID 51105).
-/// Política de decisión del motor de picking. Se configura en Fase 1
-/// y la consume el motor de la Fase 2.
+/// Orden en que el picking coge el stock dentro de cada paso (OrdenarPorEstrategia de
+/// "Gestion Picking SGA"). Se elige en la configuración.
 /// </summary>
 enum 51105 "Estrategia Picking SGA"
 {
@@ -18,8 +18,8 @@ enum 51105 "Estrategia Picking SGA"
     {
         Caption = 'FEFO (primera caducidad)';
     }
-    value(3; "Vaciar Ubicacion")
+    value(3; "Orden Ubicacion")
     {
-        Caption = 'Vaciar ubicación';
+        Caption = 'Por orden de ubicación';
     }
 }

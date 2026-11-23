@@ -22,7 +22,9 @@ page 51124 "Asignar Ordenes Picking SGA"
     Caption = 'Asignar órdenes de picking SGA';
     PageType = List;
     SourceTable = "Orden Picking SGA";
-    SourceTableView = sorting(Estado, Prioridad, "No. Orden")
+    // Descendente: arriba las pendientes de asignar y, dentro de cada estado, la prioridad más
+    // alta. Una página solo ordena en una dirección: a igual prioridad sale antes la más nueva.
+    SourceTableView = sorting(Estado, Prioridad, "No. Orden") order(descending)
                       where(Estado = filter("Pendiente Asignar" | Abierta | "En Proceso"));
     UsageCategory = Tasks;
     ApplicationArea = All;
@@ -280,22 +282,29 @@ page 51124 "Asignar Ordenes Picking SGA"
     end;
 
     /// <summary>
-    /// Asigna (o desasigna, con prm_Usuario en blanco) todas las órdenes seleccionadas.
+    /// Asigna las órdenes seleccionadas, o, con prm_Usuario en blanco, quita la asignación de
+    /// las que no se han empezado (AsignarOrdenes).
     /// </summary>
     local procedure AsignarSeleccion(prm_Usuario: Code[50])
     var
         rOrden: Record "Orden Picking SGA";
         cPicking: Codeunit "Gestion Picking SGA";
+        seleccionadas: Integer;
         hechas: Integer;
         OrdenesAsignadasMsg: Label 'Se han asignado %1 órdenes a %2.', Comment = '%1 = número, %2 = usuario';
         AsignacionQuitadaMsg: Label 'Se ha quitado la asignación de %1 órdenes.', Comment = '%1 = número';
+        EmpezadasSinQuitarMsg: Label '%1 órdenes ya empezadas siguen con su preparador.', Comment = '%1 = número';
     begin
         CurrPage.SetSelectionFilter(rOrden);
+        seleccionadas := rOrden.Count();
         hechas := cPicking.AsignarOrdenes(rOrden, prm_Usuario);
         CurrPage.Update(false);
 
         if prm_Usuario = '' then
-            Message(AsignacionQuitadaMsg, hechas)
+            if hechas < seleccionadas then
+                Message(StrSubstNo(AsignacionQuitadaMsg, hechas) + ' ' + StrSubstNo(EmpezadasSinQuitarMsg, seleccionadas - hechas))
+            else
+                Message(AsignacionQuitadaMsg, hechas)
         else
             Message(OrdenesAsignadasMsg, hechas, prm_Usuario);
     end;

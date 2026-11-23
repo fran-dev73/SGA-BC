@@ -53,7 +53,7 @@ table 51104 "Config. SGA"
             Caption = 'Zona por defecto';
             DataClassification = ToBeClassified;
             TableRelation = "Zona SGA".Code where("Cod. Almacen" = field("Almacen por Defecto"));
-            ToolTip = 'Zona que se propone en las consultas y el mapa, y sobre la que se resuelven las ubicaciones por defecto de esta configuración.';
+            ToolTip = 'Zona con la que se abre el mapa 3D. En blanco, el mapa enseña todo el almacén.';
         }
 
         field(24; "Ubic. Ajustes"; Code[20])
