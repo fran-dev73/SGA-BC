@@ -92,20 +92,23 @@ codeunit 51114 "Codigos Barras SGA"
     /// </summary>
     procedure NuevoSSCC(): Code[20]
     var
-        rInvtSetup: Record "Inventory Setup";
         cSerie: Codeunit "No. Series";
         base: Text;
         PrefijoEmpresaGS1Tok: Label '8414037', Locked = true;
         SSCCMalFormadoErr: Label 'Las series de SSCC de la configuración de inventario (%1 y %2) dan %3, que no son los 17 dígitos de un SSCC sin el de control: la extensión tiene que ser un dígito y el número, de 9.', Comment = '%1 = serie de extensión, %2 = serie de número, %3 = lo que dan';
     begin
-        rInvtSetup.SetLoadFields("No. Serie EAN-128 - IA00", "No. Serie Ind. Extension IA00");
-        rInvtSetup.Get();
-        rInvtSetup.TestField("No. Serie EAN-128 - IA00");
-        rInvtSetup.TestField("No. Serie Ind. Extension IA00");
+        // Las series se leen una vez por instancia: quien numera muchos palés usa una.
+        if not InvtSetupLeida then begin
+            InvtSetup.SetLoadFields("No. Serie EAN-128 - IA00", "No. Serie Ind. Extension IA00");
+            InvtSetup.Get();
+            InvtSetup.TestField("No. Serie EAN-128 - IA00");
+            InvtSetup.TestField("No. Serie Ind. Extension IA00");
+            InvtSetupLeida := true;
+        end;
 
-        base := cSerie.GetLastNoUsed(rInvtSetup."No. Serie Ind. Extension IA00") + PrefijoEmpresaGS1Tok + cSerie.GetNextNo(rInvtSetup."No. Serie EAN-128 - IA00");
+        base := cSerie.GetLastNoUsed(InvtSetup."No. Serie Ind. Extension IA00") + PrefijoEmpresaGS1Tok + cSerie.GetNextNo(InvtSetup."No. Serie EAN-128 - IA00");
         if (StrLen(base) <> 17) or not SoloDigitos(base) then
-            Error(SSCCMalFormadoErr, rInvtSetup."No. Serie Ind. Extension IA00", rInvtSetup."No. Serie EAN-128 - IA00", base);
+            Error(SSCCMalFormadoErr, InvtSetup."No. Serie Ind. Extension IA00", InvtSetup."No. Serie EAN-128 - IA00", base);
         exit(CopyStr(base + Format(DigitoControl(base)), 1, 20));
     end;
 
@@ -223,4 +226,9 @@ codeunit 51114 "Codigos Barras SGA"
             lectura := CopyStr(lectura, 4);
         exit(lectura);
     end;
+
+    var
+        // Las series de SSCC, leídas en NuevoSSCC una vez por instancia.
+        InvtSetup: Record "Inventory Setup";
+        InvtSetupLeida: Boolean;
 }

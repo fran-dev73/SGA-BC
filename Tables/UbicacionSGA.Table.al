@@ -292,7 +292,10 @@ table 51101 "Ubicacion SGA"
         cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
     begin
         cUbicaciones.CompletarAlta(Rec);
-        RecalcularOcupacion();
+        // Una ubicación nace siempre vacía, también en una zona bloqueada: el bloqueo lo recoge
+        // el estado en el siguiente recálculo, y la propuesta ya lo mira en la zona (EsUtilizable).
+        "Estado SGA" := "Estado SGA"::Vacia;
+        "% Ocupacion" := 0;
     end;
 
     trigger OnRename()
@@ -365,21 +368,33 @@ table 51101 "Ubicacion SGA"
     /// </summary>
     procedure RecalcularOcupacion()
     var
+        cUM: Codeunit "Unidades Producto SGA";
+        zonasBloqueadas: Dictionary of [Text, Boolean];
+    begin
+        RecalcularOcupacion(cUM, zonasBloqueadas);
+    end;
+
+    /// <summary>
+    /// RecalcularOcupacion con lo ya leído de quien recorre muchas ubicaciones: los productos
+    /// (prm_UM) y si cada zona está bloqueada (prm_ZonasBloqueadas, ver EsUtilizable).
+    /// </summary>
+    procedure RecalcularOcupacion(var prm_UM: Codeunit "Unidades Producto SGA"; var prm_ZonasBloqueadas: Dictionary of [Text, Boolean])
+    var
         ocupado: Decimal;
     begin
-        CalcFields("Cantidad Base", "Lineas Contenido");
+        CalcFields("Lineas Contenido");
 
         // Lo ocupado en palés solo se calcula contra una capacidad declarada. Capacidad 0 es sin
         // límite: no se llena nunca y su % de ocupación queda a 0.
         "% Ocupacion" := 0;
         if "Capacidad Uds." > 0 then begin
-            ocupado := OcupadoEnPales();
+            ocupado := OcupadoEnPales(prm_UM);
             "% Ocupacion" := Round(ocupado / "Capacidad Uds." * 100, 0.01);
         end;
 
         case true of
             // Bloqueada ella o su zona entera.
-            not EsUtilizable():
+            not EsUtilizable(prm_ZonasBloqueadas):
                 "Estado SGA" := "Estado SGA"::Bloqueada;
             "Lineas Contenido" = 0:
                 "Estado SGA" := "Estado SGA"::Vacia;
@@ -393,32 +408,22 @@ table 51101 "Ubicacion SGA"
     /// <summary>
     /// Lo que hay en el hueco, en palés. Cada línea se convierte con el palé de su producto,
     /// porque en el mismo hueco pueden convivir palés de 200 y de 300. Un producto sin palé
-    /// cuenta en unidades base.
+    /// cuenta en unidades base. prm_UM guarda el palé de cada producto ya leído: quien mira
+    /// muchas ubicaciones pasa siempre la misma instancia.
     /// </summary>
-    procedure OcupadoEnPales(): Decimal
+    procedure OcupadoEnPales(var prm_UM: Codeunit "Unidades Producto SGA"): Decimal
     var
         rContenido: Record "Contenido Ubicacion SGA";
-        cUM: Codeunit "Unidades Producto SGA";
-        factores: Dictionary of [Code[20], Decimal];
-        factor: Decimal;
         total: Decimal;
     begin
         rContenido.FiltrarUbicacion("Cod. Almacen", "Cod. Bin");
         // Una línea en negativo (con "Permitir cantidad negativa") no libera sitio.
         rContenido.SetFilter("Cantidad Base", '>%1', 0);
         rContenido.SetLoadFields("No. Producto", "Cantidad Base");
-        if not rContenido.FindSet() then
-            exit(0);
-
-        // Lo mismo que EnPales de cada línea, con el factor de cada producto leído una vez:
-        // un hueco suele tener varias líneas (lotes) del mismo producto.
-        repeat
-            if not factores.Get(rContenido."No. Producto", factor) then begin
-                factor := cUM.FactorPale(rContenido."No. Producto");
-                factores.Add(rContenido."No. Producto", factor);
-            end;
-            total += rContenido."Cantidad Base" / factor;
-        until rContenido.Next() = 0;
+        if rContenido.FindSet() then
+            repeat
+                total += prm_UM.EnPales(rContenido."No. Producto", rContenido."Cantidad Base");
+            until rContenido.Next() = 0;
 
         exit(Round(total, 0.00001));
     end;
@@ -443,18 +448,74 @@ table 51101 "Ubicacion SGA"
     end;
 
     /// <summary>
-    /// Si caben prm_Entrada palés más (EnPales), sin pasar de la capacidad. Sin capacidad declarada, siempre. Es la comprobación de la propuesta, que mira
+    /// La regla única de si la ubicación puede recibir una entrada de prm_Producto y prm_Lote
+    /// que ocupa prm_Entrada palés (EnPales). Devuelve 0 si puede o, en este orden, el motivo
+    /// por el que no: 1 bloqueada (ella o su zona); 9 reservada para otra entrada que no es
+    /// prm_Para (ReservarHueco); 2 reservada ("Producto fijo") a otro producto; 5 tiene otro
+    /// producto y no acepta mezcla; 6 tiene otro lote y no acepta mezcla; 4 sin sitio. La
+    /// capacidad va la última porque al registrar se puede pasar confirmándolo
+    /// (SoloAvisaCapacidad): lo demás no se salta nunca.
+    ///
+    /// Con prm_Registro (al registrar el movimiento, la comprobación que manda) se mira el
+    /// contenido real: la mezcla siempre y la ocupación sumada línea a línea; prm_Contenido queda
+    /// con la línea que impide la mezcla, para nombrarla. Sin él (la propuesta, que mira muchos
+    /// huecos seguidos) se parte del estado guardado, que deja al día cada movimiento: una vacía
+    /// no tiene con qué mezclar, una llena ya no cabe y la ocupación sale del "% Ocupacion"
+    /// (CabeEntrada).
+    /// </summary>
+    procedure MotivoRechazoEntrada(prm_Producto: Code[20]; prm_Lote: Code[50]; prm_Entrada: Decimal; prm_Para: Text; prm_Registro: Boolean; var prm_ZonasBloqueadas: Dictionary of [Text, Boolean]; var prm_UM: Codeunit "Unidades Producto SGA"; var prm_Contenido: Record "Contenido Ubicacion SGA"): Integer
+    var
+        motivo: Integer;
+        entrada: Decimal;
+    begin
+        if not EsUtilizable(prm_ZonasBloqueadas) then
+            exit(1);
+        if ReservadaParaOtro(prm_Para) then
+            exit(9);
+        if FijaParaOtroProducto(prm_Producto) then
+            exit(2);
+
+        if prm_Registro or ("Estado SGA" = "Estado SGA"::Parcial) then begin
+            motivo := ContenidoQueImpideMezcla(prm_Producto, prm_Lote, prm_Registro, prm_Contenido);
+            if motivo <> 0 then
+                exit(motivo);
+        end;
+
+        if "Capacidad Uds." <= 0 then
+            exit(0);
+        // Lo que entra se redondea igual que lo ocupado (OcupadoEnPales).
+        entrada := Round(prm_Entrada, 0.00001);
+        if prm_Registro then begin
+            if OcupadoEnPales(prm_UM) + entrada > "Capacidad Uds." then
+                exit(4);
+        end else
+            if not CabeEntrada(entrada, prm_UM) then
+                exit(4);
+        exit(0);
+    end;
+
+    /// <summary>
+    /// Error de ubicación reservada para otra entrada (ReservadaParaOtro), con para qué y quién.
+    /// </summary>
+    procedure ErrorReservada()
+    var
+        ReservadaErr: Label 'La ubicación %1 está reservada para %2 (%3). Elija otra o pida que la liberen.', Comment = '%1 = ubicación, %2 = entrada, %3 = usuario';
+    begin
+        Error(ReservadaErr, "Cod. Bin", "Reservada Para", "Reservada Por");
+    end;
+
+    /// <summary>
+    /// Si caben prm_Entrada palés más (EnPales) en una ubicación con capacidad declarada, sin
+    /// pasar de ella. Es la comprobación de la propuesta (MotivoRechazoEntrada), que mira
     /// muchos huecos seguidos: parte del estado y del "% Ocupacion" guardados, que deja al día
     /// cada movimiento (RecalcularOcupacion), y solo suma el contenido línea a línea cuando el
     /// resultado cae tan cerca de la capacidad que el redondeo del % podría cambiarlo.
     /// </summary>
-    procedure CabeEntrada(prm_Entrada: Decimal): Boolean
+    local procedure CabeEntrada(prm_Entrada: Decimal; var prm_UM: Codeunit "Unidades Producto SGA"): Boolean
     var
         estimado: Decimal;
         margen: Decimal;
     begin
-        if "Capacidad Uds." <= 0 then
-            exit(true);
         // Llena: lo que hay ya llega a la capacidad.
         if "Estado SGA" = "Estado SGA"::Llena then
             exit(false);
@@ -468,7 +529,7 @@ table 51101 "Ubicacion SGA"
         if estimado + prm_Entrada > "Capacidad Uds." + margen then
             exit(false);
 
-        exit(OcupadoEnPales() + prm_Entrada <= "Capacidad Uds.");
+        exit(OcupadoEnPales(prm_UM) + prm_Entrada <= "Capacidad Uds.");
     end;
 
     /// <summary>
@@ -482,11 +543,11 @@ table 51101 "Ubicacion SGA"
     /// <summary>
     /// Qué contenido del hueco impide dejar en él prm_Producto con lote prm_Lote: 0 si nada,
     /// 5 si hay otro producto y el hueco no acepta mezcla de productos, 6 si hay otro lote y no
-    /// acepta mezcla de lotes (los mismos códigos que el motivo de rechazo de la propuesta).
+    /// acepta mezcla de lotes (los códigos de MotivoRechazoEntrada).
     /// Con prm_LeerLinea deja en prm_Contenido la línea que choca, para nombrarla en el mensaje;
     /// sin él solo mira si existe, sin leerla (la propuesta, que recorre cientos de huecos).
     /// </summary>
-    procedure ContenidoQueImpideMezcla(prm_Producto: Code[20]; prm_Lote: Code[50]; prm_LeerLinea: Boolean; var prm_Contenido: Record "Contenido Ubicacion SGA"): Integer
+    local procedure ContenidoQueImpideMezcla(prm_Producto: Code[20]; prm_Lote: Code[50]; prm_LeerLinea: Boolean; var prm_Contenido: Record "Contenido Ubicacion SGA"): Integer
     begin
         prm_Contenido.Reset();
         prm_Contenido.FiltrarUbicacion("Cod. Almacen", "Cod. Bin");
@@ -562,18 +623,34 @@ table 51101 "Ubicacion SGA"
     /// </summary>
     procedure EsUtilizable(): Boolean
     var
+        zonasBloqueadas: Dictionary of [Text, Boolean];
+    begin
+        exit(EsUtilizable(zonasBloqueadas));
+    end;
+
+    /// <summary>
+    /// EsUtilizable para quien mira muchas ubicaciones del almacén: prm_ZonasBloqueadas guarda si
+    /// cada zona ya leída está bloqueada, para no leerla en cada ubicación.
+    /// </summary>
+    procedure EsUtilizable(var prm_ZonasBloqueadas: Dictionary of [Text, Boolean]): Boolean
+    var
         rZona: Record "Zona SGA";
+        clave: Text;
+        zonaBloqueada: Boolean;
     begin
         if Bloqueada then
             exit(false);
+        if "Cod. Zona SGA" = '' then
+            exit(true);
 
-        rZona.SetLoadFields(Bloqueada);
-        if "Cod. Zona SGA" <> '' then
+        clave := "Cod. Almacen" + '|' + "Cod. Zona SGA";
+        if not prm_ZonasBloqueadas.Get(clave, zonaBloqueada) then begin
+            rZona.SetLoadFields(Bloqueada);
             if rZona.Get("Cod. Almacen", "Cod. Zona SGA") then
-                if rZona.Bloqueada then
-                    exit(false);
-
-        exit(true);
+                zonaBloqueada := rZona.Bloqueada;
+            prm_ZonasBloqueadas.Add(clave, zonaBloqueada);
+        end;
+        exit(not zonaBloqueada);
     end;
 
     /// <summary>

@@ -265,7 +265,8 @@ page 51101 "Ficha Ubicacion SGA"
 
     trigger OnAfterGetCurrRecord()
     begin
-        EsVacia := Rec.EstaVacia();
+        // "Lineas Contenido" ya lo calcula la página: está en la ficha.
+        EsVacia := Rec."Lineas Contenido" = 0;
         Modificable := CurrPage.Editable();
     end;
 

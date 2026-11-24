@@ -148,7 +148,9 @@ page 51111 "Cue SGA"
     }
 
     trigger OnOpenPage()
+    var
+        rConfig: Record "Config. SGA";
     begin
-        Rec.ObtenerCue();
+        Rec.ObtenerCue(rConfig);
     end;
 }

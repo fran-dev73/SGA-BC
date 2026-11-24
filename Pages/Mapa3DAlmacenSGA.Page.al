@@ -285,15 +285,15 @@ page 51122 "Mapa 3D Almacen SGA"
         if not rContenido.FindSet() then
             Error(SinContenidoTrasladarErr, prm_Origen);
 
-        // Con más de una línea, el operario elige cuál; con una, es esa.
+        // Con más de una línea, el operario elige cuál; con una, es esa: Next sin más líneas
+        // deja el registro en la que ya está leída.
         if rContenido.Next() <> 0 then begin
             pContenido.SetTableView(rContenido);
             pContenido.LookupMode(true);
             if pContenido.RunModal() <> Action::LookupOK then
                 exit;
             pContenido.GetRecord(rContenido);
-        end else
-            rContenido.FindFirst();
+        end;
 
         // El operario puede cambiar en el diálogo el destino del arrastre: el mensaje lleva el elegido.
         destino := prm_Destino;

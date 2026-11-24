@@ -51,6 +51,7 @@ var SGA3D = (function () {
     var pan2Y = 0;
 
     var modoArrastre = '';  // 'girar', 'mover', 'coger', 'trasladar' o 'barra'
+    var barraArrastrada = ''; // con 'barra': 'x' (la de abajo) o 'y' (la de la derecha)
     var ultimoX = 0;
     var ultimoY = 0;
     var hover = null;
@@ -75,7 +76,7 @@ var SGA3D = (function () {
 
     var AYUDA = {
         '3d': 'Arrastre una ubicación con contenido a otra para trasladarlo · arrastre fuera de ellas (o Alt+arrastre) para girar · Mayús+arrastre para mover · doble clic para aislar su pasillo · clic derecho para vaciar · rueda para acercar',
-        'planta': 'Cada hueco se parte en sus alturas (abajo la más baja) · doble clic en un pasillo para verlo de frente · arrastre una ubicación con contenido a otra para trasladarlo · arrastre fuera para mover · clic derecho para vaciar · rueda para acercar',
+        'planta': 'Cada hueco se parte en sus alturas (abajo la más baja); un fondo de pasillo ocupa el hueco entero · doble clic en un pasillo para verlo de frente · arrastre una ubicación con contenido a otra para trasladarlo · arrastre fuera para mover · clic derecho para vaciar · rueda para acercar',
         'frente': 'Arrastre una ubicación con contenido a otra para trasladarlo · arrastre fuera para mover · clic derecho para vaciar · rueda para acercar · < > cambia de pasillo'
     };
 
@@ -93,6 +94,9 @@ var SGA3D = (function () {
     var ESCALA_MAX = 12;
     var ESCALA2_MIN = 0.2;
     var ESCALA2_MAX = 6;
+    // En la planta cada altura es una franja fina del hueco: hace falta acercar mucho más que
+    // en el frente para leerla.
+    var ESCALA_PLANTA_MAX = 30;
 
     // A partir de este ancho de cubo (en píxeles) se escribe también el producto encima.
     var ANCHO_PARA_PRODUCTO = 34;
@@ -111,12 +115,16 @@ var SGA3D = (function () {
     // (sin capacidad declarada, o un producto sin palé o caja en su ficha).
     // 5 sobrepasada no lo manda AL (para AL es llena): lo decide colorDe con el % por encima
     // de 100, para que no se confunda una ubicación justa con una que no cabe.
-    // libreIzq / libreDer: el mismo color, claro, para la parte libre de los laterales. Así el
-    // color se ve en todo el cubo y el tono oscuro dice hasta dónde está lleno.
+    // libreIzq / libreDer: la parte libre de los laterales. En las que tienen sitio (con hueco,
+    // llena y las de paleta(): fondo, reservada y los criterios ABC y caducidad) es blanco roto,
+    // como un vaso a medio llenar: el color fuerte dice hasta dónde está ocupado. La vacía va
+    // entera en su gris, más oscuro que lo libre para no confundirla con una con hueco.
+    var LIBRE_IZQ = '#eef2f6';
+    var LIBRE_DER = '#f8fafc';
     var PALETA = [
-        { techo: '#d9dde3', izq: '#aeb4bd', der: '#c3c9d1', libreIzq: '#aeb4bd', libreDer: '#c3c9d1', texto: '#3a4048' },
-        { techo: '#7cc47f', izq: '#4e8a51', der: '#68ab6b', libreIzq: '#b4d6b5', libreDer: '#cbe4cc', texto: '#16351a' },
-        { techo: '#e8a33d', izq: '#a86f1e', der: '#cc8b2c', libreIzq: '#eccb98', libreDer: '#f4dcb5', texto: '#3d2606' },
+        { techo: '#9ca3af', izq: '#6b7280', der: '#848b96', libreIzq: '#6b7280', libreDer: '#848b96', texto: '#111827' },
+        { techo: '#22c55e', izq: '#15803d', der: '#16a34a', libreIzq: LIBRE_IZQ, libreDer: LIBRE_DER, texto: '#052e16' },
+        { techo: '#e8a33d', izq: '#a86f1e', der: '#cc8b2c', libreIzq: LIBRE_IZQ, libreDer: LIBRE_DER, texto: '#3d2606' },
         { techo: '#d9534f', izq: '#93302d', der: '#bb4340', libreIzq: '#e3a3a1', libreDer: '#efc1bf', texto: '#ffffff' },
         { techo: '#a5b4fc', izq: '#6366f1', der: '#818cf8', libreIzq: '#c3cafb', libreDer: '#d6dbfd', texto: '#1e1b4b' },
         { techo: '#9a3412', izq: '#5c1f0b', der: '#7c2a0f', libreIzq: '#5c1f0b', libreDer: '#7c2a0f', texto: '#ffffff' }
@@ -130,28 +138,30 @@ var SGA3D = (function () {
     // estado manda sobre todo menos bloqueada.
     var COLOR_RESERVADA = '#14b8a6';
 
-    // Fondo de pasillo (u.f, lo manda AL): en el color por estado, su propio tono, con la parte
-    // oscura hasta donde está ocupado. Bloqueada, reservada, sobrepasada y sin medir mandan.
+    // Fondo de pasillo (u.f, lo manda AL): en el color por estado, su propio tono en dos
+    // partes, rosa fuerte hasta donde está ocupado y rosa claro lo libre (no blanco, para que se
+    // vea que es un fondo aunque esté vacío). Bloqueada, reservada, sobrepasada y sin medir mandan.
     var COLOR_FONDO = '#ec4899';
+    var PALETA_FONDO = { techo: COLOR_FONDO, izq: '#be185d', der: '#db2777', libreIzq: '#f9a8d4', libreDer: '#fbcfe8', texto: '#1f2937' };
 
     // Criterios de color. Cada uno da, para una ubicación, el color base y la entrada de su
     // leyenda. Las vacías van siempre en el gris de vacía.
     var CRITERIOS = {
         estado: {
             nombre: 'Estado',
-            leyenda: [['#d9dde3', 'vacía'], ['#7cc47f', 'con hueco'], ['#e8a33d', 'llena'], ['#9a3412', 'sobrepasada'], ['#d9534f', 'bloqueada'], [COLOR_RESERVADA, 'reservada'], ['#a5b4fc', 'sin medir'], [COLOR_FONDO, 'fondo de pasillo']]
+            leyenda: [['#9ca3af', 'vacía'], ['#22c55e', 'con hueco'], ['#e8a33d', 'llena'], ['#9a3412', 'sobrepasada'], ['#d9534f', 'bloqueada'], [COLOR_RESERVADA, 'reservada'], ['#a5b4fc', 'sin medir'], [COLOR_FONDO, 'fondo de pasillo']]
         },
         posicion: {
             nombre: 'Posición ABC',
-            leyenda: [['#ef4444', 'hueco A'], ['#f59e0b', 'hueco B'], ['#3b82f6', 'hueco C'], ['#d9dde3', 'sin clase']]
+            leyenda: [['#ef4444', 'hueco A'], ['#f59e0b', 'hueco B'], ['#3b82f6', 'hueco C'], ['#9ca3af', 'sin clase']]
         },
         abc: {
             nombre: 'Rotación ABC',
-            leyenda: [['#d9dde3', 'vacía'], ['#ef4444', 'A (alta)'], ['#f59e0b', 'B'], ['#3b82f6', 'C (baja)'], [COLOR_SIN_DATO, 'sin clase']]
+            leyenda: [['#9ca3af', 'vacía'], ['#ef4444', 'A (alta)'], ['#f59e0b', 'B'], ['#3b82f6', 'C (baja)'], [COLOR_SIN_DATO, 'sin clase']]
         },
         caducidad: {
             nombre: 'Caducidad',
-            leyenda: [['#d9dde3', 'vacía'], ['#7f1d1d', 'caducado'], ['#f97316', '30 días o menos'], ['#facc15', '31-90 días'], ['#22c55e', 'más de 90 días'], [COLOR_SIN_DATO, 'sin fecha']]
+            leyenda: [['#9ca3af', 'vacía'], ['#7f1d1d', 'caducado'], ['#f97316', '30 días o menos'], ['#facc15', '31-90 días'], ['#22c55e', 'más de 90 días'], [COLOR_SIN_DATO, 'sin fecha']]
         }
     };
 
@@ -268,7 +278,7 @@ var SGA3D = (function () {
             inicioX = e.clientX;
             inicioY = e.clientY;
 
-            // La barra de desplazamiento de las vistas planas: arrastrar el tirador, o un clic en
+            // Las barras de desplazamiento de las vistas planas: arrastrar el tirador, o un clic en
             // el carril para avanzar una pantalla hacia ese lado.
             var b = enBarra(e);
             if (b) {
@@ -276,9 +286,11 @@ var SGA3D = (function () {
                 e.preventDefault();
                 if (b.sobreTirador) {
                     modoArrastre = 'barra';
+                    barraArrastrada = b.b.eje;
                     pintar();
                 } else {
-                    desplazarHorizontal(b.x < b.g.tirador.x ? -anchoLienzo() * 0.9 : anchoLienzo() * 0.9);
+                    var pantalla = (b.b.eje === 'x' ? anchoLienzo() : altoLienzo()) * 0.9;
+                    desplazar(b.b.eje, b.antesDelTirador ? -pantalla : pantalla);
                 }
                 return;
             }
@@ -354,10 +366,10 @@ var SGA3D = (function () {
                 seHaMovido = true;
 
                 if (modoArrastre === 'barra') {
-                    // Mover el tirador dx píxeles mueve lo dibujado en la misma proporción que
-                    // el carril respecto a todo el ancho.
-                    var g = geometriaBarra();
-                    if (g) { desplazarHorizontal(dx * g.ext.ancho / g.carril.w); }
+                    // Mover el tirador unos píxeles mueve lo dibujado en la misma proporción que
+                    // el carril respecto a todo lo dibujado.
+                    var g = geometriaBarras()[barraArrastrada];
+                    if (g) { desplazar(barraArrastrada, (barraArrastrada === 'x' ? dx : dy) * g.ext.largo / g.largoCarril); }
                 } else if (modoArrastre === 'mover') {
                     if (vista === '3d') { panX += dx; panY += dy; } else { pan2X += dx; pan2Y += dy; }
                     pintar();
@@ -396,7 +408,7 @@ var SGA3D = (function () {
             e.preventDefault();
             if (vista !== '3d' && (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY))) {
                 var paso = e.shiftKey && !e.deltaX ? e.deltaY : e.deltaX;
-                desplazarHorizontal(paso);
+                desplazar('x', paso);
                 return;
             }
             var r = canvas.getBoundingClientRect();
@@ -463,13 +475,13 @@ var SGA3D = (function () {
 
     // ---------------------------------------------------------------- vistas y pasillos
 
-    // Cambia de vista conservando el pasillo elegido. El frente necesita uno: si no hay,
-    // se toma el primero. La planta enseña siempre todos.
+    // Cambia de vista conservando el pasillo elegido en las tres: con un pasillo, la 3D lo
+    // aísla, la planta enseña solo ese y el frente lo enseña de frente. El frente necesita uno:
+    // si no hay, se toma el primero.
     function cambiarVista(nueva) {
         if (!nueva || !AYUDA[nueva]) { return; }
         vista = nueva;
         if (vista === 'frente' && !pasilloActivo && pasillos.length) { pasilloActivo = pasillos[0]; }
-        if (vista === 'planta') { pasilloActivo = ''; }
         hover = null;
         mostrarFicha(null);
         mostrarInfo(null);
@@ -496,14 +508,13 @@ var SGA3D = (function () {
         ajustarTamano();
     }
 
-    // Elegir un pasillo en el selector, con < > o con doble clic. En la 3D lo aísla; en la
-    // planta pasa a verlo de frente; en el frente lo cambia. "Todos" vuelve a la planta desde
-    // el frente.
+    // Elegir un pasillo en el selector, con < > o con doble clic. En la 3D y en la planta lo
+    // deja solo; en el frente lo cambia. "Todos" vuelve a la planta desde el frente, que
+    // necesita un pasillo.
     function elegirPasillo(pasillo) {
         pasillo = pasillo || '';
-        if (vista === 'frente' && !pasillo) { cambiarVista('planta'); return; }
         pasilloActivo = pasillo;
-        if (vista === 'planta' && pasillo) { cambiarVista('frente'); return; }
+        if (vista === 'frente' && !pasillo) { cambiarVista('planta'); return; }
         sincronizarSelector();
         encuadrarVista();
         avisarPasillo();
@@ -606,7 +617,7 @@ var SGA3D = (function () {
             panY += (my - o.y) * (1 - factor);
             escala = nueva;
         } else {
-            var nueva2 = Math.max(ESCALA2_MIN, Math.min(escala2 * factor, ESCALA2_MAX));
+            var nueva2 = Math.max(ESCALA2_MIN, Math.min(escala2 * factor, vista === 'planta' ? ESCALA_PLANTA_MAX : ESCALA2_MAX));
             factor = nueva2 / escala2;
             if (factor === 1) { return; }
             o = centroPlano();
@@ -639,8 +650,8 @@ var SGA3D = (function () {
                 techo: base,
                 izq: mezclar(base, '#000000', 0.3),
                 der: mezclar(base, '#000000', 0.15),
-                libreIzq: mezclar(base, '#ffffff', 0.45),
-                libreDer: mezclar(base, '#ffffff', 0.6),
+                libreIzq: LIBRE_IZQ,
+                libreDer: LIBRE_DER,
                 texto: oscuro ? '#ffffff' : '#1f2937'
             };
         }
@@ -654,7 +665,7 @@ var SGA3D = (function () {
             // sobrepasada.
             if (u.s !== 3 && u.v) { return paleta(COLOR_RESERVADA); }
             if (u.s !== 3 && u.s !== 4 && u.l && u.o > 100) { return PALETA[5]; }
-            if (u.f && u.s !== 3 && u.s !== 4) { return paleta(COLOR_FONDO); }
+            if (u.f && u.s !== 3 && u.s !== 4) { return PALETA_FONDO; }
             return PALETA[u.s] || PALETA[0];
         }
         // Por posición se pintan todas, vacías también: es la clase del hueco, no de lo que tiene.
@@ -1098,8 +1109,9 @@ var SGA3D = (function () {
     // ---------------------------------------------------------------- vistas planas
 
     // Coloca las ubicaciones como rectángulos, a escala 1. Frente: el pasillo elegido,
-    // estanterías por alturas (la más baja abajo). Planta: una fila por pasillo y una columna por
-    // estantería, cada hueco partido en una franja por altura.
+    // estanterías por alturas (la más baja abajo). Planta: una fila por pasillo (solo el elegido,
+    // si lo hay) y una columna por estantería, cada hueco partido en una franja por altura; un
+    // fondo de pasillo, que no tiene alturas, ocupa la columna entera.
     function maquetarPlano() {
         rects = [];
         rotulos2 = [];
@@ -1111,7 +1123,7 @@ var SGA3D = (function () {
         var alturaDeNivel = {};
         for (i = 0; i < ubicaciones.length; i++) {
             u = ubicaciones[i];
-            if (vista === 'frente' && String(u.e) !== pasilloActivo) { continue; }
+            if (!visible(u)) { continue; }
             lista.push(u);
             alturaDeNivel[u.n] = u.a;
             if (u.c < minC) { minC = u.c; }
@@ -1148,22 +1160,23 @@ var SGA3D = (function () {
         var franja = PLANTA_ALTO / alturas;
         var pasoC = PLANTA_ANCHO + PLANTA_HUECO;
         var pasoE = PLANTA_ALTO + PLANTA_PASILLO;
+        var enPlanta = pasilloActivo ? [pasilloActivo] : pasillos;
         var filas = {};
-        for (i = 0; i < pasillos.length; i++) { filas[pasillos[i]] = i; }
+        for (i = 0; i < enPlanta.length; i++) { filas[enPlanta[i]] = i; }
         for (i = 0; i < lista.length; i++) {
             u = lista[i];
             var fila = filas[String(u.e)];
             rects.push({
                 u: u,
                 x: (u.c - minC) * pasoC,
-                y: fila * pasoE + (maxN - u.n) * franja,
+                y: fila * pasoE + (u.f ? 0 : (maxN - u.n) * franja),
                 w: PLANTA_ANCHO,
-                h: franja
+                h: u.f ? PLANTA_ALTO : franja
             });
             columnas[u.c] = true;
         }
-        for (i = 0; i < pasillos.length; i++) {
-            rotulos2.push({ texto: 'Pas. ' + conCeros(Number(pasillos[i]), 3), x: -10, y: i * pasoE + PLANTA_ALTO / 2, alinear: 'right' });
+        for (i = 0; i < enPlanta.length; i++) {
+            rotulos2.push({ texto: 'Pas. ' + conCeros(Number(enPlanta[i]), 3), x: -10, y: i * pasoE + PLANTA_ALTO / 2, alinear: 'right' });
         }
         for (var cc in columnas) {
             if (Object.prototype.hasOwnProperty.call(columnas, cc)) {
@@ -1204,71 +1217,101 @@ var SGA3D = (function () {
         return { x: anchoLienzo() / 2 + pan2X, y: altoLienzo() / 2 + pan2Y };
     }
 
-    // ------------------------------------------------ barra de desplazamiento horizontal
-    // En las vistas planas, con zoom, lo dibujado puede ser más ancho que el lienzo: abajo sale
-    // una barra para moverse a izquierda y derecha (arrastrándola, o con un clic en ella para
-    // avanzar una pantalla). Mayús + rueda o el desplazamiento lateral del touchpad hacen lo mismo.
+    // ------------------------------------------------ barras de desplazamiento
+    // En las vistas planas, con zoom, lo dibujado puede no caber en el lienzo: sale una barra
+    // abajo para moverse a izquierda y derecha y otra a la derecha para subir y bajar
+    // (arrastrando el tirador, o con un clic en el carril para avanzar una pantalla). Mayús +
+    // rueda o el desplazamiento lateral del touchpad mueven a los lados.
     var BARRA_ALTO = 12;
     var BARRA_MARGEN = 6;
 
-    // Ancho de lo dibujado en pantalla (con el sitio de los rótulos de la izquierda) y dónde
-    // empieza. Null si no hay nada o si cabe entero: entonces no hay barra.
-    function extensionHorizontal() {
+    // Lo dibujado en pantalla en un eje ('x' o 'y'), con el sitio de los rótulos de la izquierda
+    // y de arriba: dónde empieza y cuánto mide. Null si no hay nada o si cabe entero en el
+    // lienzo: entonces no hay barra en ese eje.
+    function extension(eje) {
         if (vista === '3d' || !rects.length) { return null; }
-        var minX = 1e9, maxX = -1e9;
+        var min = 1e9, max = -1e9;
         for (var i = 0; i < rects.length; i++) {
-            if (rects[i].x < minX) { minX = rects[i].x; }
-            if (rects[i].x + rects[i].w > maxX) { maxX = rects[i].x + rects[i].w; }
+            var desde = eje === 'x' ? rects[i].x : rects[i].y;
+            var largo = eje === 'x' ? rects[i].w : rects[i].h;
+            if (desde < min) { min = desde; }
+            if (desde + largo > max) { max = desde + largo; }
         }
-        minX -= 80;
+        min -= eje === 'x' ? 80 : (vista === 'frente' ? 52 : 22);
         var o = centroPlano();
-        var izq = o.x + minX * escala2;
-        var ancho = (maxX - minX) * escala2;
-        if (ancho <= anchoLienzo()) { return null; }
-        return { izq: izq, ancho: ancho };
+        var inicio = (eje === 'x' ? o.x : o.y) + min * escala2;
+        var largoTotal = (max - min) * escala2;
+        if (largoTotal <= (eje === 'x' ? anchoLienzo() : altoLienzo())) { return null; }
+        return { inicio: inicio, largo: largoTotal };
     }
 
-    // Geometría de la barra: el carril de lado a lado y el tirador, proporcional a lo que se ve.
-    function geometriaBarra() {
-        var ext = extensionHorizontal();
-        if (!ext) { return null; }
+    // Geometría de las dos barras: el carril (sin pisar el de la otra si están las dos) y el
+    // tirador, proporcional a lo que se ve. Null en el eje que no tiene barra.
+    function geometriaBarras() {
         var w = anchoLienzo();
-        var carril = { x: BARRA_MARGEN, y: altoLienzo() - BARRA_ALTO - BARRA_MARGEN, w: w - 2 * BARRA_MARGEN, h: BARRA_ALTO };
-        var anchoTirador = Math.max(30, carril.w * w / ext.ancho);
-        var recorrido = ext.ancho - w;
-        var hecho = Math.max(0, Math.min(-ext.izq, recorrido));
-        var tirador = { x: carril.x + (carril.w - anchoTirador) * (recorrido > 0 ? hecho / recorrido : 0), y: carril.y, w: anchoTirador, h: BARRA_ALTO };
-        return { carril: carril, tirador: tirador, ext: ext };
+        var h = altoLienzo();
+        var ex = extension('x');
+        var ey = extension('y');
+        var resto = BARRA_ALTO + BARRA_MARGEN;
+        return {
+            x: ex ? barra('x', ex, { x: BARRA_MARGEN, y: h - resto, w: w - 2 * BARRA_MARGEN - (ey ? resto : 0), h: BARRA_ALTO }, w) : null,
+            y: ey ? barra('y', ey, { x: w - resto, y: BARRA_MARGEN, w: BARRA_ALTO, h: h - 2 * BARRA_MARGEN - (ex ? resto : 0) }, h) : null
+        };
     }
 
-    function pintarBarra() {
-        var g = geometriaBarra();
-        if (!g) { return; }
+    function barra(eje, ext, carril, visto) {
+        var largoCarril = eje === 'x' ? carril.w : carril.h;
+        var largoTirador = Math.max(30, largoCarril * visto / ext.largo);
+        var recorrido = ext.largo - visto;
+        var hecho = Math.max(0, Math.min(-ext.inicio, recorrido));
+        var pos = (eje === 'x' ? carril.x : carril.y) + (largoCarril - largoTirador) * (recorrido > 0 ? hecho / recorrido : 0);
+        var tirador = eje === 'x'
+            ? { x: pos, y: carril.y, w: largoTirador, h: BARRA_ALTO }
+            : { x: carril.x, y: pos, w: BARRA_ALTO, h: largoTirador };
+        return { eje: eje, carril: carril, tirador: tirador, ext: ext, largoCarril: largoCarril };
+    }
+
+    function pintarBarras() {
+        var g = geometriaBarras();
         ctx.globalAlpha = 1;
-        ctx.fillStyle = 'rgba(31, 41, 55, 0.18)';
-        ctx.fillRect(g.carril.x, g.carril.y, g.carril.w, g.carril.h);
-        ctx.fillStyle = modoArrastre === 'barra' ? 'rgba(31, 41, 55, 0.75)' : 'rgba(31, 41, 55, 0.5)';
-        ctx.fillRect(g.tirador.x, g.tirador.y, g.tirador.w, g.tirador.h);
+        [g.x, g.y].forEach(function (b) {
+            if (!b) { return; }
+            ctx.fillStyle = 'rgba(31, 41, 55, 0.18)';
+            ctx.fillRect(b.carril.x, b.carril.y, b.carril.w, b.carril.h);
+            ctx.fillStyle = modoArrastre === 'barra' && barraArrastrada === b.eje ? 'rgba(31, 41, 55, 0.75)' : 'rgba(31, 41, 55, 0.5)';
+            ctx.fillRect(b.tirador.x, b.tirador.y, b.tirador.w, b.tirador.h);
+        });
     }
 
+    // La barra bajo el ratón, si la hay: cuál, dónde se ha pulsado en su eje y si es el tirador.
     function enBarra(evento) {
-        var g = geometriaBarra();
-        if (!g) { return null; }
+        var g = geometriaBarras();
         var r = canvas.getBoundingClientRect();
         var x = evento.clientX - r.left;
         var y = evento.clientY - r.top;
-        if (y < g.carril.y - 2 || y > g.carril.y + g.carril.h + 2) { return null; }
-        if (x < g.carril.x || x > g.carril.x + g.carril.w) { return null; }
-        return { g: g, x: x, sobreTirador: x >= g.tirador.x && x <= g.tirador.x + g.tirador.w };
+        var lista = [g.x, g.y];
+        for (var i = 0; i < lista.length; i++) {
+            var b = lista[i];
+            if (!b) { continue; }
+            var c = b.carril;
+            if (x < c.x - 2 || x > c.x + c.w + 2 || y < c.y - 2 || y > c.y + c.h + 2) { continue; }
+            var t = b.tirador;
+            var pos = b.eje === 'x' ? x : y;
+            var tiradorDesde = b.eje === 'x' ? t.x : t.y;
+            var tiradorLargo = b.eje === 'x' ? t.w : t.h;
+            return { b: b, pos: pos, antesDelTirador: pos < tiradorDesde, sobreTirador: pos >= tiradorDesde && pos <= tiradorDesde + tiradorLargo };
+        }
+        return null;
     }
 
-    // Desplaza lo dibujado dx píxeles de pantalla (positivo, hacia la derecha), sin pasarse de
-    // los bordes de lo dibujado.
-    function desplazarHorizontal(dx) {
-        var ext = extensionHorizontal();
+    // Desplaza lo dibujado d píxeles de pantalla en un eje (positivo, hacia la derecha o hacia
+    // abajo), sin pasarse de los bordes de lo dibujado.
+    function desplazar(eje, d) {
+        var ext = extension(eje);
         if (!ext) { return; }
-        var nuevoIzq = Math.max(anchoLienzo() - ext.ancho, Math.min(0, ext.izq - dx));
-        pan2X += nuevoIzq - ext.izq;
+        var visto = eje === 'x' ? anchoLienzo() : altoLienzo();
+        var nuevoInicio = Math.max(visto - ext.largo, Math.min(0, ext.inicio - d));
+        if (eje === 'x') { pan2X += nuevoInicio - ext.inicio; } else { pan2Y += nuevoInicio - ext.inicio; }
         mostrarFicha(null);
         pintar();
     }
@@ -1344,7 +1387,7 @@ var SGA3D = (function () {
 
         pintarRotulosPlano();
         pintarTraslado();
-        pintarBarra();
+        pintarBarras();
     }
 
     // Lo que se lee en una casilla del frente: arriba el código (o la columna, si no cabe) y la
@@ -1643,9 +1686,11 @@ var SGA3D = (function () {
                 ubicaciones = [];
             }
             angulo = 0;
-            pasilloActivo = '';
             listarPasillos();
-            if (vista === 'frente' && pasillos.length) { pasilloActivo = pasillos[0]; }
+            // Con un solo pasillo (la página lo ha filtrado) queda elegido, para que pasar de una
+            // vista a otra no lo suelte y pida otra vez el almacén entero.
+            pasilloActivo = pasillos.length === 1 ? pasillos[0] : '';
+            if (vista === 'frente' && pasillos.length && !pasilloActivo) { pasilloActivo = pasillos[0]; }
             sincronizarSelector();
             ajustarTamano();
             encuadrarVista();

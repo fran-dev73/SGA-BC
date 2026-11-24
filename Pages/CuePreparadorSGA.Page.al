@@ -57,10 +57,9 @@ page 51135 "Cue Preparador SGA"
         rConfig: Record "Config. SGA";
         cPicking: Codeunit "Gestion Picking SGA";
     begin
-        Rec.ObtenerCue();
+        Rec.ObtenerCue(rConfig);
 
         // Con asignación exigida, el preparador no coge órdenes por su cuenta.
-        rConfig.ObtenerConfig();
         ExigeAsignacion := rConfig."Exigir Asignacion Picking";
         Carretillero := cPicking.EsCarretillero();
     end;

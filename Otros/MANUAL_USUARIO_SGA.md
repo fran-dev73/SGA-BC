@@ -5,6 +5,7 @@ Para quien trabaja con SGA cada día. Cada uno lee su apartado; el último dice 
 ## Lo básico
 
 - **Business Central dice cuánto hay; SGA dice dónde.** SGA no cambia el stock de BC: lo reparte entre los huecos del almacén. Si no coinciden, la conciliación lo enseña (apartado 6).
+- **Productos que lleva SGA:** los de inventario que no son *Producto Tianna* ni de la categoría 820. Los demás no se ubican ni se preparan: no salen en las pantallas de entradas, pendiente, conciliación ni análisis ABC, no se pueden meter en una ubicación y, en un pedido enviado a SGA, su línea se queda como esté.
 - Las pantallas de SGA llevan **SGA** en el título. Se abren desde los menús del rol o desde el buscador (Alt+Q).
 - Cada ubicación tiene un **tipo**:
 
@@ -241,11 +242,11 @@ Para un palé concreto, lee su etiqueta en *SSCC*: sale dónde está y, si se ha
 
 ### Ubicaciones SGA
 
-Los huecos con su ocupación: gris vacía, verde con hueco, amarillo llena y rojo bloqueada. El *% ocupación* va en verde por debajo del 80 %, en ámbar del 80 al 99 % y en rojo desde el 100 %; sin capacidad (0, sin límite), sin color. Vistas por estado y por tipo, y *Reservadas* y *Sin tipo*. Acciones: **Cambiar en bloque**, **Imprimir etiquetas**, **Liberar reserva**, **Bloquear / desbloquear** y **Recalcular ocupación**. En la ficha, además, **Vaciar ubicación** (todo queda sin ubicar; el stock de BC no cambia), sus movimientos y el contenido, que solo se mira: se traslada y se bloquea desde *Contenido de ubicaciones*. Desde *Consultas* solo se mira: ni esas acciones ni la ficha cambian nada; se hace desde *Configuración*.
+Los huecos con su ocupación: gris vacía, verde con hueco, amarillo llena y rojo bloqueada. El *% ocupación* va en verde por debajo del 80 %, en ámbar del 80 al 99 % y en rojo desde el 100 %; sin capacidad (0, sin límite), sin color. Vistas por estado y por tipo, y *Reservadas* y *Sin tipo*. Acciones: **Cambiar en bloque**, **Imprimir etiquetas**, **Liberar reserva**, **Bloquear / desbloquear** y **Recalcular ocupación**. En la ficha, además, **Vaciar ubicación** (todo queda sin ubicar; el stock de BC no cambia), sus movimientos y el contenido (con la cantidad también en la unidad de venta, como en *Contenido de ubicaciones*), que solo se mira: se traslada y se bloquea desde *Contenido de ubicaciones*. Desde *Consultas* solo se mira: ni esas acciones ni la ficha cambian nada; se hace desde *Configuración*.
 
 ### Contenido de ubicaciones
 
-Qué hay en cada hueco: una línea por palé, con producto, lote y SSCC. Es para trabajar con el contenido, así que está en el menú *Almacén SGA* y no en *Consultas*.
+Qué hay en cada hueco: una línea por palé, con producto, lote y SSCC. La cantidad sale en unidades base y en la unidad de venta del producto (*Cantidad (UM venta)* y *UM venta*, por ejemplo en cajas); si el producto no tiene unidad de venta en su ficha, las dos columnas de cantidad dicen lo mismo. Es para trabajar con el contenido, así que está en el menú *Almacén SGA* y no en *Consultas*.
 
 - **Trasladar** a otra ubicación. Con *Zona destino*, propone un hueco de esa zona. Al pulsar Aceptar se registra; si no se puede (el destino no la admite, por ejemplo), sale el motivo y la ventana sigue abierta para cambiarlo.
 - **Bloquear / desbloquear** una línea, por ejemplo un lote en cuarentena. Lo reservado por una orden no se puede bloquear.
@@ -263,7 +264,7 @@ Hay tres bloqueos, y quitar uno no quita los otros:
 ### Mapas
 
 - **Mapa de almacén**: una rejilla por pasillo, una fila por altura y una columna por estantería, con los colores de estado y en azul (*RESERV*) las reservadas para una entrada. Pulsar una celda abre su contenido.
-- **Mapa 3D de almacén**: vistas *3D*, *Planta* y *Frente*. **Colorear por** estado, posición ABC, rotación ABC o caducidad. **Buscar** marca en naranja un producto o una ubicación. Con el ratón: pasar por encima enseña lo que hay, clic abre el contenido, doble clic aísla el pasillo, clic derecho vacía la ubicación y arrastrar una ubicación sobre otra de la misma zona traslada su contenido. La rueda acerca y aleja; en *Planta* y *Frente*, **Mayús + rueda** desplaza a los lados.
+- **Mapa 3D de almacén**: vistas *3D*, *Planta* y *Frente*. **Colorear por** estado, posición ABC, rotación ABC o caducidad. Cada bloque se llena desde abajo en su color hasta lo ocupado y lo libre queda en blanco; la vacía va entera en gris. Un fondo de pasillo va en rosa fuerte lo ocupado y rosa claro lo libre, y en *Planta* ocupa el hueco entero. El pasillo elegido se mantiene al cambiar entre *3D*, *Planta* y *Frente*; *Todos* vuelve a enseñarlos todos. **Buscar** marca en naranja un producto o una ubicación. Con el ratón: pasar por encima enseña lo que hay, clic abre el contenido, doble clic aísla el pasillo, clic derecho vacía la ubicación y arrastrar una ubicación sobre otra de la misma zona traslada su contenido. La rueda acerca y aleja; en *Planta* y *Frente*, si con el zoom no cabe, salen barras abajo y a la derecha para moverse a los lados y arriba y abajo, y **Mayús + rueda** desplaza a los lados.
 
 ### Movimientos de ubicación
 

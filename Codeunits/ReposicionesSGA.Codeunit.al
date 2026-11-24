@@ -71,28 +71,25 @@ codeunit 51113 "Reposiciones SGA"
     end;
 
     /// <summary>
-    /// Después de sacar de prm_Ubicacion: si es de picking y se ha quedado a cero del producto,
-    /// planifica traerlo de almacenamiento, a la misma ubicación si la sigue admitiendo. Una
-    /// línea a cero que sigue existiendo (porque aún tenía reserva) cuenta como vacía.
+    /// Después de sacar de prm_Ubicacion (la ficha ya leída por quien saca): si es de picking y
+    /// se ha quedado a cero del producto, planifica traerlo de almacenamiento, a la misma
+    /// ubicación si la sigue admitiendo. Una línea a cero que sigue existiendo (porque aún tenía
+    /// reserva) cuenta como vacía.
     /// </summary>
-    procedure ReubicarSiSeVacia(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]; prm_Producto: Code[20])
+    procedure ReubicarSiSeVacia(var prm_Ubicacion: Record "Ubicacion SGA"; prm_Producto: Code[20])
     var
-        rUbicacionSGA: Record "Ubicacion SGA";
         rContenido: Record "Contenido Ubicacion SGA";
     begin
-        rUbicacionSGA.SetLoadFields("Tipo Ubicacion");
-        if not rUbicacionSGA.Get(prm_Almacen, prm_Ubicacion) then
-            exit;
-        if rUbicacionSGA."Tipo Ubicacion" <> rUbicacionSGA."Tipo Ubicacion"::Picking then
+        if prm_Ubicacion."Tipo Ubicacion" <> prm_Ubicacion."Tipo Ubicacion"::Picking then
             exit;
 
-        rContenido.FiltrarUbicacion(prm_Almacen, prm_Ubicacion);
+        rContenido.FiltrarUbicacion(prm_Ubicacion."Cod. Almacen", prm_Ubicacion."Cod. Bin");
         rContenido.SetRange("No. Producto", prm_Producto);
         rContenido.SetFilter("Cantidad Base", '>%1', 0);
         if not rContenido.IsEmpty() then
             exit;
 
-        if Planificar(prm_Almacen, prm_Producto, prm_Ubicacion) then;
+        if Planificar(prm_Ubicacion."Cod. Almacen", prm_Producto, prm_Ubicacion."Cod. Bin") then;
     end;
 
     /// <summary>
@@ -107,8 +104,6 @@ codeunit 51113 "Reposiciones SGA"
     var
         rContenido: Record "Contenido Ubicacion SGA";
         rLineaPicking: Record "Linea Orden Picking SGA";
-        cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
-        cPicking: Codeunit "Gestion Picking SGA";
         destino: Code[20];
         cantidad: Decimal;
         factorPale: Decimal;
@@ -149,22 +144,31 @@ codeunit 51113 "Reposiciones SGA"
     /// </summary>
     local procedure BuscarOrigen(prm_Almacen: Code[10]; prm_Producto: Code[20]; var prm_Contenido: Record "Contenido Ubicacion SGA"): Boolean
     var
-        rConfig: Record "Config. SGA";
-        cPicking: Codeunit "Gestion Picking SGA";
         tramo: Integer;
     begin
-        rConfig.ObtenerConfig();
+        // La configuración se lee una vez por instancia.
+        if not ConfigLeida then begin
+            Config.ObtenerConfig();
+            ConfigLeida := true;
+        end;
         prm_Contenido.FiltrarDisponible(prm_Almacen, prm_Producto);
-        // El primero que se pueda coger: no de una ubicación o zona bloqueada.
+        // El primero que se pueda coger: no de una ubicación o zona bloqueada. Una reubicación
+        // puede salir de la ubicación de ajustes.
         for tramo := 1 to 2 do
-            if cPicking.BuscarEnPasada(prm_Contenido, 1, rConfig."Estrategia Picking", tramo) then
+            if cPicking.BuscarEnPasada(prm_Contenido, 1, Config."Estrategia Picking", tramo) then
                 repeat
-                    if prm_Contenido.SePuedeCoger(false) then
+                    if prm_Contenido.SePuedeCoger('', Utilizables) then
                         exit(true);
                 until prm_Contenido.Next() = 0;
         exit(false);
     end;
 
     var
+        Config: Record "Config. SGA";
+        // Una instancia para todo el proceso, con lo ya leído: productos, unidades y ubicaciones.
         cUM: Codeunit "Unidades Producto SGA";
+        cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
+        cPicking: Codeunit "Gestion Picking SGA";
+        Utilizables: Dictionary of [Text, Boolean];
+        ConfigLeida: Boolean;
 }

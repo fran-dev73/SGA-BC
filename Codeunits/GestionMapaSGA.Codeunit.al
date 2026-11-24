@@ -1,7 +1,5 @@
 namespace AntonioNadal.SGA;
 
-using Microsoft.Inventory.Item;
-
 /// <summary>
 /// Codeunit Gestion Mapa SGA (ID 51102).
 /// Construcción y renderizado del mapa visual de almacén sobre el Bin estándar.
@@ -23,6 +21,7 @@ codeunit 51102 "Gestion Mapa SGA"
     procedure ConstruirMapa(var prm_Buffer: Record "Buffer Mapa SGA"; prm_Almacen: Code[10]) maxEstanteriaEncontrada: Integer
     var
         rUbicacionSGA: Record "Ubicacion SGA";
+        productoUnico: Dictionary of [Code[20], Code[20]];
         pasillo: Integer;
         estanteria: Integer;
         altura: Integer;
@@ -35,9 +34,14 @@ codeunit 51102 "Gestion Mapa SGA"
         if prm_Almacen = '' then
             exit(0);
 
+        // Las líneas de cada ubicación llegan con la misma consulta; el producto de las que
+        // tienen una sola, de una lectura del contenido del almacén.
         rUbicacionSGA.SetRange("Cod. Almacen", prm_Almacen);
+        rUbicacionSGA.SetLoadFields("Cod. Bin", "Estado SGA", "Reservada Por");
+        rUbicacionSGA.SetAutoCalcFields("Lineas Contenido");
         if not rUbicacionSGA.FindSet() then
             exit(0);
+        LeerProductoUnico(prm_Almacen, productoUnico);
 
         repeat
             if cUbicaciones.TrocearCodigo(rUbicacionSGA."Cod. Bin", pasillo, estanteria, altura) then begin
@@ -48,7 +52,7 @@ codeunit 51102 "Gestion Mapa SGA"
                 // para que la página pueda avisar de que el pasillo no cabe entero.
                 if estanteria <= MaximoColumnasRejilla() then begin
                     SituarFila(prm_Buffer, prm_Almacen, pasillo, altura);
-                    Pintar(rUbicacionSGA, resumen, estilo);
+                    Pintar(rUbicacionSGA, productoUnico, resumen, estilo);
                     prm_Buffer.FijarColumna(estanteria, resumen, estilo);
                     prm_Buffer.Modify();
                 end;
@@ -90,10 +94,7 @@ codeunit 51102 "Gestion Mapa SGA"
     ///   ha ubicado),
     ///   o = % de ocupación, redondeado hacia abajo (-1 si no se puede medir),
     ///   m = por qué no se puede medir (solo si no se puede),
-    ///   l = líneas de contenido, k = contenido (solo si tiene; ver ContenidoParaMapa),
-    ///   y, solo si tiene contenido, de todas sus líneas: pp = productos (sin repetir, para
-    ///   buscar), fc = caducidad más próxima (aaaa-mm-dd, vacía si ninguna lleva) y
-    ///   r = mejor clase ABC de sus productos (1 A, 2 B, 3 C, 0 sin clase);
+    ///   l = líneas de contenido y, solo si tiene, k, pp, fc y r (ver LeerContenidos);
     ///   ch = clase del hueco por su posición (1 A, 2 B, 3 C, 0 si no es hueco útil),
     ///   f = 1 si es fondo de pasillo (solo si lo es).
     /// Las dos clases son del cálculo ABC prm_NoCalculoABC (0 = el último del almacén).
@@ -110,18 +111,18 @@ codeunit 51102 "Gestion Mapa SGA"
         cABC: Codeunit "Analisis ABC SGA";
         lista: JsonArray;
         elemento: JsonObject;
-        productos: JsonArray;
-        sinUnidad: Dictionary of [Text, Boolean];
+        contenidos: Dictionary of [Code[20], JsonObject];
+        sinPale: Dictionary of [Code[20], Text];
         clasesABC: Dictionary of [Code[20], Integer];
         clasesHueco: Dictionary of [Code[20], Integer];
+        filtroPasillo: Text;
         salida: Text;
         motivoSinMedir: Text;
-        caducidad: Date;
-        claseABC: Integer;
         claseHueco: Integer;
         pasillo: Integer;
         estanteria: Integer;
         altura: Integer;
+        conContenido: Boolean;
         SinCapacidadLbl: Label 'Sin capacidad declarada: no se puede medir cuánto ocupa. Indique la capacidad en la ficha de la ubicación.';
         ReservadaLbl: Label 'Reservada para %1 (%2).', Comment = '%1 = entrada, %2 = usuario';
     begin
@@ -131,56 +132,59 @@ codeunit 51102 "Gestion Mapa SGA"
         rUbicacionSGA.SetRange("Cod. Almacen", prm_Almacen);
         if prm_Zona <> '' then
             rUbicacionSGA.SetRange("Cod. Zona SGA", prm_Zona);
+        // Un pasillo son los códigos que empiezan por él (101-*): lo filtra la base de datos.
+        if prm_Pasillo <> 0 then
+            filtroPasillo := cUbicaciones.ConCeros(prm_Pasillo, 3) + '-*';
+        if filtroPasillo <> '' then
+            rUbicacionSGA.SetFilter("Cod. Bin", filtroPasillo);
+        rUbicacionSGA.SetLoadFields("Cod. Bin", Descripcion, "Cod. Zona SGA", Fondo, "Capacidad Uds.", "Estado SGA", "% Ocupacion", "Reservada Por", "Reservada Para");
         if not rUbicacionSGA.FindSet() then
             exit('[]');
 
-        // La clase de cada producto y la de cada hueco por su posición se leen una vez para todo el mapa.
+        // La clase de cada producto y la de cada hueco por su posición, y el contenido de todas
+        // las ubicaciones, se leen una vez para todo el mapa.
         cABC.ClasesDeCalculo(prm_Almacen, prm_NoCalculoABC, clasesABC, clasesHueco);
+        LeerContenidos(prm_Almacen, prm_Zona, filtroPasillo, clasesABC, contenidos, sinPale);
 
         repeat
             // Sin pasillo, estantería y altura no hay dónde colocar el cubo.
-            if cUbicaciones.TrocearCodigo(rUbicacionSGA."Cod. Bin", pasillo, estanteria, altura) then
-                if (prm_Pasillo = 0) or (pasillo = prm_Pasillo) then begin
-                    rUbicacionSGA.CalcFields("Lineas Contenido");
-
+            if cUbicaciones.TrocearCodigo(rUbicacionSGA."Cod. Bin", pasillo, estanteria, altura) then begin
+                // Con contenido, el elemento ya trae lo que hay dentro (LeerContenidos).
+                conContenido := contenidos.Get(rUbicacionSGA."Cod. Bin", elemento);
+                if not conContenido then begin
                     Clear(elemento);
-                    elemento.Add('b', rUbicacionSGA."Cod. Bin");
-                    elemento.Add('d', rUbicacionSGA.Descripcion);
-                    elemento.Add('z', rUbicacionSGA."Cod. Zona SGA");
-                    elemento.Add('e', pasillo);
-                    elemento.Add('c', estanteria);
-                    elemento.Add('a', altura);
                     // Líneas de contenido: el lienzo solo deja arrastrar un traslado desde
                     // una ubicación que tenga algo, y el color no basta (bloqueada tapa a llena).
-                    elemento.Add('l', rUbicacionSGA."Lineas Contenido");
-                    // Clase del hueco por su posición (1 A, 2 B, 3 C; 0 si no es hueco útil).
-                    if not clasesHueco.Get(rUbicacionSGA."Cod. Bin", claseHueco) then
-                        claseHueco := 0;
-                    elemento.Add('ch', claseHueco);
-                    if rUbicacionSGA.Fondo then
-                        elemento.Add('f', 1);
-                    motivoSinMedir := '';
-                    if rUbicacionSGA."Lineas Contenido" > 0 then begin
-                        elemento.Add('k', ContenidoParaMapa(rUbicacionSGA, sinUnidad, clasesABC, motivoSinMedir, productos, caducidad, claseABC));
-                        elemento.Add('pp', productos);
-                        if caducidad <> 0D then
-                            elemento.Add('fc', Format(caducidad, 0, 9))
-                        else
-                            elemento.Add('fc', '');
-                        elemento.Add('r', claseABC);
-                        if rUbicacionSGA."Capacidad Uds." <= 0 then
-                            motivoSinMedir := SinCapacidadLbl;
-                    end;
-                    elemento.Add('s', EstadoNumerico(rUbicacionSGA, motivoSinMedir <> ''));
-                    if rUbicacionSGA."Reservada Por" <> '' then
-                        elemento.Add('v', StrSubstNo(ReservadaLbl, rUbicacionSGA."Reservada Para", rUbicacionSGA."Reservada Por"));
-                    if motivoSinMedir <> '' then begin
-                        elemento.Add('o', -1);
-                        elemento.Add('m', motivoSinMedir);
-                    end else
-                        elemento.Add('o', Round(rUbicacionSGA."% Ocupacion", 1, '<'));
-                    lista.Add(elemento);
+                    elemento.Add('l', 0);
                 end;
+                elemento.Add('b', rUbicacionSGA."Cod. Bin");
+                elemento.Add('d', rUbicacionSGA.Descripcion);
+                elemento.Add('z', rUbicacionSGA."Cod. Zona SGA");
+                elemento.Add('e', pasillo);
+                elemento.Add('c', estanteria);
+                elemento.Add('a', altura);
+                // Clase del hueco por su posición (1 A, 2 B, 3 C; 0 si no es hueco útil).
+                if not clasesHueco.Get(rUbicacionSGA."Cod. Bin", claseHueco) then
+                    claseHueco := 0;
+                elemento.Add('ch', claseHueco);
+                if rUbicacionSGA.Fondo then
+                    elemento.Add('f', 1);
+                motivoSinMedir := '';
+                if conContenido then
+                    if rUbicacionSGA."Capacidad Uds." <= 0 then
+                        motivoSinMedir := SinCapacidadLbl
+                    else
+                        if sinPale.Get(rUbicacionSGA."Cod. Bin", motivoSinMedir) then;
+                elemento.Add('s', EstadoNumerico(rUbicacionSGA, motivoSinMedir <> ''));
+                if rUbicacionSGA."Reservada Por" <> '' then
+                    elemento.Add('v', StrSubstNo(ReservadaLbl, rUbicacionSGA."Reservada Para", rUbicacionSGA."Reservada Por"));
+                if motivoSinMedir <> '' then begin
+                    elemento.Add('o', -1);
+                    elemento.Add('m', motivoSinMedir);
+                end else
+                    elemento.Add('o', Round(rUbicacionSGA."% Ocupacion", 1, '<'));
+                lista.Add(elemento);
+            end;
         until rUbicacionSGA.Next() = 0;
 
         lista.WriteTo(salida);
@@ -188,7 +192,100 @@ codeunit 51102 "Gestion Mapa SGA"
     end;
 
     /// <summary>
-    /// Lo que hay en una ubicación, para la ficha flotante del mapa 3D:
+    /// Lo que hay en las ubicaciones del mapa (almacén, zona y pasillo de DatosMapa3D), leído en
+    /// una sola consulta: el contenido se recorre por su clave principal, que empieza por
+    /// almacén y ubicación, así que las líneas de cada ubicación vienen seguidas. La descripción
+    /// del producto llega en la misma consulta (FlowField Descripcion).
+    ///
+    /// Por cada ubicación con contenido deja en prm_Contenidos el principio de su elemento:
+    ///   l = líneas, k = las primeras líneas (ver LineaMapa) y, de todas ellas, pp = productos
+    ///   (sin repetir, para buscar), fc = caducidad más próxima (aaaa-mm-dd, vacía si ninguna
+    ///   lleva) y r = mejor clase ABC de sus productos según prm_ClasesABC (1 A, 2 B, 3 C,
+    ///   0 sin clase).
+    /// Y en prm_SinPale, si algún producto de dentro no tiene palé en su ficha, por qué no se
+    /// puede medir en palés (el primero que falla).
+    ///
+    /// Va con el resto del mapa y no se pide al pasar el ratón: una ida y vuelta a BC por cada
+    /// bloque haría la ficha lenta. Se envían solo las primeras líneas para que un hueco mixto
+    /// con muchas referencias no engorde el JSON; el lienzo dice cuántas faltan con "l".
+    /// </summary>
+    local procedure LeerContenidos(prm_Almacen: Code[10]; prm_Zona: Code[10]; prm_FiltroPasillo: Text; var prm_ClasesABC: Dictionary of [Code[20], Integer]; var prm_Contenidos: Dictionary of [Code[20], JsonObject]; var prm_SinPale: Dictionary of [Code[20], Text])
+    var
+        rContenido: Record "Contenido Ubicacion SGA";
+        grupo: JsonObject;
+        lineas: JsonArray;
+        productos: JsonArray;
+        vistos: List of [Code[20]];
+        ubicacion: Code[20];
+        umPale: Code[10];
+        factorPale: Decimal;
+        caducidad: Date;
+        numLineas: Integer;
+        claseABC: Integer;
+        clase: Integer;
+        MaxLineas: Integer;
+        fin: Boolean;
+        SinPaleLbl: Label 'El producto %1 no tiene palé en su ficha ("Cód. palé por defecto"): no se puede medir cuánto ocupa.', Comment = '%1 = producto';
+    begin
+        MaxLineas := 8;
+        caducidad := 0D;
+        claseABC := 0;
+        rContenido.SetRange("Cod. Almacen", prm_Almacen);
+        if prm_Zona <> '' then
+            rContenido.SetRange("Cod. Zona SGA", prm_Zona);
+        if prm_FiltroPasillo <> '' then
+            rContenido.SetFilter("Cod. Bin", prm_FiltroPasillo);
+        rContenido.SetLoadFields("Cod. Bin", "No. Producto", "No. Lote", "Cod. Unidad Medida", "Cantidad Base", "Fecha Caducidad", Bloqueado);
+        rContenido.SetAutoCalcFields(Descripcion);
+        if not rContenido.FindSet() then
+            exit;
+
+        repeat
+            ubicacion := rContenido."Cod. Bin";
+            numLineas += 1;
+            if numLineas <= MaxLineas then
+                lineas.Add(LineaMapa(rContenido));
+            if not vistos.Contains(rContenido."No. Producto") then begin
+                vistos.Add(rContenido."No. Producto");
+                productos.Add(rContenido."No. Producto");
+                // A (1) es la mejor; 0 = sin clase, no cuenta.
+                if prm_ClasesABC.Get(rContenido."No. Producto", clase) then
+                    if (clase > 0) and ((claseABC = 0) or (clase < claseABC)) then
+                        claseABC := clase;
+                // Sin palé, su contenido se contaría en unidades base como si cada una fuera un palé.
+                if not prm_SinPale.ContainsKey(ubicacion) then
+                    if not cUM.LeerPale(rContenido."No. Producto", umPale, factorPale) then
+                        prm_SinPale.Add(ubicacion, StrSubstNo(SinPaleLbl, rContenido."No. Producto"));
+            end;
+            if rContenido."Fecha Caducidad" <> 0D then
+                if (caducidad = 0D) or (rContenido."Fecha Caducidad" < caducidad) then
+                    caducidad := rContenido."Fecha Caducidad";
+
+            // Tras la última línea de la ubicación se guarda lo reunido y se empieza la siguiente.
+            fin := rContenido.Next() = 0;
+            if fin or (rContenido."Cod. Bin" <> ubicacion) then begin
+                grupo.Add('l', numLineas);
+                grupo.Add('k', lineas);
+                grupo.Add('pp', productos);
+                if caducidad <> 0D then
+                    grupo.Add('fc', Format(caducidad, 0, 9))
+                else
+                    grupo.Add('fc', '');
+                grupo.Add('r', claseABC);
+                prm_Contenidos.Add(ubicacion, grupo);
+                Clear(grupo);
+                Clear(lineas);
+                Clear(productos);
+                Clear(vistos);
+                numLineas := 0;
+                caducidad := 0D;
+                claseABC := 0;
+            end;
+        until fin;
+    end;
+
+    /// <summary>
+    /// Una línea de contenido, para la ficha flotante del mapa 3D:
     ///   p = producto, t = descripción, l = lote, f = caducidad (aaaa-mm-dd o vacía),
     ///   q = cantidad, u = unidad, x = bloqueado,
     ///   g = palé por defecto del producto (ficha del producto), gf = cuántas "u" lleva ese palé.
@@ -196,89 +293,21 @@ codeunit 51102 "Gestion Mapa SGA"
     /// La cantidad no se enseña en la unidad en que se registró, sino como se cuenta en el
     /// almacén (ver UnidadParaMostrar): el palé si está completo y, si no llega al 100 %, el
     /// número de cajas. Con el palé completo no se manda "gf": diría "1 PALE/palé".
-    ///
-    /// Se envía con el resto del mapa y no se pide al pasar el ratón: una ida y vuelta a BC por
-    /// cada bloque haría la ficha lenta. Se limita a las primeras líneas para que un hueco
-    /// mixto con muchas referencias no engorde el JSON; el lienzo dice cuántas faltan con "l".
-    ///
-    /// Mira además todas las líneas, no solo las enviadas, para saber si la ocupación se puede
-    /// medir: con capacidad declarada (en palés), cada producto tiene que tener palé en su
-    /// ficha. Si no, deja el porqué en prm_MotivoSinMedir (el primer producto que falla).
-    /// prm_SinUnidad guarda lo ya mirado de cada producto en todo el mapa.
-    ///
-    /// De todas las líneas devuelve también, para colorear y buscar: los productos sin repetir
-    /// (prm_Productos), la caducidad más próxima (prm_Caducidad, 0D si ninguna lleva) y la mejor
-    /// clase ABC de sus productos según prm_ClasesABC (prm_ClaseABC, 0 si ninguno tiene).
-    /// </summary>
-    local procedure ContenidoParaMapa(var prm_Ubicacion: Record "Ubicacion SGA"; var prm_SinUnidad: Dictionary of [Text, Boolean]; var prm_ClasesABC: Dictionary of [Code[20], Integer]; var prm_MotivoSinMedir: Text; var prm_Productos: JsonArray; var prm_Caducidad: Date; var prm_ClaseABC: Integer): JsonArray
-    var
-        rContenido: Record "Contenido Ubicacion SGA";
-        cUM: Codeunit "Unidades Producto SGA";
-        lineas: JsonArray;
-        vistos: List of [Code[20]];
-        enviadas: Integer;
-        MaxLineas: Integer;
-        clase: Integer;
-        falta: Boolean;
-        medirEnPales: Boolean;
-        SinPaleLbl: Label 'El producto %1 no tiene palé en su ficha ("Cód. palé por defecto"): no se puede medir cuánto ocupa.', Comment = '%1 = producto';
-    begin
-        MaxLineas := 8;
-        enviadas := 0;
-        Clear(prm_Productos);
-        prm_Caducidad := 0D;
-        prm_ClaseABC := 0;
-        medirEnPales := prm_Ubicacion."Capacidad Uds." > 0;
-        rContenido.FiltrarUbicacion(prm_Ubicacion."Cod. Almacen", prm_Ubicacion."Cod. Bin");
-        if rContenido.FindSet() then
-            repeat
-                if medirEnPales and (prm_MotivoSinMedir = '') then begin
-                    if not prm_SinUnidad.Get(rContenido."No. Producto", falta) then begin
-                        falta := cUM.UMPale(rContenido."No. Producto") = '';
-                        prm_SinUnidad.Add(rContenido."No. Producto", falta);
-                    end;
-                    if falta then
-                        prm_MotivoSinMedir := StrSubstNo(SinPaleLbl, rContenido."No. Producto");
-                end;
-                if enviadas < MaxLineas then begin
-                    lineas.Add(LineaMapa(rContenido));
-                    enviadas += 1;
-                end;
-                if not vistos.Contains(rContenido."No. Producto") then begin
-                    vistos.Add(rContenido."No. Producto");
-                    prm_Productos.Add(rContenido."No. Producto");
-                    // A (1) es la mejor; 0 = sin clase, no cuenta.
-                    if prm_ClasesABC.Get(rContenido."No. Producto", clase) then
-                        if (clase > 0) and ((prm_ClaseABC = 0) or (clase < prm_ClaseABC)) then
-                            prm_ClaseABC := clase;
-                end;
-                if rContenido."Fecha Caducidad" <> 0D then
-                    if (prm_Caducidad = 0D) or (rContenido."Fecha Caducidad" < prm_Caducidad) then
-                        prm_Caducidad := rContenido."Fecha Caducidad";
-            until rContenido.Next() = 0;
-
-        exit(lineas);
-    end;
-
-    /// <summary>
-    /// Una línea de contenido en el formato de la ficha flotante (ver ContenidoParaMapa).
+    /// La descripción la trae el registro (FlowField calculado al leer, ver LeerContenidos).
     /// </summary>
     local procedure LineaMapa(var prm_Contenido: Record "Contenido Ubicacion SGA"): JsonObject
     var
-        rItem: Record Item;
-        cUM: Codeunit "Unidades Producto SGA";
         linea: JsonObject;
         umMostrar: Code[10];
         umPale: Code[10];
         factorMostrar: Decimal;
+        factorPale: Decimal;
     begin
-        rItem.SetLoadFields(Description);
-        if not rItem.Get(prm_Contenido."No. Producto") then
-            Clear(rItem);
+        cUM.LeerPale(prm_Contenido."No. Producto", umPale, factorPale);
         cUM.UnidadParaMostrar(prm_Contenido."No. Producto", prm_Contenido."Cantidad Base", umMostrar, factorMostrar);
 
         linea.Add('p', prm_Contenido."No. Producto");
-        linea.Add('t', CopyStr(rItem.Description, 1, 60));
+        linea.Add('t', CopyStr(prm_Contenido.Descripcion, 1, 60));
         linea.Add('l', prm_Contenido."No. Lote");
         if prm_Contenido."Fecha Caducidad" <> 0D then
             linea.Add('f', Format(prm_Contenido."Fecha Caducidad", 0, 9))
@@ -294,10 +323,9 @@ codeunit 51102 "Gestion Mapa SGA"
         linea.Add('x', prm_Contenido.Bloqueado);
         // Tipo de palé del producto (el de su ficha) y cuánto lleva en la misma unidad
         // que la cantidad, para que la ficha diga "45 CAJA12 · PALE (45 CAJA12/palé)".
-        umPale := cUM.UMPale(prm_Contenido."No. Producto");
         linea.Add('g', umPale);
         if (umPale <> '') and (umMostrar <> '') and (umMostrar <> umPale) then
-            linea.Add('gf', Round(cUM.FactorUM(prm_Contenido."No. Producto", umPale) / factorMostrar, 0.01))
+            linea.Add('gf', Round(factorPale / factorMostrar, 0.01))
         else
             linea.Add('gf', 0);
         exit(linea);
@@ -344,11 +372,28 @@ codeunit 51102 "Gestion Mapa SGA"
     end;
 
     /// <summary>
-    /// Texto y color de la celda de una ubicación.
+    /// El producto de cada ubicación del almacén, en una lectura del contenido. Solo se usa en las
+    /// que tienen una sola línea, así que basta el de cualquiera de sus líneas.
     /// </summary>
-    local procedure Pintar(var prm_Ubicacion: Record "Ubicacion SGA"; var prm_Resumen: Text; var prm_Estilo: Text)
+    local procedure LeerProductoUnico(prm_Almacen: Code[10]; var prm_Productos: Dictionary of [Code[20], Code[20]])
     var
         rContenido: Record "Contenido Ubicacion SGA";
+    begin
+        rContenido.SetRange("Cod. Almacen", prm_Almacen);
+        rContenido.SetLoadFields("Cod. Bin", "No. Producto");
+        if rContenido.FindSet() then
+            repeat
+                if not prm_Productos.ContainsKey(rContenido."Cod. Bin") then
+                    prm_Productos.Add(rContenido."Cod. Bin", rContenido."No. Producto");
+            until rContenido.Next() = 0;
+    end;
+
+    /// <summary>
+    /// Texto y color de la celda de una ubicación, con "Lineas Contenido" ya calculado y el
+    /// producto de cada ubicación (LeerProductoUnico).
+    /// </summary>
+    local procedure Pintar(var prm_Ubicacion: Record "Ubicacion SGA"; var prm_ProductoUnico: Dictionary of [Code[20], Code[20]]; var prm_Resumen: Text; var prm_Estilo: Text)
+    var
         LineasLbl: Label '%1 lín.', Comment = '%1 = nº de líneas de contenido (producto, lote y palé)';
     begin
         prm_Estilo := prm_Ubicacion.EstiloEstado();
@@ -360,17 +405,11 @@ codeunit 51102 "Gestion Mapa SGA"
             exit;
         end;
 
-        prm_Ubicacion.CalcFields("Lineas Contenido");
         case prm_Ubicacion."Lineas Contenido" of
             0:
                 prm_Resumen := '-';
             1:
-                begin
-                    rContenido.FiltrarUbicacion(prm_Ubicacion."Cod. Almacen", prm_Ubicacion."Cod. Bin");
-                    rContenido.SetLoadFields("No. Producto");
-                    rContenido.FindFirst();
-                    prm_Resumen := rContenido."No. Producto";
-                end;
+                prm_Resumen := prm_ProductoUnico.Get(prm_Ubicacion."Cod. Bin");
             else
                 // Una línea por producto, lote y palé: no son productos distintos.
                 prm_Resumen := StrSubstNo(LineasLbl, prm_Ubicacion."Lineas Contenido");
@@ -386,4 +425,6 @@ codeunit 51102 "Gestion Mapa SGA"
 
     var
         cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
+        // Una instancia para toda la carga: guarda lo leído de cada producto.
+        cUM: Codeunit "Unidades Producto SGA";
 }

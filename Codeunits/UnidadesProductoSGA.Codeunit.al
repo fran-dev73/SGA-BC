@@ -6,8 +6,10 @@ using Microsoft.Inventory.Item;
 /// <summary>
 /// Codeunit Unidades Producto SGA (ID 51108).
 /// Lo que SGA sabe de las unidades de medida de un producto: cuántas unidades base lleva cada
-/// una, cuál es la base y cuáles son su palé y su caja. El mapa (Cod. "Gestion Mapa SGA") y el
-/// palé de una tarea (Cod. "Gestion Entradas SGA") leen el factor de la ficha por su cuenta.
+/// una, cuál es la base y cuáles son su palé y su caja. Cada ficha de producto y cada unidad se
+/// leen una vez por instancia y se guardan en memoria: quien trata muchas líneas usa una sola
+/// instancia (variable global o parámetro var), y lo que cambie en la ficha mientras tanto no
+/// se ve hasta la siguiente instancia.
 ///
 /// Las conversiones que llevan el factor guardado en el propio documento (línea de venta,
 /// ensamblado, línea de picking) no pasan por aquí: usan el de su registro, porque la ficha
@@ -26,14 +28,108 @@ codeunit 51108 "Unidades Producto SGA"
     procedure FactorUM(prm_Producto: Code[20]; prm_UM: Code[10]): Decimal
     var
         rItem: Record Item;
+        factor: Decimal;
     begin
         // En blanco el estándar también da 1; así no se lee la ficha ni falla sin producto.
         if prm_UM = '' then
             exit(1);
 
+        factor := FactorSiExiste(prm_Producto, prm_UM);
+        if factor > 0 then
+            exit(factor);
+        // Sin el producto, sin esa unidad o con factor cero: el error del estándar.
         rItem.SetLoadFields("Base Unit of Measure");
         rItem.Get(prm_Producto);
         exit(cUOMMgt.GetQtyPerUnitOfMeasure(rItem, prm_UM));
+    end;
+
+    /// <summary>
+    /// Unidades base que lleva una unidad del producto, de "Item Unit of Measure"; 0 si el
+    /// producto no la tiene (para avisar en vez de dar el error de FactorUM). Se lee una vez por
+    /// producto y unidad en cada instancia.
+    /// </summary>
+    procedure FactorSiExiste(prm_Producto: Code[20]; prm_UM: Code[10]) factor: Decimal
+    var
+        rItemUM: Record "Item Unit of Measure";
+        clave: Text;
+    begin
+        clave := prm_Producto + '|' + prm_UM;
+        if FactoresLeidos.Get(clave, factor) then
+            exit(factor);
+        rItemUM.SetLoadFields("Qty. per Unit of Measure");
+        if rItemUM.Get(prm_Producto, prm_UM) then
+            factor := rItemUM."Qty. per Unit of Measure";
+        FactoresLeidos.Add(clave, factor);
+    end;
+
+    /// <summary>
+    /// Deja en TempFicha la ficha del producto, leída una vez por instancia del codeunit con todo
+    /// lo que SGA usa de ella: lo que decide si SGA lo ubica (tipo, "Producto Tianna" y
+    /// categoría), descripción, unidad base, unidad de venta, palé por defecto, volumen y
+    /// estantería. False si no existe.
+    /// </summary>
+    local procedure LeerFicha(prm_Producto: Code[20]): Boolean
+    var
+        rItem: Record Item;
+    begin
+        if TempFicha.Get(prm_Producto) then
+            exit(true);
+        if ProductosSinFicha.Contains(prm_Producto) then
+            exit(false);
+
+        rItem.SetLoadFields(Type, "Producto Tianna", "Item Category Code", Description, "Base Unit of Measure", "Sales Unit of Measure",
+                            "Cod. Pale por Defecto", "Unit Volume", "Shelf No.");
+        if not rItem.Get(prm_Producto) then begin
+            ProductosSinFicha.Add(prm_Producto);
+            exit(false);
+        end;
+        TempFicha.Init();
+        TempFicha."No." := rItem."No.";
+        TempFicha.Type := rItem.Type;
+        TempFicha."Producto Tianna" := rItem."Producto Tianna";
+        TempFicha."Item Category Code" := rItem."Item Category Code";
+        TempFicha.Description := rItem.Description;
+        TempFicha."Base Unit of Measure" := rItem."Base Unit of Measure";
+        TempFicha."Sales Unit of Measure" := rItem."Sales Unit of Measure";
+        TempFicha."Cod. Pale por Defecto" := rItem."Cod. Pale por Defecto";
+        TempFicha."Unit Volume" := rItem."Unit Volume";
+        TempFicha."Shelf No." := rItem."Shelf No.";
+        TempFicha.Insert();
+        exit(true);
+    end;
+
+    /// <summary>
+    /// Descripción de la ficha del producto (LeerFicha). En blanco si el producto no existe.
+    /// </summary>
+    procedure Descripcion(prm_Producto: Code[20]): Text[100]
+    begin
+        if LeerFicha(prm_Producto) then
+            exit(TempFicha.Description);
+        exit('');
+    end;
+
+    /// <summary>
+    /// Copia en prm_Ficha lo leído de la ficha del producto (LeerFicha), para quien necesita
+    /// mirarla entera sin leerla otra vez (Consulta Stock SGA.EsProductoSGA). False si el
+    /// producto no existe. prm_Ficha es solo para leer.
+    /// </summary>
+    procedure Ficha(prm_Producto: Code[20]; var prm_Ficha: Record Item): Boolean
+    begin
+        if not LeerFicha(prm_Producto) then
+            exit(false);
+        prm_Ficha := TempFicha;
+        exit(true);
+    end;
+
+    /// <summary>
+    /// "Shelf No." de la ficha del producto (LeerFicha): su ubicación de casa. En blanco si no
+    /// la tiene o el producto no existe.
+    /// </summary>
+    procedure Estanteria(prm_Producto: Code[20]): Code[10]
+    begin
+        if LeerFicha(prm_Producto) then
+            exit(TempFicha."Shelf No.");
+        exit('');
     end;
 
     /// <summary>
@@ -65,24 +161,15 @@ codeunit 51108 "Unidades Producto SGA"
     end;
 
     /// <summary>
-    /// Unidad base del producto, leída de la ficha una vez por producto en cada instancia del
-    /// codeunit: quien recorre muchas líneas la pide sin volver a leer la ficha. False (y en
-    /// blanco) si el producto no existe.
+    /// Unidad base del producto (LeerFicha: una lectura por producto en cada instancia del
+    /// codeunit). False (y en blanco) si el producto no existe.
     /// </summary>
     procedure LeerUMBase(prm_Producto: Code[20]; var prm_UMBase: Code[10]): Boolean
-    var
-        rItem: Record Item;
     begin
-        if UMBasesLeidas.Get(prm_Producto, prm_UMBase) then
-            exit(true);
-
         prm_UMBase := '';
-        rItem.SetLoadFields("Base Unit of Measure");
-        if not rItem.Get(prm_Producto) then
+        if not LeerFicha(prm_Producto) then
             exit(false);
-
-        prm_UMBase := rItem."Base Unit of Measure";
-        UMBasesLeidas.Add(prm_Producto, prm_UMBase);
+        prm_UMBase := TempFicha."Base Unit of Measure";
         exit(true);
     end;
 
@@ -116,29 +203,28 @@ codeunit 51108 "Unidades Producto SGA"
     end;
 
     /// <summary>
-    /// El palé del producto y su factor, leídos una vez: la unidad "Cod. Pale por Defecto" de la
-    /// ficha si existe y lleva más de una unidad base. False, en blanco, si no.
+    /// El palé del producto y su factor en una llamada: la unidad "Cod. Pale por Defecto" de la
+    /// ficha si existe y lleva más de una unidad base. False, en blanco y 0, si no. La ficha y
+    /// la unidad se leen una vez por producto en cada instancia (LeerFicha, FactorSiExiste).
     /// </summary>
-    local procedure LeerPale(prm_Producto: Code[20]; var prm_UMPale: Code[10]; var prm_FactorPale: Decimal): Boolean
+    procedure LeerPale(prm_Producto: Code[20]; var prm_UMPale: Code[10]; var prm_FactorPale: Decimal): Boolean
     var
-        rItem: Record Item;
-        rItemUM: Record "Item Unit of Measure";
+        codPale: Code[10];
+        factor: Decimal;
     begin
         prm_UMPale := '';
         prm_FactorPale := 0;
-        rItem.SetLoadFields("Cod. Pale por Defecto");
-        if not rItem.Get(prm_Producto) then
+        if not LeerFicha(prm_Producto) then
             exit(false);
-        if rItem."Cod. Pale por Defecto" = '' then
+        codPale := TempFicha."Cod. Pale por Defecto";
+        if codPale = '' then
             exit(false);
         // Sin palé válido no es un error: el producto se cuenta en unidades base.
-        rItemUM.SetLoadFields("Qty. per Unit of Measure");
-        if not rItemUM.Get(prm_Producto, rItem."Cod. Pale por Defecto") then
+        factor := FactorSiExiste(prm_Producto, codPale);
+        if factor <= 1 then
             exit(false);
-        if rItemUM."Qty. per Unit of Measure" <= 1 then
-            exit(false);
-        prm_UMPale := rItem."Cod. Pale por Defecto";
-        prm_FactorPale := rItemUM."Qty. per Unit of Measure";
+        prm_UMPale := codPale;
+        prm_FactorPale := factor;
         exit(true);
     end;
 
@@ -198,13 +284,10 @@ codeunit 51108 "Unidades Producto SGA"
     /// base) por las unidades base que lleva.
     /// </summary>
     procedure VolumenUM(prm_Producto: Code[20]; prm_UM: Code[10]): Decimal
-    var
-        rItem: Record Item;
     begin
-        rItem.SetLoadFields("Unit Volume");
-        if not rItem.Get(prm_Producto) then
+        if not LeerFicha(prm_Producto) then
             exit(0);
-        exit(rItem."Unit Volume" * FactorUM(prm_Producto, prm_UM));
+        exit(TempFicha."Unit Volume" * FactorUM(prm_Producto, prm_UM));
     end;
 
     /// <summary>
@@ -324,30 +407,29 @@ codeunit 51108 "Unidades Producto SGA"
     /// </summary>
     local procedure UnidadesReparto(prm_Producto: Code[20]; prm_UMPaleIndicada: Code[10]; var prm_UMPale: Code[10]; var prm_FactorPale: Decimal; var prm_UMCaja: Code[10]; var prm_FactorCaja: Decimal)
     var
-        rItem: Record Item;
+        umVenta: Code[10];
     begin
-        prm_FactorPale := 0;
         prm_FactorCaja := 0;
         prm_UMCaja := '';
         if prm_UMPaleIndicada = '' then
-            prm_UMPale := UMPale(prm_Producto)
-        else
+            LeerPale(prm_Producto, prm_UMPale, prm_FactorPale)
+        else begin
             prm_UMPale := prm_UMPaleIndicada;
-        if prm_UMPale <> '' then
             prm_FactorPale := FactorUM(prm_Producto, prm_UMPale);
+        end;
 
-        rItem.SetLoadFields("Sales Unit of Measure");
-        if not rItem.Get(prm_Producto) then
+        if not LeerFicha(prm_Producto) then
             exit;
-        if rItem."Sales Unit of Measure" = '' then
+        umVenta := TempFicha."Sales Unit of Measure";
+        if umVenta = '' then
             exit;
 
-        prm_FactorCaja := FactorUM(prm_Producto, rItem."Sales Unit of Measure");
+        prm_FactorCaja := FactorUM(prm_Producto, umVenta);
         if (prm_FactorCaja <= 1) or ((prm_FactorPale > 0) and (prm_FactorCaja >= prm_FactorPale)) then begin
             prm_FactorCaja := 0;
             exit;
         end;
-        prm_UMCaja := rItem."Sales Unit of Measure";
+        prm_UMCaja := umVenta;
     end;
 
     /// <summary>
@@ -386,8 +468,11 @@ codeunit 51108 "Unidades Producto SGA"
     end;
 
     var
+        // Lo ya leído en esta instancia: la ficha de cada producto (LeerFicha) y el factor de
+        // cada producto y unidad (FactorSiExiste). Quien recorre muchas líneas usa una instancia.
+        TempFicha: Record Item temporary;
         // Global para aprovechar su caché: guarda la última unidad leída de un producto.
         cUOMMgt: Codeunit "Unit of Measure Management";
-        // Caché de LeerUMBase: unidad base de cada producto ya leído.
-        UMBasesLeidas: Dictionary of [Code[20], Code[10]];
+        ProductosSinFicha: List of [Code[20]];
+        FactoresLeidos: Dictionary of [Text, Decimal];
 }

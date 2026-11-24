@@ -254,8 +254,10 @@ table 51108 "Orden Picking SGA"
         rLinea.FiltrarPendientes();
         hayPendientes := not rLinea.IsEmpty();
 
-        // Empezada: alguna parada lleva algo recogido, entera o a medias.
-        hayRecogidas := TieneRecogido();
+        // Empezada: alguna parada lleva algo recogido, entera o a medias. Solo cuenta si quedan
+        // pendientes: sin ellas está finalizada.
+        if hayPendientes then
+            hayRecogidas := TieneRecogido();
 
         case true of
             not hayPendientes:
@@ -308,7 +310,15 @@ table 51108 "Orden Picking SGA"
         rConfig: Record "Config. SGA";
     begin
         rConfig.ObtenerConfig();
-        if rConfig."Exigir Asignacion Picking" and ("Cod. Usuario Asignado" = '') then
+        exit(EstadoSinEmpezar(rConfig."Exigir Asignacion Picking"));
+    end;
+
+    /// <summary>
+    /// EstadoSinEmpezar con "Exigir Asignacion Picking" de la configuración ya leída.
+    /// </summary>
+    procedure EstadoSinEmpezar(prm_ExigirAsignacion: Boolean): Enum "Estado Orden SGA"
+    begin
+        if prm_ExigirAsignacion and ("Cod. Usuario Asignado" = '') then
             exit(Estado::"Pendiente Asignar");
 
         exit(Estado::Abierta);

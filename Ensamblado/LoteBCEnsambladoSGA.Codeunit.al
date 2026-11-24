@@ -98,9 +98,11 @@ codeunit 51109 "Lote BC Ensamblado SGA"
     begin
         if prm_Cab.Lote = '' then
             exit(prm_Seguimiento.IsEmpty());
-        if prm_Seguimiento.Count() <> 1 then
+        // Una lectura: la primera línea y, con Next, si hay otra.
+        if not prm_Seguimiento.FindSet() then
             exit(false);
-        prm_Seguimiento.FindFirst();
+        if prm_Seguimiento.Next() <> 0 then
+            exit(false);
         exit((prm_Seguimiento."Lot No." = prm_Cab.Lote) and
              (prm_Seguimiento."Quantity (Base)" = prm_Cab."Remaining Quantity (Base)") and
              (prm_Seguimiento."Qty. to Handle (Base)" = prm_Cab."Quantity to Assemble (Base)"));

@@ -253,22 +253,21 @@ table 51105 "Cue SGA"
     /// Lee el registro de cues (lo crea la primera vez) y pone los filtros de las pilas: el
     /// almacén por defecto de la configuración, el usuario actual, la fecha de trabajo
     /// (movimientos), todo el día de trabajo (lo terminado o confirmado hoy) y las fechas de
-    /// envío ya llegadas.
+    /// envío ya llegadas. Deja leída la configuración en prm_Config, por si la página necesita
+    /// algo más de ella.
     /// </summary>
-    procedure ObtenerCue()
-    var
-        rConfig: Record "Config. SGA";
+    procedure ObtenerCue(var prm_Config: Record "Config. SGA")
     begin
         if not Get() then begin
             Init();
             Insert();
         end;
 
-        rConfig.ObtenerConfig();
-        if rConfig."Almacen por Defecto" <> '' then
-            SetRange("Filtro Almacen", rConfig."Almacen por Defecto");
+        prm_Config.ObtenerConfig();
+        if prm_Config."Almacen por Defecto" <> '' then
+            SetRange("Filtro Almacen", prm_Config."Almacen por Defecto");
 
-        SetRange("Filtro Usuario", rConfig.UsuarioActual());
+        SetRange("Filtro Usuario", prm_Config.UsuarioActual());
         SetRange("Filtro Fecha", WorkDate());
         SetRange("Filtro Momento", CreateDateTime(WorkDate(), 0T), CreateDateTime(WorkDate(), 235959.999T));
         // Sin fecha de envío no cuenta como vencida.

@@ -25,12 +25,28 @@ codeunit 51103 "Consulta Stock SGA"
 
     /// <summary>
     /// Si SGA ubica el producto: de tipo Inventario, sin marcar como "Producto Tianna" y fuera
-    /// de la categoría 820. Lo mismo que filtra FiltrarProductosSGA.
+    /// de la categoría 820. Es la regla de todo SGA: lo mismo que filtra FiltrarProductosSGA y lo
+    /// que miran EsProductoSGA y TestProductoSGA. prm_Item tiene que traer leídos esos tres
+    /// campos; para quien ya tiene la ficha leída por otro motivo.
     /// </summary>
-    local procedure ProductoSGA(var prm_Item: Record Item): Boolean
+    procedure ProductoSGA(var prm_Item: Record Item): Boolean
     begin
         exit(prm_Item.IsInventoriableType() and not prm_Item."Producto Tianna" and
              (prm_Item."Item Category Code" <> CategoriaExcluidaTok));
+    end;
+
+    /// <summary>
+    /// ProductoSGA de un producto por su código, con la ficha que guarda prm_UM (Unidades
+    /// Producto SGA.Ficha): quien mira muchos productos pasa siempre la misma instancia y cada
+    /// ficha se lee una vez. False si el producto no existe.
+    /// </summary>
+    procedure EsProductoSGA(prm_Producto: Code[20]; var prm_UM: Codeunit "Unidades Producto SGA"): Boolean
+    var
+        rFicha: Record Item;
+    begin
+        if not prm_UM.Ficha(prm_Producto, rFicha) then
+            exit(false);
+        exit(ProductoSGA(rFicha));
     end;
 
     /// <summary>
@@ -50,17 +66,28 @@ codeunit 51103 "Consulta Stock SGA"
     end;
 
     /// <summary>
-    /// Error si SGA no ubica el producto (ProductoSGA).
+    /// Error si SGA no ubica el producto (ProductoSGA). Sin ficha, el error estándar de que no
+    /// existe.
     /// </summary>
     procedure TestProductoSGA(prm_Producto: Code[20])
     var
-        rItem: Record Item;
+        rFicha: Record Item;
+    begin
+        if not cUM.Ficha(prm_Producto, rFicha) then
+            rFicha.Get(prm_Producto);
+        TestProductoSGA(rFicha);
+    end;
+
+    /// <summary>
+    /// TestProductoSGA sobre la ficha ya leída por quien llama, con el tipo, "Producto Tianna" y
+    /// la categoría.
+    /// </summary>
+    procedure TestProductoSGA(var prm_Item: Record Item)
+    var
         ProductoFueraSGAErr: Label 'SGA no ubica el producto %1: solo los de tipo Inventario que no son "Producto Tianna" ni de la categoría %2.', Comment = '%1 = producto, %2 = categoría excluida';
     begin
-        rItem.SetLoadFields(Type, "Producto Tianna", "Item Category Code");
-        rItem.Get(prm_Producto);
-        if not ProductoSGA(rItem) then
-            Error(ProductoFueraSGAErr, prm_Producto, CategoriaExcluidaTok);
+        if not ProductoSGA(prm_Item) then
+            Error(ProductoFueraSGAErr, prm_Item."No.", CategoriaExcluidaTok);
     end;
 
     /// <summary>
@@ -72,7 +99,6 @@ codeunit 51103 "Consulta Stock SGA"
     /// </summary>
     local procedure AcumularStockPorLote(prm_Producto: Code[20]; prm_Almacen: Code[10]; var rStock: Record "Buffer Conciliacion SGA")
     var
-        cUM: Codeunit "Unidades Producto SGA";
         qMovsAbiertos: Query "Grouped Item Ledger Entries";
         umBase: Code[10];
     begin
@@ -101,7 +127,6 @@ codeunit 51103 "Consulta Stock SGA"
     local procedure AcumularContenidoUbicado(prm_Producto: Code[20]; prm_Almacen: Code[10]; var rStock: Record "Buffer Conciliacion SGA")
     var
         rContenido: Record "Contenido Ubicacion SGA";
-        cUM: Codeunit "Unidades Producto SGA";
         conLoteBC: Dictionary of [Code[20], Boolean];
         umBase: Code[10];
         lote: Code[50];
@@ -141,36 +166,30 @@ codeunit 51103 "Consulta Stock SGA"
     procedure Conciliar(prm_Almacen: Code[10]; prm_VistaProductos: Text; prm_SoloDiferencias: Boolean): Integer
     var
         rStock: Record "Buffer Conciliacion SGA";
-        rItem: Record Item;
+        TempStock: Record "Buffer Conciliacion SGA" temporary;
         cVentana: Codeunit "Ventana Progreso SGA";
-        producto: Code[20];
-        productoCuenta: Boolean;
+        lineas: Integer;
         TituloLbl: Label 'Conciliando el stock de BC con las ubicaciones…';
     begin
         rStock.FiltrarUsuarioActual();
         rStock.DeleteAll();
 
+        // Se acumula en memoria y a la tabla solo va lo que se enseña.
         cVentana.Abrir(TituloLbl, 0);
-        LeerStockYUbicado(prm_Almacen, prm_VistaProductos, rStock, cVentana);
+        LeerStockYUbicado(prm_Almacen, prm_VistaProductos, TempStock, cVentana);
         cVentana.Cerrar();
 
         // Leyendo todo el almacén de una vez vienen todos los productos: fuera los que SGA no
         // ubica y, si se piden solo las diferencias, lo que cuadra.
-        rItem.SetLoadFields(Type, "Producto Tianna", "Item Category Code");
-        rStock.FiltrarUsuarioActual();
-        producto := '';
-        if rStock.FindSet() then
+        if TempStock.FindSet() then
             repeat
-                if rStock."No. Producto" <> producto then begin
-                    producto := rStock."No. Producto";
-                    productoCuenta := false;
-                    if rItem.Get(producto) then
-                        productoCuenta := ProductoSGA(rItem);
+                if EsProductoSGA(TempStock."No. Producto", cUM) and not (prm_SoloDiferencias and (TempStock.Diferencia = 0)) then begin
+                    rStock := TempStock;
+                    rStock.Insert();
+                    lineas += 1;
                 end;
-                if (not productoCuenta) or (prm_SoloDiferencias and (rStock.Diferencia = 0)) then
-                    rStock.Delete();
-            until rStock.Next() = 0;
-        exit(rStock.Count());
+            until TempStock.Next() = 0;
+        exit(lineas);
     end;
 
     /// <summary>
@@ -325,11 +344,9 @@ codeunit 51103 "Consulta Stock SGA"
     /// </summary>
     procedure CargarPendienteUbicar(prm_Almacen: Code[10]; prm_VistaProductos: Text; prm_EntradoDesde: Date; var prm_Pendiente: Record "Buffer Conciliacion SGA" temporary): Integer
     var
-        rItem: Record Item;
         TempStock: Record "Buffer Conciliacion SGA" temporary;
         TempEntradas: Record "Linea Ubicacion SGA" temporary;
         cEntradas: Codeunit "Gestion Entradas SGA";
-        cUM: Codeunit "Unidades Producto SGA";
         cVentana: Codeunit "Ventana Progreso SGA";
         existencias: Dictionary of [Code[20], Decimal];
         producto: Code[20];
@@ -365,8 +382,6 @@ codeunit 51103 "Consulta Stock SGA"
         end;
         cVentana.FijarTotal(TempStock.Count());
 
-        rItem.Reset();
-        rItem.SetLoadFields(Type, "Producto Tianna", "Item Category Code");
         producto := '';
         repeat
             cVentana.Avanzar(StrSubstNo(ProductoLbl, TempStock."No. Producto"));
@@ -374,8 +389,7 @@ codeunit 51103 "Consulta Stock SGA"
                 producto := TempStock."No. Producto";
                 productoCuenta := false;
                 if existencias.Get(producto) > 0 then
-                    if rItem.Get(producto) then
-                        productoCuenta := ProductoSGA(rItem);
+                    productoCuenta := EsProductoSGA(producto, cUM);
             end;
 
             if productoCuenta then begin
@@ -534,7 +548,6 @@ codeunit 51103 "Consulta Stock SGA"
     /// </summary>
     local procedure PendienteEnDocumentos(var prm_Entradas: Codeunit "Gestion Entradas SGA"; var prm_Buffer: Record "Linea Ubicacion SGA" temporary; prm_Origen: Enum "Origen Mov. SGA"; prm_Almacen: Code[10]; var prm_Lote: Record "Buffer Conciliacion SGA" temporary): Decimal
     var
-        cUM: Codeunit "Unidades Producto SGA";
         total: Decimal;
     begin
         prm_Entradas.CargarEntradasLote(prm_Buffer, prm_Origen, prm_Almacen, prm_Lote."No. Producto", prm_Lote."No. Lote");
@@ -605,18 +618,25 @@ codeunit 51103 "Consulta Stock SGA"
     /// Caducidad de un lote, con el estándar (ExistingExpirationDate de "Item Tracking
     /// Management"): la de su última entrada en el producto. Es la fecha que se
     /// guarda en el contenido y en los movimientos al ubicar, y la que enseña "Pendiente de ubicar".
+    /// Se lee una vez por producto y lote en cada instancia: todos los palés de un lote llevan
+    /// la misma.
     /// </summary>
-    procedure CaducidadLote(prm_Producto: Code[20]; prm_Lote: Code[50]): Date
+    procedure CaducidadLote(prm_Producto: Code[20]; prm_Lote: Code[50]) caducidad: Date
     var
         TempItemTrackingSetup: Record "Item Tracking Setup" temporary;
         cItemTrackingMgt: Codeunit "Item Tracking Management";
+        clave: Text;
         existenMovs: Boolean;
     begin
         if prm_Lote = '' then
             exit(0D);
 
+        clave := prm_Producto + '|' + prm_Lote;
+        if CaducidadesLeidas.Get(clave, caducidad) then
+            exit(caducidad);
         TempItemTrackingSetup."Lot No." := prm_Lote;
-        exit(cItemTrackingMgt.ExistingExpirationDate(prm_Producto, '', TempItemTrackingSetup, false, existenMovs));
+        caducidad := cItemTrackingMgt.ExistingExpirationDate(prm_Producto, '', TempItemTrackingSetup, false, existenMovs);
+        CaducidadesLeidas.Add(clave, caducidad);
     end;
 
     /// <summary>
@@ -625,21 +645,30 @@ codeunit 51103 "Consulta Stock SGA"
     /// seguimiento de BC (y el picking lo escribe en el pedido); sin él, del lote propio del
     /// ensamblado, y al pedido no se le pone seguimiento.
     /// </summary>
-    procedure LoteEstandar(prm_Producto: Code[20]): Boolean
+    procedure LoteEstandar(prm_Producto: Code[20]) conLote: Boolean
     var
         rItem: Record Item;
         rCodigoSeguimiento: Record "Item Tracking Code";
     begin
+        // Una vez por producto en cada instancia.
+        if LotesEstandar.Get(prm_Producto, conLote) then
+            exit(conLote);
+
         rItem.SetLoadFields("Item Tracking Code");
-        if not rItem.Get(prm_Producto) then
-            exit(false);
-        if rItem."Item Tracking Code" = '' then
-            exit(false);
-
-        rCodigoSeguimiento.SetLoadFields("Lot Specific Tracking");
-        if not rCodigoSeguimiento.Get(rItem."Item Tracking Code") then
-            exit(false);
-
-        exit(rCodigoSeguimiento."Lot Specific Tracking");
+        if rItem.Get(prm_Producto) then
+            if rItem."Item Tracking Code" <> '' then begin
+                rCodigoSeguimiento.SetLoadFields("Lot Specific Tracking");
+                if rCodigoSeguimiento.Get(rItem."Item Tracking Code") then
+                    conLote := rCodigoSeguimiento."Lot Specific Tracking";
+            end;
+        LotesEstandar.Add(prm_Producto, conLote);
     end;
+
+    var
+        // Una instancia para todo el proceso: guarda lo leído de cada producto.
+        cUM: Codeunit "Unidades Producto SGA";
+        // Lo ya leído en LoteEstandar: si cada producto lleva lote de BC.
+        LotesEstandar: Dictionary of [Code[20], Boolean];
+        // Lo ya leído en CaducidadLote, por "producto|lote".
+        CaducidadesLeidas: Dictionary of [Text, Date];
 }

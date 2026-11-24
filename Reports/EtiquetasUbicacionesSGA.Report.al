@@ -29,11 +29,15 @@ report 51106 "Etiquetas Ubicaciones SGA"
             column(CodBin; "Cod. Bin") { }
             column(Barras; Barras) { }
 
-            trigger OnAfterGetRecord()
-            var
-                BarcodeFontProvider: Interface "Barcode Font Provider";
+            trigger OnPreDataItem()
             begin
+                // De cada ubicación solo se imprime el código.
+                SetLoadFields("Cod. Almacen", "Cod. Bin");
                 BarcodeFontProvider := Enum::"Barcode Font Provider"::IDAutomation1D;
+            end;
+
+            trigger OnAfterGetRecord()
+            begin
                 Barras := BarcodeFontProvider.EncodeFont("Cod. Bin", Enum::"Barcode Symbology"::Code128);
             end;
         }
@@ -50,5 +54,6 @@ report 51106 "Etiquetas Ubicaciones SGA"
     }
 
     var
+        BarcodeFontProvider: Interface "Barcode Font Provider";
         Barras: Text;
 }

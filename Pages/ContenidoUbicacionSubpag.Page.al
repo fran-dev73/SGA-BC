@@ -48,6 +48,17 @@ page 51102 "Contenido Ubicacion Subpag"
                     ToolTip = 'Unidades base que hay de este producto y lote en la ubicación.';
                     ApplicationArea = All;
                 }
+                field(CantidadVenta; CantidadVenta)
+                {
+                    Caption = 'Cantidad (UM venta)';
+                    ToolTip = 'La misma cantidad en la unidad de venta del producto, por ejemplo en cajas. Sin unidad de venta en la ficha, en unidades base.';
+                    ApplicationArea = All;
+                    DecimalPlaces = 0 : 5;
+                }
+                field("UM Venta"; Rec."UM Venta")
+                {
+                    ApplicationArea = All;
+                }
                 field("Cantidad Reservada"; Rec."Cantidad Reservada")
                 {
                     ToolTip = 'Cantidad ya comprometida por órdenes de picking pendientes.';
@@ -89,10 +100,20 @@ page 51102 "Contenido Ubicacion Subpag"
     }
 
     var
+        // Una instancia mientras la página está abierta: guarda el factor de cada producto.
+        cUM: Codeunit "Unidades Producto SGA";
         EstiloFila: Text;
+        CantidadVenta: Decimal;
+
+    trigger OnOpenPage()
+    begin
+        // La unidad de venta llega en la misma consulta de la página (CantidadEnUMVenta).
+        Rec.SetAutoCalcFields("UM Venta");
+    end;
 
     trigger OnAfterGetRecord()
     begin
         EstiloFila := Rec.EstiloContenido();
+        CantidadVenta := Rec.CantidadEnUMVenta(cUM);
     end;
 }

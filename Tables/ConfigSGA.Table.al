@@ -205,7 +205,9 @@ table 51104 "Config. SGA"
     begin
         if prm_Almacen <> '' then
             exit(prm_Almacen);
-        ObtenerConfig();
+        // Con la configuración ya leída no se vuelve a leer.
+        if "Almacen por Defecto" = '' then
+            ObtenerConfig();
         exit("Almacen por Defecto");
     end;
 

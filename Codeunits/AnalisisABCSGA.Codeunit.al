@@ -1,6 +1,5 @@
 namespace AntonioNadal.SGA;
 
-using Microsoft.Inventory.Item;
 using Microsoft.Inventory.Ledger;
 
 /// <summary>
@@ -145,18 +144,13 @@ codeunit 51107 "Analisis ABC SGA"
 
     local procedure AnotarVentas(var prm_Calculo: Record "Calculo ABC SGA"; prm_Producto: Code[20]; prm_CantidadBase: Decimal)
     var
-        rItem: Record Item;
         rLinea: Record "Clasificacion ABC SGA";
-        cUM: Codeunit "Unidades Producto SGA";
     begin
         if prm_CantidadBase <= 0 then
             exit;
 
-        // Solo lo que ocupa hueco: un producto que no es de inventario no se ubica.
-        rItem.SetLoadFields(Type);
-        if not rItem.Get(prm_Producto) then
-            exit;
-        if not rItem.IsInventoriableType() then
+        // Solo los productos que SGA ubica: los demás no ocupan hueco.
+        if not cStock.EsProductoSGA(prm_Producto, cUM) then
             exit;
 
         NuevaLinea(prm_Calculo, prm_Producto, rLinea);
@@ -171,16 +165,12 @@ codeunit 51107 "Analisis ABC SGA"
     end;
 
     local procedure NuevaLinea(prm_Calculo: Record "Calculo ABC SGA"; prm_Producto: Code[20]; var prm_Linea: Record "Clasificacion ABC SGA")
-    var
-        rItem: Record Item;
     begin
         prm_Linea.Init();
         prm_Linea."No. Calculo" := prm_Calculo."No.";
         prm_Linea."No. Producto" := prm_Producto;
         prm_Linea."Cod. Almacen" := prm_Calculo."Cod. Almacen";
-        rItem.SetLoadFields(Description);
-        if rItem.Get(prm_Producto) then
-            prm_Linea.Descripcion := rItem.Description;
+        prm_Linea.Descripcion := cUM.Descripcion(prm_Producto);
     end;
 
     /// <summary>
@@ -417,4 +407,8 @@ codeunit 51107 "Analisis ABC SGA"
             until rLinea.Next() = 0;
     end;
 
+    var
+        // Una instancia para todo el cálculo: cada ficha de producto se lee una vez.
+        cUM: Codeunit "Unidades Producto SGA";
+        cStock: Codeunit "Consulta Stock SGA";
 }

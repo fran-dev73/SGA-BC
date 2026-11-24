@@ -46,6 +46,8 @@ codeunit 51106 "Carga Inicial SGA"
         cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
         cStock: Codeunit "Consulta Stock SGA";
         cUM: Codeunit "Unidades Producto SGA";
+        // Una instancia para toda la carga: lee las series de SSCC una vez.
+        cLectura: Codeunit "Codigos Barras SGA";
         Almacen: Code[10];
         UbicacionIndicada: Code[20];
         VistaProductos: Text;
@@ -277,7 +279,6 @@ codeunit 51106 "Carga Inicial SGA"
     /// </summary>
     local procedure Cargar(var prm_Producto: Record Item; var prm_Stock: Record "Buffer Conciliacion SGA"; prm_Bin: Code[20]; prm_UM: Code[10]; prm_Cantidad: Decimal; prm_CantidadBase: Decimal; prm_Motivo: Text)
     var
-        cLectura: Codeunit "Codigos Barras SGA";
         DescripcionCargaInicialLbl: Label 'Carga inicial SGA';
         UbicacionPendientesLbl: Label 'Ubicación de stock pendiente SGA';
     begin

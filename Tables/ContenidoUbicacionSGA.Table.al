@@ -124,6 +124,14 @@ table 51102 "Contenido Ubicacion SGA"
             FieldClass = FlowField;
             CalcFormula = lookup(Item.Description where("No." = field("No. Producto")));
         }
+        field(121; "UM Venta"; Code[10])
+        {
+            Caption = 'UM venta';
+            Editable = false;
+            FieldClass = FlowField;
+            CalcFormula = lookup(Item."Sales Unit of Measure" where("No." = field("No. Producto")));
+            ToolTip = 'Unidad de medida de venta del producto (la de su ficha), por ejemplo la caja.';
+        }
         field(130; "Cod. Zona SGA"; Code[10])
         {
             Caption = 'Cód. zona';
@@ -240,6 +248,17 @@ table 51102 "Contenido Ubicacion SGA"
     end;
 
     /// <summary>
+    /// La cantidad de la línea en la unidad de venta del producto ("UM Venta", que tiene que
+    /// venir calculado: las páginas lo piden con SetAutoCalcFields), por ejemplo en cajas. Sin
+    /// unidad de venta en la ficha, en unidades base. prm_UM es la instancia de la página, que
+    /// guarda el factor de cada producto y unidad ya leído.
+    /// </summary>
+    procedure CantidadEnUMVenta(var prm_UM: Codeunit "Unidades Producto SGA"): Decimal
+    begin
+        exit(prm_UM.DesdeBase("No. Producto", "UM Venta", "Cantidad Base"));
+    end;
+
+    /// <summary>
     /// Expresión de estilo para las páginas de contenido: en rojo lo bloqueado y lo caducado.
     /// </summary>
     procedure EstiloContenido(): Text
@@ -288,21 +307,22 @@ table 51102 "Contenido Ubicacion SGA"
     /// donde lo regularizado es una diferencia y no mercancía que se pueda recoger. Completa a
     /// FiltrarDisponible, que solo puede filtrar por campos de la propia línea.
     /// </summary>
-    procedure SePuedeCoger(prm_ParaPicking: Boolean): Boolean
+    procedure SePuedeCoger(prm_UbicAjustes: Code[20]; var prm_Utilizables: Dictionary of [Text, Boolean]) utilizable: Boolean
     var
         rUbicacionSGA: Record "Ubicacion SGA";
-        rConfig: Record "Config. SGA";
+        clave: Text;
     begin
+        // prm_UbicAjustes: la de la configuración para un picking de venta; en blanco si se
+        // puede coger de ella (reubicaciones).
+        if (prm_UbicAjustes <> '') and ("Cod. Bin" = prm_UbicAjustes) then
+            exit(false);
+        // Si la ubicación se puede usar se mira una vez por ubicación en todo el proceso.
+        clave := "Cod. Almacen" + '|' + "Cod. Bin";
+        if prm_Utilizables.Get(clave, utilizable) then
+            exit(utilizable);
         rUbicacionSGA.SetLoadFields(Bloqueada, "Cod. Zona SGA");
-        if not rUbicacionSGA.Get("Cod. Almacen", "Cod. Bin") then
-            exit(false);
-        if not rUbicacionSGA.EsUtilizable() then
-            exit(false);
-        if prm_ParaPicking then begin
-            rConfig.ObtenerConfig();
-            if (rConfig."Ubic. Ajustes" <> '') and ("Cod. Bin" = rConfig."Ubic. Ajustes") then
-                exit(false);
-        end;
-        exit(true);
+        if rUbicacionSGA.Get("Cod. Almacen", "Cod. Bin") then
+            utilizable := rUbicacionSGA.EsUtilizable();
+        prm_Utilizables.Add(clave, utilizable);
     end;
 }

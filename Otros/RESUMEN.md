@@ -13,6 +13,7 @@ SGA es el módulo de gestión de ubicaciones del almacén dentro de Business Cen
 ## Qué no resuelve
 
 - **No sustituye el stock de BC**: BC sigue mandando en cantidades, lotes y contabilidad. SGA solo dice dónde está.
+- **No lleva los productos Tianna ni los de la categoría 820**: ni se ubican ni se preparan.
 - **No ubica al registrar**: las compras y ensamblados se ubican después, al confirmarlo el operario. Así un hueco lleno nunca impide registrar un albarán.
 - **No crea solo la orden de picking**: oficina la envía desde el pedido lanzado.
 - **No regulariza excesos**: si las ubicaciones tienen más que BC, se recuenta a mano.
