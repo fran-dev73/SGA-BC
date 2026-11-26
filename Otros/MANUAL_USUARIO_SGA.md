@@ -165,9 +165,22 @@ En el entorno de pruebas (Sandbox), la etiqueta A5 lleva un SSCC distinto del ub
 
 Para ver dónde están los palés de un ensamblado: en la ficha o en la lista de ensamblados registrados, **Palés SGA**. Abre *Contenido de ubicaciones* con sus palés, también las cajas sueltas que se han separado. Los que ya han salido enteros no aparecen.
 
+### Alta de stock (PDA)
+
+Para dar de alta en SGA lo que ya está en un hueco y SGA no tiene. En la PDA, **Alta de stock SGA**. La pantalla es como la de preparar pedidos.
+
+1. **Ubicación**, en la casilla de arriba: léela, o tócala y escribe sus 7 cifras con el teclado numérico; los guiones salen solos (`101-15-03`) y con la última cifra se comprueba sola. Si no tiene el formato o no existe en el almacén, se queda en rojo con el aviso y no hay ubicación puesta. Si está bien, se queda en verde y la marca *Ubicación* pasa a verde. Para corregirla, lee otra o toca la casilla y escribe la nueva.
+2. Lee la **etiqueta del palé** en la casilla *Etiqueta del palé*, si la tiene: se queda su SSCC. Sin etiqueta, sigue sin ella.
+3. **Elegir producto**: la lista sale en la misma pantalla, con los productos propios y externos que lleva SGA. Escribe una palabra o parte del código y la lista se filtra sola mientras escribes: salen todos los que la llevan en cualquier parte de la descripción o del código, sin importar mayúsculas (por ejemplo, *secas* saca todos los que tienen *secas* en la descripción). Toca el producto. La lista se desplaza con el dedo y, al llegar abajo, carga los siguientes, hasta el último. **Volver** deja el que había.
+4. **Lote**: tecléalo o léelo en su casilla. Es obligatorio si el producto lleva lotes.
+5. **Cantidad** con **+** y **−**, sin teclado (para una cantidad grande, toca la cifra y escríbela). El botón azul de al lado es la unidad: cada toque pasa a la siguiente (palé, caja, unidad).
+6. **ACEPTAR**: queda dado de alta en el hueco. El producto, el lote y la unidad se quedan para el siguiente palé; la ubicación, la etiqueta y la cantidad se vacían, y la pantalla queda lista, desde arriba, para el siguiente sin salir.
+
+No deja pasar de la capacidad de la ubicación: lo avisa en rojo, o pide confirmación si la ubicación (o la configuración) solo avisa. Cualquier cosa que impida el alta (capacidad, lote que falta, SSCC repetido…) sale en el aviso rojo de la propia pantalla, con pitido, y no se graba nada. No comprueba mezcla ni bloqueos (la mercancía ya está ahí) ni que la cantidad sea la pendiente de ubicar: lo que no cuadre con BC sale en la **Conciliación**. Un SSCC que ya está en el almacén da error.
+
 ### Ubicar producto
 
-Para una cosa suelta. Indica producto, lote, unidad de medida y cantidad, o pulsa **Ubicar todo lo pendiente**. **Proponer ubicación** llena **Dónde dejarlo**: una línea por palé y una por el resto. Lee en cada línea el *SSCC* de su palé y pulsa **Confirmar todo** o **Confirmar esta línea**. Si la configuración exige confirmar ubicación, antes lee en *Ubicación leída* la etiqueta del hueco donde la dejas.
+Para una cosa suelta. Indica producto, lote, unidad de medida y cantidad, o pulsa **Ubicar todo lo pendiente**. La flecha de *Producto* solo enseña los productos con algo pendiente de ubicar en el almacén elegido (lo que sale en *A ubicar* de *Pendiente de ubicar*); en almacenes grandes tarda lo mismo que calcular *Pendiente de ubicar* sin filtros. **Proponer ubicación** llena **Dónde dejarlo**: una línea por palé y una por el resto. Lee en cada línea el *SSCC* de su palé y pulsa **Confirmar todo** o **Confirmar esta línea**. Si la configuración exige confirmar ubicación, antes lee en *Ubicación leída* la etiqueta del hueco donde la dejas.
 
 ### Pendiente de ubicar
 
@@ -236,9 +249,13 @@ Cada hueco lleva su etiqueta, y el preparador la lee al recoger. Se imprimen por
 
 ### ¿Dónde está el producto?
 
-Solo consulta. Escribe el *Producto* y, si quieres, *Almacén* y *Lote*. Salen las ubicaciones donde está, por caducidad. *Solo con cantidad disponible* oculta lo bloqueado y lo reservado. También desde la ficha o la lista de productos (**SGA** > **¿Dónde está?**), desde **Ver todas** del cuadro de ubicaciones del producto y desde la columna *Ubicado* de *Pendiente de ubicar*.
+Solo consulta. Escribe el *Producto* y, si quieres, *Almacén* y *Lote*. Salen las ubicaciones donde está, por caducidad. Con *Grupo IIEE* (y sin producto) salen todas las ubicaciones con productos de ese grupo de Impuestos Especiales, con su total; el grupo es el de la ficha del producto. *Solo con cantidad disponible* oculta lo bloqueado y lo reservado. También desde la ficha o la lista de productos (**SGA** > **¿Dónde está?**), desde **Ver todas** del cuadro de ubicaciones del producto y desde la columna *Ubicado* de *Pendiente de ubicar*.
 
 Para un palé concreto, lee su etiqueta en *SSCC*: sale dónde está y, si se ha partido, dónde están sus cajas.
+
+### Existencias SGA en la ficha del producto
+
+La ficha y la lista de productos llevan *Existencias SGA* al lado de *Inventario*: lo que hay del producto en ubicaciones, en unidad base. Tienen que coincidir. Si no coinciden, hay stock sin ubicar o un descuadre: mira *Pendiente de ubicar* o la conciliación. Para comparar un solo almacén, filtra la lista por almacén; sin filtro, las dos cifras suman todos los almacenes. Pulsa la cifra para ver en qué ubicaciones está.
 
 ### Ubicaciones SGA
 
@@ -246,13 +263,13 @@ Los huecos con su ocupación: gris vacía, verde con hueco, amarillo llena y roj
 
 ### Contenido de ubicaciones
 
-Qué hay en cada hueco: una línea por palé, con producto, lote y SSCC. La cantidad sale en unidades base y en la unidad de venta del producto (*Cantidad (UM venta)* y *UM venta*, por ejemplo en cajas); si el producto no tiene unidad de venta en su ficha, las dos columnas de cantidad dicen lo mismo. Es para trabajar con el contenido, así que está en el menú *Almacén SGA* y no en *Consultas*.
+Qué hay en cada hueco: una línea por palé, con producto, *Grupo IIEE*, lote y SSCC. La cantidad sale en unidades base y en la unidad de venta del producto (*Cantidad (UM venta)* y *UM venta*, por ejemplo en cajas); si el producto no tiene unidad de venta en su ficha, las dos columnas de cantidad dicen lo mismo. Es para trabajar con el contenido, así que está en el menú *Almacén SGA* y no en *Consultas*.
 
 - **Trasladar** a otra ubicación. Con *Zona destino*, propone un hueco de esa zona. Al pulsar Aceptar se registra; si no se puede (el destino no la admite, por ejemplo), sale el motivo y la ventana sigue abierta para cambiarlo.
 - **Bloquear / desbloquear** una línea, por ejemplo un lote en cuarentena. Lo reservado por una orden no se puede bloquear.
 - **Recontar**: escribe la *Cantidad contada* en unidades base y al pulsar Aceptar la diferencia queda registrada. Corrige solo la ubicación, no el stock de BC.
 - **Quitar de la ubicación**: enseña lo que se quita, pide confirmación y las líneas seleccionadas salen enteras y quedan pendientes de ubicar. Es lo mismo que **Vaciar ubicación** de la ficha y del mapa 3D.
-- **Movimientos del palé**: la historia de su SSCC.
+- **Movimientos del palé**: la historia de su SSCC. Solo se puede pulsar en las líneas con SSCC.
 
 ### Bloquear
 
@@ -263,12 +280,12 @@ Hay tres bloqueos, y quitar uno no quita los otros:
 
 ### Mapas
 
-- **Mapa de almacén**: una rejilla por pasillo, una fila por altura y una columna por estantería, con los colores de estado y en azul (*RESERV*) las reservadas para una entrada. Pulsar una celda abre su contenido.
-- **Mapa 3D de almacén**: vistas *3D*, *Planta* y *Frente*. **Colorear por** estado, posición ABC, rotación ABC o caducidad. Cada bloque se llena desde abajo en su color hasta lo ocupado y lo libre queda en blanco; la vacía va entera en gris. Un fondo de pasillo va en rosa fuerte lo ocupado y rosa claro lo libre, y en *Planta* ocupa el hueco entero. El pasillo elegido se mantiene al cambiar entre *3D*, *Planta* y *Frente*; *Todos* vuelve a enseñarlos todos. **Buscar** marca en naranja un producto o una ubicación. Con el ratón: pasar por encima enseña lo que hay, clic abre el contenido, doble clic aísla el pasillo, clic derecho vacía la ubicación y arrastrar una ubicación sobre otra de la misma zona traslada su contenido. La rueda acerca y aleja; en *Planta* y *Frente*, si con el zoom no cabe, salen barras abajo y a la derecha para moverse a los lados y arriba y abajo, y **Mayús + rueda** desplaza a los lados.
+- **Mapa de almacén**: una rejilla por pasillo, una fila por altura y una columna por estantería, con los colores de estado y en azul (*RESERV*) las reservadas para una entrada. Pulsar una celda abre su contenido. Con *Grupo IIEE*, las ubicaciones con algún producto de ese grupo llevan ◆ delante, las demás se apagan en gris, y *Ubicaciones con el grupo* dice cuántas son.
+- **Mapa 3D de almacén**: vistas *3D*, *Planta* y *Frente*. **Colorear por** estado, posición ABC, rotación ABC o caducidad. Cada bloque se llena desde abajo en su color hasta lo ocupado y lo libre queda en blanco; la vacía va entera en gris. Un fondo de pasillo va en rosa fuerte lo ocupado y rosa claro lo libre, y en *Planta* ocupa el hueco entero. El pasillo elegido se mantiene al cambiar entre *3D*, *Planta* y *Frente*; *Todos* vuelve a enseñarlos todos. **Buscar** marca en naranja un producto o una ubicación. **Grupo IIEE** lista los grupos de Impuestos Especiales de lo que hay en el almacén; al elegir uno se marcan en naranja las ubicaciones con productos de ese grupo, el resto se apaga y arriba sale cuántas son. Se combina con *Buscar*; al pasar el ratón por una ubicación se ven sus grupos. Con el ratón: pasar por encima enseña lo que hay, clic abre el contenido, doble clic aísla el pasillo, clic derecho vacía la ubicación y arrastrar una ubicación sobre otra de la misma zona traslada su contenido. La rueda acerca y aleja; en *Planta* y *Frente*, si con el zoom no cabe, salen barras abajo y a la derecha para moverse a los lados y arriba y abajo, y **Mayús + rueda** desplaza a los lados.
 
 ### Movimientos de ubicación
 
-Quién movió qué, cuándo y de dónde a dónde. Vistas *Traslados* y *Ajustes y recuentos*. Para un listado a medida, filtra esta lista, *Contenido de ubicaciones* o *Ubicaciones SGA* y ábrela en Excel.
+Quién movió qué, cuándo y de dónde a dónde, con el *Grupo IIEE* de cada producto: filtrando por él se ve por dónde han pasado los productos de un grupo. Vistas *Traslados* y *Ajustes y recuentos*. Para un listado a medida, filtra esta lista, *Contenido de ubicaciones* o *Ubicaciones SGA* y ábrela en Excel.
 
 ### Conciliación con el stock
 

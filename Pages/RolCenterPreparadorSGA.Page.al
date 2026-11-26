@@ -36,6 +36,13 @@ page 51133 "Rol Center Preparador SGA"
                 ApplicationArea = All;
                 RunObject = page "Preparar Picking SGA";
             }
+            action(AltaStock)
+            {
+                Caption = 'Alta de stock SGA';
+                ToolTip = 'Da de alta en SGA, palé a palé, el stock que ya está en una ubicación: se lee la ubicación y la etiqueta del palé, y se indican producto, lote y cantidad.';
+                ApplicationArea = All;
+                RunObject = page "Alta Stock PDA SGA";
+            }
             action(OrdenesPicking)
             {
                 Caption = 'Órdenes de picking';

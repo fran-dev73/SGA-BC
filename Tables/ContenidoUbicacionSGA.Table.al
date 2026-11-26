@@ -132,6 +132,14 @@ table 51102 "Contenido Ubicacion SGA"
             CalcFormula = lookup(Item."Sales Unit of Measure" where("No." = field("No. Producto")));
             ToolTip = 'Unidad de medida de venta del producto (la de su ficha), por ejemplo la caja.';
         }
+        field(122; "Grupo IIEE"; Code[20])
+        {
+            Caption = 'Grupo IIEE';
+            Editable = false;
+            FieldClass = FlowField;
+            CalcFormula = lookup(Item."Grupo IIEE" where("No." = field("No. Producto")));
+            ToolTip = 'Grupo de Impuestos Especiales (IIEE/SILICIE) del producto, el de su ficha.';
+        }
         field(130; "Cod. Zona SGA"; Code[10])
         {
             Caption = 'Cód. zona';

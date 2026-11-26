@@ -66,6 +66,17 @@ page 51108 "Consulta Ubic. Producto SGA"
                         AplicarFiltros();
                     end;
                 }
+                field(FiltroGrupoIIEE; FiltroGrupoIIEE)
+                {
+                    Caption = 'Grupo IIEE';
+                    ToolTip = 'Grupo de Impuestos Especiales (IIEE/SILICIE): enseña dónde están todos los productos de ese grupo. En blanco, de cualquier grupo.';
+                    ApplicationArea = All;
+
+                    trigger OnValidate()
+                    begin
+                        AplicarFiltros();
+                    end;
+                }
                 field(FiltroSSCC; FiltroSSCC)
                 {
                     Caption = 'SSCC';
@@ -81,6 +92,7 @@ page 51108 "Consulta Ubic. Producto SGA"
                             FiltroProducto := '';
                             FiltroAlmacen := '';
                             FiltroLote := '';
+                            FiltroGrupoIIEE := '';
                             SoloDisponible := false;
                         end;
                         AplicarFiltros();
@@ -142,6 +154,10 @@ page 51108 "Consulta Ubic. Producto SGA"
                 field(Descripcion; Rec.Descripcion)
                 {
                     ToolTip = 'Descripción del producto.';
+                    ApplicationArea = All;
+                }
+                field("Grupo IIEE"; Rec."Grupo IIEE")
+                {
                     ApplicationArea = All;
                 }
                 field("No. Lote"; Rec."No. Lote")
@@ -220,6 +236,7 @@ page 51108 "Consulta Ubic. Producto SGA"
         FiltroProducto: Code[20];
         FiltroAlmacen: Code[10];
         FiltroLote: Code[50];
+        FiltroGrupoIIEE: Code[20];
         // Largo para que quepa la lectura entera de la etiqueta; al validar queda solo el SSCC.
         FiltroSSCC: Text[100];
         SoloDisponible: Boolean;
@@ -267,6 +284,12 @@ page 51108 "Consulta Ubic. Producto SGA"
         else
             Rec.SetRange("No. Lote");
 
+        // El grupo está en la ficha del producto (FlowField): BC lo filtra en la misma consulta.
+        if FiltroGrupoIIEE <> '' then
+            Rec.SetRange("Grupo IIEE", FiltroGrupoIIEE)
+        else
+            Rec.SetRange("Grupo IIEE");
+
         if FiltroSSCC <> '' then
             Rec.SetRange(SSCC, FiltroSSCC)
         else
@@ -280,8 +303,19 @@ page 51108 "Consulta Ubic. Producto SGA"
         end;
 
         rTotal.CopyFilters(Rec);
-        rTotal.CalcSums("Cantidad Base");
-        TotalUbicado := rTotal."Cantidad Base";
+        // CalcSums suma en la base de datos; con el filtro del grupo, que es un FlowField, se suma
+        // recorriendo lo filtrado, para no depender de que CalcSums lo admita.
+        if FiltroGrupoIIEE = '' then begin
+            rTotal.CalcSums("Cantidad Base");
+            TotalUbicado := rTotal."Cantidad Base";
+        end else begin
+            TotalUbicado := 0;
+            rTotal.SetLoadFields("Cantidad Base");
+            if rTotal.FindSet() then
+                repeat
+                    TotalUbicado += rTotal."Cantidad Base";
+                until rTotal.Next() = 0;
+        end;
 
         CurrPage.Update(false);
     end;

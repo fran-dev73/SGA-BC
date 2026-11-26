@@ -20,9 +20,17 @@ using System.Utilities;
 /// </summary>
 codeunit 51100 "Gestion Contenido SGA"
 {
+    // Codeunit.Run da de alta el palé que trae Rec (ver IntentarAltaStock).
+    TableNo = "Movimiento Ubicacion SGA";
     Permissions = tabledata "Contenido Ubicacion SGA" = rimd,
                   tabledata "Movimiento Ubicacion SGA" = rimd,
                   tabledata "Ubicacion SGA" = rimd;
+
+    trigger OnRun()
+    begin
+        RegistrarAltaStock(Rec."Cod. Almacen", Rec."Cod. Bin Destino", Rec."No. Producto", Rec."No. Lote", Rec.SSCC,
+                           Rec."Cod. Unidad Medida", Rec.Cantidad);
+    end;
 
     var
         cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
@@ -90,13 +98,22 @@ codeunit 51100 "Gestion Contenido SGA"
     /// </summary>
     local procedure TestSSCCEntrada(prm_Almacen: Code[10]; prm_Producto: Code[20]; prm_SSCC: Code[20])
     var
-        rContenido: Record "Contenido Ubicacion SGA";
         SSCCObligatorioErr: Label 'Indique el SSCC del palé de %1 que entra.', Comment = '%1 = producto';
-        SSCCYaEnAlmacenErr: Label 'El SSCC %1 ya está en la ubicación %2 con %3, lote %4. Es un palé que ya entró: revise la etiqueta.', Comment = '%1 = SSCC, %2 = ubicación, %3 = producto, %4 = lote';
     begin
         if prm_SSCC = '' then
             Error(SSCCObligatorioErr, prm_Producto);
+        TestSSCCNuevo(prm_Almacen, prm_SSCC);
+    end;
 
+    /// <summary>
+    /// Error si el SSCC ya está en el almacén, con el mismo producto o con otro: es una etiqueta
+    /// leída dos veces o la de otro palé.
+    /// </summary>
+    local procedure TestSSCCNuevo(prm_Almacen: Code[10]; prm_SSCC: Code[20])
+    var
+        rContenido: Record "Contenido Ubicacion SGA";
+        SSCCYaEnAlmacenErr: Label 'El SSCC %1 ya está en la ubicación %2 con %3, lote %4. Es un palé que ya entró: revise la etiqueta.', Comment = '%1 = SSCC, %2 = ubicación, %3 = producto, %4 = lote';
+    begin
         rContenido.SetCurrentKey(SSCC, "Cod. Almacen");
         rContenido.SetRange(SSCC, prm_SSCC);
         rContenido.SetRange("Cod. Almacen", prm_Almacen);
@@ -255,19 +272,67 @@ codeunit 51100 "Gestion Contenido SGA"
 
     /// <summary>
     /// Mete en una ubicación mercancía que ya está ahí, sin comprobar capacidad ni reglas de
-    /// mezcla y sin SSCC: la carga inicial (prm_Tipo "Carga Inicial") o lo que BC tiene y SGA no
-    /// tiene ubicado, en la ubicación de ajustes (prm_Tipo Ajuste, Regularizar de la
-    /// conciliación), que guarda diferencias y no palés.
+    /// mezcla: la carga inicial y el alta de stock en la PDA (prm_Tipo "Carga Inicial") o lo que
+    /// BC tiene y SGA no tiene ubicado, en la ubicación de ajustes (prm_Tipo Ajuste, Regularizar
+    /// de la conciliación), que guarda diferencias y no palés. El SSCC es opcional; si viene, no
+    /// puede estar ya en el almacén (TestSSCCNuevo).
     /// </summary>
-    procedure RegistrarAjuste(prm_Tipo: Enum "Tipo Mov. Ubicacion SGA"; prm_Almacen: Code[10]; prm_Ubicacion: Code[20]; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_UM: Code[10]; prm_Cantidad: Decimal; prm_Descripcion: Text)
+    procedure RegistrarAjuste(prm_Tipo: Enum "Tipo Mov. Ubicacion SGA"; prm_Almacen: Code[10]; prm_Ubicacion: Code[20]; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_SSCC: Code[20]; prm_UM: Code[10]; prm_Cantidad: Decimal; prm_Descripcion: Text)
     var
         origen: Enum "Origen Mov. SGA";
     begin
+        if prm_SSCC <> '' then
+            TestSSCCNuevo(prm_Almacen, prm_SSCC);
         origen := "Origen Mov. SGA"::Manual;
         if prm_Tipo = prm_Tipo::"Carga Inicial" then
             origen := "Origen Mov. SGA"::"Carga Inicial";
-        AplicarMovimiento(prm_Tipo, origen, prm_Almacen, '', prm_Ubicacion, prm_Producto, prm_Lote, '', prm_UM,
+        AplicarMovimiento(prm_Tipo, origen, prm_Almacen, '', prm_Ubicacion, prm_Producto, prm_Lote, prm_SSCC, prm_UM,
                           prm_Cantidad, '', 0, prm_Descripcion);
+    end;
+
+    /// <summary>
+    /// RegistrarAltaStock sin la ventana de error de BC, para la PDA: se lanza con Codeunit.Run
+    /// (OnRun), así que si algo falla no queda nada grabado y el texto del error vuelve en
+    /// prm_Error para enseñarlo en la propia pantalla. Una confirmación (capacidad que solo
+    /// avisa) sigue saliendo como pregunta de BC; si se contesta que no, prm_Error va vacío.
+    /// </summary>
+    procedure IntentarAltaStock(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_SSCC: Code[20]; prm_UM: Code[10]; prm_Cantidad: Decimal; var prm_Error: Text): Boolean
+    var
+        TempPale: Record "Movimiento Ubicacion SGA" temporary;
+    begin
+        TempPale."Cod. Almacen" := prm_Almacen;
+        TempPale."Cod. Bin Destino" := prm_Ubicacion;
+        TempPale."No. Producto" := prm_Producto;
+        TempPale."No. Lote" := prm_Lote;
+        TempPale.SSCC := prm_SSCC;
+        TempPale."Cod. Unidad Medida" := prm_UM;
+        TempPale.Cantidad := prm_Cantidad;
+        ClearLastError();
+        if Codeunit.Run(Codeunit::"Gestion Contenido SGA", TempPale) then
+            exit(true);
+        prm_Error := GetLastErrorText();
+        exit(false);
+    end;
+
+    /// <summary>
+    /// Alta de un palé que ya está en su ubicación (pantalla "Alta Stock PDA SGA"): stock de BC
+    /// que SGA aún no tiene ubicado y que no se puede colocar con la carga inicial porque el
+    /// almacén no se puede vaciar. Se registra como la carga inicial, sin comprobar mezcla ni
+    /// bloqueos (la mercancía ya está ahí), pero sin pasar de la capacidad de la ubicación
+    /// (TestCapacidadAlta). El SSCC es el de la etiqueta, si la tiene; el lote se exige si el
+    /// producto lleva lotes de BC.
+    /// </summary>
+    local procedure RegistrarAltaStock(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_SSCC: Code[20]; prm_UM: Code[10]; prm_Cantidad: Decimal)
+    var
+        UbicacionObligatoriaErr: Label 'Lea o teclee la ubicación del palé.';
+        AltaStockPDALbl: Label 'Alta de stock en PDA';
+    begin
+        if prm_Ubicacion = '' then
+            Error(UbicacionObligatoriaErr);
+        cStock.TestLoteIndicado(prm_Producto, prm_Lote);
+        TestCapacidadAlta(prm_Almacen, prm_Ubicacion, prm_Producto, cUM.EnBase(prm_Producto, prm_UM, prm_Cantidad));
+        RegistrarAjuste("Tipo Mov. Ubicacion SGA"::"Carga Inicial", prm_Almacen, prm_Ubicacion, prm_Producto, prm_Lote, prm_SSCC,
+                        prm_UM, prm_Cantidad, AltaStockPDALbl);
     end;
 
     /// <summary>
@@ -734,21 +799,15 @@ codeunit 51100 "Gestion Contenido SGA"
     local procedure TestUbicacionAdmite(var rUbicacionSGA: Record "Ubicacion SGA"; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_CantidadBase: Decimal)
     var
         rContenido: Record "Contenido Ubicacion SGA";
-        cConfirmMgt: Codeunit "Confirm Management";
         // El bloqueo de la zona se lee en cada registro: no se guarda entre movimientos.
         zonasBloqueadas: Dictionary of [Text, Boolean];
-        ocupado: Decimal;
         entrada: Decimal;
         UbicacionBloqueadaErr: Label 'La ubicación %1 está bloqueada: %2', Comment = '%1 = ubicación, %2 = motivo de bloqueo';
         UbicacionProductoFijoErr: Label 'La ubicación %1 está reservada para el producto %2.', Comment = '%1 = ubicación, %2 = producto fijo';
         MezclaProductoErr: Label 'La ubicación %1 no permite mezclar productos y ya contiene %2.', Comment = '%1 = ubicación, %2 = producto que ya contiene';
         MezclaLoteErr: Label 'La ubicación %1 no permite mezclar lotes y ya contiene el lote %2.', Comment = '%1 = ubicación, %2 = lote que ya contiene';
-        SinCapacidadErr: Label 'La ubicación %1 no tiene hueco: capacidad %2, ocupado %3, se intenta añadir %4.', Comment = '%1 = ubicación, %2 = capacidad, %3 = ocupado, %4 = cantidad que se intenta añadir';
-        SuperaCapacidadQst: Label 'La ubicación %1 se queda por encima de su capacidad (%2 de %3). ¿Desea continuar?', Comment = '%1 = ubicación, %2 = ocupación resultante, %3 = capacidad';
     begin
-        // La capacidad se declara en palés. Lo que hay se cuenta con el palé de cada producto y
-        // lo que entra, con el de este producto: así caben juntos palés de 200 y de 300.
-        entrada := Round(cUM.EnPales(prm_Producto, prm_CantidadBase), 0.00001);
+        entrada := EntradaEnPales(prm_Producto, prm_CantidadBase);
         case rUbicacionSGA.MotivoRechazoEntrada(prm_Producto, prm_Lote, entrada, ParaReserva, true, zonasBloqueadas, cUM, rContenido) of
             0:
                 exit;
@@ -763,21 +822,60 @@ codeunit 51100 "Gestion Contenido SGA"
             6:
                 Error(MezclaLoteErr, rUbicacionSGA."Cod. Bin", rContenido."No. Lote");
         end;
+        // Sin sitio (4).
+        RechazarPorCapacidad(rUbicacionSGA, entrada);
+    end;
 
-        // Sin sitio (4). Lo ocupado solo se calcula para el mensaje.
+    /// <summary>
+    /// La capacidad se declara en palés. Lo que hay se cuenta con el palé de cada producto y lo
+    /// que entra, con el de este producto: así caben juntos palés de 200 y de 300.
+    /// </summary>
+    local procedure EntradaEnPales(prm_Producto: Code[20]; prm_CantidadBase: Decimal): Decimal
+    begin
+        exit(Round(cUM.EnPales(prm_Producto, prm_CantidadBase), 0.00001));
+    end;
+
+    /// <summary>
+    /// Ubicación sin sitio para prm_Entrada palés: error, salvo que la ubicación (o la
+    /// configuración, si ella no dice nada) solo avise; entonces se deja pasar confirmándolo.
+    /// </summary>
+    local procedure RechazarPorCapacidad(var rUbicacionSGA: Record "Ubicacion SGA"; prm_Entrada: Decimal)
+    var
+        cConfirmMgt: Codeunit "Confirm Management";
+        ocupado: Decimal;
+        SinCapacidadErr: Label 'La ubicación %1 no tiene hueco: capacidad %2, ocupado %3, se intenta añadir %4.', Comment = '%1 = ubicación, %2 = capacidad, %3 = ocupado, %4 = cantidad que se intenta añadir';
+        SuperaCapacidadQst: Label 'La ubicación %1 se queda por encima de su capacidad (%2 de %3). ¿Desea continuar?', Comment = '%1 = ubicación, %2 = ocupación resultante, %3 = capacidad';
+    begin
+        // Lo ocupado solo se calcula para el mensaje.
         ocupado := rUbicacionSGA.OcupadoEnPales(cUM);
 
         // La capacidad se controla siempre: solo si la ubicación (o la configuración, si ella no
         // dice nada) avisa se puede pasar, confirmándolo. Si no, se bloquea.
         if not rUbicacionSGA.SoloAvisaCapacidad() then
-            Error(SinCapacidadErr, rUbicacionSGA."Cod. Bin", rUbicacionSGA."Capacidad Uds.", ocupado, entrada);
+            Error(SinCapacidadErr, rUbicacionSGA."Cod. Bin", rUbicacionSGA."Capacidad Uds.", ocupado, prm_Entrada);
 
         // Avisar: sin interfaz se deja pasar y queda el registro del movimiento.
         if not GuiAllowed() then
             exit;
 
-        if not cConfirmMgt.GetResponseOrDefault(StrSubstNo(SuperaCapacidadQst, rUbicacionSGA."Cod. Bin", ocupado + entrada, rUbicacionSGA."Capacidad Uds."), false) then
+        if not cConfirmMgt.GetResponseOrDefault(StrSubstNo(SuperaCapacidadQst, rUbicacionSGA."Cod. Bin", ocupado + prm_Entrada, rUbicacionSGA."Capacidad Uds."), false) then
             Error('');
+    end;
+
+    /// <summary>
+    /// El alta de stock (RegistrarAltaStock) solo comprueba la capacidad de la ubicación: la
+    /// mercancía ya está ahí, así que ni mezcla ni bloqueos impiden darla de alta, pero no
+    /// puede pasar de lo que cabe (o, si la ubicación solo avisa, confirmándolo).
+    /// </summary>
+    local procedure TestCapacidadAlta(prm_Almacen: Code[10]; prm_Ubicacion: Code[20]; prm_Producto: Code[20]; prm_CantidadBase: Decimal)
+    var
+        rUbicacionSGA: Record "Ubicacion SGA";
+        entrada: Decimal;
+    begin
+        LeerUbicacionSGA(prm_Almacen, prm_Ubicacion, rUbicacionSGA);
+        entrada := EntradaEnPales(prm_Producto, prm_CantidadBase);
+        if rUbicacionSGA.SuperaCapacidad(entrada, cUM) then
+            RechazarPorCapacidad(rUbicacionSGA, entrada);
     end;
 
     local procedure InsertarMovimiento(prm_Tipo: Enum "Tipo Mov. Ubicacion SGA"; prm_Origen: Enum "Origen Mov. SGA"; prm_Almacen: Code[10]; prm_UbicacionOrigen: Code[20]; prm_UbicacionDestino: Code[20]; prm_Producto: Code[20]; prm_Lote: Code[50]; prm_SSCC: Code[20]; prm_Caducidad: Date; prm_UM: Code[10]; prm_Cantidad: Decimal; prm_CantidadBase: Decimal; prm_NoDocumento: Code[20]; prm_NoLinea: Integer; prm_Descripcion: Text): Integer

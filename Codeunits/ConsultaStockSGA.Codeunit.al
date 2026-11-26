@@ -79,6 +79,18 @@ codeunit 51103 "Consulta Stock SGA"
     end;
 
     /// <summary>
+    /// Error si el producto lleva lotes de BC (LoteEstandar) y no se dice el lote: en blanco se
+    /// mezclarían todos.
+    /// </summary>
+    procedure TestLoteIndicado(prm_Producto: Code[20]; prm_Lote: Code[50])
+    var
+        LoteObligatorioErr: Label 'El producto %1 lleva lotes: indique el lote que va a ubicar.', Comment = '%1 = producto';
+    begin
+        if (prm_Lote = '') and LoteEstandar(prm_Producto) then
+            Error(LoteObligatorioErr, prm_Producto);
+    end;
+
+    /// <summary>
     /// TestProductoSGA sobre la ficha ya leída por quien llama, con el tipo, "Producto Tianna" y
     /// la categoría.
     /// </summary>
@@ -284,7 +296,7 @@ codeunit 51103 "Consulta Stock SGA"
         // El stock que BC tiene y SGA no aparece en la ubicación de ajustes hasta que
         // alguien lo coloque físicamente donde le corresponde.
         cContenido.RegistrarAjuste("Tipo Mov. Ubicacion SGA"::Ajuste, prm_Fila."Cod. Almacen", rConfig."Ubic. Ajustes", prm_Fila."No. Producto",
-                                   prm_Fila."No. Lote", prm_Fila."Unidad Medida Base",
+                                   prm_Fila."No. Lote", '', prm_Fila."Unidad Medida Base",
                                    aRegularizar, RegularizacionConciliacionLbl);
 
         prm_Fila."Stock SGA" += aRegularizar;
@@ -405,6 +417,35 @@ codeunit 51103 "Consulta Stock SGA"
 
         cVentana.Cerrar();
         exit(lineas);
+    end;
+
+    /// <summary>
+    /// Deja marcados en prm_Item (MarkedOnly) los productos con algo que ubicar a mano en el
+    /// almacén: "A Ubicar" de CargarPendienteUbicar con la "Fecha inicio SGA", lo mismo que mide
+    /// "Ubicar producto". Error si no hay ninguno.
+    /// </summary>
+    procedure MarcarPendientesUbicar(prm_Almacen: Code[10]; var prm_Item: Record Item)
+    var
+        TempPendiente: Record "Buffer Conciliacion SGA" temporary;
+        rConfig: Record "Config. SGA";
+        producto: Code[20];
+        NadaPendienteErr: Label 'No hay nada pendiente de ubicar a mano en el almacén %1.', Comment = '%1 = almacén';
+    begin
+        rConfig.ObtenerConfig();
+        CargarPendienteUbicar(prm_Almacen, '', rConfig."Fecha Inicio SGA", TempPendiente);
+        TempPendiente.SetFilter("A Ubicar", '>0');
+        if not TempPendiente.FindSet() then
+            Error(NadaPendienteErr, prm_Almacen);
+        // Mark va por la clave primaria: basta con ponerla, sin leer la ficha.
+        producto := '';
+        repeat
+            if TempPendiente."No. Producto" <> producto then begin
+                producto := TempPendiente."No. Producto";
+                prm_Item."No." := producto;
+                prm_Item.Mark(true);
+            end;
+        until TempPendiente.Next() = 0;
+        prm_Item.MarkedOnly(true);
     end;
 
     /// <summary>

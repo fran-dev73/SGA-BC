@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<!-- Plantilla del mapa de SGA. No se abre directamente: GenerarMapa.ps1 mete los datos en
+     DATOS_MAPA y escribe MapaSGA.html. Sin librerías externas: funciona sin conexión.
+
+     Dos vistas, dibujadas en SVG:
+     - Plano general: menús -> pantallas -> lógica (codeunits) -> tablas, a nivel de objeto.
+     - Recorrido de una pantalla: sus botones y campos -> las funciones que usan -> tablas y
+       pantallas que abren. Las funciones propias de la pantalla no se dibujan: se atraviesan. -->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Mapa de SGA</title>
+<style>
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body { display: flex; flex-direction: column; font: 14px "Segoe UI", Roboto, sans-serif; color: #111827; background: #f3f4f6; }
+
+    header { display: flex; align-items: center; gap: 14px; padding: 10px 16px; background: #111827; color: #f9fafb; flex-wrap: wrap; }
+    header h1 { margin: 0; font-size: 18px; font-weight: 700; }
+    .migas { font-size: 15px; color: #d1d5db; }
+    .migas span.enlace { color: #93c5fd; cursor: pointer; }
+    .migas span.enlace:hover { text-decoration: underline; }
+    .buscador { position: relative; margin-left: auto; width: 380px; }
+    .buscador input { width: 100%; padding: 7px 10px; font: inherit; border: none; border-radius: 6px; }
+    #resultados { position: absolute; top: 36px; left: 0; right: 0; z-index: 30; max-height: 60vh; overflow-y: auto; background: #fff; border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.25); color: #111827; display: none; }
+    #resultados div { padding: 6px 10px; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+    #resultados div:hover { background: #eff6ff; }
+    .sinacceso { font-size: 12px; color: #fcd34d; cursor: pointer; }
+
+    #ayuda { padding: 8px 16px; background: #fff; border-bottom: 1px solid #e5e7eb; font-size: 13px; color: #374151; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; min-height: 40px; }
+    #ayuda b { color: #111827; }
+    .boton { padding: 5px 12px; background: #2563eb; color: #fff; border-radius: 6px; cursor: pointer; font: inherit; font-size: 13px; border: none; }
+    .boton.gris { background: #e5e7eb; color: #111827; }
+    .leyenda { display: inline-flex; gap: 12px; align-items: center; margin-left: auto; font-size: 12px; color: #4b5563; }
+    .leyenda i { display: inline-block; width: 22px; height: 0; border-top: 2px solid; vertical-align: middle; margin-right: 4px; }
+
+    #lienzo { flex: 1; overflow: auto; position: relative; }
+    svg text { font-family: "Segoe UI", Roboto, sans-serif; }
+    .caja { cursor: pointer; }
+    .caja rect.fondo { transition: opacity .15s; }
+    .apagado { opacity: .12; }
+    .arista { fill: none; transition: opacity .15s; }
+    .arista.oculta { display: none; }
+
+    #ficha { position: fixed; top: 0; right: 0; bottom: 0; width: 420px; background: #fff; box-shadow: -8px 0 24px rgba(0,0,0,.18); padding: 16px 18px; overflow-y: auto; z-index: 20; display: none; }
+    #ficha h2 { margin: 0 0 4px; font-size: 19px; padding-right: 30px; }
+    #ficha h3 { margin: 18px 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: #6b7280; }
+    #ficha .cerrar { position: absolute; top: 10px; right: 14px; font-size: 22px; cursor: pointer; color: #6b7280; }
+    #ficha .sub { color: #4b5563; font-size: 13px; }
+    #ficha .doc { white-space: pre-wrap; background: #f9fafb; padding: 10px 12px; border-radius: 6px; border-left: 4px solid #d1d5db; font-size: 13px; line-height: 1.45; margin-top: 10px; }
+    #ficha .lista div { padding: 3px 0; font-size: 13px; }
+    #ficha .gris { color: #9ca3af; }
+    .enlace { color: #1d4ed8; cursor: pointer; }
+    .enlace:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<header>
+    <h1>Mapa de SGA</h1>
+    <div class="migas" id="migas"></div>
+    <span class="sinacceso" id="sinacceso"></span>
+    <div class="buscador">
+        <input id="buscar" type="search" placeholder="Buscar pantalla, botón, función o tabla…" autocomplete="off">
+        <div id="resultados"></div>
+    </div>
+</header>
+<div id="ayuda"></div>
+<div id="lienzo"></div>
+<div id="ficha"></div>
+<script>var DATOS = /*DATOS_MAPA*/null;</script>
+<script src="MapaComun.js"></script>
+<script>
+(function () {
+    'use strict';
+
+    var N = DATOS.nodos;
+    var SVGNS = 'http://www.w3.org/2000/svg';
+    var lienzo = document.getElementById('lienzo');
+    var ayuda = document.getElementById('ayuda');
+    var ficha = document.getElementById('ficha');
+
+    var COLOR = { menu: '#374151', page: '#2563eb', report: '#db2777', codeunit: '#15803d', table: '#b45309', bc: '#9ca3af', accion: '#0891b2' };
+    var COLOR_ARISTA = { lee: '#d97706', escribe: '#dc2626', abre: '#2563eb', llama: '#16a34a', usa: '#64748b' };
+    var CLASE = {
+        proc: 'Función', trigger: 'Trigger', action: 'Botón (acción)', field: 'Campo', usercontrol: 'Control de la pantalla',
+        suscriptor: 'Reacción a un evento de BC', page: 'Pantalla', report: 'Informe', codeunit: 'Codeunit (lógica)',
+        table: 'Tabla', tableextension: 'Ampliación de tabla', pageextension: 'Ampliación de pantalla de BC',
+        menu: 'Menú', profile: 'Perfil'
+    };
+
+    // ---- Utilidades -------------------------------------------------------------------------
+
+    function el(etiqueta, clase, texto) {
+        var e = document.createElement(etiqueta);
+        if (clase) { e.className = clase; }
+        if (texto !== undefined && texto !== null) { e.textContent = texto; }
+        return e;
+    }
+    function svg(etiqueta, atributos, padre) {
+        var e = document.createElementNS(SVGNS, etiqueta);
+        Object.keys(atributos || {}).forEach(function (k) { e.setAttribute(k, atributos[k]); });
+        if (padre) { padre.appendChild(e); }
+        return e;
+    }
+    function tipo(id) { return N[id] ? N[id].t : ''; }
+    function esBC(id) { return tipo(id).indexOf('bc-') === 0; }
+    function objDe(id) { return N[id].o || id; }
+    function esPagina(id) { var t = tipo(id); return t === 'page' || t === 'report'; }
+    function esParte(id) { var pt = N[id].pt; return pt === 'CardPart' || pt === 'ListPart' || pt === 'RoleCenter'; }
+    function esLogica(id) { var o = N[id] && N[id].o; var t = tipo(o); return !!o && (t === 'codeunit' || t === 'table' || t === 'tableextension'); }
+
+    function nombre(id) {
+        var n = N[id];
+        if (TEXTOS[n.n]) { return TEXTOS[n.n]; }
+        if (n.t === 'suscriptor' && n.ev) { return n.ev; }
+        if (n.t === 'trigger' && TRIGGERS[n.n.toLowerCase()]) { return TRIGGERS[n.n.toLowerCase()]; }
+        if (n.c && !n.o) { return n.c; }
+        return n.n;
+    }
+    // Lo que se lee en una fila: el campo dice además qué lo dispara.
+    function textoFila(id) {
+        var n = N[id];
+        var t = nombre(id);
+        if (n.t === 'field' && n.g) { t += ' (' + n.g.split(', ').map(function (g) { return TRIGGERS[g.toLowerCase()] || g; }).join(', ') + ')'; }
+        if (n.t === 'usercontrol') { t = 'Control ' + t + (n.g ? ' (eventos: ' + n.g + ')' : ''); }
+        return t;
+    }
+    function colorObjeto(id) {
+        if (esBC(id)) { return COLOR.bc; }
+        var t = tipo(id);
+        if (t === 'tableextension') { return COLOR.table; }
+        return COLOR[t] || '#6b7280';
+    }
+    function recortar(texto, ancho, tamano) {
+        var max = Math.floor(ancho / (tamano * 0.56));
+        return texto.length > max ? texto.substring(0, max - 1) + '…' : texto;
+    }
+
+    var miembrosDe = {};
+    var entran = {};
+    Object.keys(N).forEach(function (id) {
+        var o = N[id].o;
+        if (o) { (miembrosDe[o] = miembrosDe[o] || []).push(id); }
+        N[id].e.forEach(function (a) { if (N[a.a]) { (entran[a.a] = entran[a.a] || []).push({ de: id, k: a.k, m: a.m }); } });
+    });
+    Object.keys(miembrosDe).forEach(function (o) { miembrosDe[o].sort(function (a, b) { return (N[a].l || 0) - (N[b].l || 0); }); });
+
+    function partesDe(id) {
+        return N[id].e.filter(function (a) { return a.k === 'contiene' && tipo(a.a) === 'page' && !esBC(a.a); }).map(function (a) { return a.a; });
+    }
+    function propiosDe(id) {
+        var p = {};
+        p[id] = true;
+        if (esPagina(id)) { partesDe(id).forEach(function (x) { p[x] = true; }); }
+        return p;
+    }
+
+    function onRun(cu) {
+        var r = (miembrosDe[cu] || []).filter(function (m) { return N[m].t === 'trigger' && N[m].n.toLowerCase() === 'onrun'; });
+        return r.length ? r[0] : null;
+    }
+
+    // Qué alcanza un grupo de miembros, a nivel de objeto: atraviesa las funciones propias (y
+    // las de las tablas, que son parte de los datos) y se para en codeunits, pantallas y tablas.
+    function salidas(inicios, propios) {
+        var res = { cu: {}, tab: {}, pag: {} }, vistos = {}, pila = inicios.slice();
+        while (pila.length) {
+            var m = pila.pop();
+            if (vistos[m]) { continue; }
+            vistos[m] = true;
+            N[m].e.forEach(function (a) {
+                var d = a.a, td = tipo(d);
+                if (!N[d]) { return; }
+                if (a.k === 'lee' || a.k === 'escribe') {
+                    if (td === 'table' || td === 'bc-table') { res.tab[d] = (res.tab[d] === 'escribe' || a.k === 'escribe') ? 'escribe' : 'lee'; }
+                    return;
+                }
+                if (a.k === 'abre') { if (esPagina(d) && !propios[d]) { res.pag[d] = true; } return; }
+                if (a.k === 'ejecuta') { if (td === 'codeunit') { res.cu[d] = true; } return; }
+                if ((a.k !== 'llama' && a.k !== 'dispara') || esBC(d)) { return; }
+                var od = objDe(d), tod = tipo(od);
+                if (propios[od] || tod === 'table' || tod === 'tableextension') { pila.push(d); return; }
+                if (tod === 'codeunit') { res.cu[od] = true; return; }
+                if (esPagina(od)) { res.pag[od] = true; }
+            });
+        }
+        return res;
+    }
+
+    // ---- Plano general ---------------------------------------------------------------------
+
+    var plano = null;
+
+    function construirPlano() {
+        var grupos = [];
+        function destinosFila(m, propios) {
+            var directos = N[m].e.filter(function (a) { return a.k === 'abre' || a.k === 'ejecuta'; }).map(function (a) { return a.a; });
+            if (directos.length) { return directos; }
+            var s = salidas([m], propios);
+            return Object.keys(s.pag).concat(Object.keys(s.cu));
+        }
+        N['raiz:perfiles'].e.forEach(function (a) {
+            N[a.a].e.forEach(function (b) {
+                N[b.a].e.forEach(function (c) {
+                    if (tipo(c.a) !== 'menu') { return; }
+                    var g = { id: c.a, titulo: nombre(c.a), sub: nombre(a.a), filas: [] };
+                    N[c.a].e.forEach(function (d) { g.filas.push({ id: d.a, texto: nombre(d.a), destinos: destinosFila(d.a, propiosDe(b.a)) }); });
+                    grupos.push(g);
+                });
+            });
+        });
+        // Una caja por pantalla de BC a la que SGA añade botones o campos.
+        N['raiz:bc'].e.forEach(function (a) {
+            var g = { id: a.a, titulo: N[a.a].b || nombre(a.a), sub: 'pantalla de BC · lo que añade SGA', filas: [] };
+            N[a.a].e.forEach(function (b) {
+                if (b.k !== 'tiene') { return; }
+                g.filas.push({ id: b.a, texto: textoFila(b.a), destinos: destinosFila(b.a, propiosDe(a.a)) });
+            });
+            if (g.filas.length) { grupos.push(g); }
+        });
+        var ev = { id: 'raiz:eventos', titulo: 'Eventos de BC', sub: 'SGA reacciona cuando BC…', filas: [] };
+        N['raiz:eventos'].e.forEach(function (a) { ev.filas.push({ id: a.a, texto: nombre(a.a), destinos: [objDe(a.a)] }); });
+        if (ev.filas.length) { grupos.push(ev); }
+
+        // Objetos de cada capa y lo que usa cada uno.
+        var paginas = [], codeunits = [], tablas = {};
+        Object.keys(N).forEach(function (id) {
+            if (esPagina(id) && !esParte(id)) { paginas.push(id); }
+            if (tipo(id) === 'codeunit') { codeunits.push(id); }
+            if (tipo(id) === 'table' && !N[id].tmp) { tablas[id] = true; }
+        });
+        var usa = {};   // objeto -> [{a, k}]
+        function anotar(o, s) {
+            var l = [];
+            Object.keys(s.cu).forEach(function (x) { if (x !== o) { l.push({ a: x, k: 'llama' }); } });
+            Object.keys(s.tab).forEach(function (x) { l.push({ a: x, k: s.tab[x] }); tablas[x] = true; });
+            Object.keys(s.pag).forEach(function (x) { if (x !== o && !esBC(x)) { l.push({ a: x, k: 'abre' }); } });
+            usa[o] = l;
+        }
+        paginas.forEach(function (p) {
+            var propios = propiosDe(p), ini = [];
+            Object.keys(propios).forEach(function (o) { ini = ini.concat(miembrosDe[o] || []); });
+            anotar(p, salidas(ini, propios));
+        });
+        codeunits.forEach(function (c) { anotar(c, salidas(miembrosDe[c] || [], propiosDe(c))); });
+
+        // Orden de las pantallas: como salen en los menús; las que no, al final.
+        var orden = {}, n = 0;
+        grupos.forEach(function (g) { g.filas.forEach(function (f) { f.destinos.forEach(function (d) { if (orden[d] === undefined) { orden[d] = n++; } }); }); });
+        paginas.sort(function (a, b) {
+            var oa = orden[a] === undefined ? 9999 : orden[a], ob = orden[b] === undefined ? 9999 : orden[b];
+            return oa - ob || nombre(a).localeCompare(nombre(b));
+        });
+        plano = { grupos: grupos, paginas: paginas, codeunits: codeunits, tablas: Object.keys(tablas), usa: usa };
+    }
+
+    // Coloca en vertical una columna: cada caja lo más cerca posible de su altura deseada.
+    function colocar(ids, deseada, alto, hueco, inicio) {
+        ids.sort(function (a, b) { return deseada(a) - deseada(b); });
+        var y = {}, ultimo = inicio - hueco;
+        ids.forEach(function (id) { var v = Math.max(deseada(id), ultimo + hueco); y[id] = v; ultimo = v + alto; });
+        return y;
+    }
+
+    function pintarPlano(seleccion) {
+        if (!plano) { construirPlano(); }
+        vista = { tipo: 'plano' };
+        migas([{ texto: 'Plano general' }]);
+        ayudaPlano(null);
+
+        var X = [20, 360, 690, 1000], W = [300, 280, 260, 240], ALTO = 30, HUECO = 8, ARRIBA = 50;
+        var lienzoSvg = nuevoSvg();
+        var capaAristas = svg('g', {}, lienzoSvg), capaCajas = svg('g', {}, lienzoSvg);
+        ['MENÚS', 'PANTALLAS', 'LÓGICA (CODEUNITS)', 'TABLAS'].forEach(function (t, i) {
+            svg('text', { x: X[i], y: 28, 'font-size': 12, 'font-weight': 700, fill: '#6b7280', 'letter-spacing': '1' }, capaCajas).textContent = t;
+        });
+
+        var pos = {};    // id -> {x, y, w, h}  (centro vertical en y + h/2)
+        var y = ARRIBA;
+        plano.grupos.forEach(function (g) {
+            var alto = 40 + g.filas.length * 22 + 6;
+            var caja = cajaGrupo(capaCajas, X[0], y, W[0], alto, g);
+            pos[g.id] = { x: X[0], y: y, w: W[0], h: alto, el: caja };
+            g.filas.forEach(function (f, i) { pos[f.id] = { x: X[0], y: y + 40 + i * 22, w: W[0], h: 22, fila: true }; });
+            y += alto + 14;
+        });
+        var altoMenus = y;
+
+        // Las pantallas, seguidas y en el orden de los menús.
+        plano.paginas.forEach(function (p, i) { pos[p] = { x: X[1], y: ARRIBA + i * (ALTO + HUECO), w: W[1], h: ALTO }; });
+
+        function media(destino, fuentes) {
+            var suma = 0, cuenta = 0;
+            fuentes.forEach(function (f) { (plano.usa[f] || []).forEach(function (u) { if (u.a === destino && pos[f]) { suma += pos[f].y; cuenta++; } }); });
+            return cuenta ? suma / cuenta : 99999;
+        }
+        var filasMenu = [];
+        plano.grupos.forEach(function (g) { g.filas.forEach(function (f) { filasMenu.push(f); }); });
+        var yc = colocar(plano.codeunits.slice(), function (c) {
+            var v = media(c, plano.paginas), s = 0, k = 0;
+            filasMenu.forEach(function (f) { if (f.destinos.indexOf(c) >= 0) { s += pos[f.id].y; k++; } });
+            if (k) { v = v === 99999 ? s / k : (v + s / k) / 2; }
+            return v;
+        }, ALTO, HUECO * 2, ARRIBA);
+        plano.codeunits.forEach(function (c) { pos[c] = { x: X[2], y: yc[c], w: W[2], h: ALTO }; });
+        var yt = colocar(plano.tablas.slice(), function (t) {
+            var a = media(t, plano.codeunits), b = media(t, plano.paginas);
+            if (a === 99999) { return b; }
+            if (b === 99999) { return a; }
+            return (a * 2 + b) / 3;
+        }, ALTO, HUECO, ARRIBA);
+        plano.tablas.forEach(function (t) { pos[t] = { x: X[3], y: yt[t], w: W[3], h: ALTO }; });
+
+        // Cajas de pantallas, codeunits y tablas.
+        plano.paginas.concat(plano.codeunits, plano.tablas).forEach(function (id) {
+            var p = pos[id];
+            p.el = cajaSimple(capaCajas, p.x, p.y, p.w, p.h, nombre(id), colorObjeto(id), id, tipo(id) === 'codeunit' || tipo(id) === 'table');
+        });
+
+        // Aristas: filas de menú -> objeto; pantalla -> codeunit/tabla; codeunit -> tabla/codeunit.
+        var aristas = [];
+        filasMenu.forEach(function (f) {
+            f.destinos.forEach(function (d) { if (pos[d]) { aristas.push({ de: f.id, a: d, k: tipo(d) === 'codeunit' ? 'llama' : 'abre' }); } });
+        });
+        Object.keys(plano.usa).forEach(function (o) {
+            plano.usa[o].forEach(function (u) { if (pos[o] && pos[u.a]) { aristas.push({ de: o, a: u.a, k: u.k }); } });
+        });
+        // Las de quién usa a quién directamente. Sin líneas hasta que se pulsa una caja: todas a
+        // la vez no se pueden leer. Lo que alcanza la caja pulsada va en capaResalte.
+        aristas.forEach(function (a) {
+            a.el = trazo(capaAristas, pos[a.de], pos[a.a], a.k, 0.85, 1.8);
+            a.el.classList.add('oculta');
+        });
+        plano.capaResalte = svg('g', {}, capaAristas);
+
+        var alto = Math.max(altoMenus, ARRIBA + plano.paginas.length * (ALTO + HUECO));
+        Object.keys(pos).forEach(function (id) { alto = Math.max(alto, pos[id].y + pos[id].h + 20); });
+        lienzoSvg.setAttribute('width', 1280);
+        lienzoSvg.setAttribute('height', alto);
+
+        plano.pos = pos;
+        plano.aristas = aristas;
+        lienzoSvg.addEventListener('click', function (e) {
+            var id = idPulsado(e);
+            if (!id) { resaltarPlano(null); return; }
+            resaltarPlano(id);
+        });
+        lienzoSvg.addEventListener('dblclick', function (e) {
+            var id = idPulsado(e);
+            if (id && esPagina(id) && pos[id] && !pos[id].fila) { pintarRecorrido(id); }
+        });
+        if (seleccion) {
+            resaltarPlano(seleccion);
+            var p = pos[seleccion];
+            if (p) { lienzo.scrollTop = Math.max(0, p.y - 200); }
+        }
+    }
+
+    function cajaSimple(padre, x, y, w, h, texto, color, id, relleno) {
+        var g = svg('g', { 'class':'caja', 'data-id': id }, padre);
+        svg('rect', { 'class':'fondo', x: x, y: y, width: w, height: h, rx: 6, fill: relleno ? color : '#fff', stroke: color, 'stroke-width': 1.6 }, g);
+        svg('text', { x: x + 10, y: y + h / 2 + 5, 'font-size': 13, fill: relleno ? '#fff' : '#111827', 'font-weight': relleno ? 600 : 400 }, g).textContent = recortar(texto, w - 20, 13);
+        svg('title', {}, g).textContent = texto + (CLASE[tipo(id)] ? ' · ' + CLASE[tipo(id)] : '') + (esBC(id) ? ' de BC' : '');
+        return g;
+    }
+
+    function cajaGrupo(padre, x, y, w, h, grupo) {
+        var g = svg('g', { 'data-grupo': grupo.id }, padre);
+        svg('rect', { x: x, y: y, width: w, height: h, rx: 8, fill: '#fff', stroke: COLOR.menu, 'stroke-width': 1.6 }, g);
+        svg('rect', { x: x, y: y, width: w, height: 34, rx: 8, fill: COLOR.menu }, g);
+        svg('rect', { x: x, y: y + 26, width: w, height: 8, fill: COLOR.menu }, g);
+        svg('text', { x: x + 10, y: y + 15, 'font-size': 13, 'font-weight': 700, fill: '#fff' }, g).textContent = recortar(grupo.titulo, w - 20, 13);
+        svg('text', { x: x + 10, y: y + 29, 'font-size': 11, fill: '#d1d5db' }, g).textContent = recortar(grupo.sub, w - 20, 11);
+        grupo.filas.forEach(function (f, i) {
+            var fy = y + 40 + i * 22;
+            var fg = svg('g', { 'class':'caja', 'data-id': f.id }, g);
+            svg('rect', { 'class':'fondo', x: x + 4, y: fy, width: w - 8, height: 20, rx: 4, fill: i % 2 ? '#f9fafb' : '#fff' }, fg);
+            var sinDestino = !f.destinos.some(function (d) { return !esBC(d); });
+            svg('text', { x: x + 12, y: fy + 15, 'font-size': 12.5, fill: sinDestino ? '#9ca3af' : '#111827' }, fg).textContent = recortar(f.texto + (sinDestino && f.destinos.length ? '  (de BC)' : ''), w - 24, 12.5);
+            svg('title', {}, fg).textContent = f.texto;
+        });
+        return g;
+    }
+
+    function idPulsado(e) {
+        var g = e.target;
+        while (g && g.getAttribute && !g.getAttribute('data-id')) { g = g.parentNode; }
+        return g && g.getAttribute ? g.getAttribute('data-id') : null;
+    }
+
+    // Resalta lo conectado a id (hacia atrás: quién lo usa; hacia delante: qué usa) y apaga el resto.
+    function resaltarPlano(id) {
+        var cajas = lienzo.querySelectorAll('.caja');
+        if (!id) {
+            Array.prototype.forEach.call(cajas, function (c) { c.classList.remove('apagado'); });
+            plano.aristas.forEach(function (a) { a.el.classList.add('oculta'); });
+            plano.capaResalte.innerHTML = '';
+            ayudaPlano(null);
+            return;
+        }
+        // Hacia delante, lo que de verdad usa, función a función; hacia atrás, solo quien lo usa
+        // directamente (la cadena entera hacia atrás de una tabla muy usada es media aplicación).
+        var alcance = alcanceReal(id, cadenaCompleta);
+        var delante = alcance.nodos, detras = {};
+        detras[id] = true;
+        plano.aristas.forEach(function (a) { if (a.a === id) { detras[a.de] = true; } });
+        var activo = function (x) { return delante[x] || detras[x]; };
+        Array.prototype.forEach.call(cajas, function (c) { c.classList.toggle('apagado', !activo(c.getAttribute('data-id'))); });
+        plano.aristas.forEach(function (a) { a.el.classList.toggle('oculta', !(detras[a.de] && a.a === id)); });
+        plano.capaResalte.innerHTML = '';
+        alcance.aristas.forEach(function (a) { trazo(plano.capaResalte, plano.pos[a.de], plano.pos[a.a], a.k, 0.85, 1.8); });
+        ayudaPlano(id, delante, detras);
+    }
+
+    // Lo que alcanza un elemento del plano siguiendo las llamadas reales, función a función: de
+    // cada función solo cuenta lo que llama ella, no todo lo que hace su codeunit. Lo que se
+    // dibuja es la caja visible desde la que se llama: las funciones de la propia pantalla (y de
+    // sus partes) y las de las tablas se atraviesan con la caja que las llamó.
+    // Sin prm_Completo se para en la primera codeunit: lo que la caja usa directamente. Con él,
+    // la cadena entera, siguiendo solo lo que se puede ejecutar con los valores que llegan a cada
+    // función (pasos).
+    var cadenaCompleta = false;
+    function alcanceReal(id, prm_Completo) {
+        var res = { nodos: {}, aristas: [] }, claves = {}, vistos = {}, cola = [];
+        res.nodos[id] = true;
+        function encolar(m, v, ps) { ps.forEach(function (p) { cola.push([m, v, p]); }); }
+        function arista(de, a, k) {
+            if (!plano.pos[de] || !plano.pos[a] || de === a) { return; }
+            var c = de + '|' + a + '|' + k;
+            if (claves[c]) { return; }
+            claves[c] = true;
+            res.aristas.push({ de: de, a: a, k: k });
+            res.nodos[a] = true;
+        }
+        function entrarEn(objeto) {
+            var propios = propiosDe(objeto);
+            Object.keys(propios).forEach(function (o) { (miembrosDe[o] || []).forEach(function (m) { cola.push([m, objeto, {}]); }); });
+        }
+        function transparente(od, v) {
+            var t = tipo(od);
+            if (t === 'table' || t === 'tableextension' || od === v) { return true; }
+            if (esPagina(v) && partesDe(v).indexOf(od) >= 0) { return true; }
+            return !!N[v] && N[v].o === od;   // fila de menú: las funciones de su propia ampliación
+        }
+        var t = tipo(id);
+        if (esPagina(id) || t === 'codeunit') { entrarEn(id); }
+        else if (N[id].o) { cola.push([id, id, {}]); }   // fila de un menú
+        while (cola.length) {
+            var par = cola.shift(), m = par[0], v = par[1], ctx = par[2], c = m + '|' + v + '|' + claveCtx(ctx);
+            if (vistos[c]) { continue; }
+            vistos[c] = true;
+            N[m].e.forEach(function (a) {
+                var d = a.a, td = tipo(d);
+                if (!N[d]) { return; }
+                var ps = pasos(a, ctx);
+                if (!ps.length) { return; }
+                if (a.k === 'lee' || a.k === 'escribe') { if (td === 'table' || td === 'bc-table') { arista(v, d, a.k); } return; }
+                if (a.k === 'abre') {
+                    if (esPagina(d) && !esParte(d)) {
+                        arista(v, d, 'abre');
+                        // Una opción de menú lleva a su pantalla, y con ella a todo lo que esa pantalla hace.
+                        if (!esPagina(v) && tipo(v) !== 'codeunit') { entrarEn(d); }
+                    }
+                    return;
+                }
+                if (a.k === 'ejecuta') {
+                    if (td === 'codeunit') { arista(v, d, 'llama'); var on = onRun(d); if (on && prm_Completo) { cola.push([on, d, {}]); } }
+                    return;
+                }
+                if ((a.k !== 'llama' && a.k !== 'dispara') || esBC(d)) { return; }
+                var od = objDe(d);
+                if (transparente(od, v)) { encolar(d, v, ps); return; }
+                if (tipo(od) === 'codeunit') { arista(v, od, 'llama'); if (prm_Completo) { encolar(d, od, ps); } return; }
+                if (esPagina(od)) { arista(v, od, 'abre'); }
+            });
+        }
+        return res;
+    }
+
+    // Una línea del plano entre dos cajas; en la misma columna, un arco por la derecha.
+    function trazo(capa, p1, p2, k, opacidad, grosor) {
+        var y1 = p1.y + p1.h / 2, y2 = p2.y + p2.h / 2, d;
+        if (p1.x === p2.x) {
+            var xr = p1.x + p1.w, kk = 30 + Math.min(120, Math.abs(y2 - y1) / 5);
+            d = 'M' + xr + ',' + y1 + ' C' + (xr + kk) + ',' + y1 + ' ' + (xr + kk) + ',' + y2 + ' ' + xr + ',' + y2;
+        } else {
+            var x1 = p1.x + p1.w, x2 = p2.x, mx = (x1 + x2) / 2;
+            d = 'M' + x1 + ',' + y1 + ' C' + mx + ',' + y1 + ' ' + mx + ',' + y2 + ' ' + x2 + ',' + y2;
+        }
+        return svg('path', { d: d, 'class': 'arista', stroke: COLOR_ARISTA[k] || '#9ca3af', 'stroke-width': grosor, opacity: opacidad, 'stroke-dasharray': k === 'lee' ? '4 3' : '' }, capa);
+    }
+
+    function ayudaPlano(id, delante, detras) {
+        ayuda.innerHTML = '';
+        if (!id) {
+            ayuda.appendChild(textoAyuda('<b>Plano general.</b> De izquierda a derecha: los menús, las pantallas que abren, la lógica que usan y las tablas que tocan. Pulsa cualquier caja para ver con qué se conecta; doble clic en una pantalla para ver qué hace cada botón.'));
+        } else {
+            var cuenta = function (s) { return Object.keys(s).length - 1; };
+            ayuda.appendChild(textoAyuda('<b>' + escapar(nombre(id)) + '</b> · ' + (CLASE[tipo(id)] || tipo(id)) + (esBC(id) ? ' de BC' : '') + ' · ' + (cadenaCompleta ? 'cadena completa: ' : 'lo que usa directamente: ') + cuenta(delante) + ', lo usan ' + cuenta(detras) + '. Pulsa en vacío para quitar el resaltado.'));
+            if (tipo(id) !== 'table' && tipo(id) !== 'bc-table') {
+                ayuda.appendChild(boton(cadenaCompleta ? 'Ver solo lo directo' : 'Ver la cadena completa', function () { cadenaCompleta = !cadenaCompleta; resaltarPlano(id); }, true));
+            }
+            if (esPagina(id) && !esParte(id)) { ayuda.appendChild(boton('Ver qué hace cada botón ▶', function () { pintarRecorrido(id); })); }
+            var paginaFila = N[id].o && plano.grupos.some(function (g) { return g.filas.some(function (f) { return f.id === id; }); });
+            if (paginaFila) {
+                var destino = null;
+                plano.grupos.forEach(function (g) { g.filas.forEach(function (f) { if (f.id === id) { destino = f.destinos.filter(esPagina)[0]; } }); });
+                if (destino) { ayuda.appendChild(boton('Abrir el recorrido de ' + nombre(destino) + ' ▶', function () { pintarRecorrido(destino); })); }
+            }
+            ayuda.appendChild(boton('Detalles', function () { mostrarFicha(id); }, true));
+        }
+        ayuda.appendChild(leyenda());
+    }
+
+    // ---- Recorrido de una pantalla ---------------------------------------------------------
+
+    function construirRecorrido(P) {
+        var propios = propiosDe(P);
+        var entradas = [];
+        Object.keys(propios).forEach(function (o) {
+            (miembrosDe[o] || []).forEach(function (m) {
+                var t = tipo(m);
+                if (t === 'trigger' || t === 'action' || t === 'field' || t === 'usercontrol') { entradas.push(m); }
+            });
+        });
+        // Botones y campos primero en el orden de la pantalla; los triggers de la pantalla delante.
+        entradas.sort(function (a, b) {
+            var ta = tipo(a) === 'trigger' ? 0 : 1, tb = tipo(b) === 'trigger' ? 0 : 1;
+            return ta - tb || (N[a].l || 0) - (N[b].l || 0);
+        });
+
+        // Lo que hace un miembro, atravesando las funciones propias de la pantalla. De cada
+        // función de lógica a la que llega se guarda con qué valores entra (contextos[función]).
+        var contextos = {};
+        function directos(m) {
+            var res = [], vistos = {}, pila = [[m, {}]], unicos = {};
+            function anadir(a, k, ctx) {
+                var c = a + '|' + k;
+                if (!unicos[c]) { unicos[c] = true; res.push({ a: a, k: k }); }
+                if (ctx) { (contextos[a] = contextos[a] || []).push(ctx); }
+            }
+            while (pila.length) {
+                var par = pila.pop(), x = par[0], ctx = par[1], cx = x + '#' + claveCtx(ctx);
+                if (vistos[cx]) { continue; }
+                vistos[cx] = true;
+                N[x].e.forEach(function (a) {
+                    var d = a.a, td = tipo(d);
+                    if (!N[d]) { return; }
+                    var ps = pasos(a, ctx);
+                    if (!ps.length) { return; }
+                    if (a.k === 'lee' || a.k === 'escribe') { if (td === 'table' || td === 'bc-table') { anadir(d, a.k); } return; }
+                    if (a.k === 'abre') { if (!propios[d] && (esPagina(d) || td === 'bc-page' || td === 'bc-report')) { anadir(d, 'abre'); } return; }
+                    if (a.k === 'ejecuta') { if (td === 'codeunit') { anadir(onRun(d) || d, 'llama', {}); } return; }
+                    if ((a.k !== 'llama' && a.k !== 'dispara') || esBC(d)) { return; }
+                    var od = objDe(d);
+                    if (propios[od] && (tipo(d) === 'proc' || tipo(d) === 'trigger')) { ps.forEach(function (p) { pila.push([d, p]); }); return; }
+                    if (esPagina(od) && !propios[od]) { anadir(od, 'abre'); return; }
+                    if (esLogica(d)) { ps.forEach(function (p) { anadir(d, 'llama', p); }); }
+                });
+            }
+            return res;
+        }
+
+        var filas1 = [], logica = [], enLogica = {}, datos = [], enDatos = {}, aristas = [], internas = {};
+        function aDatos(id) { if (!enDatos[id]) { enDatos[id] = true; datos.push(id); } }
+        function aLogica(id) { if (!enLogica[id]) { enLogica[id] = true; logica.push(id); } }
+        entradas.forEach(function (m) {
+            var ds = directos(m);
+            if (!ds.length) { return; }
+            filas1.push(m);
+            ds.forEach(function (d) {
+                if (esLogica(d.a)) { aLogica(d.a); } else { aDatos(d.a); }
+                aristas.push({ de: m, a: d.a, k: d.k });
+            });
+        });
+        // De cada función que usa la pantalla, solo se dibuja lo que toca al final (tablas y
+        // pantallas), sumando todo lo que hace por dentro; las funciones internas se cuentan.
+        // Solo se sigue lo que se puede ejecutar con los valores con que la llama la pantalla.
+        logica.forEach(function (m) {
+            var vistos = {}, funciones = {}, cola = [], tab = {}, pag = {};
+            (contextos[m] || [{}]).forEach(function (ctx) { cola.push([m, ctx]); });
+            funciones[m] = true;
+            while (cola.length) {
+                var par = cola.shift(), cx = par[0] + '#' + claveCtx(par[1]);
+                if (vistos[cx]) { continue; }
+                vistos[cx] = true;
+                directosLogica(par[0], par[1]).forEach(function (d) {
+                    if (esLogica(d.a)) { funciones[d.a] = true; cola.push([d.a, d.ctx]); }
+                    else if (d.k === 'abre') { pag[d.a] = true; }
+                    else { tab[d.a] = (tab[d.a] === 'escribe' || d.k === 'escribe') ? 'escribe' : 'lee'; }
+                });
+            }
+            internas[m] = Object.keys(funciones).length - 1;
+            Object.keys(tab).forEach(function (t) { aDatos(t); aristas.push({ de: m, a: t, k: tab[t] }); });
+            Object.keys(pag).forEach(function (p) { aDatos(p); aristas.push({ de: m, a: p, k: 'abre' }); });
+        });
+        function directosLogica(m, ctx) {
+            var res = [];
+            N[m].e.forEach(function (a) {
+                var d = a.a, td = tipo(d);
+                if (!N[d]) { return; }
+                var ps = pasos(a, ctx);
+                if (!ps.length) { return; }
+                if (a.k === 'lee' || a.k === 'escribe') { if (td === 'table' || td === 'bc-table') { res.push({ a: d, k: a.k }); } return; }
+                if (a.k === 'abre') { if (esPagina(d) || td === 'bc-page' || td === 'bc-report') { res.push({ a: d, k: 'abre' }); } return; }
+                if (a.k === 'ejecuta') { if (td === 'codeunit') { res.push({ a: onRun(d) || d, k: 'llama', ctx: {} }); } return; }
+                if ((a.k !== 'llama' && a.k !== 'dispara') || esBC(d)) { return; }
+                if (esLogica(d)) { ps.forEach(function (p) { res.push({ a: d, k: 'llama', ctx: p }); }); return; }
+                var od = objDe(d);
+                if (esPagina(od)) { res.push({ a: od, k: 'abre' }); }
+            });
+            return res;
+        }
+
+        // Cajas de lógica: una por codeunit (o tabla con funciones), con sus funciones dentro.
+        var cajas = [], porObjeto = {};
+        logica.forEach(function (m) {
+            var o = objDe(m);
+            if (!porObjeto[o]) { porObjeto[o] = { id: o, filas: [] }; cajas.push(porObjeto[o]); }
+            porObjeto[o].filas.push(m);
+        });
+        return { pagina: P, partes: partesDe(P), filas1: filas1, cajas: cajas, datos: datos, aristas: aristas, internas: internas };
+    }
+
+    function pintarRecorrido(P, marcar) {
+        var r = construirRecorrido(P);
+        vista = { tipo: 'recorrido', pagina: P };
+        migas([{ texto: 'Plano general', ir: function () { pintarPlano(P); } }, { texto: nombre(P) }]);
+        ayuda.innerHTML = '';
+        ayuda.appendChild(textoAyuda('<b>' + escapar(nombre(P)) + '.</b> Cada botón o campo de la pantalla, la lógica que usa y las tablas que lee o escribe (y las pantallas que abre). Pasa el ratón por un botón para seguir solo su camino; pulsa cualquier cosa para ver sus detalles.'));
+        ayuda.appendChild(boton('← Plano general', function () { pintarPlano(P); }, true));
+        ayuda.appendChild(leyenda());
+
+        var X = [20, 300, 630, 1030], W = [240, 290, 340, 240];
+        var lienzoSvg = nuevoSvg();
+        var capaAristas = svg('g', {}, lienzoSvg), capaCajas = svg('g', {}, lienzoSvg);
+        ['PANTALLA', 'BOTONES Y CAMPOS', 'LÓGICA QUE USA', 'TABLAS Y PANTALLAS'].forEach(function (t, i) {
+            svg('text', { x: X[i], y: 28, 'font-size': 12, 'font-weight': 700, fill: '#6b7280', 'letter-spacing': '1' }, capaCajas).textContent = t;
+        });
+        var pos = {}, ARRIBA = 50;
+
+        // Carril 1: la pantalla, con sus subpantallas y su tabla.
+        var extra = r.partes.map(function (p) { return 'Contiene: ' + nombre(p); });
+        N[P].e.forEach(function (a) { if (a.k === 'tabla') { extra.push('Tabla: ' + nombre(a.a)); } });
+        var altoP = extra.length ? 44 + extra.length * 20 + 8 : 40;
+        var gp = cajaSimple(capaCajas, X[0], ARRIBA, W[0], 40, nombre(P), colorObjeto(P), P, true);
+        if (extra.length) { svg('rect', { x: X[0], y: ARRIBA + 40, width: W[0], height: altoP - 40, fill: '#fff', stroke: colorObjeto(P), 'stroke-width': 1.6 }, gp); }
+        extra.forEach(function (t, i) { svg('text', { x: X[0] + 10, y: ARRIBA + 58 + i * 20, 'font-size': 12, fill: '#4b5563' }, gp).textContent = recortar(t, W[0] - 20, 12); });
+
+        // Carril 2: botones y campos.
+        r.filas1.forEach(function (m, i) {
+            var y = ARRIBA + i * 36;
+            pos[m] = { x: X[1], y: y, w: W[1], h: 30 };
+            var t = textoFila(m);
+            if (tipo(m) === 'action') { t = '▶ ' + t; }
+            if (objDe(m) !== P) { t = nombre(objDe(m)) + ' › ' + t; }
+            pos[m].el = cajaSimple(capaCajas, X[1], y, W[1], 30, t, tipo(m) === 'trigger' ? '#7c3aed' : COLOR.accion, m, false);
+        });
+        if (!r.filas1.length) { svg('text', { x: X[1], y: ARRIBA + 20, 'font-size': 13, fill: '#9ca3af' }, capaCajas).textContent = 'Ningún botón usa lógica fuera de la pantalla.'; }
+
+        // Carril 3: cajas de lógica, cerca de quien las usa.
+        function mediaFuentes(ids) {
+            var s = 0, k = 0;
+            r.aristas.forEach(function (a) { if (ids.indexOf(a.a) >= 0 && pos[a.de]) { s += pos[a.de].y; k++; } });
+            return k ? s / k : 0;
+        }
+        var y3 = ARRIBA;
+        r.cajas.forEach(function (c) {
+            var alto = 30 + c.filas.length * 22 + 6;
+            var deseada = Math.max(y3, mediaFuentes(c.filas) - alto / 2);
+            c.y = deseada;
+            y3 = deseada + alto + 14;
+            var g = svg('g', {}, capaCajas);
+            var color = colorObjeto(c.id);
+            svg('rect', { x: X[2], y: c.y, width: W[2], height: alto, rx: 8, fill: '#fff', stroke: color, 'stroke-width': 1.6 }, g);
+            var cab = svg('g', { 'class':'caja', 'data-id': c.id }, g);
+            svg('rect', { 'class':'fondo', x: X[2], y: c.y, width: W[2], height: 26, rx: 8, fill: color }, cab);
+            svg('rect', { x: X[2], y: c.y + 18, width: W[2], height: 8, fill: color }, cab);
+            svg('text', { x: X[2] + 10, y: c.y + 18, 'font-size': 13, 'font-weight': 700, fill: '#fff' }, cab).textContent = recortar(nombre(c.id) + (tipo(c.id) === 'codeunit' ? '' : ' (funciones de la tabla)'), W[2] - 20, 13);
+            svg('title', {}, cab).textContent = nombre(c.id);
+            c.filas.forEach(function (m, i) {
+                var fy = c.y + 30 + i * 22;
+                pos[m] = { x: X[2], y: fy, w: W[2], h: 20 };
+                var fg = svg('g', { 'class':'caja', 'data-id': m }, g);
+                svg('rect', { 'class':'fondo', x: X[2] + 4, y: fy, width: W[2] - 8, height: 20, rx: 4, fill: i % 2 ? '#f9fafb' : '#fff' }, fg);
+                var mas = r.internas[m] ? '  (+' + r.internas[m] + ' por dentro)' : '';
+                svg('text', { x: X[2] + 12, y: fy + 15, 'font-size': 12.5, fill: '#111827' }, fg).textContent = recortar(textoFila(m) + mas, W[2] - 24, 12.5);
+                svg('title', {}, fg).textContent = textoFila(m) + (mas ? ': usa ' + r.internas[m] + ' funciones más por dentro (pulsa para verlas)' : '');
+                pos[m].el = fg;
+            });
+        });
+
+        // Carril 4: tablas y pantallas, cerca de quien las usa.
+        var y4 = colocar(r.datos.slice(), function (d) { return mediaFuentes([d]) - 15; }, 30, 8, ARRIBA);
+        r.datos.forEach(function (d) {
+            pos[d] = { x: X[3], y: y4[d], w: W[3], h: 30 };
+            var t = nombre(d);
+            if (esPagina(d) || tipo(d) === 'bc-page' || tipo(d) === 'bc-report') { t = 'Abre: ' + t; }
+            pos[d].el = cajaSimple(capaCajas, X[3], y4[d], W[3], 30, t, colorObjeto(d), d, tipo(d) === 'table');
+        });
+
+        // Aristas.
+        var lista = [];
+        r.aristas.forEach(function (a) {
+            var p1 = pos[a.de], p2 = pos[a.a];
+            if (!p1 || !p2) { return; }
+            var y1 = p1.y + p1.h / 2, y2 = p2.y + p2.h / 2;
+            var x1 = p1.x + p1.w, x2 = p2.x, mx = (x1 + x2) / 2;
+            var d = 'M' + x1 + ',' + y1 + ' C' + mx + ',' + y1 + ' ' + mx + ',' + y2 + ' ' + x2 + ',' + y2;
+            a.el = svg('path', { d: d, 'class': 'arista', stroke: COLOR_ARISTA[a.k] || '#9ca3af', 'stroke-width': 1.4, opacity: 0.55, 'stroke-dasharray': a.k === 'lee' ? '4 3' : '', 'marker-end': 'url(#punta-' + (a.k in COLOR_ARISTA ? a.k : 'usa') + ')' }, capaAristas);
+            lista.push(a);
+        });
+
+        var alto = ARRIBA + altoP;
+        Object.keys(pos).forEach(function (id) { alto = Math.max(alto, pos[id].y + pos[id].h + 30); });
+        lienzoSvg.setAttribute('width', 1300);
+        lienzoSvg.setAttribute('height', alto);
+
+        // Pasar por un botón: solo su camino.
+        function camino(desde) {
+            var si = {};
+            si[desde] = true;
+            var cambio = true;
+            while (cambio) {
+                cambio = false;
+                lista.forEach(function (a) { if (si[a.de] && !si[a.a]) { si[a.a] = true; cambio = true; } });
+            }
+            return si;
+        }
+        function resaltar(desde) {
+            var si = desde ? camino(desde) : null;
+            lista.forEach(function (a) {
+                var on = !si || (si[a.de] && si[a.a]);
+                a.el.setAttribute('opacity', si ? (on ? 0.95 : 0.05) : 0.55);
+                a.el.setAttribute('stroke-width', si && on ? 2.2 : 1.4);
+            });
+            // La cabecera de una caja de lógica sigue encendida si lo está alguna de sus funciones.
+            var objetos = {};
+            if (si) { Object.keys(si).forEach(function (x) { objetos[objDe(x)] = true; }); }
+            Array.prototype.forEach.call(lienzoSvg.querySelectorAll('.caja'), function (c) {
+                var id = c.getAttribute('data-id');
+                c.classList.toggle('apagado', !!si && !si[id] && !objetos[id] && id !== P);
+            });
+        }
+        r.filas1.forEach(function (m) {
+            pos[m].el.addEventListener('mouseenter', function () { resaltar(m); });
+            pos[m].el.addEventListener('mouseleave', function () { resaltar(marcado); });
+        });
+        var marcado = null;
+        lienzoSvg.addEventListener('click', function (e) {
+            var id = idPulsado(e);
+            if (!id) { marcado = null; resaltar(null); cerrarFicha(); return; }
+            if (r.filas1.indexOf(id) >= 0) { marcado = id; resaltar(id); }
+            if ((esPagina(id) && id !== P && !esParte(id))) { pintarRecorrido(id); return; }
+            mostrarFicha(id);
+        });
+        if (marcar && pos[marcar]) {
+            var fuentes = {};
+            r.aristas.forEach(function (a) { fuentes[a.a] = fuentes[a.a] || []; fuentes[a.a].push(a.de); });
+            var raiz = marcar;
+            while (fuentes[raiz] && r.filas1.indexOf(raiz) < 0) { raiz = fuentes[raiz][0]; }
+            marcado = r.filas1.indexOf(raiz) >= 0 ? raiz : null;
+            resaltar(marcado);
+            pos[marcar].el.querySelector('rect').setAttribute('stroke', '#111827');
+            pos[marcar].el.querySelector('rect').setAttribute('stroke-width', 3);
+            lienzo.scrollTop = Math.max(0, pos[marcar].y - 200);
+            mostrarFicha(marcar);
+        }
+        else if (marcar) { mostrarFicha(marcar); }
+    }
+
+    // ---- Comunes -----------------------------------------------------------------------------
+
+    var vista = null;
+
+    function nuevoSvg() {
+        lienzo.innerHTML = '';
+        lienzo.scrollTop = 0;
+        cerrarFicha();
+        var s = svg('svg', {}, lienzo);
+        var defs = svg('defs', {}, s);
+        Object.keys(COLOR_ARISTA).forEach(function (k) {
+            var m = svg('marker', { id: 'punta-' + k, viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse' }, defs);
+            svg('path', { d: 'M0,0 L10,5 L0,10 z', fill: COLOR_ARISTA[k] }, m);
+        });
+        return s;
+    }
+
+    function migas(lista) {
+        var m = document.getElementById('migas');
+        m.innerHTML = '';
+        lista.forEach(function (x, i) {
+            if (i) { m.appendChild(document.createTextNode('  ›  ')); }
+            var s = el('span', x.ir ? 'enlace' : null, x.texto);
+            if (x.ir) { s.addEventListener('click', x.ir); }
+            m.appendChild(s);
+        });
+    }
+    function escapar(t) { return t.replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+    function textoAyuda(html) { var s = el('span'); s.innerHTML = html; return s; }
+    function boton(texto, accion, gris) { var b = el('button', 'boton' + (gris ? ' gris' : ''), texto); b.addEventListener('click', accion); return b; }
+    function leyenda() {
+        var l = el('span', 'leyenda');
+        [['abre', 'abre'], ['llama', 'usa lógica'], ['lee', 'lee'], ['escribe', 'escribe']].forEach(function (x) {
+            var s = el('span');
+            var i = el('i');
+            i.style.borderTopColor = COLOR_ARISTA[x[0]];
+            if (x[0] === 'lee') { i.style.borderTopStyle = 'dashed'; }
+            s.appendChild(i);
+            s.appendChild(document.createTextNode(x[1]));
+            l.appendChild(s);
+        });
+        return l;
+    }
+
+    // Ficha lateral con los detalles de cualquier elemento.
+    function mostrarFicha(id) {
+        var n = N[id];
+        ficha.innerHTML = '';
+        ficha.style.display = 'block';
+        var x = el('span', 'cerrar', '×');
+        x.addEventListener('click', cerrarFicha);
+        ficha.appendChild(x);
+        ficha.appendChild(el('h2', null, textoFila(id)));
+        var sub = el('div', 'sub');
+        sub.appendChild(document.createTextNode((CLASE[n.t] || n.t) + (esBC(id) ? ' de Business Central' : '')));
+        if (n.o) { sub.appendChild(document.createTextNode(' · en ')); sub.appendChild(enlaceA(n.o)); }
+        if (n.t === 'trigger' || n.t === 'suscriptor') { sub.appendChild(document.createTextNode(' · ' + n.n)); }
+        ficha.appendChild(sub);
+        if (n.f) {
+            var a = el('a', null, 'Abrir en VS Code: ' + n.f + (n.l ? ':' + n.l : ''));
+            a.href = 'vscode://file/' + DATOS.raiz + '/' + n.f + (n.l ? ':' + n.l : '');
+            var p = el('div', 'sub');
+            p.style.marginTop = '6px';
+            p.appendChild(a);
+            ficha.appendChild(p);
+        }
+        if (n.d) { ficha.appendChild(el('div', 'doc', n.d)); }
+        if (!n.o && (n.t === 'codeunit' || n.t === 'table' || esPagina(id))) {
+            var acciones = el('div');
+            acciones.style.marginTop = '10px';
+            if (esPagina(id) && !esParte(id)) { acciones.appendChild(boton('Ver qué hace cada botón ▶', function () { pintarRecorrido(id); })); }
+            acciones.appendChild(boton('Ver en el plano general', function () { pintarPlano(id); }, true));
+            ficha.appendChild(acciones);
+        }
+        listaFicha('Lo usan', (entran[id] || []).map(function (x) { return { id: x.de, k: x.k }; }));
+        listaFicha('Usa', n.e.filter(function (a) { return N[a.a] && a.k !== 'tiene'; }).map(function (a) { return { id: a.a, k: a.k, m: a.m }; }));
+        if (!n.o && miembrosDe[id]) {
+            listaFicha('Contiene', miembrosDe[id].filter(function (m) { return N[m].t !== 'menu'; }).map(function (m) { return { id: m }; }));
+        }
+    }
+    var VERBO = { llama: 'usa', abre: 'abre', ejecuta: 'ejecuta', lee: 'lee', escribe: 'escribe', dispara: 'dispara', contiene: 'contiene', tabla: 'tabla de la pantalla', tiene: '' };
+    function listaFicha(titulo, items) {
+        ficha.appendChild(el('h3', null, titulo + ' (' + items.length + ')'));
+        var l = el('div', 'lista');
+        if (!items.length) { l.appendChild(el('div', 'gris', 'Nada.')); }
+        items.slice(0, 80).forEach(function (x) {
+            var d = el('div');
+            if (x.k && VERBO[x.k]) { d.appendChild(el('span', 'gris', VERBO[x.k] + (x.m ? ' ' + x.m : '') + ' · ')); }
+            d.appendChild(enlaceA(x.id));
+            if (N[x.id].o && N[x.id].t !== 'menu') { d.appendChild(el('span', 'gris', '  (' + nombre(N[x.id].o) + ')')); }
+            l.appendChild(d);
+        });
+        if (items.length > 80) { l.appendChild(el('div', 'gris', '… y ' + (items.length - 80) + ' más')); }
+        ficha.appendChild(l);
+    }
+    function enlaceA(id) {
+        var a = el('span', 'enlace', textoFila(id));
+        a.addEventListener('click', function () { ir(id); });
+        return a;
+    }
+    function cerrarFicha() { ficha.style.display = 'none'; }
+
+    // Ir a cualquier elemento: una pantalla abre su recorrido; una función, el recorrido de una
+    // pantalla desde la que se llega, con la función marcada; codeunits y tablas, el plano.
+    function ir(id) {
+        if (esPagina(id) && !esParte(id)) { pintarRecorrido(id); return; }
+        if (!N[id].o) { pintarPlano(id); mostrarFicha(id); return; }
+        var P = paginaQueLlega(id);
+        if (P) { pintarRecorrido(P, id); return; }
+        pintarPlano(objDe(id));
+        mostrarFicha(id);
+    }
+    function paginaQueLlega(id) {
+        var vistos = {}, cola = [id];
+        vistos[id] = true;
+        while (cola.length) {
+            var x = cola.shift();
+            var o = objDe(x);
+            if (esPagina(o) && !esParte(o) && N[x].o) { return o; }
+            (entran[x] || []).forEach(function (y) {
+                if (vistos[y.de] || y.k === 'lee' || y.k === 'escribe' || y.k === 'tiene' || !N[y.de].o) { return; }
+                vistos[y.de] = true;
+                cola.push(y.de);
+            });
+        }
+        return null;
+    }
+
+    // ---- Buscador y código sin acceso ------------------------------------------------------
+
+    var buscar = document.getElementById('buscar');
+    var resultados = document.getElementById('resultados');
+    var TILDES = new RegExp('[' + String.fromCharCode(0x300) + '-' + String.fromCharCode(0x36f) + ']', 'g');
+    function normal(s) { return (s || '').toLowerCase().normalize('NFD').replace(TILDES, ''); }
+    var indice = Object.keys(N).filter(function (id) { var t = tipo(id); return t !== 'raiz' && t !== 'menu' && t !== 'profile'; }).map(function (id) {
+        return { id: id, texto: normal(textoFila(id) + ' ' + N[id].n + ' ' + (N[id].o ? nombre(N[id].o) : '')) };
+    });
+    buscar.addEventListener('input', function () {
+        var q = normal(buscar.value.trim());
+        resultados.innerHTML = '';
+        if (q.length < 2) { resultados.style.display = 'none'; return; }
+        var palabras = q.split(/\s+/);
+        var hallados = indice.filter(function (x) { return palabras.every(function (p) { return x.texto.indexOf(p) >= 0; }); });
+        hallados.sort(function (a, b) { return (N[a.id].o ? 1 : 0) - (N[b.id].o ? 1 : 0); });
+        hallados.slice(0, 50).forEach(function (x) {
+            var d = el('div');
+            var c = el('span', null, CLASE[tipo(x.id)] || (esBC(x.id) ? 'BC' : tipo(x.id)));
+            c.style.cssText = 'font-size:11px;color:#6b7280;width:110px;flex:0 0 110px';
+            d.appendChild(c);
+            d.appendChild(el('span', null, textoFila(x.id)));
+            if (N[x.id].o) { var o = el('span', null, nombre(N[x.id].o)); o.style.cssText = 'font-size:11px;color:#9ca3af'; d.appendChild(o); }
+            d.addEventListener('mousedown', function (e) { e.preventDefault(); resultados.style.display = 'none'; buscar.blur(); ir(x.id); });
+            resultados.appendChild(d);
+        });
+        if (!hallados.length) { resultados.appendChild(el('div', null, 'Nada con ese texto.')); }
+        resultados.style.display = 'block';
+    });
+    buscar.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { var p = resultados.querySelector('div'); if (p) { p.dispatchEvent(new MouseEvent('mousedown')); } }
+        if (e.key === 'Escape') { resultados.style.display = 'none'; }
+    });
+    buscar.addEventListener('blur', function () { resultados.style.display = 'none'; });
+
+    // Código al que no se llega desde ninguna entrada (menús, pantallas, eventos).
+    (function () {
+        var vistos = {}, cola = DATOS.raices.slice();
+        cola.forEach(function (r) { vistos[r] = true; });
+        Object.keys(N).forEach(function (id) { if (esPagina(id) || tipo(id) === 'pageextension') { vistos[id] = true; cola.push(id); } });
+        while (cola.length) {
+            var id = cola.shift();
+            N[id].e.forEach(function (a) { if (!vistos[a.a] && N[a.a] && a.k !== 'lee' && a.k !== 'escribe') { vistos[a.a] = true; cola.push(a.a); } });
+        }
+        var CODIGO = { proc: 1, trigger: 1, action: 1, field: 1, usercontrol: 1, suscriptor: 1 };
+        var sin = Object.keys(N).filter(function (id) { return CODIGO[tipo(id)] && !vistos[id]; });
+        var s = document.getElementById('sinacceso');
+        if (!sin.length) { return; }
+        s.textContent = sin.length + ' sin acceso desde menú';
+        s.title = 'Código al que no se llega desde ningún menú ni pantalla: lo lanza la cola de proyectos o sobra.';
+        s.addEventListener('click', function () {
+            ficha.innerHTML = '';
+            ficha.style.display = 'block';
+            var x = el('span', 'cerrar', '×');
+            x.addEventListener('click', cerrarFicha);
+            ficha.appendChild(x);
+            ficha.appendChild(el('h2', null, 'Sin acceso desde menú'));
+            ficha.appendChild(el('div', 'sub', 'No se llega a esto desde ningún menú, pantalla ni evento. O lo lanza algo que el mapa no ve (la cola de proyectos, por ejemplo), o sobra.'));
+            listaFicha('Elementos', sin.map(function (id) { return { id: id }; }));
+        });
+    })();
+
+    // MapaSGA.html#id abre un elemento; #plano:id lo resalta en el plano general.
+    var inicial = decodeURIComponent(location.hash.substring(1));
+    var enPlano = inicial.indexOf('plano:') === 0;
+    if (enPlano) { inicial = inicial.substring(6); }
+    if (!N[inicial]) { pintarPlano(null); }
+    else if (enPlano) { pintarPlano(inicial); }
+    else { construirPlano(); ir(inicial); }
+})();
+</script>
+</body>
+</html>

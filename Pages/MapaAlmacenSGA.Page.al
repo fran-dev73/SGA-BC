@@ -65,6 +65,25 @@ page 51107 "Mapa Almacen SGA"
                         FiltrarPasillo();
                     end;
                 }
+                field(FiltroGrupoIIEE; FiltroGrupoIIEE)
+                {
+                    Caption = 'Grupo IIEE';
+                    ToolTip = 'Grupo de Impuestos Especiales (IIEE/SILICIE): marca con ◆ las ubicaciones que tienen algún producto de ese grupo y apaga las demás. En blanco no marca nada.';
+                    ApplicationArea = All;
+
+                    trigger OnValidate()
+                    begin
+                        Construir();
+                    end;
+                }
+                field(UbicacionesConGrupo; UbicacionesConGrupo)
+                {
+                    Caption = 'Ubicaciones con el grupo';
+                    ToolTip = 'Cuántas ubicaciones del almacén tienen algún producto del Grupo IIEE elegido.';
+                    ApplicationArea = All;
+                    Editable = false;
+                    Visible = FiltroGrupoIIEE <> '';
+                }
                 field(Leyenda; Leyenda)
                 {
                     Caption = 'Leyenda';
@@ -530,6 +549,8 @@ page 51107 "Mapa Almacen SGA"
         cMapa: Codeunit "Gestion Mapa SGA";
         FiltroAlmacen: Code[10];
         FiltroPasillo: Integer;
+        FiltroGrupoIIEE: Code[20];
+        UbicacionesConGrupo: Integer;
         Leyenda: Text;
         Aviso: Text;
         HayAviso: Boolean;
@@ -564,7 +585,7 @@ page 51107 "Mapa Almacen SGA"
     begin
         limiteRejilla := cMapa.MaximoColumnasRejilla();
 
-        columnaMaxima := cMapa.ConstruirMapa(Rec, FiltroAlmacen);
+        columnaMaxima := cMapa.ConstruirMapa(Rec, FiltroAlmacen, FiltroGrupoIIEE, UbicacionesConGrupo);
 
         // El aviso se decide contra el tope de la rejilla, antes de recortar por lo que hay.
         HayAviso := columnaMaxima > limiteRejilla;

@@ -4,10 +4,22 @@ using Microsoft.Inventory.Item;
 
 /// <summary>
 /// PageExtension Item List SGA (ID 51101) extends Page "Item List".
-/// Añade a la lista de productos el acceso directo a "¿dónde está este producto?".
+/// Añade a la lista de productos las existencias SGA, al lado de las de BC, y el acceso directo
+/// a "¿dónde está este producto?".
 /// </summary>
 pageextension 51101 "Item List SGA" extends "Item List"
 {
+    layout
+    {
+        addafter(InventoryField)
+        {
+            field("Stock SGA"; Rec."Stock SGA")
+            {
+                ApplicationArea = All;
+            }
+        }
+    }
+
     actions
     {
         addlast(processing)

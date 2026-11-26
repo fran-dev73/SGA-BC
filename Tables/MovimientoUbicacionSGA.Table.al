@@ -143,6 +143,14 @@ table 51103 "Movimiento Ubicacion SGA"
             FieldClass = FlowField;
             CalcFormula = lookup(Item.Description where("No." = field("No. Producto")));
         }
+        field(111; "Grupo IIEE"; Code[20])
+        {
+            Caption = 'Grupo IIEE';
+            Editable = false;
+            FieldClass = FlowField;
+            CalcFormula = lookup(Item."Grupo IIEE" where("No." = field("No. Producto")));
+            ToolTip = 'Grupo de Impuestos Especiales (IIEE/SILICIE) del producto, el de su ficha.';
+        }
     }
 
     keys

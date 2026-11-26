@@ -165,6 +165,8 @@ page 51122 "Mapa 3D Almacen SGA"
 
                 trigger OnAction()
                 begin
+                    // Todo de nuevo, también lo que se guarda entre repintados (clases ABC y fichas).
+                    Clear(cMapa);
                     Refrescar(false);
                 end;
             }
@@ -191,6 +193,9 @@ page 51122 "Mapa 3D Almacen SGA"
     }
 
     var
+        // Una instancia mientras la página está abierta: guarda las clases ABC ya leídas, y
+        // repintar tras un traslado no las vuelve a calcular.
+        cMapa: Codeunit "Gestion Mapa SGA";
         FiltroAlmacen: Code[10];
         FiltroZona: Code[10];
         FiltroPasillo: Integer;
@@ -236,15 +241,13 @@ page 51122 "Mapa 3D Almacen SGA"
     /// </summary>
     local procedure Refrescar(prm_ConservarVista: Boolean)
     var
-        cMapa: Codeunit "Gestion Mapa SGA";
-        cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
         datos: Text;
         IndiqueAlmacenLbl: Label 'Indique un almacén para dibujar el mapa.';
     begin
         if not ControlPreparado then
             exit;
 
-        datos := cMapa.DatosMapa3D(FiltroAlmacen, FiltroZona, FiltroPasillo, NoCalculoABC);
+        datos := cMapa.DatosMapa3D(FiltroAlmacen, FiltroZona, FiltroPasillo, NoCalculoABC, Resumen);
         if prm_ConservarVista then
             CurrPage.Lienzo.Actualizar(datos)
         else
@@ -254,9 +257,7 @@ page 51122 "Mapa 3D Almacen SGA"
             Preparada := false;
         end;
         if FiltroAlmacen = '' then
-            Resumen := IndiqueAlmacenLbl
-        else
-            Resumen := cUbicaciones.ResumenUbicaciones(FiltroAlmacen, FiltroZona);
+            Resumen := IndiqueAlmacenLbl;
         CurrPage.Update(false);
     end;
 

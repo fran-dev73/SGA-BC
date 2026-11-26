@@ -107,6 +107,7 @@ permissionset 51100 "PermissionSet-SGA"
         page "Ficha Orden Picking SGA" = X,
         page "Lineas Orden Picking Subpag" = X,
         page "Preparar Picking SGA" = X,
+        page "Alta Stock PDA SGA" = X,
         page "Rol Center Preparador SGA" = X,
         page "Cue Preparador SGA" = X,
         page "Lineas Picking SGA" = X,

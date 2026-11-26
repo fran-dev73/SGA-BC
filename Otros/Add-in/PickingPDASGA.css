@@ -159,10 +159,81 @@ body {
     color: #166534;
 }
 
+/* Casilla con lo tecleado rechazado (formato o ubicación que no existe). */
+.pk-campo.pk-mal {
+    background: #fee2e2;
+    color: #991b1b;
+    border-color: #dc2626;
+}
+
 .pk-campo.pk-leido:focus {
     border-color: #16a34a;
 }
 
+
+/* Alta de stock: más apretada que el picking para que quepa entera en la PDA sin desplazarse. */
+.pk-compacto .pk-bloque {
+    margin-bottom: 5px;
+    padding: 5px 8px;
+}
+
+.pk-compacto .pk-fila {
+    margin-top: 5px;
+}
+
+.pk-compacto .pk-linea {
+    align-items: center;
+    gap: 4px 6px;
+}
+
+/* Las tres marcas de lo que falta, en una sola línea. */
+.pk-compacto .pk-paso {
+    padding: 1px 6px;
+    font-size: 13px;
+}
+
+.pk-compacto .pk-campo,
+.pk-compacto .pk-btn,
+.pk-compacto .pk-otros .pk-btn {
+    height: 46px;
+    min-height: 46px;
+}
+
+.pk-compacto .pk-principal {
+    min-height: 52px;
+    margin-bottom: 0;
+}
+
+.pk-compacto .pk-descripcion {
+    font-size: 18px;
+}
+
+/* La ubicación va al lado de su título y ocupa el resto de la línea. */
+.pk-compacto .pk-linea .pk-campo-ubicacion {
+    flex: 1;
+}
+
+.pk-compacto .pk-campo.pk-campo-ubicacion {
+    height: 50px;
+    font-size: 26px;
+}
+
+/* Producto y lote en la misma fila, a partes iguales. */
+.pk-compacto .pk-otros .pk-campo {
+    flex: 1;
+}
+
+.pk-cambiar-unidad {
+    flex: 1;
+}
+
+/* Casilla de la ubicación del alta de stock: tan grande como la ubicación de picking. */
+.pk-campo.pk-campo-ubicacion {
+    height: 60px;
+    font-size: 30px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+}
 
 .pk-campo-cantidad {
     flex: 0 0 84px;
@@ -238,6 +309,48 @@ body {
 .pk-secundario {
     color: #111827;
     background: #e5e7eb;
+}
+
+/* La opción elegida de un grupo (la unidad de la cantidad en el alta de stock). */
+.pk-elegido {
+    color: #ffffff;
+    background: #2563eb;
+}
+
+/* Lista de productos del alta de stock: se desplaza ella sola y deja a la vista la búsqueda de
+   arriba y Volver de abajo. */
+.pk-lista {
+    max-height: calc(100vh - 160px);
+    margin-bottom: 6px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.pk-cargando {
+    padding: 8px;
+    text-align: center;
+}
+
+/* Fila de la lista de productos del alta de stock: la descripción grande y el código debajo. */
+.pk-producto {
+    display: block;
+    width: 100%;
+    margin-bottom: 6px;
+    padding: 6px 10px;
+    text-align: left;
+    color: #111827;
+    background: #ffffff;
+    border-left: 6px solid #2563eb;
+}
+
+.pk-producto-desc {
+    font-size: 19px;
+    font-weight: 700;
+}
+
+.pk-volver {
+    display: block;
+    width: 100%;
 }
 
 .pk-peligro {

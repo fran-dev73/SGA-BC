@@ -6,8 +6,8 @@ using Microsoft.Inventory.Setup;
 /// <summary>
 /// Codeunit Codigos Barras SGA (ID 51114).
 /// Todo lo de códigos de barras de SGA, sin depender del resto del proyecto:
-/// - Interpreta lo que lee el escáner: si es una ubicación o un palé (SSCC, solo o en el (00)
-///   de una lectura GS1-128).
+/// - Interpreta lo que lee el escáner: si es una ubicación (EsUbicacion) o un palé (LeerSSCC:
+///   SSCC, solo o en el (00) de una lectura GS1-128).
 /// - Da los SSCC nuevos (NuevoSSCC) con las series de SSCC de la configuración de inventario.
 /// </summary>
 codeunit 51114 "Codigos Barras SGA"
@@ -48,7 +48,7 @@ codeunit 51114 "Codigos Barras SGA"
     /// Devuelve true si la lectura trae un SSCC: el (00) de un GS1-128 o los 18 dígitos solos,
     /// con su dígito de control bien. El SSCC queda en prm_SSCC.
     /// </summary>
-    local procedure LeerSSCC(prm_Lectura: Text; var prm_SSCC: Code[20]): Boolean
+    procedure LeerSSCC(prm_Lectura: Text; var prm_SSCC: Code[20]): Boolean
     var
         codigo: Text;
         sscc: Text;

@@ -481,17 +481,31 @@ table 51101 "Ubicacion SGA"
                 exit(motivo);
         end;
 
+        if prm_Registro then begin
+            if SuperaCapacidad(prm_Entrada, prm_UM) then
+                exit(4);
+            exit(0);
+        end;
         if "Capacidad Uds." <= 0 then
             exit(0);
         // Lo que entra se redondea igual que lo ocupado (OcupadoEnPales).
         entrada := Round(prm_Entrada, 0.00001);
-        if prm_Registro then begin
-            if OcupadoEnPales(prm_UM) + entrada > "Capacidad Uds." then
-                exit(4);
-        end else
-            if not CabeEntrada(entrada, prm_UM) then
-                exit(4);
+        if not CabeEntrada(entrada, prm_UM) then
+            exit(4);
         exit(0);
+    end;
+
+    /// <summary>
+    /// Si al meter prm_Entrada palés la ubicación pasa de su capacidad, con lo que tiene de
+    /// verdad (OcupadoEnPales). Sin capacidad declarada, nunca. Es la comprobación de capacidad
+    /// al registrar: la de MotivoRechazoEntrada y la única que hace el alta de stock.
+    /// </summary>
+    procedure SuperaCapacidad(prm_Entrada: Decimal; var prm_UM: Codeunit "Unidades Producto SGA"): Boolean
+    begin
+        if "Capacidad Uds." <= 0 then
+            exit(false);
+        // Lo que entra se redondea igual que lo ocupado.
+        exit(OcupadoEnPales(prm_UM) + Round(prm_Entrada, 0.00001) > "Capacidad Uds.");
     end;
 
     /// <summary>

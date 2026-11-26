@@ -239,6 +239,14 @@ page 51112 "Rol Center Almacen SGA"
                     Image = Balance;
                     RunObject = report "Conciliacion SGA vs Stock";
                 }
+                action(ImprimirEtiquetas)
+                {
+                    Caption = 'Imprimir etiquetas';
+                    ToolTip = 'Imprime etiquetas de palé, de ubicación o de producto.';
+                    ApplicationArea = All;
+                    Image = Print;
+                    RunObject = report "Etiquetas Ubicaciones SGA";
+                }
             }
             group(SGAConfiguracion)
             {

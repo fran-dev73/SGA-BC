@@ -287,7 +287,7 @@ codeunit 51106 "Carga Inicial SGA"
                                         prm_UM, prm_Cantidad, "Origen Mov. SGA"::Manual, '', UbicacionPendientesLbl)
         else
             cContenido.RegistrarAjuste("Tipo Mov. Ubicacion SGA"::"Carga Inicial", Almacen, prm_Bin, prm_Producto."No.",
-                                       prm_Stock."No. Lote", prm_UM, prm_Cantidad, DescripcionCargaInicialLbl);
+                                       prm_Stock."No. Lote", '', prm_UM, prm_Cantidad, DescripcionCargaInicialLbl);
 
         Anotar(prm_Producto, prm_Stock, prm_Bin, prm_UM, prm_Cantidad, prm_CantidadBase, true, prm_Motivo);
         UnidadesCargadas += prm_CantidadBase;

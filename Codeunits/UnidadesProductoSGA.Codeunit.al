@@ -280,6 +280,29 @@ codeunit 51108 "Unidades Producto SGA"
     end;
 
     /// <summary>
+    /// Las unidades en las que se cuenta el producto, de mayor a menor: su palé, su caja y su
+    /// unidad base (UnidadesReparto), las que tenga. Vacía si el producto no existe.
+    /// </summary>
+    procedure Unidades(prm_Producto: Code[20]; var prm_Unidades: List of [Code[10]])
+    var
+        umDelPale: Code[10];
+        umCaja: Code[10];
+        umBaseProducto: Code[10];
+        factorDelPale: Decimal;
+        factorCaja: Decimal;
+    begin
+        Clear(prm_Unidades);
+        if not LeerUMBase(prm_Producto, umBaseProducto) then
+            exit;
+        UnidadesReparto(prm_Producto, '', umDelPale, factorDelPale, umCaja, factorCaja);
+        if (umDelPale <> '') and (umDelPale <> umBaseProducto) then
+            prm_Unidades.Add(umDelPale);
+        if umCaja <> '' then
+            prm_Unidades.Add(umCaja);
+        prm_Unidades.Add(umBaseProducto);
+    end;
+
+    /// <summary>
     /// Volumen en litros de una unidad de medida del producto: el volumen de la ficha (por unidad
     /// base) por las unidades base que lleva.
     /// </summary>

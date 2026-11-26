@@ -57,6 +57,10 @@ page 51103 "Contenido Ubicaciones SGA"
                     ToolTip = 'Descripción del producto.';
                     ApplicationArea = All;
                 }
+                field("Grupo IIEE"; Rec."Grupo IIEE")
+                {
+                    ApplicationArea = All;
+                }
                 field("No. Lote"; Rec."No. Lote")
                 {
                     ToolTip = 'Lote al que corresponde la cantidad.';
@@ -235,6 +239,8 @@ page 51103 "Contenido Ubicaciones SGA"
                 ToolTip = 'Muestra la historia del palé (SSCC) de esta línea: dónde entró y por dónde se ha movido.';
                 ApplicationArea = All;
                 Image = ItemTrackingLedger;
+                // Sin SSCC el filtro sería "SSCC en blanco": todos los movimientos sin palé.
+                Enabled = Rec.SSCC <> '';
                 RunObject = page "Movs. Ubicacion SGA";
                 RunPageLink = SSCC = field(SSCC);
             }

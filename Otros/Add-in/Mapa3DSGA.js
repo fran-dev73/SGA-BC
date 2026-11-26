@@ -32,6 +32,7 @@ var SGA3D = (function () {
     var colorear = 'estado'; // 'estado', 'posicion', 'abc' o 'caducidad'
     var busqueda = '';      // texto buscado, en mayúsculas; vacío = no se busca
     var busquedaExacta = false; // la búsqueda llegó de AL (Preparar): un producto exacto
+    var grupoIIEE = '';     // Grupo IIEE elegido: resalta las ubicaciones con productos de ese grupo
 
     // Vista 3D
     var cubos = [];         // cubos ya proyectados, ordenados de atrás a adelante
@@ -85,8 +86,11 @@ var SGA3D = (function () {
     var ALTO = 11;
     var GRUESO = 16;
 
-    // Cuánto se separan las estanterías entre sí en la 3D. 1 = pegadas (bloque macizo).
+    // Cuánto se separan las estanterías entre sí en la 3D, como mínimo. 1 = pegadas (bloque
+    // macizo). Con muchas alturas se separan más (separacion3D): la de delante no puede tapar
+    // la altura más baja de la de detrás.
     var SEPARACION = 2.6;
+    var HOLGURA_PASILLO = 1;   // aire, en anchos de cubo, entre la de delante y la de detrás
 
     // Límites del zoom. El máximo es alto a propósito: un pasillo aislado se encuadra a lo
     // que haga falta para que sus huecos se vean grandes y se lea lo que hay dentro.
@@ -212,6 +216,9 @@ var SGA3D = (function () {
             '  <span class="sga3d-sel">Buscar:' +
             '    <input type="search" class="sga3d-combo sga3d-buscar" id="sga3d-buscar" placeholder="Producto o ubicación">' +
             '  </span>' +
+            '  <span class="sga3d-sel">Grupo IIEE:' +
+            '    <select class="sga3d-combo" id="sga3d-grupo"><option value="">Todos</option></select>' +
+            '  </span>' +
             '  <span class="sga3d-grupo">' +
             '    <button type="button" class="sga3d-btn sga3d-solo3d" data-accion="girar">Girar 45°</button>' +
             '    <button type="button" class="sga3d-btn" data-accion="acercar">+</button>' +
@@ -266,6 +273,12 @@ var SGA3D = (function () {
         cont.querySelector('#sga3d-buscar').addEventListener('input', function (e) {
             busqueda = String(e.target.value || '').trim().toUpperCase();
             busquedaExacta = false;
+            mostrarInfo(hover);
+            pintar();
+        });
+
+        cont.querySelector('#sga3d-grupo').addEventListener('change', function (e) {
+            grupoIIEE = e.target.value;
             mostrarInfo(hover);
             pintar();
         });
@@ -550,6 +563,28 @@ var SGA3D = (function () {
         sel.value = pasilloActivo;
     }
 
+    // Los Grupos IIEE de los productos que hay en los datos, para elegir uno. Si el elegido ya
+    // no está (otro almacén), se suelta.
+    function sincronizarGrupos() {
+        var sel = document.getElementById('sga3d-grupo');
+        if (!sel) { return; }
+        var vistos = {}, grupos = [], i, j;
+        for (i = 0; i < ubicaciones.length; i++) {
+            var gi = ubicaciones[i].gi || [];
+            for (j = 0; j < gi.length; j++) {
+                if (!vistos[gi[j]]) { vistos[gi[j]] = true; grupos.push(gi[j]); }
+            }
+        }
+        grupos.sort();
+        if (grupoIIEE && !vistos[grupoIIEE]) { grupoIIEE = ''; }
+        var html = '<option value="">Todos</option>';
+        for (i = 0; i < grupos.length; i++) {
+            html += '<option value="' + esc(grupos[i]) + '">' + esc(grupos[i]) + '</option>';
+        }
+        sel.innerHTML = html;
+        sel.value = grupoIIEE;
+    }
+
     function listarPasillos() {
         var vistos = {};
         pasillos = [];
@@ -718,9 +753,18 @@ var SGA3D = (function () {
 
     // ---------------------------------------------------------------- búsqueda
 
+    // Hay algo que resaltar: un texto buscado o un Grupo IIEE elegido.
+    function filtrando() { return busqueda !== '' || grupoIIEE !== ''; }
+
+    // Si la ubicación tiene algún producto del Grupo IIEE elegido (gi) y, además, lo buscado.
+    function coincide(u) {
+        if (grupoIIEE && !(u.gi && u.gi.indexOf(grupoIIEE) >= 0)) { return false; }
+        return coincideBusqueda(u);
+    }
+
     // Si la ubicación tiene el producto buscado (código o descripción) o su código contiene
     // lo buscado. Sin búsqueda, todas coinciden.
-    function coincide(u) {
+    function coincideBusqueda(u) {
         if (!busqueda) { return true; }
         var i;
         // Desde el análisis ABC se busca un producto concreto: solo su código exacto.
@@ -825,7 +869,7 @@ var SGA3D = (function () {
         if (!hayAlguna) { return; }
 
         // Se gira alrededor del centro de la nave para que no se escape de la pantalla.
-        var sep = separarPasillos ? SEPARACION : 1;
+        var sep = separarPasillos ? separacion3D() : 1;
         var centroE = ((minE + maxE) / 2) * sep;
         var centroC = (minC + maxC) / 2;
 
@@ -849,6 +893,19 @@ var SGA3D = (function () {
         if (separarPasillos) {
             proyectarRotulos(minC, sep, centroE, centroC);
         }
+    }
+
+    // Separación entre pasillos para que, sin girar, se vea entera la altura más baja de cada
+    // uno. En pantalla, dos pasillos seguidos quedan, en la misma vertical, a 2 · sep · ALTO
+    // píxeles; la estantería de delante sube nivelMax · GRUESO más el techo (ALTO). Se pide eso
+    // y un poco de aire.
+    function separacion3D() {
+        var nivelMax = 1;
+        for (var i = 0; i < ubicaciones.length; i++) {
+            if (visible(ubicaciones[i]) && ubicaciones[i].n > nivelMax) { nivelMax = ubicaciones[i].n; }
+        }
+        var necesaria = (nivelMax * GRUESO + ALTO) / (2 * ALTO) + HOLGURA_PASILLO;
+        return Math.max(SEPARACION, necesaria);
     }
 
     // Un cartel por pasillo, delante de su primera estantería, para saber en qué pasillo se
@@ -1004,7 +1061,7 @@ var SGA3D = (function () {
                 if (resaltado) {
                     ctx.strokeStyle = '#1d4ed8';
                     ctx.lineWidth = grosorBorde + 1;
-                } else if (busqueda && encontrada) {
+                } else if (filtrando() && encontrada) {
                     ctx.strokeStyle = COLOR_ENCONTRADA;
                     ctx.lineWidth = grosorBorde + 1.5;
                 } else {
@@ -1371,7 +1428,7 @@ var SGA3D = (function () {
                 if (resaltado) {
                     ctx.strokeStyle = '#1d4ed8';
                     ctx.lineWidth = 2.5;
-                } else if (busqueda && encontrada) {
+                } else if (filtrando() && encontrada) {
                     ctx.strokeStyle = COLOR_ENCONTRADA;
                     ctx.lineWidth = 3;
                 } else {
@@ -1656,12 +1713,16 @@ var SGA3D = (function () {
         var el = document.getElementById('sga3d-info');
         if (!el) { return; }
         if (!cu) {
-            el.textContent = busqueda ? contarCoincidencias() + ' ubicaciones con «' + busqueda + '»' : '';
+            var que = [];
+            if (grupoIIEE) { que.push('Grupo IIEE ' + grupoIIEE); }
+            if (busqueda) { que.push('«' + busqueda + '»'); }
+            el.textContent = que.length ? contarCoincidencias() + ' ubicaciones con ' + que.join(' y ') : '';
             return;
         }
         var t = cu.u.b;
         if (cu.u.d) { t += '  ·  ' + cu.u.d; }
         if (cu.u.z) { t += '  ·  Zona ' + cu.u.z; }
+        if (cu.u.gi && cu.u.gi.length) { t += '  ·  Grupo IIEE ' + cu.u.gi.join(', '); }
         t += '  ·  ' + textoOcupacion(cu.u);
         el.textContent = t;
     }
@@ -1692,6 +1753,7 @@ var SGA3D = (function () {
             pasilloActivo = pasillos.length === 1 ? pasillos[0] : '';
             if (vista === 'frente' && pasillos.length && !pasilloActivo) { pasilloActivo = pasillos[0]; }
             sincronizarSelector();
+            sincronizarGrupos();
             ajustarTamano();
             encuadrarVista();
             mostrarInfo(null);
@@ -1721,6 +1783,7 @@ var SGA3D = (function () {
                 pasilloActivo = vista === 'frente' && pasillos.length ? pasillos[0] : '';
             }
             sincronizarSelector();
+            sincronizarGrupos();
             hover = null;
             proyectar();
             pintar();

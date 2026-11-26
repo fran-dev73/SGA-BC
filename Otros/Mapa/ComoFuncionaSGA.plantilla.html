@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>SGA · Cómo funciona</title>
+<!--
+Cómo funciona cada acción de SGA. Lo genera GenerarMapa.ps1 con los mismos datos que el mapa: por
+cada botón, campo o evento, sigue el camino que de verdad recorre el código (con las condiciones,
+como el mapa) y enseña en orden lo que comprueba, lo que pregunta, lo que graba y lo que abre.
+-->
+<style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: 'Segoe UI', Arial, sans-serif; background: #eef1f5; color: #111827; height: 100vh; display: flex; flex-direction: column; }
+    header { background: #111827; color: #fff; padding: 10px 20px; display: flex; align-items: center; gap: 16px; }
+    header b { font-size: 19px; }
+    header input { margin-left: auto; width: 340px; font: inherit; font-size: 14px; padding: 6px 10px; border-radius: 6px; border: 0; }
+    header a { color: #93c5fd; font-size: 14px; text-decoration: none; }
+    .todo { flex: 1; display: flex; min-height: 0; }
+    nav { width: 300px; overflow-y: auto; background: #fff; border-right: 1px solid #e5e7eb; padding: 8px 0 30px; }
+    nav .grupo { margin: 10px 0 2px; padding: 6px 16px; }
+    nav .grupo b { display: block; font-size: 13px; }
+    nav .grupo small { color: #6b7280; font-size: 11px; }
+    nav .item { padding: 6px 16px 6px 26px; font-size: 14px; cursor: pointer; border-left: 3px solid transparent; }
+    nav .item:hover { background: #f3f4f6; }
+    nav .item.sel { background: #eff6ff; border-left-color: #2563eb; font-weight: 600; }
+    nav .item.oculto { display: none; }
+    main { flex: 1; overflow-y: auto; padding: 18px 26px 40px; }
+    h1 { margin: 0; font-size: 22px; }
+    .sub { color: #6b7280; font-size: 13px; margin: 2px 0 12px; }
+    .sub a { color: #2563eb; text-decoration: none; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px; }
+    .chip { padding: 6px 12px; border-radius: 16px; background: #fff; border: 1.5px solid #d1d5db; font-size: 13px; cursor: pointer; }
+    .chip:hover { border-color: #93c5fd; }
+    .chip.sel { background: #2563eb; border-color: #2563eb; color: #fff; }
+    .chip.vacia { color: #9ca3af; border-style: dashed; }
+    .chip.vacia.sel { background: #9ca3af; border-color: #9ca3af; color: #fff; }
+    .accion { background: #fff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.08); padding: 18px 22px; max-width: 900px; }
+    .accion h2 { margin: 0 0 6px; font-size: 19px; }
+    .resumen { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+    .resumen span { font-size: 12px; padding: 3px 10px; border-radius: 12px; }
+    .linea { position: relative; padding-left: 46px; }
+    .linea::before { content: ''; position: absolute; left: 17px; top: 6px; bottom: 6px; width: 2px; background: #e5e7eb; }
+    .paso { position: relative; margin-bottom: 10px; border-radius: 10px; padding: 10px 14px; border: 1.5px solid; }
+    .paso .num { position: absolute; left: -46px; top: 8px; width: 36px; height: 36px; border-radius: 50%; color: #fff; font-weight: 700;
+                 display: flex; align-items: center; justify-content: center; font-size: 15px; border: 3px solid #fff; }
+    .paso .que { font-size: 12px; font-weight: 700; letter-spacing: .03em; margin-bottom: 3px; }
+    .paso .txt { font-size: 15px; }
+    .paso .aviso { margin-top: 6px; padding: 7px 10px; border-radius: 6px; background: #fef2f2; color: #991b1b; font-size: 14px; border: 1px solid #fecaca; }
+    .paso .donde { margin-top: 5px; font-size: 11px; color: #6b7280; }
+    .paso .donde a { color: #2563eb; text-decoration: none; }
+    .comprueba { background: #f0fdf4; border-color: #86efac; } .comprueba .num { background: #16a34a; } .comprueba .que { color: #166534; }
+    .pregunta { background: #fefce8; border-color: #fde047; } .pregunta .num { background: #ca8a04; } .pregunta .que { color: #854d0e; }
+    .pregunta .aviso { background: #fef9c3; color: #713f12; border-color: #fde047; }
+    .mensaje { background: #eff6ff; border-color: #bfdbfe; } .mensaje .num { background: #3b82f6; } .mensaje .que { color: #1e40af; }
+    .mensaje .aviso { background: #dbeafe; color: #1e3a8a; border-color: #bfdbfe; }
+    .graba { background: #fff7ed; border-color: #fdba74; } .graba .num { background: #b45309; } .graba .que { color: #9a3412; }
+    .abre { background: #f5f3ff; border-color: #c4b5fd; } .abre .num { background: #7c3aed; } .abre .que { color: #5b21b6; }
+    .bc { background: #f9fafb; border-color: #d1d5db; } .bc .num { background: #6b7280; } .bc .que { color: #374151; }
+    .nada { color: #6b7280; font-size: 15px; padding: 10px 0; }
+    .leyenda { font-size: 12px; color: #6b7280; margin-top: 18px; max-width: 900px; line-height: 1.5; }
+    .portada { max-width: 760px; font-size: 15px; line-height: 1.55; color: #374151; }
+</style>
+</head>
+<body>
+<header>
+    <b>SGA · Cómo funciona</b>
+    <a href="MapaSGA.html">Abrir el mapa de llamadas</a>
+    <input id="buscar" type="search" placeholder="Buscar pantalla, botón o campo…">
+</header>
+<div class="todo">
+    <nav id="indice"></nav>
+    <main id="principal"></main>
+</div>
+<script>var DATOS = /*DATOS_MAPA*/null;</script>
+<script src="MapaComun.js"></script>
+<script>
+(function () {
+    'use strict';
+    var N = DATOS.nodos;
+    function tipo(id) { return N[id] ? N[id].t : ''; }
+    function esBC(id) { return tipo(id).indexOf('bc-') === 0; }
+    function h(tag, clase, texto) { var e = document.createElement(tag); if (clase) { e.className = clase; } if (texto !== undefined) { e.textContent = texto; } return e; }
+    function enlace(id, linea) { return 'vscode://file/' + DATOS.raiz + '/' + N[id].f + ':' + (linea || N[id].l); }
+
+    var miembrosDe = {};
+    Object.keys(N).forEach(function (id) { if (N[id].o) { (miembrosDe[N[id].o] = miembrosDe[N[id].o] || []).push(id); } });
+    Object.keys(miembrosDe).forEach(function (o) { miembrosDe[o].sort(function (a, b) { return (N[a].l || 0) - (N[b].l || 0); }); });
+
+    function nombre(id) {
+        var n = N[id];
+        if (TEXTOS[n.n]) { return TEXTOS[n.n]; }
+        if (n.t === 'suscriptor' && n.ev) { return n.ev; }
+        if (n.t === 'trigger' && TRIGGERS[n.n.toLowerCase()]) { return TRIGGERS[n.n.toLowerCase()]; }
+        if (n.c) { return n.c; }
+        return n.n;
+    }
+    function onRun(cu) {
+        var r = (miembrosDe[cu] || []).filter(function (m) { return N[m].t === 'trigger' && N[m].n.toLowerCase() === 'onrun'; });
+        return r.length ? r[0] : null;
+    }
+    function partesDe(id) {
+        return N[id].e.filter(function (a) { return a.k === 'contiene' && tipo(a.a) === 'page' && !esBC(a.a); }).map(function (a) { return a.a; });
+    }
+
+    // ---- Acciones de una pantalla ----------------------------------------------------------
+    // Cada botón, campo con trigger, trigger de la pantalla y evento de un control. Un campo con
+    // varios triggers da una acción por trigger; un control de la PDA, una por evento y por botón.
+    var EVENTOS = {
+        listo: 'Al cargar la pantalla', lectura: 'Al leer con el escáner', cantidad: 'Al cambiar la cantidad',
+        dato: 'Al escribir un dato', accion: 'Al pulsar un botón', controladdinready: 'Al preparar el escáner',
+        barcodereceived: 'Al recibir una lectura del escáner', controllisto: 'Al cargar el mapa',
+        celdapulsada: 'Al pulsar una ubicación', trasladosolicitado: 'Al pedir un traslado', vaciarsolicitado: 'Al pedir vaciar',
+        pasilloseleccionado: 'Al elegir un pasillo'
+    };
+    // Triggers de los informes y procesos: "Dataitem - OnAfterGetRecord", "RequestPage - OnOpenPage".
+    var TRIGGERS_INFORME = {
+        onpredataitem: 'Antes de recorrer «%»', onaftergetrecord: 'Con cada registro de «%»', onpostdataitem: 'Después de recorrer «%»'
+    };
+    function textoTriggerInforme(n) {
+        var p = n.split(' - ');
+        if (p.length !== 2) { return null; }
+        if (p[0] === 'RequestPage') { return p[1].toLowerCase() === 'onopenpage' ? 'Al abrir la ventana de opciones' : 'Ventana de opciones: ' + textoTrigger(p[1]); }
+        var t = TRIGGERS_INFORME[p[1].toLowerCase()];
+        return t ? t.replace('%', p[0]) : null;
+    }
+    // Lo que manda la pantalla de la PDA y no es un botón con texto (los botones salen de su JS).
+    var PDA = {
+        ubicacion: 'Teclea la ubicación', lote: 'Escribe el lote', busqueda: 'Busca en la lista de productos',
+        masproductos: 'Llega al final de la lista de productos', elegir: 'Elige un producto de la lista',
+        unidad: 'Cambia la unidad (botón ↻)'
+    };
+    function textoTrigger(t) { var k = t.toLowerCase(); return TRIGGERS[k] || EVENTOS[k] || t; }
+    function textoRama(evento, valor) {
+        var v = valor.replace(/:$/, '').toLowerCase();
+        var b = DATOS.botones[valor.toLowerCase()] || DATOS.botones[v];
+        if (b) { return 'Botón ' + b; }
+        if (PDA[v]) { return PDA[v]; }
+        return textoTrigger(evento) + ': ' + valor;
+    }
+    function accionesDe(pantalla) {
+        var res = [], primero = [], objetos = [pantalla].concat(tipo(pantalla) === 'page' ? partesDe(pantalla) : []);
+        objetos.forEach(function (o) {
+            var prefijo = o === pantalla ? '' : nombre(o) + ' › ';
+            (miembrosDe[o] || []).forEach(function (m) {
+                var n = N[m];
+                if (['trigger', 'action', 'field', 'usercontrol', 'suscriptor'].indexOf(n.t) < 0) { return; }
+                var sg = n.sg || [], rm = n.rm || [];
+                if (!sg.length) {
+                    var t = n.t === 'field' ? 'Campo ' + nombre(m) + (n.g ? ' (' + n.g.split(', ').map(textoTrigger).join(', ') + ')' : '')
+                        : n.t === 'action' ? 'Botón ' + nombre(m)
+                        : textoTriggerInforme(n.n) || nombre(m);
+                    // Los triggers de la propia pantalla (al abrir, al leer cada línea…) van delante.
+                    (n.t === 'trigger' ? primero : res).push({ id: m, texto: prefijo + t });
+                    return;
+                }
+                sg.forEach(function (s, i) {
+                    var hasta = i + 1 < sg.length ? sg[i + 1].d : 1e9;
+                    var base = n.t === 'field' ? 'Campo ' + nombre(m) + ' (' + textoTrigger(s.n) + ')' : textoTrigger(s.n);
+                    var propias = rm.filter(function (r) { return r.d >= s.d && r.d < hasta; });
+                    if (!propias.length) { res.push({ id: m, texto: prefijo + base, rango: [[s.d, hasta]] }); return; }
+                    // Lo que va antes del primer botón es común a todos (por ejemplo, salir si no hay parada).
+                    propias.forEach(function (r, j) {
+                        var fin = j + 1 < propias.length ? propias[j + 1].d : hasta;
+                        res.push({ id: m, texto: prefijo + textoRama(s.n.toLowerCase(), r.v), rango: [[s.d, propias[0].d], [r.d, fin]] });
+                    });
+                });
+            });
+        });
+        return primero.concat(res);
+    }
+
+    // ---- Recorrido de una acción -----------------------------------------------------------
+    // Sigue los pasos de cada función en orden, entrando en las funciones que llama con los valores
+    // que les pasa; solo lo que se puede ejecutar con esos valores. Cada función, con unos mismos
+    // valores, se recorre una vez; un aviso o una escritura repetidos salen una vez.
+    function recorrer(accion) {
+        var salida = [], vistos = {}, unicos = {};
+        function anadir(paso, m) {
+            var clave = paso.k === 'aviso' ? 'a|' + paso.s + '|' + paso.t : paso.k + '|' + paso.a + '|' + (paso.op || '');
+            if (unicos[clave]) { return; }
+            unicos[clave] = true;
+            salida.push({ paso: paso, en: m });
+        }
+        function dentro(i, rango) { return !rango || rango.some(function (r) { return i >= r[0] && i < r[1]; }); }
+        function ir(m, ctx, rango) {
+            var cx = m + '#' + claveCtx(ctx);
+            if (!rango) { if (vistos[cx]) { return; } vistos[cx] = true; }
+            (N[m].p || []).forEach(function (p) {
+                if (!dentro(p.i, rango)) { return; }
+                var ps = pasos(p.x ? { x: [p.x] } : {}, ctx);
+                if (!ps.length) { return; }
+                var d = p.a;
+                if (p.k === 'llama' || p.k === 'dispara') {
+                    if (N[d] && N[d].o) { ps.forEach(function (c) { ir(d, c); }); }
+                    else if (tipo(d) === 'bc-codeunit') { anadir({ k: 'bc', a: d, l: p.l }, m); }
+                    return;
+                }
+                if (p.k === 'ejecuta') {
+                    var on = onRun(d);
+                    if (on) { ir(on, {}); } else if (esBC(d)) { anadir({ k: 'bc', a: d, l: p.l }, m); }
+                    return;
+                }
+                if (p.k === 'abre' && (tipo(d) === 'page' || tipo(d) === 'report' || tipo(d) === 'bc-page' || tipo(d) === 'bc-report')) { anadir(p, m); return; }
+                if (p.k === 'escribe' || p.k === 'aviso') { anadir(p, m); }
+            });
+        }
+        // Un botón sin código que abre algo (RunObject): lo que abre o el proceso que lanza.
+        if (!N[accion.id].p) {
+            N[accion.id].e.forEach(function (a) {
+                if (a.k === 'abre' && tipo(a.a) !== 'menu') { anadir({ k: 'abre', a: a.a, l: N[accion.id].l }, accion.id); }
+                if (a.k === 'ejecuta') { var on = onRun(a.a); if (on) { ir(on, {}); } }
+            });
+        }
+        ir(accion.id, {}, accion.rango);
+        return salida;
+    }
+
+    var OPERACION = { 'insert': 'crea registros', 'modify': 'cambia registros', 'modifyall': 'cambia registros', 'delete': 'borra registros', 'deleteall': 'borra registros', 'rename': 'cambia la clave' };
+    function tarjeta(x, n) {
+        var p = x.paso, clase, que, txt, aviso = null;
+        if (p.k === 'aviso' && p.s === 'err') { clase = 'comprueba'; que = '✔ COMPRUEBA'; txt = 'Si no se cumple, se para y el usuario ve:'; aviso = p.t; }
+        else if (p.k === 'aviso' && p.s === 'campo') { clase = 'comprueba'; que = '✔ COMPRUEBA'; txt = 'Que esté relleno el campo «' + p.t + '». Si está vacío, se para.'; }
+        else if (p.k === 'aviso' && p.s === 'qst') { clase = 'pregunta'; que = '? PREGUNTA'; txt = 'Pide confirmación al usuario (si contesta que no, no sigue):'; aviso = p.t; }
+        else if (p.k === 'aviso') { clase = 'mensaje'; que = 'ℹ MENSAJE'; txt = 'El usuario ve:'; aviso = p.t; }
+        else if (p.k === 'escribe') { clase = 'graba'; que = '💾 GRABA'; txt = nombre(p.a) + ': ' + (OPERACION[p.op] || 'graba'); }
+        else if (p.k === 'abre') { clase = 'abre'; que = '↗ ABRE'; txt = (tipo(p.a).indexOf('report') >= 0 ? 'El informe ' : 'La pantalla ') + nombre(p.a); }
+        else { clase = 'bc'; que = '⚙ PROCESO DE BC'; txt = 'Usa el proceso estándar de BC «' + nombre(p.a) + '»'; }
+        var d = h('div', 'paso ' + clase);
+        d.appendChild(h('div', 'num', String(n)));
+        d.appendChild(h('div', 'que', que));
+        d.appendChild(h('div', 'txt', txt));
+        if (aviso) { d.appendChild(h('div', 'aviso', aviso)); }
+        var donde = h('div', 'donde', 'En ' + nombre(N[x.en].o) + ' · ' + nombre(x.en) + ' ');
+        var a = h('a', '', 'ver código ↗');
+        a.href = enlace(x.en, p.l);
+        donde.appendChild(a);
+        d.appendChild(donde);
+        return d;
+    }
+
+    function pintarAccion(caja, accion) {
+        caja.innerHTML = '';
+        var pasosAccion = recorrer(accion);
+        var c = h('div', 'accion');
+        c.appendChild(h('h2', '', accion.texto));
+        var cuenta = { comprueba: 0, pregunta: 0, graba: {}, abre: 0 };
+        pasosAccion.forEach(function (x) {
+            var p = x.paso;
+            if (p.k === 'aviso' && (p.s === 'err' || p.s === 'campo')) { cuenta.comprueba++; }
+            else if (p.k === 'aviso' && p.s === 'qst') { cuenta.pregunta++; }
+            else if (p.k === 'escribe') { cuenta.graba[nombre(p.a)] = true; }
+            else if (p.k === 'abre') { cuenta.abre++; }
+        });
+        var r = h('div', 'resumen');
+        function chipResumen(texto, fondo, color) { var s = h('span', '', texto); s.style.background = fondo; s.style.color = color; r.appendChild(s); }
+        if (cuenta.comprueba) { chipResumen(cuenta.comprueba + (cuenta.comprueba === 1 ? ' comprobación' : ' comprobaciones'), '#dcfce7', '#166534'); }
+        if (cuenta.pregunta) { chipResumen(cuenta.pregunta + (cuenta.pregunta === 1 ? ' pregunta' : ' preguntas'), '#fef9c3', '#854d0e'); }
+        var tablas = Object.keys(cuenta.graba);
+        if (tablas.length) { chipResumen('graba en: ' + tablas.join(', '), '#ffedd5', '#9a3412'); }
+        if (cuenta.abre) { chipResumen('abre ' + cuenta.abre + (cuenta.abre === 1 ? ' pantalla' : ' pantallas'), '#ede9fe', '#5b21b6'); }
+        if (r.childNodes.length) { c.appendChild(r); }
+        if (!pasosAccion.length) {
+            c.appendChild(h('div', 'nada', 'No comprueba, no pregunta y no graba nada en SGA: solo cambia lo que se ve en la pantalla.'));
+        } else {
+            var l = h('div', 'linea');
+            pasosAccion.forEach(function (x, i) { l.appendChild(tarjeta(x, i + 1)); });
+            c.appendChild(l);
+        }
+        caja.appendChild(c);
+        caja.appendChild(h('div', 'leyenda', 'Los pasos van en el orden en que están escritos en el código, entrando en cada función a la que llama. Solo salen los caminos que se pueden ejecutar desde esta acción; cuando algo depende de los datos (si la ubicación está llena, si el producto lleva lote…), el paso sale porque puede pasar. Si algo falla después de grabar, BC deshace lo grabado. Cada paso lleva al código donde se hace.'));
+    }
+
+    // ---- Pantalla, índice y búsqueda -------------------------------------------------------
+    var principal = document.getElementById('principal');
+    function pintarPantalla(pantalla, titulo, accionInicial) {
+        principal.innerHTML = '';
+        principal.appendChild(h('h1', '', titulo || nombre(pantalla)));
+        var sub = h('div', 'sub', '');
+        var mapa = h('a', '', 'Ver en el mapa de llamadas');
+        mapa.href = 'MapaSGA.html#' + pantalla;
+        sub.appendChild(mapa);
+        principal.appendChild(sub);
+        var acciones = tipo(pantalla) === 'suscriptor' ? [{ id: pantalla, texto: nombre(pantalla) }]
+            : tipo(pantalla) === 'codeunit' ? (onRun(pantalla) ? [{ id: onRun(pantalla), texto: 'Al ejecutar' }] : [])
+            : accionesDe(pantalla);
+        var chips = h('div', 'chips'), caja = h('div', '');
+        var botones = [];
+        acciones.forEach(function (a, i) {
+            a.vacia = recorrer(a).length === 0;
+            var b = h('div', 'chip' + (a.vacia ? ' vacia' : ''), a.texto);
+            b.addEventListener('click', function () {
+                botones.forEach(function (x) { x.classList.remove('sel'); });
+                b.classList.add('sel');
+                pintarAccion(caja, a);
+                history.replaceState(null, '', '#' + pantalla + '|' + i);
+            });
+            botones.push(b);
+            chips.appendChild(b);
+        });
+        principal.appendChild(chips);
+        principal.appendChild(caja);
+        if (!acciones.length) { caja.appendChild(h('div', 'nada', 'Esta pantalla no tiene botones ni campos que hagan algo en SGA.')); return; }
+        // Al entrar, la primera acción que hace algo (o la pedida en la dirección).
+        var inicial = accionInicial;
+        if (inicial === undefined) {
+            inicial = 0;
+            for (var i = acciones.length - 1; i >= 0; i--) { if (!acciones[i].vacia) { inicial = i; } }
+        }
+        if (botones[inicial]) { botones[inicial].click(); }
+    }
+
+    var indice = document.getElementById('indice'), items = [];
+    function grupo(titulo, sub) { var g = h('div', 'grupo'); g.appendChild(h('b', '', titulo)); if (sub) { g.appendChild(h('small', '', sub)); } indice.appendChild(g); }
+    function item(texto, destino) {
+        var d = h('div', 'item', texto);
+        d.setAttribute('data-buscar', (texto + ' ' + nombre(destino)).toLowerCase());
+        d.addEventListener('click', function () {
+            items.forEach(function (x) { x.classList.remove('sel'); });
+            d.classList.add('sel');
+            pintarPantalla(destino, texto);
+        });
+        items.push(d);
+        indice.appendChild(d);
+    }
+    // El destino de una opción de menú: la pantalla, el informe o el proceso que lanza. Un proceso
+    // que solo abre una pantalla de SGA (por ejemplo, en modo consulta) lleva a esa pantalla.
+    function destino(m) {
+        var e = N[m].e.filter(function (a) { return a.k === 'abre' || a.k === 'ejecuta'; })[0];
+        if (!e) { return null; }
+        var on = tipo(e.a) === 'codeunit' ? onRun(e.a) : null;
+        if (on) {
+            var pag = N[on].e.filter(function (a) { return a.k === 'llama' && N[a.a] && tipo(N[a.a].o) === 'page'; })[0];
+            if (pag) { return N[pag.a].o; }
+        }
+        return e.a;
+    }
+    var listados = {};
+    N['raiz:perfiles'].e.forEach(function (a) {
+        N[a.a].e.forEach(function (b) {
+            N[b.a].e.forEach(function (c) {
+                if (tipo(c.a) !== 'menu') { return; }
+                grupo(nombre(c.a), nombre(a.a));
+                N[c.a].e.forEach(function (d) {
+                    var x = destino(d.a);
+                    if (!x || esBC(x)) { return; }
+                    item(nombre(d.a), x);
+                    listados[x] = true;
+                });
+            });
+        });
+    });
+    grupo('Pantallas de BC', 'lo que SGA añade a pantallas estándar');
+    N['raiz:bc'].e.forEach(function (a) { item(N[a.a].b || nombre(a.a), a.a); });
+    var otras = N['raiz:busqueda'].e.filter(function (a) { return !listados[a.a]; });
+    if (otras.length) {
+        grupo('Desde la búsqueda de BC', 'pantallas que no están en los menús');
+        otras.forEach(function (a) { item(nombre(a.a), a.a); listados[a.a] = true; });
+    }
+    grupo('Lo que lanza BC', 'SGA reacciona cuando BC…');
+    N['raiz:eventos'].e.forEach(function (a) { item(nombre(a.a), a.a); });
+    // Procesos sin menú: codeunits con OnRun que no lanza nada de SGA (la cola de proyectos).
+    var lanzadas = {};
+    Object.keys(N).forEach(function (id) { N[id].e.forEach(function (a) { if (a.k === 'ejecuta') { lanzadas[a.a] = true; } }); });
+    var cola = Object.keys(N).filter(function (id) { return tipo(id) === 'codeunit' && onRun(id) && !lanzadas[id] && !listados[id]; });
+    if (cola.length) {
+        grupo('Sin menú', 'procesos que se programan en la cola de proyectos');
+        cola.forEach(function (id) { item(nombre(id), id); });
+    }
+
+    document.getElementById('buscar').addEventListener('input', function () {
+        var t = this.value.toLowerCase().trim();
+        items.forEach(function (d) { d.classList.toggle('oculto', t !== '' && d.getAttribute('data-buscar').indexOf(t) < 0); });
+    });
+
+    // Dirección: #pantalla|n abre esa pantalla con su acción n.
+    var hash = decodeURIComponent(location.hash.substring(1)).split('|');
+    if (N[hash[0]]) {
+        var it = items.filter(function (d) { return d.getAttribute('data-buscar').indexOf(nombre(hash[0]).toLowerCase()) >= 0; })[0];
+        if (it) { it.classList.add('sel'); }
+        pintarPantalla(hash[0], it ? it.textContent : undefined, hash[1] !== undefined ? parseInt(hash[1], 10) : undefined);
+    } else {
+        var portada = h('div', 'portada');
+        portada.appendChild(h('h1', '', 'Cómo funciona SGA'));
+        portada.appendChild(h('p', '', 'Elija a la izquierda una opción de menú. Arriba salen sus botones, campos y eventos; al pulsar uno se ve, paso a paso y en orden, lo que comprueba SGA (con el aviso exacto que ve el usuario si algo no se cumple), lo que pregunta, lo que graba y lo que abre.'));
+        portada.appendChild(h('p', '', 'Generado el ' + DATOS.fecha + ' a partir del código de SGA.'));
+        principal.appendChild(portada);
+    }
+})();
+</script>
+</body>
+</html>

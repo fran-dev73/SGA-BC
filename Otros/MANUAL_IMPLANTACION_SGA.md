@@ -130,6 +130,8 @@ Reparte entre las ubicaciones el stock que ya tiene BC. Menú **Configuración**
 4. Al terminar dice cuántas unidades se han ubicado y cuántas se han quedado sin sitio, y sale **Resultado de la carga inicial**. La vista *No cargado* dice qué se ha quedado fuera y por qué.
 5. Se puede relanzar sin riesgo: carga, lote a lote, solo lo que falta (stock de BC menos lo ya ubicado y menos lo pendiente en albaranes y ensamblados), lo mismo que enseña **Pendiente de ubicar**.
 
+Con el almacén lleno, que no se puede vaciar para que la carga lo reparta, el stock se da de alta donde ya está, palé a palé desde la PDA, con **Alta de stock SGA** (manual de usuario, apartado 4). No limita la cantidad a lo pendiente de ubicar: lo que no cuadre con BC sale en la **Conciliación**.
+
 ## 8. Empezar de cero
 
 **Inicializar contenido** (solo responsables) deja el almacén sin nada ubicado: borra el contenido, los movimientos de ubicación y las órdenes de picking sin terminar. Las ubicaciones y el stock de BC no cambian. Con **Eliminar también las ubicaciones** borra además los huecos del almacén entero. No se puede deshacer.

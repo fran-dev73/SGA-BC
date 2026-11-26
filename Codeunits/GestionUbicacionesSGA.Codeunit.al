@@ -125,7 +125,6 @@ codeunit 51101 "Gestion Ubicaciones SGA"
         vacias: Integer;
         llenas: Integer;
         bloqueadas: Integer;
-        ResumenLbl: Label '%1 ubicaciones: %2 vacías, %3 llenas, %4 bloqueadas.', Comment = '%1 = total, %2 = vacías, %3 = llenas, %4 = bloqueadas';
     begin
         rUbicacionSGA.SetRange("Cod. Almacen", prm_Almacen);
         if prm_Zona <> '' then
@@ -138,7 +137,18 @@ codeunit 51101 "Gestion Ubicaciones SGA"
         rUbicacionSGA.SetRange("Estado SGA", rUbicacionSGA."Estado SGA"::Bloqueada);
         bloqueadas := rUbicacionSGA.Count();
 
-        exit(StrSubstNo(ResumenLbl, total, vacias, llenas, bloqueadas));
+        exit(TextoResumen(total, vacias, llenas, bloqueadas));
+    end;
+
+    /// <summary>
+    /// El texto de ResumenUbicaciones con las cuentas ya hechas: el mapa 3D las cuenta mientras
+    /// lee las ubicaciones, sin volver a la base de datos.
+    /// </summary>
+    procedure TextoResumen(prm_Total: Integer; prm_Vacias: Integer; prm_Llenas: Integer; prm_Bloqueadas: Integer): Text
+    var
+        ResumenLbl: Label '%1 ubicaciones: %2 vacías, %3 llenas, %4 bloqueadas.', Comment = '%1 = total, %2 = vacías, %3 = llenas, %4 = bloqueadas';
+    begin
+        exit(StrSubstNo(ResumenLbl, prm_Total, prm_Vacias, prm_Llenas, prm_Bloqueadas));
     end;
 
     /// <summary>
@@ -416,15 +426,29 @@ codeunit 51101 "Gestion Ubicaciones SGA"
     /// </summary>
     procedure ComprobarCodigoUbicacion(prm_Codigo: Code[20])
     var
+        motivo: Text;
+    begin
+        if not CodigoUbicacionValido(prm_Codigo, motivo) then
+            Error(motivo);
+    end;
+
+    /// <summary>
+    /// La regla de ComprobarCodigoUbicacion sin dar error, para quien avisa de otra forma (la
+    /// PDA): devuelve si el código tiene el formato y, si no, en prm_Motivo el texto del aviso.
+    /// </summary>
+    procedure CodigoUbicacionValido(prm_Codigo: Code[20]; var prm_Motivo: Text): Boolean
+    var
         pasillo: Integer;
         estanteria: Integer;
         altura: Integer;
         CodigoUbicacionErr: Label 'El código %1 no es válido. Tiene que ser pasillo-estantería-altura: pasillo de 001 a 999, estantería de 01 a 99 y altura de 00 a 99 (por ejemplo 101-15-10).', Comment = '%1 = código tecleado';
     begin
-        if not TrocearCodigo(prm_Codigo, pasillo, estanteria, altura) then
-            Error(CodigoUbicacionErr, prm_Codigo);
-        if (pasillo < 1) or (estanteria < 1) then
-            Error(CodigoUbicacionErr, prm_Codigo);
+        prm_Motivo := '';
+        if TrocearCodigo(prm_Codigo, pasillo, estanteria, altura) then
+            if (pasillo >= 1) and (estanteria >= 1) then
+                exit(true);
+        prm_Motivo := StrSubstNo(CodigoUbicacionErr, prm_Codigo);
+        exit(false);
     end;
 
     /// <summary>
@@ -685,11 +709,8 @@ codeunit 51101 "Gestion Ubicaciones SGA"
         motivo: Text;
         hueco: Code[20];
         MaxLineasReparto: Integer;
-        LoteObligatorioErr: Label 'El producto %1 lleva lotes: indique el lote que va a ubicar.', Comment = '%1 = producto';
     begin
-        // Con lotes de BC hay que saber de qué lote es: en blanco se mezclarían todos.
-        if (prm_Lote = '') and cStock.LoteEstandar(prm_Producto) then
-            Error(LoteObligatorioErr, prm_Producto);
+        cStock.TestLoteIndicado(prm_Producto, prm_Lote);
         MaxLineasReparto := 200;
         // El tope corta el reparto al crearlo, por si una cantidad desorbitada o una unidad mal
         // configurada diera miles de palés.

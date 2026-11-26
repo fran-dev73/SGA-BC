@@ -69,6 +69,10 @@ page 51104 "Movs. Ubicacion SGA"
                     ToolTip = 'Descripción del producto movido.';
                     ApplicationArea = All;
                 }
+                field("Grupo IIEE"; Rec."Grupo IIEE")
+                {
+                    ApplicationArea = All;
+                }
                 field("No. Lote"; Rec."No. Lote")
                 {
                     ToolTip = 'Lote movido.';

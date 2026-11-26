@@ -55,6 +55,22 @@ page 51117 "Ubicar Producto SGA"
                     TableRelation = Item;
                     ShowMandatory = true;
 
+                    // La lista solo trae los productos con algo pendiente de ubicar en el almacén.
+                    trigger OnLookup(var Text: Text): Boolean
+                    var
+                        rItem: Record Item;
+                        cStock: Codeunit "Consulta Stock SGA";
+                        IndiqueAlmacenErr: Label 'Indique primero el almacén.';
+                    begin
+                        if Almacen = '' then
+                            Error(IndiqueAlmacenErr);
+                        cStock.MarcarPendientesUbicar(Almacen, rItem);
+                        if Page.RunModal(Page::"Item Lookup", rItem) <> Action::LookupOK then
+                            exit(false);
+                        Text := rItem."No.";
+                        exit(true);
+                    end;
+
                     trigger OnValidate()
                     var
                         cStock: Codeunit "Consulta Stock SGA";

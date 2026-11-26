@@ -17,11 +17,15 @@ codeunit 51102 "Gestion Mapa SGA"
     /// Rellena el buffer de la rejilla con las ubicaciones del almacén y devuelve la última
     /// estantería encontrada, para que la página avise si no caben todas.
     /// El buffer lo pasa la página: es temporal y cada página tiene su propia instancia.
+    /// Con prm_GrupoIIEE, las ubicaciones con algún producto de ese grupo se marcan (◆ y su
+    /// color) y las demás se apagan; en prm_ConGrupo, cuántas lo tienen.
     /// </summary>
-    procedure ConstruirMapa(var prm_Buffer: Record "Buffer Mapa SGA"; prm_Almacen: Code[10]) maxEstanteriaEncontrada: Integer
+    procedure ConstruirMapa(var prm_Buffer: Record "Buffer Mapa SGA"; prm_Almacen: Code[10]; prm_GrupoIIEE: Code[20]; var prm_ConGrupo: Integer) maxEstanteriaEncontrada: Integer
     var
         rUbicacionSGA: Record "Ubicacion SGA";
         productoUnico: Dictionary of [Code[20], Code[20]];
+        conGrupo: List of [Code[20]];
+        MarcaGrupoTok: Label '◆ ', Locked = true;
         pasillo: Integer;
         estanteria: Integer;
         altura: Integer;
@@ -30,6 +34,7 @@ codeunit 51102 "Gestion Mapa SGA"
     begin
         prm_Buffer.Reset();
         prm_Buffer.DeleteAll();
+        prm_ConGrupo := 0;
 
         if prm_Almacen = '' then
             exit(0);
@@ -42,6 +47,10 @@ codeunit 51102 "Gestion Mapa SGA"
         if not rUbicacionSGA.FindSet() then
             exit(0);
         LeerProductoUnico(prm_Almacen, productoUnico);
+        if prm_GrupoIIEE <> '' then begin
+            LeerUbicacionesConGrupo(prm_Almacen, prm_GrupoIIEE, conGrupo);
+            prm_ConGrupo := conGrupo.Count();
+        end;
 
         repeat
             if cUbicaciones.TrocearCodigo(rUbicacionSGA."Cod. Bin", pasillo, estanteria, altura) then begin
@@ -53,6 +62,11 @@ codeunit 51102 "Gestion Mapa SGA"
                 if estanteria <= MaximoColumnasRejilla() then begin
                     SituarFila(prm_Buffer, prm_Almacen, pasillo, altura);
                     Pintar(rUbicacionSGA, productoUnico, resumen, estilo);
+                    if prm_GrupoIIEE <> '' then
+                        if conGrupo.Contains(rUbicacionSGA."Cod. Bin") then
+                            resumen := MarcaGrupoTok + resumen
+                        else
+                            estilo := 'Subordinate';
                     prm_Buffer.FijarColumna(estanteria, resumen, estilo);
                     prm_Buffer.Modify();
                 end;
@@ -87,6 +101,7 @@ codeunit 51102 "Gestion Mapa SGA"
     /// Devuelve las ubicaciones del almacén en JSON, para el mapa 3D.
     /// Cada elemento lleva las coordenadas físicas que el lienzo necesita para colocar el
     /// cubo y el estado con el que lo pinta:
+    /// Lo vacío o a cero no va (d, z, ch, l): el lienzo lo toma como vacío o 0.
     ///   b = código de ubicación, d = descripción, z = zona,
     ///   e = pasillo, c = estantería, a = altura (los tres como número),
     ///   s = estado (0 vacía, 1 parcial, 2 llena, 3 bloqueada, 4 con contenido sin medir),
@@ -94,28 +109,31 @@ codeunit 51102 "Gestion Mapa SGA"
     ///   ha ubicado),
     ///   o = % de ocupación, redondeado hacia abajo (-1 si no se puede medir),
     ///   m = por qué no se puede medir (solo si no se puede),
-    ///   l = líneas de contenido y, solo si tiene, k, pp, fc y r (ver LeerContenidos);
+    ///   l = líneas de contenido y, solo si tiene, k, pp, gi, fc y r (ver LeerContenidos);
     ///   ch = clase del hueco por su posición (1 A, 2 B, 3 C, 0 si no es hueco útil),
     ///   f = 1 si es fondo de pasillo (solo si lo es).
     /// Las dos clases son del cálculo ABC prm_NoCalculoABC (0 = el último del almacén).
     /// Las claves son cortas porque el JSON viaja entero al navegador y un almacén grande
     /// son más de mil ubicaciones. Con prm_Pasillo distinto de 0, solo las de ese pasillo.
+    /// En prm_Resumen, el de ResumenUbicaciones del almacén y la zona: sin pasillo se cuenta con
+    /// las mismas ubicaciones que se leen; con pasillo se pide aparte.
     ///
     /// El % se redondea hacia abajo para que no diga 100 % de una ubicación que aún tiene
     /// hueco. No se puede medir sin capacidad declarada, ni si algún producto de dentro no tiene
     /// palé en su ficha: su contenido se contaría en unidades base como si cada una fuera un palé.
     /// </summary>
-    procedure DatosMapa3D(prm_Almacen: Code[10]; prm_Zona: Code[10]; prm_Pasillo: Integer; prm_NoCalculoABC: Integer): Text
+    procedure DatosMapa3D(prm_Almacen: Code[10]; prm_Zona: Code[10]; prm_Pasillo: Integer; prm_NoCalculoABC: Integer; var prm_Resumen: Text): Text
     var
         rUbicacionSGA: Record "Ubicacion SGA";
-        cABC: Codeunit "Analisis ABC SGA";
         lista: JsonArray;
         elemento: JsonObject;
         contenidos: Dictionary of [Code[20], JsonObject];
         sinPale: Dictionary of [Code[20], Text];
-        clasesABC: Dictionary of [Code[20], Integer];
-        clasesHueco: Dictionary of [Code[20], Integer];
         filtroPasillo: Text;
+        total: Integer;
+        vacias: Integer;
+        llenas: Integer;
+        bloqueadas: Integer;
         salida: Text;
         motivoSinMedir: Text;
         claseHueco: Integer;
@@ -138,35 +156,51 @@ codeunit 51102 "Gestion Mapa SGA"
         if filtroPasillo <> '' then
             rUbicacionSGA.SetFilter("Cod. Bin", filtroPasillo);
         rUbicacionSGA.SetLoadFields("Cod. Bin", Descripcion, "Cod. Zona SGA", Fondo, "Capacidad Uds.", "Estado SGA", "% Ocupacion", "Reservada Por", "Reservada Para");
-        if not rUbicacionSGA.FindSet() then
+        // El resumen de un pasillo no sirve: es el del almacén (y zona), que se cuenta aparte.
+        if prm_Pasillo <> 0 then
+            prm_Resumen := cUbicaciones.ResumenUbicaciones(prm_Almacen, prm_Zona);
+        if not rUbicacionSGA.FindSet() then begin
+            if prm_Pasillo = 0 then
+                prm_Resumen := cUbicaciones.TextoResumen(0, 0, 0, 0);
             exit('[]');
+        end;
 
         // La clase de cada producto y la de cada hueco por su posición, y el contenido de todas
         // las ubicaciones, se leen una vez para todo el mapa.
-        cABC.ClasesDeCalculo(prm_Almacen, prm_NoCalculoABC, clasesABC, clasesHueco);
-        LeerContenidos(prm_Almacen, prm_Zona, filtroPasillo, clasesABC, contenidos, sinPale);
+        LeerClasesABC(prm_Almacen, prm_NoCalculoABC);
+        LeerContenidos(prm_Almacen, prm_Zona, filtroPasillo, ClasesABC, contenidos, sinPale);
 
         repeat
+            // Sin pasillo, el resumen sale de lo que se está leyendo (todas, se dibujen o no).
+            total += 1;
+            case rUbicacionSGA."Estado SGA" of
+                rUbicacionSGA."Estado SGA"::Vacia:
+                    vacias += 1;
+                rUbicacionSGA."Estado SGA"::Llena:
+                    llenas += 1;
+                rUbicacionSGA."Estado SGA"::Bloqueada:
+                    bloqueadas += 1;
+            end;
             // Sin pasillo, estantería y altura no hay dónde colocar el cubo.
             if cUbicaciones.TrocearCodigo(rUbicacionSGA."Cod. Bin", pasillo, estanteria, altura) then begin
                 // Con contenido, el elemento ya trae lo que hay dentro (LeerContenidos).
+                // Lo vacío o a cero no se manda (el lienzo lo toma así): un almacén grande son
+                // miles de elementos. Sin "l", la ubicación no tiene contenido y el lienzo no deja
+                // arrastrar un traslado desde ella.
                 conContenido := contenidos.Get(rUbicacionSGA."Cod. Bin", elemento);
-                if not conContenido then begin
+                if not conContenido then
                     Clear(elemento);
-                    // Líneas de contenido: el lienzo solo deja arrastrar un traslado desde
-                    // una ubicación que tenga algo, y el color no basta (bloqueada tapa a llena).
-                    elemento.Add('l', 0);
-                end;
                 elemento.Add('b', rUbicacionSGA."Cod. Bin");
-                elemento.Add('d', rUbicacionSGA.Descripcion);
-                elemento.Add('z', rUbicacionSGA."Cod. Zona SGA");
+                if rUbicacionSGA.Descripcion <> '' then
+                    elemento.Add('d', rUbicacionSGA.Descripcion);
+                if rUbicacionSGA."Cod. Zona SGA" <> '' then
+                    elemento.Add('z', rUbicacionSGA."Cod. Zona SGA");
                 elemento.Add('e', pasillo);
                 elemento.Add('c', estanteria);
                 elemento.Add('a', altura);
-                // Clase del hueco por su posición (1 A, 2 B, 3 C; 0 si no es hueco útil).
-                if not clasesHueco.Get(rUbicacionSGA."Cod. Bin", claseHueco) then
-                    claseHueco := 0;
-                elemento.Add('ch', claseHueco);
+                // Clase del hueco por su posición (1 A, 2 B, 3 C; sin ella, no es hueco útil).
+                if ClasesHueco.Get(rUbicacionSGA."Cod. Bin", claseHueco) then
+                    elemento.Add('ch', claseHueco);
                 if rUbicacionSGA.Fondo then
                     elemento.Add('f', 1);
                 motivoSinMedir := '';
@@ -187,6 +221,8 @@ codeunit 51102 "Gestion Mapa SGA"
             end;
         until rUbicacionSGA.Next() = 0;
 
+        if prm_Pasillo = 0 then
+            prm_Resumen := cUbicaciones.TextoResumen(total, vacias, llenas, bloqueadas);
         lista.WriteTo(salida);
         exit(salida);
     end;
@@ -199,9 +235,9 @@ codeunit 51102 "Gestion Mapa SGA"
     ///
     /// Por cada ubicación con contenido deja en prm_Contenidos el principio de su elemento:
     ///   l = líneas, k = las primeras líneas (ver LineaMapa) y, de todas ellas, pp = productos
-    ///   (sin repetir, para buscar), fc = caducidad más próxima (aaaa-mm-dd, vacía si ninguna
-    ///   lleva) y r = mejor clase ABC de sus productos según prm_ClasesABC (1 A, 2 B, 3 C,
-    ///   0 sin clase).
+    ///   (sin repetir, para buscar), gi = Grupos IIEE de sus productos (sin repetir, los que
+    ///   tienen), fc = caducidad más próxima (aaaa-mm-dd, vacía si ninguna lleva) y r = mejor
+    ///   clase ABC de sus productos según prm_ClasesABC (1 A, 2 B, 3 C, 0 sin clase).
     /// Y en prm_SinPale, si algún producto de dentro no tiene palé en su ficha, por qué no se
     /// puede medir en palés (el primero que falla).
     ///
@@ -215,7 +251,9 @@ codeunit 51102 "Gestion Mapa SGA"
         grupo: JsonObject;
         lineas: JsonArray;
         productos: JsonArray;
+        gruposIIEE: JsonArray;
         vistos: List of [Code[20]];
+        vistosGrupo: List of [Code[20]];
         ubicacion: Code[20];
         umPale: Code[10];
         factorPale: Decimal;
@@ -236,7 +274,7 @@ codeunit 51102 "Gestion Mapa SGA"
         if prm_FiltroPasillo <> '' then
             rContenido.SetFilter("Cod. Bin", prm_FiltroPasillo);
         rContenido.SetLoadFields("Cod. Bin", "No. Producto", "No. Lote", "Cod. Unidad Medida", "Cantidad Base", "Fecha Caducidad", Bloqueado);
-        rContenido.SetAutoCalcFields(Descripcion);
+        rContenido.SetAutoCalcFields(Descripcion, "Grupo IIEE");
         if not rContenido.FindSet() then
             exit;
 
@@ -257,6 +295,10 @@ codeunit 51102 "Gestion Mapa SGA"
                     if not cUM.LeerPale(rContenido."No. Producto", umPale, factorPale) then
                         prm_SinPale.Add(ubicacion, StrSubstNo(SinPaleLbl, rContenido."No. Producto"));
             end;
+            if (rContenido."Grupo IIEE" <> '') and not vistosGrupo.Contains(rContenido."Grupo IIEE") then begin
+                vistosGrupo.Add(rContenido."Grupo IIEE");
+                gruposIIEE.Add(rContenido."Grupo IIEE");
+            end;
             if rContenido."Fecha Caducidad" <> 0D then
                 if (caducidad = 0D) or (rContenido."Fecha Caducidad" < caducidad) then
                     caducidad := rContenido."Fecha Caducidad";
@@ -267,6 +309,7 @@ codeunit 51102 "Gestion Mapa SGA"
                 grupo.Add('l', numLineas);
                 grupo.Add('k', lineas);
                 grupo.Add('pp', productos);
+                grupo.Add('gi', gruposIIEE);
                 if caducidad <> 0D then
                     grupo.Add('fc', Format(caducidad, 0, 9))
                 else
@@ -277,6 +320,8 @@ codeunit 51102 "Gestion Mapa SGA"
                 Clear(lineas);
                 Clear(productos);
                 Clear(vistos);
+                Clear(gruposIIEE);
+                Clear(vistosGrupo);
                 numLineas := 0;
                 caducidad := 0D;
                 claseABC := 0;
@@ -389,6 +434,24 @@ codeunit 51102 "Gestion Mapa SGA"
     end;
 
     /// <summary>
+    /// Las ubicaciones del almacén con algún producto del Grupo IIEE (el de la ficha del
+    /// producto, FlowField del contenido), en una lectura.
+    /// </summary>
+    local procedure LeerUbicacionesConGrupo(prm_Almacen: Code[10]; prm_GrupoIIEE: Code[20]; var prm_Ubicaciones: List of [Code[20]])
+    var
+        rContenido: Record "Contenido Ubicacion SGA";
+    begin
+        rContenido.SetRange("Cod. Almacen", prm_Almacen);
+        rContenido.SetRange("Grupo IIEE", prm_GrupoIIEE);
+        rContenido.SetLoadFields("Cod. Bin");
+        if rContenido.FindSet() then
+            repeat
+                if not prm_Ubicaciones.Contains(rContenido."Cod. Bin") then
+                    prm_Ubicaciones.Add(rContenido."Cod. Bin");
+            until rContenido.Next() = 0;
+    end;
+
+    /// <summary>
     /// Texto y color de la celda de una ubicación, con "Lineas Contenido" ya calculado y el
     /// producto de cada ubicación (LeerProductoUnico).
     /// </summary>
@@ -423,8 +486,37 @@ codeunit 51102 "Gestion Mapa SGA"
         end;
     end;
 
+    /// <summary>
+    /// Deja en ClasesABC y ClasesHueco las clases del cálculo ABC prm_NoCalculo del almacén (0 =
+    /// el último). Se leen una vez por instancia: el mapa 3D guarda la suya mientras está
+    /// abierto, y repintar tras un traslado o un vaciado no vuelve a clasificar todos los huecos.
+    /// Un cálculo nuevo es otro número y se lee.
+    /// </summary>
+    local procedure LeerClasesABC(prm_Almacen: Code[10]; prm_NoCalculo: Integer)
+    var
+        rCalculo: Record "Calculo ABC SGA";
+        cABC: Codeunit "Analisis ABC SGA";
+        noCalculo: Integer;
+    begin
+        noCalculo := prm_NoCalculo;
+        if noCalculo = 0 then
+            noCalculo := rCalculo.UltimoDelAlmacen(prm_Almacen);
+        if ClasesLeidas and (ClasesAlmacen = prm_Almacen) and (ClasesCalculo = noCalculo) then
+            exit;
+        cABC.ClasesDeCalculo(prm_Almacen, noCalculo, ClasesABC, ClasesHueco);
+        ClasesAlmacen := prm_Almacen;
+        ClasesCalculo := noCalculo;
+        ClasesLeidas := true;
+    end;
+
     var
         cUbicaciones: Codeunit "Gestion Ubicaciones SGA";
         // Una instancia para toda la carga: guarda lo leído de cada producto.
         cUM: Codeunit "Unidades Producto SGA";
+        // Clases ABC ya leídas (LeerClasesABC): de qué almacén y cálculo son.
+        ClasesABC: Dictionary of [Code[20], Integer];
+        ClasesHueco: Dictionary of [Code[20], Integer];
+        ClasesAlmacen: Code[10];
+        ClasesCalculo: Integer;
+        ClasesLeidas: Boolean;
 }

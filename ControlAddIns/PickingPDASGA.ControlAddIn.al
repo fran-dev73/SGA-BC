@@ -7,8 +7,11 @@ namespace AntonioNadal.SGA;
 /// confirmar. Funciona igual en el navegador.
 ///
 /// No decide nada: AL le manda la parada con Mostrar y ella devuelve lo que hace el
-/// preparador (lecturas, cantidad y botones). Toda la lógica sigue en la página
-/// "Preparar Picking SGA" y en Cod. "Gestion Picking SGA".
+/// preparador (lecturas, cantidad, datos tecleados y botones). Toda la lógica sigue en la
+/// página "Preparar Picking SGA" y en Cod. "Gestion Picking SGA".
+///
+/// La misma pantalla sirve para el alta de stock en la PDA (página "Alta Stock PDA SGA"): con
+/// "modo" = 'alta' en los datos pinta la ubicación, el palé, la lectura y la cantidad del alta.
 /// </summary>
 controladdin "Picking PDA SGA"
 {
@@ -49,7 +52,14 @@ controladdin "Picking PDA SGA"
     event Cantidad(prm_Valor: Text);
 
     /// <summary>
-    /// Botón pulsado: confirmar, saltar, sinstock o siguiente (buscar otra orden).
+    /// Dato tecleado en una casilla que no es la lectura ni la cantidad: prm_Campo dice cuál
+    /// (en el alta de stock, 'lote').
+    /// </summary>
+    event Dato(prm_Campo: Text; prm_Valor: Text);
+
+    /// <summary>
+    /// Botón pulsado: confirmar, saltar, sinstock o siguiente (buscar otra orden); en el alta de
+    /// stock, aceptar, producto (elegirlo de la lista) o unidad:CÓDIGO.
     /// </summary>
     event Accion(prm_Accion: Text);
 }

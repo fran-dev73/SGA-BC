@@ -4,13 +4,20 @@ using Microsoft.Inventory.Item;
 
 /// <summary>
 /// PageExtension Item Card SGA (ID 51100) extends Page "Item Card".
-/// Añade a la ficha de producto el factbox con las ubicaciones en las que está y el
-/// acceso a la consulta de localización.
+/// Añade a la ficha de producto las existencias SGA, al lado de las de BC, el factbox con las
+/// ubicaciones en las que está y el acceso a la consulta de localización.
 /// </summary>
 pageextension 51100 "Item Card SGA" extends "Item Card"
 {
     layout
     {
+        addafter(Inventory)
+        {
+            field("Stock SGA"; Rec."Stock SGA")
+            {
+                ApplicationArea = All;
+            }
+        }
         addlast(factboxes)
         {
             part(UbicacionesSGAFactBox; "Ubicaciones Producto FactBox")
